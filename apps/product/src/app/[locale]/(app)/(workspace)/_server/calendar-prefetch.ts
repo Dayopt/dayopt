@@ -50,7 +50,6 @@ export async function prefetchCalendarData(view: CalendarViewType, dateParam: st
       helpers.plans.list.prefetch(listInput),
       helpers.records.list.prefetch(listInput),
       helpers.externalCalendar.listEvents.prefetch(buildCalendarRangeInput(rangeOptions)),
-      helpers.statistics.getActivityStats.prefetch(),
     ]);
   } catch (error) {
     // 認証エラー（UNAUTHORIZED）等の場合はprefetchをスキップ

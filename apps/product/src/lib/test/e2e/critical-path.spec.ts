@@ -66,9 +66,24 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
 
   await page.mouse.move(x, yFrom);
   await page.mouse.down();
-  // mousemove は rAF スロットルされるため中間 move を挟んで hasDragged を確定させる
-  await page.mouse.move(x, yFrom + 24, { steps: 4 });
-  await page.mouse.move(x, yTo, { steps: 8 });
+  // mouse-down / selection 更新で global listener が effect から再設定される。
+  // 次のイベントを同じ描画内に送り、保留 rAF を cleanup で消させない。
+  const settleDragFrame = () =>
+    page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+  await settleDragFrame();
+  const preview = page.locator('[data-drag-selection-preview]');
+  // 終端を1回送る（5px超なのでこの move で drag が成立）。未反映の selection を
+  // mouseup で確定し、短い Record のまま後段の Report だけが落ちるのを防ぐ。
+  await page.mouse.move(x, yTo);
+  await expect(preview).toContainText(
+    `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourTo).padStart(2, '0')}:00`,
+  );
+  await settleDragFrame();
   await page.mouse.up();
 }
 
@@ -140,6 +155,20 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       createPanel.getByRole('button', { name: ACTIVITY_NAME }),
       'record',
     );
+
+    // Report の期待値の前提を実 DB で確認する。HTTP 成功やカード存在だけでは
+    // 座標操作が短い選択を保存した場合に、集計失敗と区別できない。
+    const { data: savedRecords, error: recordsError } = await adminSupabase
+      .from('records')
+      .select('start_at,end_at')
+      .eq('user_id', IDENTITY.userId);
+    expect(recordsError).toBeNull();
+    expect(savedRecords).toHaveLength(1);
+    expect(
+      new Date(savedRecords![0]!.end_at!).getTime() -
+        new Date(savedRecords![0]!.start_at!).getTime(),
+      'Report が集計する保存済み Record は60分であること',
+    ).toBe(60 * 60 * 1000);
 
     // Record レーンにカードが現れる（lane カードはアクティビティ名を表示する）
     const recordCard = page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME }).first();

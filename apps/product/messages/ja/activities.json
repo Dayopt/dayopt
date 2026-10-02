@@ -34,7 +34,9 @@
       "activityDescription": "この操作は取り消せません。関連する {count} 件の予定・記録は削除されず、アクティビティなしになります。",
       "activityDescriptionEmpty": "この操作は取り消せません。関連する予定・記録はありません。",
       "categoryDescription": "この操作は取り消せません。所属する {count} 件のアクティビティは削除されず、未分類になります。",
-      "categoryDescriptionEmpty": "この操作は取り消せません。所属するアクティビティはありません。"
+      "categoryDescriptionEmpty": "この操作は取り消せません。所属するアクティビティはありません。",
+      "activityDescriptionUnknown": "この操作は取り消せません。関連する予定・記録は削除されず、アクティビティなしになります。",
+      "categoryDescriptionUnknown": "この操作は取り消せません。所属するアクティビティは削除されず、未分類になります。"
     },
     "undo": "元に戻す"
   }

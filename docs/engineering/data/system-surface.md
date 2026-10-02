@@ -335,7 +335,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `review.getReportPeriod`                     | 1                   | 0                   |
 | `review.trackOpened`                         | 1                   | 0                   |
 | `statistics.getActivityEstimationFactors`    | 1                   | 0                   |
-| `statistics.getActivityStats`                | 3                   | 0                   |
+| `statistics.getActivityStats`                | 2                   | 0                   |
 | `statistics.getMcpReview`                    | 0                   | 1                   |
 | `statistics.getTagEstimationFactors`         | 0                   | 0                   |
 | `timeblockContext.getConstraints`            | 0                   | 1                   |
@@ -559,4 +559,4 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
 | `settings`          | 49     | 42        | 22        | 18 / 22                |
-| `timeblock`         | 99     | 58        | 20        | 14 / 20                |
+| `timeblock`         | 99     | 59        | 20        | 14 / 20                |

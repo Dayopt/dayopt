@@ -157,6 +157,14 @@ export function buildProductCallGraph(
     ),
     mcpToolFiles,
     pageFiles,
+    // CalendarSidebar は workspace layout 経由でマウントされるため page import だけでは
+    // 辿れない。即時作成と一覧が共有する統計 hook を Calendar に明示的に帰属させる。
+    sharedPageHookFiles: new Map([
+      [
+        '/[locale]/calendar',
+        ['apps/product/src/features/timeblock/hooks/useActivityMedianDurations.ts'],
+      ],
+    ]),
   });
 }
 
