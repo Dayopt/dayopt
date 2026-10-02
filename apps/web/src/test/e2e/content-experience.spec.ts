@@ -143,6 +143,25 @@ test('未知のガイドは404を返し、ホームへ戻れる', async ({ page 
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
 });
 
+test('現在の文面では全文字フォントを読み込まず、任意入力の字形は補える', async ({ page }) => {
+  const fullFontRequests: string[] = [];
+  page.on('request', (request) => {
+    if (/\/fonts\/NotoSansJP-full-.*\.woff2/.test(request.url()))
+      fullFontRequests.push(request.url());
+  });
+  await page.goto('/ja/contact');
+  await page.evaluate(() => document.fonts.ready);
+  expect(fullFontRequests).toHaveLength(0);
+  const fontResponse = page.waitForResponse((response) =>
+    /\/fonts\/NotoSansJP-full-.*\.woff2/.test(response.url()),
+  );
+  const name = page.locator('input[name="name"]');
+  await name.fill('龍');
+  expect((await fontResponse).status()).toBe(200);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(name).toHaveValue('龍');
+});
+
 test('JavaScript無効でもモバイルのガイドとBlogの登録導線が成立する', async ({
   browser,
 }, testInfo) => {

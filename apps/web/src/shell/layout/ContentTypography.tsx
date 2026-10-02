@@ -1,17 +1,11 @@
-import { Noto_Sans_JP } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import '../../styles/fonts/japanese-content.css';
+import '../../styles/fonts/japanese-full.css';
 import './ContentTypography.css';
 
-// LP の共通文言は root の subset で網羅する。本文・検索結果・入力文字には
-// 既存の全文字フォントも必要なので、この定義を各 content route で読み込む。
-const fullJapanese = Noto_Sans_JP({
-  subsets: ['latin'],
-  weight: 'variable',
-  display: 'swap',
-  preload: false,
-});
+// 現在の本文は subset、その他の文字は同じ書体の full face で補う。
+// 大量の Unicode-range 宣言を含む stylesheet を初期描画から外す。
 
 export function ContentTypography({
   children,
@@ -24,7 +18,8 @@ export function ContentTypography({
     <div
       className={className}
       style={{
-        fontFamily: `var(--font-latin), var(--font-noto-jp-subset), "Dayopt Content JP", ${fullJapanese.style.fontFamily}, var(--font-stack-sans)`,
+        fontFamily:
+          'var(--font-latin), var(--font-noto-jp-subset), "Dayopt Content JP", "Dayopt Content JP Full", var(--font-stack-sans)',
       }}
     >
       {children}

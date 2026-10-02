@@ -7,8 +7,11 @@ uses the same 400 / 500 instances as before; their glyph outlines and advance
 widths are preserved. Content routes (docs, blog, legal, contact, search) additionally
 load a variable subset containing the characters in current MDX and messages.
 This avoids dozens of separate Unicode-range font requests for a reading page.
-The existing full Japanese Google font remains the fallback for other characters,
-including arbitrary search queries and form input. The content subset is generated
+The remaining glyphs of that same Japanese font are one deferred local fallback,
+including arbitrary search queries and form input. Disjoint, compact Unicode
+ranges ensure it is requested only for characters absent from the current copy,
+instead of shipping Google's large range stylesheet on every content page.
+The content subset is generated
 alongside the other subsets, with the same glyph and metrics checks, and loaded
 only by ContentTypography. It is not preloaded on the LP.
 The LP covers its current localized copy with the subsets and does not load the
