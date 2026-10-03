@@ -34,7 +34,7 @@ flowchart TD
   n7 -->|"応答"| n8
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 8・失敗 6 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 8・失敗 7 種。
 
 #### この経路を守るテスト
 
@@ -195,13 +195,27 @@ restore_plan_command_v1 / restore_record_command_v1 を呼ぶ。削除済みの�
 <details>
 <summary>⚡ 戻す位置に別の Plan / Record ができていた（23P01） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
 
-- 画面: 「復元できませんでした。もう一度お試しください」のトースト。重なりが理由だとは出ない。
+- 画面: 「この時間帯には既に記録があります」のトースト。
 - データ: 変化なし。削除済みのまま。
 - 再試行: しない。もう一度押しても同じ。
 - 痕跡: 想定内（TIME_OVERLAP）なので Sentry には出ない。
 - **最初に見る場所**: 同じ時間帯の行。MCP の trash から探して、時間帯を空けてから戻す。
 - 根拠:
-  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const reportRestoreError = () => toast.error(t('toast.restoreFailed'));` を探す
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const reportRestoreError = (error: unknown) =>` を探す
+
+</details>
+
+<details>
+<summary>⚡ 再取り込み後に古い外部予定を復元しようとした（EXTERNAL_CALENDAR_ALREADY_CONVERTED） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
+
+- 画面: 「同じ外部予定を取り込み済みのため、復元できません」のトースト。
+- データ: 新しい有効行を保ち、古い行は削除済みのまま。
+- 再試行: しない。新しい行を自動で置き換えない。
+- 痕跡: 想定内の競合なので Sentry には出ない。
+- **最初に見る場所**: 同じ external_calendar_event_id を参照する有効な Plan / Record。
+- 根拠:
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `getTimeblockServiceCode(error) === 'EXTERNAL_CALENDAR_ALREADY_CONVERTED'` を探す
+  - [`supabase/migrations/20260930014002_prevent_duplicate_external_calendar_conversion.sql`](../../../supabase/migrations/20260930014002_prevent_duplicate_external_calendar_conversion.sql) で `CREATE UNIQUE INDEX plans_active_external_event_unique` を探す
 
 </details>
 
@@ -675,7 +689,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
         {
           "id": "restore-overlap",
           "label": "戻す位置に別の Plan / Record ができていた（23P01）",
-          "screen": "「復元できませんでした。もう一度お試しください」のトースト。重なりが理由だとは出ない。",
+          "screen": "「この時間帯には既に記録があります」のトースト。",
           "data": "変化なし。削除済みのまま。",
           "retry": "しない。もう一度押しても同じ。",
           "trace": "想定内（TIME_OVERLAP）なので Sentry には出ない。",
@@ -683,7 +697,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
           "refs": [
             {
               "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-              "find": "const reportRestoreError = () => toast.error(t('toast.restoreFailed'));"
+              "find": "const reportRestoreError = (error: unknown) =>"
             }
           ],
           "tags": {
@@ -701,7 +715,44 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
                 "label": "新しい予定"
               }
             ],
-            "toast": "復元できませんでした。もう一度お試しください",
+            "toast": "この時間帯には既に記録があります",
+            "toastTone": "bad"
+          }
+        },
+        {
+          "id": "restore-external-calendar-duplicate",
+          "label": "再取り込み後に古い外部予定を復元しようとした（EXTERNAL_CALENDAR_ALREADY_CONVERTED）",
+          "screen": "「同じ外部予定を取り込み済みのため、復元できません」のトースト。",
+          "data": "新しい有効行を保ち、古い行は削除済みのまま。",
+          "retry": "しない。新しい行を自動で置き換えない。",
+          "trace": "想定内の競合なので Sentry には出ない。",
+          "look": "同じ external_calendar_event_id を参照する有効な Plan / Record。",
+          "refs": [
+            {
+              "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
+              "find": "getTimeblockServiceCode(error) === 'EXTERNAL_CALENDAR_ALREADY_CONVERTED'"
+            },
+            {
+              "path": "supabase/migrations/20260930014002_prevent_duplicate_external_calendar_conversion.sql",
+              "find": "CREATE UNIQUE INDEX plans_active_external_event_unique"
+            }
+          ],
+          "tags": {
+            "screen": "toast",
+            "data": "unchanged",
+            "retry": "none",
+            "trace": "none"
+          },
+          "screenAfter": {
+            "t": "calendar",
+            "url": "/ja/calendar",
+            "blocks": [
+              {
+                "state": "saved",
+                "label": "新しい予定"
+              }
+            ],
+            "toast": "同じ外部予定を取り込み済みのため、復元できません",
             "toastTone": "bad"
           }
         },

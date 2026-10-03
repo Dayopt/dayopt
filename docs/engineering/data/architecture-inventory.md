@@ -1859,11 +1859,12 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（3）</summary>
+<summary>docs の候補（4）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [docs/operations/calendar-integration-rehearsal.md](<../../operations/calendar-integration-rehearsal.md>) | frontmatter code: external-calendar |
 | [docs/operations/google-oauth-verification.md](<../../operations/google-oauth-verification.md>) | frontmatter code: external-calendar |
 | [docs/product/specs/auth.md](<../../product/specs/auth.md>) | frontmatter code: external-calendar |
 | [docs/product/specs/external-calendar.md](<../../product/specs/external-calendar.md>) | frontmatter code: external-calendar |
