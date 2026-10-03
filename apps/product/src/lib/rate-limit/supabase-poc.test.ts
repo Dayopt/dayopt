@@ -92,6 +92,33 @@ describe('Supabase POC deployment switches', () => {
       }),
     ).toBe(false);
   });
+
+  it('normalizes surrounding whitespace and escaped newlines on both switches', () => {
+    expect(
+      isSupabaseRateLimitPocEnabled({
+        ...FIXED_INTEGRATION_ENV,
+        SUPABASE_RATE_LIMIT_POC_ENABLED: '  true\n',
+      }),
+    ).toBe(true);
+    expect(
+      isSupabaseRateLimitPocEnabled({
+        ...FIXED_INTEGRATION_ENV,
+        SUPABASE_RATE_LIMIT_POC_ENABLED: 'true\\n',
+      }),
+    ).toBe(true);
+    expect(
+      isSupabaseWebhookClaimPocEnabled({
+        ...FIXED_INTEGRATION_ENV,
+        SUPABASE_WEBHOOK_CLAIM_POC_ENABLED: '  true  ',
+      }),
+    ).toBe(true);
+    expect(
+      isSupabaseWebhookClaimPocEnabled({
+        ...FIXED_INTEGRATION_ENV,
+        SUPABASE_WEBHOOK_CLAIM_POC_ENABLED: 'true\\n',
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('Supabase rate-limit POC adapter', () => {

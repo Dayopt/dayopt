@@ -53,7 +53,13 @@ class SuppressionWriteError extends Error {
 
 type ClaimedWebhookEvent =
   | { backend: 'upstash'; eventId: string; token: string }
-  | { backend: 'supabase'; eventHash: string; token: string };
+  | {
+      backend: 'supabase-with-upstash-compatibility';
+      eventId: string;
+      upstashToken: string;
+      eventHash: string;
+      supabaseToken: string;
+    };
 
 type WebhookClaimResult =
   | { status: 'claimed'; claim: ClaimedWebhookEvent }
@@ -177,33 +183,80 @@ async function claimWebhookEvent(eventId: string): Promise<WebhookClaimResult> {
     return { status: 'claimed', claim: { backend: 'upstash', eventId, token: claim.token } };
   }
 
-  const eventHash = await hashRateLimitIdentifier(`resend-event:${eventId}`);
-  const token = crypto.randomUUID();
-  const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
-  const status = await claimSupabaseWebhookEventPoc(client, eventHash, token);
-  if (status !== 'claimed') return { status };
-  return { status, claim: { backend: 'supabase', eventHash, token } };
+  // Keep Upstash as a compatibility claim while old 35-day markers and old Vercel
+  // deployments can still receive retries. New POC events are written to both stores.
+  const upstashClaim = await claimResendWebhookEventWithUpstash(eventId);
+  if (upstashClaim.status !== 'claimed') return upstashClaim;
+
+  let eventHash: string | undefined;
+  let client: SupabaseRateLimitPocClient | undefined;
+  const supabaseToken = crypto.randomUUID();
+  try {
+    eventHash = await hashRateLimitIdentifier(`resend-event:${eventId}`);
+    client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
+    const status = await claimSupabaseWebhookEventPoc(client, eventHash, supabaseToken);
+    if (status !== 'claimed') {
+      await releaseResendWebhookEventWithUpstash(eventId, upstashClaim.token);
+      return { status };
+    }
+    return {
+      status,
+      claim: {
+        backend: 'supabase-with-upstash-compatibility',
+        eventId,
+        upstashToken: upstashClaim.token,
+        eventHash,
+        supabaseToken,
+      },
+    };
+  } catch (error) {
+    const releases: Promise<unknown>[] = [
+      releaseResendWebhookEventWithUpstash(eventId, upstashClaim.token),
+    ];
+    if (client && eventHash) {
+      releases.push(releaseSupabaseWebhookEventPoc(client, eventHash, supabaseToken));
+    }
+    const releaseResults = await Promise.allSettled(releases);
+    if (releaseResults.some((result) => result.status === 'rejected')) {
+      logger.error('Failed to release Resend webhook compatibility claim');
+    }
+    throw error;
+  }
 }
 
 async function completeWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
-  if (claim.backend === 'upstash') {
-    await completeResendWebhookEventWithUpstash(claim.eventId, claim.token);
+  if (claim.backend === 'supabase-with-upstash-compatibility') {
+    const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
+    const completed = await completeSupabaseWebhookEventPoc(
+      client,
+      claim.eventHash,
+      claim.supabaseToken,
+    );
+    if (!completed) throw new Error('Supabase webhook processing lease is no longer owned');
+    await completeResendWebhookEventWithUpstash(claim.eventId, claim.upstashToken);
     return;
   }
 
-  const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
-  const completed = await completeSupabaseWebhookEventPoc(client, claim.eventHash, claim.token);
-  if (!completed) throw new Error('Supabase webhook processing lease is no longer owned');
+  if (claim.backend === 'upstash') {
+    await completeResendWebhookEventWithUpstash(claim.eventId, claim.token);
+  }
 }
 
 async function releaseWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
-  if (claim.backend === 'upstash') {
-    await releaseResendWebhookEventWithUpstash(claim.eventId, claim.token);
+  if (claim.backend === 'supabase-with-upstash-compatibility') {
+    const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
+    const results = await Promise.allSettled([
+      releaseSupabaseWebhookEventPoc(client, claim.eventHash, claim.supabaseToken),
+      releaseResendWebhookEventWithUpstash(claim.eventId, claim.upstashToken),
+    ]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed?.status === 'rejected') throw failed.reason;
     return;
   }
 
-  const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
-  await releaseSupabaseWebhookEventPoc(client, claim.eventHash, claim.token);
+  if (claim.backend === 'upstash') {
+    await releaseResendWebhookEventWithUpstash(claim.eventId, claim.token);
+  }
 }
 
 export async function POST(request: NextRequest) {

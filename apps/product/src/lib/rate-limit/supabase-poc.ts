@@ -16,6 +16,10 @@ export type SupabaseRateLimitPocClient = {
 
 type SupabaseRateLimitPocEnvironment = Record<string, string | undefined>;
 
+function isPocSwitchEnabled(value: string | undefined): boolean {
+  return value?.replace(/\\+n/g, '').trim() === 'true';
+}
+
 /**
  * Preview deployments can share the Integration database, so URL-only detection is unsafe.
  * Each POC path requires its own explicit switch and this same fixed deployment identity.
@@ -41,7 +45,7 @@ export function isSupabaseRateLimitPocEnabled(
   environment: SupabaseRateLimitPocEnvironment = process.env,
 ): boolean {
   return (
-    environment.SUPABASE_RATE_LIMIT_POC_ENABLED === 'true' &&
+    isPocSwitchEnabled(environment.SUPABASE_RATE_LIMIT_POC_ENABLED) &&
     isFixedIntegrationDeployment(environment)
   );
 }
@@ -50,7 +54,7 @@ export function isSupabaseWebhookClaimPocEnabled(
   environment: SupabaseRateLimitPocEnvironment = process.env,
 ): boolean {
   return (
-    environment.SUPABASE_WEBHOOK_CLAIM_POC_ENABLED === 'true' &&
+    isPocSwitchEnabled(environment.SUPABASE_WEBHOOK_CLAIM_POC_ENABLED) &&
     isFixedIntegrationDeployment(environment)
   );
 }

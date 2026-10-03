@@ -292,7 +292,7 @@ describe('Product Resend webhook', () => {
     expect(mocks.completeResendWebhookEvent).not.toHaveBeenCalled();
   });
 
-  it('uses atomic Supabase webhook claims on the enabled Integration path', async () => {
+  it('uses Supabase claims and preserves the Upstash compatibility marker on Integration', async () => {
     mocks.useSupabaseWebhookClaimPoc = true;
     mocks.verifyWebhook.mockReturnValue({
       type: 'email.bounced',
@@ -318,9 +318,47 @@ describe('Product Resend webhook', () => {
       'b'.repeat(64),
       expect.stringMatching(/^[0-9a-f-]{36}$/u),
     );
-    expect(mocks.claimResendWebhookEvent).not.toHaveBeenCalled();
-    expect(mocks.completeResendWebhookEvent).not.toHaveBeenCalled();
+    expect(mocks.claimResendWebhookEvent).toHaveBeenCalledWith('event-1');
+    expect(mocks.completeResendWebhookEvent).toHaveBeenCalledWith('event-1', 'lease-1');
     expect(upsert).toHaveBeenCalledOnce();
+  });
+
+  it('honors an existing completed Upstash marker before claiming in Supabase', async () => {
+    mocks.useSupabaseWebhookClaimPoc = true;
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.bounced',
+      data: { to: ['private@example.com'], email_id: 'email-old-duplicate' },
+    });
+    const upsert = vi.fn();
+    mocks.createServiceRoleClient.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromWithWriteFence(() => ({ upsert })),
+    });
+    mocks.claimResendWebhookEvent.mockResolvedValueOnce({ status: 'already_processed' });
+
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.claimSupabaseWebhookEventPoc).not.toHaveBeenCalled();
+    expect(mocks.completeSupabaseWebhookEventPoc).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not bypass an Upstash lease held by a pre-cutover delivery', async () => {
+    mocks.useSupabaseWebhookClaimPoc = true;
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.bounced',
+      data: { to: ['private@example.com'], email_id: 'email-old-in-progress' },
+    });
+    const upsert = vi.fn();
+    mocks.createServiceRoleClient.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromWithWriteFence(() => ({ upsert })),
+    });
+    mocks.claimResendWebhookEvent.mockResolvedValueOnce({ status: 'in_progress' });
+
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    expect(mocks.claimSupabaseWebhookEventPoc).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it('does not run webhook effects when the Supabase claim is already processed or unavailable', async () => {
@@ -339,11 +377,12 @@ describe('Product Resend webhook', () => {
     expect((await POST(request())).status).toBe(200);
     expect(upsert).not.toHaveBeenCalled();
     expect(mocks.completeSupabaseWebhookEventPoc).not.toHaveBeenCalled();
+    expect(mocks.releaseResendWebhookEvent).toHaveBeenCalledWith('event-1', 'lease-1');
 
     mocks.claimSupabaseWebhookEventPoc.mockRejectedValueOnce(new Error('database unavailable'));
     expect((await POST(request())).status).toBe(500);
     expect(upsert).not.toHaveBeenCalled();
-    expect(mocks.claimResendWebhookEvent).not.toHaveBeenCalled();
+    expect(mocks.releaseResendWebhookEvent).toHaveBeenCalledTimes(2);
   });
 
   it('releases the Supabase webhook lease after a failed suppression write', async () => {
@@ -364,7 +403,29 @@ describe('Product Resend webhook', () => {
       'b'.repeat(64),
       expect.stringMatching(/^[0-9a-f-]{36}$/u),
     );
-    expect(mocks.releaseResendWebhookEvent).not.toHaveBeenCalled();
+    expect(mocks.releaseResendWebhookEvent).toHaveBeenCalledWith('event-1', 'lease-1');
+  });
+
+  it('does not repeat effects if the Supabase terminal marker succeeds before Upstash fails', async () => {
+    mocks.useSupabaseWebhookClaimPoc = true;
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.bounced',
+      data: { to: ['private@example.com'], email_id: 'email-poc-complete-retry' },
+    });
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    mocks.createServiceRoleClient.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromWithWriteFence(() => ({ upsert })),
+    });
+    mocks.claimSupabaseWebhookEventPoc
+      .mockResolvedValueOnce('claimed')
+      .mockResolvedValueOnce('already_processed');
+    mocks.completeResendWebhookEvent.mockRejectedValueOnce(new Error('Upstash unavailable'));
+
+    expect((await POST(request())).status).toBe(500);
+    expect((await POST(request())).status).toBe(200);
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(mocks.completeSupabaseWebhookEventPoc).toHaveBeenCalledOnce();
   });
 
   it('rejects missing/invalid signatures and oversized bodies before side effects', async () => {
