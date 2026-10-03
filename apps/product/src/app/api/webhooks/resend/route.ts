@@ -59,6 +59,7 @@ type ClaimedWebhookEvent =
       upstashToken: string;
       eventHash: string;
       supabaseToken: string;
+      supabaseCompleted: boolean;
     };
 
 type WebhookClaimResult =
@@ -190,12 +191,21 @@ async function claimWebhookEvent(eventId: string): Promise<WebhookClaimResult> {
 
   let eventHash: string | undefined;
   let client: SupabaseRateLimitPocClient | undefined;
+  let preserveUpstashClaim = false;
   const supabaseToken = crypto.randomUUID();
   try {
     eventHash = await hashRateLimitIdentifier(`resend-event:${eventId}`);
     client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
     const status = await claimSupabaseWebhookEventPoc(client, eventHash, supabaseToken);
-    if (status !== 'claimed') {
+    if (status === 'already_processed') {
+      // Supabase is already terminal. Promote this compatibility lease to the
+      // Upstash processed marker; if that write fails, keep the lease until its
+      // TTL instead of deleting the only barrier old Upstash-only workers see.
+      preserveUpstashClaim = true;
+      await completeResendWebhookEventWithUpstash(eventId, upstashClaim.token);
+      return { status };
+    }
+    if (status === 'in_progress') {
       await releaseResendWebhookEventWithUpstash(eventId, upstashClaim.token);
       return { status };
     }
@@ -207,13 +217,15 @@ async function claimWebhookEvent(eventId: string): Promise<WebhookClaimResult> {
         upstashToken: upstashClaim.token,
         eventHash,
         supabaseToken,
+        supabaseCompleted: false,
       },
     };
   } catch (error) {
-    const releases: Promise<unknown>[] = [
-      releaseResendWebhookEventWithUpstash(eventId, upstashClaim.token),
-    ];
-    if (client && eventHash) {
+    const releases: Promise<unknown>[] = [];
+    if (!preserveUpstashClaim) {
+      releases.push(releaseResendWebhookEventWithUpstash(eventId, upstashClaim.token));
+    }
+    if (!preserveUpstashClaim && client && eventHash) {
       releases.push(releaseSupabaseWebhookEventPoc(client, eventHash, supabaseToken));
     }
     const releaseResults = await Promise.allSettled(releases);
@@ -233,6 +245,7 @@ async function completeWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
       claim.supabaseToken,
     );
     if (!completed) throw new Error('Supabase webhook processing lease is no longer owned');
+    claim.supabaseCompleted = true;
     await completeResendWebhookEventWithUpstash(claim.eventId, claim.upstashToken);
     return;
   }
@@ -244,6 +257,11 @@ async function completeWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
 
 async function releaseWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
   if (claim.backend === 'supabase-with-upstash-compatibility') {
+    if (claim.supabaseCompleted) {
+      // Supabase has the durable terminal marker. Keep the Upstash processing
+      // lease for retry to promote, rather than deleting it after partial success.
+      return;
+    }
     const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
     const results = await Promise.allSettled([
       releaseSupabaseWebhookEventPoc(client, claim.eventHash, claim.supabaseToken),
