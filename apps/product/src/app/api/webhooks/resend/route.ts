@@ -1,7 +1,7 @@
 /**
  * Product-owned Resend webhook.
  *
- * The app-specific signing secret, source tag, and Redis lease keep Product
+ * The app-specific signing secret, source tag, and atomic claim lease keep Product
  * delivery events isolated and idempotent while preserving transactional-email
  * suppression behavior.
  */
@@ -14,9 +14,17 @@ import { env } from '@/env';
 import { logger } from '@/lib/logger';
 import { isWriteFenceEnabled } from '@/lib/ops/write-fence';
 import {
-  claimResendWebhookEvent,
-  completeResendWebhookEvent,
-  releaseResendWebhookEvent,
+  claimSupabaseWebhookEventPoc,
+  completeSupabaseWebhookEventPoc,
+  isSupabaseWebhookClaimPocEnabled,
+  releaseSupabaseWebhookEventPoc,
+  type SupabaseRateLimitPocClient,
+} from '@/lib/rate-limit/supabase-poc';
+import {
+  claimResendWebhookEvent as claimResendWebhookEventWithUpstash,
+  completeResendWebhookEvent as completeResendWebhookEventWithUpstash,
+  hashRateLimitIdentifier,
+  releaseResendWebhookEvent as releaseResendWebhookEventWithUpstash,
 } from '@/lib/rate-limit/upstash';
 import { captureUnexpectedDatabaseError, captureUnexpectedError } from '@/lib/sentry';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
@@ -42,6 +50,15 @@ class SuppressionWriteError extends Error {
     this.name = 'SuppressionWriteError';
   }
 }
+
+type ClaimedWebhookEvent =
+  | { backend: 'upstash'; eventId: string; token: string }
+  | { backend: 'supabase'; eventHash: string; token: string };
+
+type WebhookClaimResult =
+  | { status: 'claimed'; claim: ClaimedWebhookEvent }
+  | { status: 'already_processed' }
+  | { status: 'in_progress' };
 
 type EmailEventData = {
   email_id: string;
@@ -153,8 +170,44 @@ async function recordSuppression(
   }
 }
 
+async function claimWebhookEvent(eventId: string): Promise<WebhookClaimResult> {
+  if (!isSupabaseWebhookClaimPocEnabled()) {
+    const claim = await claimResendWebhookEventWithUpstash(eventId);
+    if (claim.status !== 'claimed') return claim;
+    return { status: 'claimed', claim: { backend: 'upstash', eventId, token: claim.token } };
+  }
+
+  const eventHash = await hashRateLimitIdentifier(`resend-event:${eventId}`);
+  const token = crypto.randomUUID();
+  const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
+  const status = await claimSupabaseWebhookEventPoc(client, eventHash, token);
+  if (status !== 'claimed') return { status };
+  return { status, claim: { backend: 'supabase', eventHash, token } };
+}
+
+async function completeWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
+  if (claim.backend === 'upstash') {
+    await completeResendWebhookEventWithUpstash(claim.eventId, claim.token);
+    return;
+  }
+
+  const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
+  const completed = await completeSupabaseWebhookEventPoc(client, claim.eventHash, claim.token);
+  if (!completed) throw new Error('Supabase webhook processing lease is no longer owned');
+}
+
+async function releaseWebhookEvent(claim: ClaimedWebhookEvent): Promise<void> {
+  if (claim.backend === 'upstash') {
+    await releaseResendWebhookEventWithUpstash(claim.eventId, claim.token);
+    return;
+  }
+
+  const client = createServiceRoleClient() as unknown as SupabaseRateLimitPocClient;
+  await releaseSupabaseWebhookEventPoc(client, claim.eventHash, claim.token);
+}
+
 export async function POST(request: NextRequest) {
-  let claimedEvent: { id: string; token: string } | undefined;
+  let claimedEvent: ClaimedWebhookEvent | undefined;
   let contactDeliveryFailure: { eventType: string; data: EmailEventData } | undefined;
 
   try {
@@ -213,7 +266,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true }, { status: 200 });
     }
 
-    // claim（Redis lease）より前に確認する。claim 後に 503 を返すと lease が残ったまま
+    // claim（Redis / Supabase lease）より前に確認する。claim 後に 503 を返すと lease が残ったまま
     // 残り、Resend の再送が「処理中」で弾かれ続ける。この分岐より前（署名検証だけで
     // 済む早期 return）には書き込みが無いので fence は不要 — むしろ手前で 503 にすると
     // 無意味な再送で Resend の backoff 予算を消費させてしまう。
@@ -225,14 +278,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const claim = await claimResendWebhookEvent(svixId);
+    const claim = await claimWebhookEvent(svixId);
     if (claim.status === 'already_processed') {
       return NextResponse.json({ received: true }, { status: 200 });
     }
     if (claim.status === 'in_progress') {
       return NextResponse.json({ error: 'Webhook processing in progress' }, { status: 503 });
     }
-    claimedEvent = { id: svixId, token: claim.token };
+    const activeClaim = claim.claim;
+    claimedEvent = activeClaim;
 
     switch (event.type) {
       case 'email.bounced': {
@@ -293,7 +347,7 @@ export async function POST(request: NextRequest) {
         logger.info('Resend webhook event', { type: event.type });
     }
 
-    await completeResendWebhookEvent(svixId, claim.token);
+    await completeWebhookEvent(activeClaim);
     claimedEvent = undefined;
     // The terminal marker must win the race with the observable side effect.
     // Otherwise a marker failure followed by a provider retry creates a second
@@ -308,7 +362,7 @@ export async function POST(request: NextRequest) {
 
     if (claimedEvent) {
       try {
-        await releaseResendWebhookEvent(claimedEvent.id, claimedEvent.token);
+        await releaseWebhookEvent(claimedEvent);
       } catch (releaseError) {
         logger.error('Failed to release Resend webhook event claim');
         captureUnexpectedError(

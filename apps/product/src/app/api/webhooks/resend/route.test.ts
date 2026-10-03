@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   claimResendWebhookEvent: vi.fn(),
   completeResendWebhookEvent: vi.fn(),
   releaseResendWebhookEvent: vi.fn(),
+  hashRateLimitIdentifier: vi.fn(),
+  useSupabaseWebhookClaimPoc: false,
+  claimSupabaseWebhookEventPoc: vi.fn(),
+  completeSupabaseWebhookEventPoc: vi.fn(),
+  releaseSupabaseWebhookEventPoc: vi.fn(),
   writeFenceMaybeSingle: vi.fn(),
   env: {
     RESEND_API_KEY: 'test-key' as string | undefined,
@@ -47,7 +52,14 @@ vi.mock('@/lib/logger', () => ({ logger: mocks.logger }));
 vi.mock('@/lib/rate-limit/upstash', () => ({
   claimResendWebhookEvent: mocks.claimResendWebhookEvent,
   completeResendWebhookEvent: mocks.completeResendWebhookEvent,
+  hashRateLimitIdentifier: mocks.hashRateLimitIdentifier,
   releaseResendWebhookEvent: mocks.releaseResendWebhookEvent,
+}));
+vi.mock('@/lib/rate-limit/supabase-poc', () => ({
+  isSupabaseWebhookClaimPocEnabled: () => mocks.useSupabaseWebhookClaimPoc,
+  claimSupabaseWebhookEventPoc: mocks.claimSupabaseWebhookEventPoc,
+  completeSupabaseWebhookEventPoc: mocks.completeSupabaseWebhookEventPoc,
+  releaseSupabaseWebhookEventPoc: mocks.releaseSupabaseWebhookEventPoc,
 }));
 vi.mock('@/lib/sentry', () => ({
   captureUnexpectedDatabaseError: mocks.captureUnexpectedDatabaseError,
@@ -78,6 +90,11 @@ describe('Product Resend webhook', () => {
     mocks.claimResendWebhookEvent.mockResolvedValue({ status: 'claimed', token: 'lease-1' });
     mocks.completeResendWebhookEvent.mockResolvedValue(undefined);
     mocks.releaseResendWebhookEvent.mockResolvedValue(undefined);
+    mocks.hashRateLimitIdentifier.mockResolvedValue('b'.repeat(64));
+    mocks.useSupabaseWebhookClaimPoc = false;
+    mocks.claimSupabaseWebhookEventPoc.mockResolvedValue('claimed');
+    mocks.completeSupabaseWebhookEventPoc.mockResolvedValue(true);
+    mocks.releaseSupabaseWebhookEventPoc.mockResolvedValue(true);
     mocks.writeFenceMaybeSingle.mockResolvedValue({ data: { fence_enabled: false }, error: null });
     mocks.createServiceRoleClient.mockReturnValue({
       from: fromWithWriteFence(() => undefined),
@@ -273,6 +290,81 @@ describe('Product Resend webhook', () => {
     mocks.claimResendWebhookEvent.mockResolvedValueOnce({ status: 'in_progress' });
     expect((await POST(request())).status).toBe(503);
     expect(mocks.completeResendWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('uses atomic Supabase webhook claims on the enabled Integration path', async () => {
+    mocks.useSupabaseWebhookClaimPoc = true;
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.bounced',
+      data: { to: ['private@example.com'], email_id: 'email-poc' },
+    });
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    mocks.createServiceRoleClient.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromWithWriteFence(() => ({ upsert })),
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.hashRateLimitIdentifier).toHaveBeenCalledWith('resend-event:event-1');
+    expect(mocks.claimSupabaseWebhookEventPoc).toHaveBeenCalledWith(
+      expect.objectContaining({ rpc: expect.any(Function) }),
+      'b'.repeat(64),
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+    );
+    expect(mocks.completeSupabaseWebhookEventPoc).toHaveBeenCalledWith(
+      expect.anything(),
+      'b'.repeat(64),
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+    );
+    expect(mocks.claimResendWebhookEvent).not.toHaveBeenCalled();
+    expect(mocks.completeResendWebhookEvent).not.toHaveBeenCalled();
+    expect(upsert).toHaveBeenCalledOnce();
+  });
+
+  it('does not run webhook effects when the Supabase claim is already processed or unavailable', async () => {
+    mocks.useSupabaseWebhookClaimPoc = true;
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.bounced',
+      data: { to: ['private@example.com'], email_id: 'email-poc-duplicate' },
+    });
+    const upsert = vi.fn();
+    mocks.createServiceRoleClient.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromWithWriteFence(() => ({ upsert })),
+    });
+    mocks.claimSupabaseWebhookEventPoc.mockResolvedValueOnce('already_processed');
+
+    expect((await POST(request())).status).toBe(200);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(mocks.completeSupabaseWebhookEventPoc).not.toHaveBeenCalled();
+
+    mocks.claimSupabaseWebhookEventPoc.mockRejectedValueOnce(new Error('database unavailable'));
+    expect((await POST(request())).status).toBe(500);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(mocks.claimResendWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('releases the Supabase webhook lease after a failed suppression write', async () => {
+    mocks.useSupabaseWebhookClaimPoc = true;
+    mocks.verifyWebhook.mockReturnValue({
+      type: 'email.complained',
+      data: { to: ['private@example.com'], email_id: 'email-poc-failure' },
+    });
+    const upsert = vi.fn().mockResolvedValue({ error: { code: 'PGRST500' } });
+    mocks.createServiceRoleClient.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromWithWriteFence(() => ({ upsert })),
+    });
+
+    expect((await POST(request())).status).toBe(500);
+    expect(mocks.releaseSupabaseWebhookEventPoc).toHaveBeenCalledWith(
+      expect.anything(),
+      'b'.repeat(64),
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+    );
+    expect(mocks.releaseResendWebhookEvent).not.toHaveBeenCalled();
   });
 
   it('rejects missing/invalid signatures and oversized bodies before side effects', async () => {
