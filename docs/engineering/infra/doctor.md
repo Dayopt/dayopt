@@ -26,7 +26,7 @@ pnpm run doctor --format json
 
 ## 対象と正本
 
-[expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。現行の統合棚卸しは[inventory-2026-10-01.md](./inventory-2026-10-01.md)、初回の履歴は[inventory-2026-09-30.md](./inventory-2026-09-30.md)。観測値で期待値を自動上書きしない。
+[expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。現行の追加確認は[inventory-2026-10-03.md](./inventory-2026-10-03.md)、接続・検査の詳細snapshotは[inventory-2026-10-01.md](./inventory-2026-10-01.md)、初回の履歴は[inventory-2026-09-30.md](./inventory-2026-09-30.md)。観測値で期待値を自動上書きしない。
 
 `--service`には`github`, `vercel`, `supabase`, `stripe`, `resend`, `cloudflare`, `sentry`, `posthog`, `upstash`, `uptimerobot`, `google`, `mcp_oauth`, `telemetry`, `pwned_passwords`, `support_smtp`, `optional`を指定できる。Cloudflareには公開DNS、Turnstile、R2とdomain registration metadataを含む。GitHub Appsはrepository hooksとは別のmanual検査。`all`はCLI既定の環境選択。
 
