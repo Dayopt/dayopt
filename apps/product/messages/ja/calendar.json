@@ -275,7 +275,6 @@
         "convertedToPlan": "予定に追加しました",
         "convertedToRecord": "記録として保存しました",
         "convertUndone": "元に戻しました",
-        "convertFailed": "追加できませんでした。もう一度お試しください",
         "dismissFailed": "非表示にできませんでした。もう一度お試しください"
       }
     },

@@ -386,19 +386,20 @@ allowlist、MCP registry）に載っていないかを併せて確かめる。
 
 docs の frontmatter `code:` が指す実装から引く。
 
-| doc                                            | feature                                 |
-| ---------------------------------------------- | --------------------------------------- |
-| `docs/operations/contact-email.md`             | `contact`                               |
-| `docs/operations/google-oauth-verification.md` | `external-calendar`                     |
-| `docs/operations/posthog-analytics.md`         | `settings`, `timeblock`                 |
-| `docs/product/specs/activities.md`             | `activities`                            |
-| `docs/product/specs/auth.md`                   | `auth`, `external-calendar`, `settings` |
-| `docs/product/specs/calendar.md`               | `calendar`                              |
-| `docs/product/specs/contact.md`                | `contact`                               |
-| `docs/product/specs/external-calendar.md`      | `external-calendar`                     |
-| `docs/product/specs/plan-record.md`            | `timeblock`                             |
-| `docs/product/specs/review.md`                 | `review`                                |
-| `docs/product/specs/settings.md`               | `settings`                              |
+| doc                                                 | feature                                 |
+| --------------------------------------------------- | --------------------------------------- |
+| `docs/operations/calendar-integration-rehearsal.md` | `external-calendar`                     |
+| `docs/operations/contact-email.md`                  | `contact`                               |
+| `docs/operations/google-oauth-verification.md`      | `external-calendar`                     |
+| `docs/operations/posthog-analytics.md`              | `settings`, `timeblock`                 |
+| `docs/product/specs/activities.md`                  | `activities`                            |
+| `docs/product/specs/auth.md`                        | `auth`, `external-calendar`, `settings` |
+| `docs/product/specs/calendar.md`                    | `calendar`                              |
+| `docs/product/specs/contact.md`                     | `contact`                               |
+| `docs/product/specs/external-calendar.md`           | `external-calendar`                     |
+| `docs/product/specs/plan-record.md`                 | `timeblock`                             |
+| `docs/product/specs/review.md`                      | `review`                                |
+| `docs/product/specs/settings.md`                    | `settings`                              |
 
 **doc から辿れない feature**: なし
 

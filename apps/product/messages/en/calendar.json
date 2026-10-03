@@ -275,7 +275,6 @@
         "convertedToPlan": "Added to Plan",
         "convertedToRecord": "Recorded",
         "convertUndone": "Undone",
-        "convertFailed": "Couldn't add this. Try again.",
         "dismissFailed": "Couldn't dismiss this. Try again."
       }
     },

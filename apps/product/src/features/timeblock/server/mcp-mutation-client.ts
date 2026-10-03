@@ -34,6 +34,7 @@ const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {
   '22004': 'INVALID_INPUT',
   '22023': 'INVALID_INPUT',
   '23P01': 'TIME_OVERLAP',
+  '23505': 'CONFLICT',
   '55P03': 'CONFLICT',
   '57014': 'CONFLICT',
   DM003: 'WRITE_DISABLED',
