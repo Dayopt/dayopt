@@ -1,3 +1,7 @@
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+
 -- Reversible proof of concept. Runtime adapters remain disabled outside an explicit Integration opt-in.
 -- State is isolated in an unexposed schema; only service_role may invoke the RPCs.
 
@@ -476,3 +480,5 @@ BEGIN
   END LOOP;
 END;
 $poc_contract$;
+
+COMMIT;
