@@ -129,7 +129,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `healthCheckGlobalRateLimit`   | 120  | `1 m`  | `apps/product/src/app/api/health/route.ts`                                                                                                        |
 | `icalFeedGlobalRateLimit`      | 600  | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `calendarConnectRateLimit`     | 10   | `1 h`  | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts`, `apps/product/src/app/api/integrations/google-calendar/start/route.ts` |
-| `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/router.ts`                                                                                    |
+| `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/sync-rate-limit.ts`                                                                           |
 | `cspReportRateLimit`           | 20   | `1 m`  | `apps/product/src/app/api/csp-report/route.ts`                                                                                                    |
 | `cspReportGlobalRateLimit`     | 120  | `1 m`  | `apps/product/src/app/api/csp-report/route.ts`                                                                                                    |
 
@@ -392,6 +392,7 @@ docs の frontmatter `code:` が指す実装から引く。
 | `docs/operations/contact-email.md`                  | `contact`                               |
 | `docs/operations/google-oauth-verification.md`      | `external-calendar`                     |
 | `docs/operations/posthog-analytics.md`              | `settings`, `timeblock`                 |
+| `docs/operations/supabase-rate-limit-poc.md`        | `external-calendar`                     |
 | `docs/product/specs/activities.md`                  | `activities`                            |
 | `docs/product/specs/auth.md`                        | `auth`, `external-calendar`, `settings` |
 | `docs/product/specs/calendar.md`                    | `calendar`                              |
@@ -555,7 +556,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
 | `calendar`          | 193    | 101       | 59        | 31 / 59                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
-| `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
+| `external-calendar` | 27     | 20        | 2         | 1 / 2                  |
 | `review`            | 37     | 22        | 19        | 14 / 19                |
 | `settings`          | 49     | 40        | 22        | 17 / 22                |
 | `timeblock`         | 98     | 54        | 18        | 12 / 18                |

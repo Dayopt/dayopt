@@ -1,7 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { calendarSyncNowRateLimit } from '@/lib/rate-limit/upstash';
 import { handleServiceError } from '@/lib/trpc/errors';
 import { entitlementKeys } from '@dayopt/billing';
 
@@ -17,6 +16,7 @@ import {
 import { setEventDismissed } from './event-command-service';
 import { listGhostEvents } from './event-query-service';
 import { isGoogleCalendarConfigured, resolveRedirectUri } from './google-oauth';
+import { checkCalendarSyncNowRateLimit } from './sync-rate-limit';
 import { syncConnection } from './sync-service';
 
 /**
@@ -100,13 +100,11 @@ const updateSelectedCalendarsInput = z.object({
  */
 export const TRPC_TIME_BUDGET_MS = 50_000;
 
-/** 手動同期の per-user rate limit。upstash 未設定なら素通り（fallback は route 側に無い）。 */
+/** 手動同期の per-user rate limit。backend障害はfail-closedで扱う。 */
 async function enforceSyncNowRateLimit(userId: string): Promise<void> {
-  if (!calendarSyncNowRateLimit) return;
-
   let success: boolean;
   try {
-    ({ success } = await calendarSyncNowRateLimit.limit(userId));
+    success = await checkCalendarSyncNowRateLimit(userId);
   } catch (error) {
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',

@@ -53,6 +53,15 @@ const serverSchema = z
     // Upstash Redis
     UPSTASH_REDIS_REST_URL: z.string().url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+    // Independent fixed-Integration switches keep Calendar and Resend tests isolated.
+    SUPABASE_RATE_LIMIT_POC_ENABLED: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.enum(['true', 'false']).optional(),
+    ),
+    SUPABASE_WEBHOOK_CLAIM_POC_ENABLED: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.enum(['true', 'false']).optional(),
+    ),
 
     // Resend
     RESEND_API_KEY: z.string().optional(),

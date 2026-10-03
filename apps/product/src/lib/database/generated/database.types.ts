@@ -1580,6 +1580,15 @@ export type Database = {
         Args: { p_deletion_id: string; p_user_id: string };
         Returns: boolean;
       };
+      check_supabase_rate_limit_poc: {
+        Args: {
+          p_identifier_hash: string;
+          p_limit_count: number;
+          p_scope: string;
+          p_window_seconds: number;
+        };
+        Returns: Json;
+      };
       claim_account_deletion_step_v1: {
         Args: { p_deletion_id: string; p_step: string; p_user_id: string };
         Returns: {
@@ -1714,6 +1723,10 @@ export type Database = {
         };
         Returns: string;
       };
+      claim_supabase_webhook_event_poc: {
+        Args: { p_event_hash: string; p_processing_token: string };
+        Returns: string;
+      };
       classify_billing_customer_event_v1: {
         Args: { p_stripe_customer_id: string };
         Returns: string;
@@ -1815,6 +1828,10 @@ export type Database = {
       };
       complete_calendar_revoke_outbox_v1: {
         Args: { p_lease_id: string; p_outbox_id: string };
+        Returns: boolean;
+      };
+      complete_supabase_webhook_event_poc: {
+        Args: { p_event_hash: string; p_processing_token: string };
         Returns: boolean;
       };
       confirm_day_plans_command_v1: {
@@ -2402,6 +2419,10 @@ export type Database = {
           supabase_project_ref: string;
         }[];
       };
+      prune_supabase_rate_limit_poc: {
+        Args: { p_batch_size?: number };
+        Returns: Json;
+      };
       reconcile_billing_mutation_v2: {
         Args: {
           p_operation_id: string;
@@ -2473,6 +2494,10 @@ export type Database = {
           p_user_id: string;
         };
         Returns: string;
+      };
+      release_supabase_webhook_event_poc: {
+        Args: { p_event_hash: string; p_processing_token: string };
+        Returns: boolean;
       };
       replace_mfa_recovery_codes_v1: {
         Args: { p_code_hashes: string[]; p_user_id: string };
