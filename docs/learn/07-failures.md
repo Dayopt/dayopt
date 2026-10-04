@@ -29,7 +29,7 @@ flowchart TD
 
 - **文言から逆引きする**: 画面の文言は `apps/product/messages/ja/*.json` にある。キーを検索すれば、それを出しているコードに辿れる。各経路の「⚡ 失敗」は、どの文言がどの失敗から出るかを段ごとに持っている
 - **想定内として Sentry に送らないもの**: tRPC の BAD_REQUEST / UNAUTHORIZED / FORBIDDEN / NOT_FOUND / CONFLICT / TOO_MANY_REQUESTS など（`lib/trpc/errors.ts` の `EXPECTED_TRPC_CODES`）、write fence による停止、パスワード違いなど想定内の認証エラー
-- **Sentry が見えない場所**: `/api/health` の transaction は inbound filter で捨てている。ブラウザの Sentry は分析の同意がある時だけ動く。Sentry 自体は Production 以外では動かない
+- **Sentry が見えない場所**: `/api/health` の transaction は inbound filter で捨てている。ブラウザの Sentry は分析の同意がある時だけ動く。Sentry は Production と識別済みの固定 Integration で初期化し、通常 Preview と開発環境では動かない。DSN が無い場合も初期化しない
 - **write fence**: 運用で書き込みだけを止めるスイッチ。読み取りは動く。止めている間の失敗は Sentry に送らない（障害の観測中に Sentry を埋めないため）。**MCP の tool からの書き込みは write fence で止まらない**（別のスイッチ `mcp_mutation_control`。write fence が止めるのは AI クライアントの新規接続の token 発行だけ）
 - **cron**: 取りこぼした回を埋め直さない。止まったことは完了記録（heartbeat）が古くなることで気づく。4 本の cron と他の入口の一覧は [system/entrypoints.md](system/entrypoints.md)
 
@@ -99,7 +99,7 @@ write fence（runbook の「Write Fence 有効化」）。止まるのは、tRPC
   },
   {
     "path": "apps/product/sentry.server.config.ts",
-    "find": "const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';"
+    "find": "if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {"
   },
   {
     "path": "apps/product/src/app/api/health/route.ts",

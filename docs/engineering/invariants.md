@@ -25,6 +25,13 @@ last_verified: 2026-09-25
 自動レビュー（ai-review）は撤去したが、カタログ自体はレビュアーに依存しない資産なので
 docs へ残している。
 
+## Agent の 1Password 起動契約
+
+- 秘密注入を使う専用環境の agent 起動は、確認済みの active Service Account と `agent` vault の ID・名前・全件数を照合し、token 未設定 / 認証失敗 / 許可外 vault では作業 command を起動しない（2026-09-30、`scripts/tasks/agent-service-account.mjs`）。
+- ローカルの通常の `op` 用 entry point は、注入済み token または専用 Keychain 項目からの取得と SA 検証に成功した場合だけ要求 command を SA で実行する。人間用 CLI による bootstrap を使わず、取得失敗時に人間用認証へ fallback させない。この entry point は OS / MCP / UI の隔離を保証しない（2026-09-30、`scripts/tasks/agent-op.mjs`）。
+- Connect / 人間用 CLI session / desktop 統合を起動 process に継承せず、検査の raw stdout / stderr を記録しない。SA は 1Password 側で `agent` read-only に限定し、人間用の認証・UI・ファイルへの別経路は専用クラウド、または人間用ホームへのアクセスを拒否した専用の標準 Mac ユーザーで閉じる。
+- wrapper / preflight の存在や fixture test の成功を実環境の隔離完了と扱わない。CLI の vault 一覧は書き込み・共有・vault 作成・Environments 権限を証明しない。権限と platform の検証・移行状態の正本は [secrets.md](../operations/secrets.md#service-account)。
+
 ## 課金・entitlement
 
 - **利用権が終わった後に server が拒否する mutation（`lib/billing/operation-access.ts` の
@@ -47,7 +54,7 @@ docs へ残している。
 
 - 公開エンドポイント（OAuth callback / webhook / contact）は rate limit を持つ
 - `app/api/health/cron/route.ts` は UptimeRobot 用の無認証・production-only monitor。
-  service-role で読むのは `cron_heartbeats` の allowlist 8件の job 名と完了時刻だけで、
+  service-role で読むのは `cron_heartbeats` の allowlist 9件の job 名と完了時刻だけで、
   OAuth identity を照合してから評価する。全体 30回/分、DB query は5秒で打ち切り、
   応答は `healthy` / `unhealthy` のみ・`no-store`・失敗時503。上限超過時は60秒以内の
   成功/失敗結果だけ再生し、新しい結果が無ければ503を返す。
@@ -61,8 +68,8 @@ docs へ残している。
   握って Sentry へ送るだけなので **行は永遠に作られない**。監査
   （`production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES`）へ job を足すのは、
   制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
-  現状 **Vercel cron 4 本のうち `billing-reconciliation` だけ heartbeat を持たない**ため、
-  止まっても検知されない（2026-09-20 に PR #2863 の `@codex review` で判明、#2864 で塞ぐ）
+  監査対象の全job名を実DBのCHECK制約と照合するintegration testで追加漏れを検出する
+  （#2864）。`billing-reconciliation` は差分検出の503とは独立に、照合完了を記録する。
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
 
 ## メール通知

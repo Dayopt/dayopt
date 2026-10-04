@@ -488,13 +488,14 @@ function withBaseInputs({ added, baseSeed }, { moveFile, makeTempDir, readFile, 
 }
 
 /**
- * @param {{ exec?: typeof defaultExec, readFile?: (path: string) => string, listMigrations?: () => string[],
+ * @param {{ env?: Record<string, string | undefined>, exec?: typeof defaultExec, readFile?: (path: string) => string, listMigrations?: () => string[],
  *   writeFile?: (path: string, text: string) => void,
  *   moveFile?: (from: string, to: string) => void, makeTempDir?: () => string,
  *   log?: (text: string) => void, summaryPath?: string | null, resultPath?: string | null }} deps
  */
 export function runDbUpgradeCheck({
   exec = defaultExec,
+  env = process.env,
   readFile = (path) => readFileSync(resolve(ROOT, path), 'utf8'),
   writeFile = (path, text) => writeFileSync(resolve(ROOT, path), text),
   listMigrations = () =>
@@ -530,9 +531,16 @@ export function runDbUpgradeCheck({
     if (resultPath) writeFileSync(resolve(resultPath), `${JSON.stringify(result, null, 2)}\n`);
     return result;
   };
-  // base = pull_request checkout（merge commit）の第 1 親。無ければ origin/main。
+  // GitHub の PR merge ref だけ第 1 親が比較元。通常 branch の main-sync merge
+  // は第 1 親が古い candidate なので、手動実行では origin/main を使う。
   let baseSha;
   try {
+    if (
+      env.GITHUB_EVENT_NAME !== 'pull_request' ||
+      !/^refs\/pull\/\d+\/merge$/.test(env.GITHUB_REF ?? '')
+    ) {
+      throw new Error('not a GitHub PR merge ref');
+    }
     baseSha = exec('git', ['rev-parse', '--verify', 'HEAD^1^{commit}']).trim();
     exec('git', ['rev-parse', '--verify', 'HEAD^2^{commit}']);
   } catch {

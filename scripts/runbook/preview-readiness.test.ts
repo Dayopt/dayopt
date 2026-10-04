@@ -11,24 +11,54 @@ const options = {
   supabaseBranchId: '11111111-1111-1111-1111-111111111111',
   databaseMode: 'ephemeral',
   expectedMigrations: ['20260901000000'],
-  vercelToken: 'vercel-private',
+  githubToken: 'github-private',
   supabaseToken: 'supabase-private',
   bypassSecret: 'bypass-private',
 };
 
 function world() {
-  const deployment = {
-    id: options.deploymentId,
-    projectId: 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa',
-    target: null as string | null,
-    readyState: 'READY',
-    url: 'product-abc123-dayopt.vercel.app',
-    meta: {
-      githubCommitSha: options.sha,
-      githubCommitRef: options.branchName,
-      githubCommitOrg: 'Dayopt',
-      githubCommitRepo: 'dayopt',
+  const creator = { id: 35613825, login: 'vercel[bot]', type: 'Bot' };
+  const createdAt = '2026-09-28T11:23:45Z';
+  const pr = {
+    number: options.prNumber,
+    state: 'open',
+    draft: false,
+    head: {
+      ref: options.branchName,
+      sha: options.sha,
+      repo: { id: 1006944000, full_name: 'Dayopt/dayopt', fork: false },
     },
+    base: { ref: 'main', repo: { id: 1006944000, full_name: 'Dayopt/dayopt' } },
+  };
+  const commitStatus = {
+    id: 55073316235,
+    state: 'success',
+    context: 'Vercel – product',
+    target_url: `https://vercel.com/dayopt/product/${options.deploymentId.slice(4)}`,
+    created_at: createdAt,
+    creator,
+  };
+  const deployment = {
+    id: 6708659866,
+    sha: options.sha,
+    ref: options.sha,
+    task: 'deploy',
+    environment: 'Preview – product',
+    original_environment: 'Preview – product',
+    production_environment: false,
+    repository_url: 'https://api.github.com/repos/Dayopt/dayopt',
+    created_at: createdAt,
+    creator,
+  };
+  const deploymentStatus = {
+    id: 18941762944,
+    state: 'success',
+    environment: 'Preview – product',
+    environment_url: 'https://product-abc123-dayopt.vercel.app',
+    deployment_url: `https://api.github.com/repos/Dayopt/dayopt/deployments/${deployment.id}`,
+    repository_url: 'https://api.github.com/repos/Dayopt/dayopt',
+    created_at: createdAt,
+    creator,
   };
   const branch = {
     id: options.supabaseBranchId,
@@ -53,20 +83,39 @@ function world() {
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     expect(init?.redirect).toBe('error');
-    if (url.startsWith('https://api.vercel.com/')) return Response.json(deployment);
+    if (url.startsWith('https://api.github.com/')) {
+      const path = new URL(url).pathname;
+      if (path.endsWith(`/pulls/${options.prNumber}`)) return Response.json(pr);
+      if (path.endsWith(`/commits/${options.sha}/statuses`)) return Response.json([commitStatus]);
+      if (path.endsWith(`/deployments/${deployment.id}/statuses`))
+        return Response.json([deploymentStatus]);
+      if (path.endsWith('/deployments')) return Response.json([deployment]);
+    }
     if (url.endsWith('/branches')) return Response.json([branch]);
-    if (url.endsWith('/database/query')) {
-      expect(JSON.parse(String(init?.body))).toEqual({
-        query: 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version',
-        read_only: true,
-      });
+    if (url.endsWith('/database/migrations')) {
+      expect(url).toBe(
+        `https://api.supabase.com/v1/projects/${options.supabaseProjectRef}/database/migrations`,
+      );
+      expect(init?.method).toBe('GET');
+      expect(init?.body).toBeUndefined();
+      expect(new Headers(init?.headers).get('Content-Type')).toBeNull();
       return Response.json(migrations);
     }
     if (url.endsWith('/api/health/version')) return Response.json(version);
     if (url.endsWith('/api/health')) return Response.json(health);
     throw new Error('unexpected request');
   });
-  return { deployment, branch, version, health, migrations, fetchImpl };
+  return {
+    pr,
+    commitStatus,
+    deployment,
+    deploymentStatus,
+    branch,
+    version,
+    health,
+    migrations,
+    fetchImpl,
+  };
 }
 
 describe('Preview readiness', () => {
@@ -79,14 +128,20 @@ describe('Preview readiness', () => {
       supabaseProjectRef: options.supabaseProjectRef,
       origin: 'https://product-abc123-dayopt.vercel.app',
     });
-    expect(w.fetchImpl).toHaveBeenCalledTimes(5);
+    expect(w.fetchImpl).toHaveBeenCalledTimes(8);
     expect(JSON.stringify(result)).not.toContain('private');
+    expect(result.providerEvidence).toMatchObject({
+      provider: 'vercel',
+      githubDeploymentId: w.deployment.id,
+      githubDeploymentStatusId: w.deploymentStatus.id,
+      githubCommitStatusId: w.commitStatus.id,
+    });
     for (const [input, init] of w.fetchImpl.mock.calls) {
       const url = String(input);
       const headers = new Headers(init?.headers);
       expect(headers.get('Authorization')).toBe(
-        url.startsWith('https://api.vercel.com/')
-          ? 'Bearer vercel-private'
+        url.startsWith('https://api.github.com/')
+          ? 'Bearer github-private'
           : url.startsWith('https://api.supabase.com/')
             ? 'Bearer supabase-private'
             : null,
@@ -107,36 +162,96 @@ describe('Preview readiness', () => {
     ).resolves.toMatchObject({ status: 'ready' });
   });
 
-  it.each(['projectId', 'readyState', 'url'] as const)(
-    '不正deployment %sを拒否しDBへ進まない',
+  it('回収modeだけはclose/head更新済みPRでも元の固定provider/DB候補を照合する', async () => {
+    const w = world();
+    w.pr.state = 'closed';
+    w.pr.draft = true;
+    w.pr.head.sha = 'b'.repeat(40);
+    await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
+      'candidate PR is not open and ready',
+    );
+    await expect(
+      observePreviewReadiness({
+        ...options,
+        fetchImpl: w.fetchImpl,
+        requireRunnablePullRequest: false,
+      }),
+    ).resolves.toMatchObject({ status: 'ready', sha: options.sha });
+  });
+
+  it.each([60_001, -1])(
+    '全provider/DB/app観測の時間差%smsが古い/逆行した場合は合格にしない',
+    async (elapsed) => {
+      const w = world();
+      const started = Date.parse('2026-09-29T00:00:00Z');
+      let clock = started;
+      const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const response = await w.fetchImpl(input, init);
+        if (String(input).endsWith('/api/health')) clock = started + elapsed;
+        return response;
+      });
+      await expect(
+        observePreviewReadiness({ ...options, fetchImpl, now: () => new Date(clock) }),
+      ).rejects.toThrow('observation window is stale or clock moved backwards');
+      expect(fetchImpl).toHaveBeenCalledTimes(8);
+    },
+  );
+
+  it('全観測60秒ちょうどは許可し開始/終了時刻を残す', async () => {
+    const w = world();
+    const started = Date.parse('2026-09-29T00:00:00Z');
+    let clock = started;
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const response = await w.fetchImpl(input, init);
+      if (String(input).endsWith('/api/health')) clock = started + 60_000;
+      return response;
+    });
+    await expect(
+      observePreviewReadiness({ ...options, fetchImpl, now: () => new Date(clock) }),
+    ).resolves.toMatchObject({
+      startedAt: '2026-09-29T00:00:00.000Z',
+      observedAt: '2026-09-29T00:01:00.000Z',
+    });
+  });
+
+  it('不正な観測clockはネットワーク前に停止する', async () => {
+    const w = world();
+    await expect(
+      observePreviewReadiness({
+        ...options,
+        fetchImpl: w.fetchImpl,
+        now: () => new Date('invalid'),
+      }),
+    ).rejects.toThrow('observation clock is invalid');
+    expect(w.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(['sha', 'task', 'environment'] as const)(
+    'GitHub provider deploymentの不正%sを拒否しDBへ進まない',
     async (key) => {
       const w = world();
       w.deployment[key] = 'wrong';
-      await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
-        'deployment',
-      );
-      expect(w.fetchImpl).toHaveBeenCalledTimes(1);
+      await expect(
+        observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl }),
+      ).rejects.toThrow();
+      expect(
+        w.fetchImpl.mock.calls.some(([input]) => String(input).includes('api.supabase.com')),
+      ).toBe(false);
     },
   );
 
-  it('本番deploymentを拒否', async () => {
+  it('GitHub providerが示した本番deploymentを拒否', async () => {
     const w = world();
-    w.deployment.target = 'production';
-    await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
-      'deployment',
-    );
+    w.deployment.production_environment = true;
+    await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow();
   });
 
-  it.each(['githubCommitSha', 'githubCommitRef', 'githubCommitOrg', 'githubCommitRepo'] as const)(
-    '別Git source %sを拒否',
-    async (key) => {
-      const w = world();
-      w.deployment.meta[key] = 'wrong';
-      await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
-        'deployment',
-      );
-    },
-  );
+  it.each(['sha', 'ref'] as const)('別PR source %sを拒否', async (key) => {
+    const w = world();
+    w.pr.head[key] = 'wrong';
+    await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow();
+    expect(w.fetchImpl).toHaveBeenCalledTimes(1);
+  });
 
   it.each(['is_default', 'with_data', 'persistent'] as const)(
     '不正branch %sを拒否',
@@ -146,7 +261,7 @@ describe('Preview readiness', () => {
       await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
         'branch',
       );
-      expect(w.fetchImpl).toHaveBeenCalledTimes(2);
+      expect(w.fetchImpl).toHaveBeenCalledTimes(5);
     },
   );
 
@@ -175,6 +290,69 @@ describe('Preview readiness', () => {
     else w.migrations.push({ version: '20260902000000' });
     await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
       'migration sets differ',
+    );
+  });
+
+  it('migration metadataのnameと順序に依存せずversion集合を厳密照合する', async () => {
+    const w = world();
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) =>
+      String(input).endsWith('/database/migrations')
+        ? Response.json([
+            { version: '20260902000000', name: 'second' },
+            { version: '20260901000000', name: 'first' },
+          ])
+        : w.fetchImpl(input, init),
+    );
+    await expect(
+      observePreviewReadiness({
+        ...options,
+        expectedMigrations: ['20260901000000', '20260902000000'],
+        fetchImpl,
+      }),
+    ).resolves.toMatchObject({ status: 'ready' });
+  });
+
+  it.each([
+    null,
+    { migrations: [{ version: '20260901000000' }] },
+    [null],
+    [{ version: 20260901000000 }],
+    [{ version: 'invalid' }],
+    [{ name: 'no-version' }],
+  ])('不正なmigration metadataを拒否しアプリへ進まない: %j', async (migrations) => {
+    const w = world();
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) =>
+      String(input).endsWith('/database/migrations')
+        ? Response.json(migrations)
+        : w.fetchImpl(input, init),
+    );
+    await expect(observePreviewReadiness({ ...options, fetchImpl })).rejects.toThrow(
+      'migration observation is invalid',
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+  });
+
+  it('重複したmigration versionは集合へ丸めず拒否する', async () => {
+    const w = world();
+    w.migrations.push({ version: '20260901000000' });
+    await expect(observePreviewReadiness({ ...options, fetchImpl: w.fetchImpl })).rejects.toThrow(
+      'migration sets differ',
+    );
+  });
+
+  it('Migrations Readの権限不足でSQLへfallbackしない', async () => {
+    const w = world();
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) =>
+      String(input).endsWith('/database/migrations')
+        ? new Response('supabase-private', { status: 403 })
+        : w.fetchImpl(input, init),
+    );
+    await expect(observePreviewReadiness({ ...options, fetchImpl })).rejects.toThrow(
+      /^Preview readiness: platform observation failed$/,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+    expect(fetchImpl.mock.calls.some(([input]) => String(input).includes('/database/query'))).toBe(
+      false,
     );
   });
 
@@ -207,7 +385,7 @@ describe('Preview readiness', () => {
       }),
     ).rejects.toThrow('nonproduction');
     await expect(
-      observePreviewReadiness({ ...options, vercelToken: '', fetchImpl: w.fetchImpl }),
+      observePreviewReadiness({ ...options, githubToken: '', fetchImpl: w.fetchImpl }),
     ).rejects.toThrow('credentials');
     expect(w.fetchImpl).not.toHaveBeenCalled();
   });
@@ -215,9 +393,11 @@ describe('Preview readiness', () => {
   it.each(['http', 'json', 'network'])(
     '観測失敗%sの生応答やsecretを診断へ出さない',
     async (mode) => {
-      const fetchImpl = vi.fn(async () => {
-        if (mode === 'network') throw new Error('vercel-private');
-        return new Response('vercel-private', { status: mode === 'http' ? 403 : 200 });
+      const w = world();
+      const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (!String(input).startsWith('https://api.supabase.com/')) return w.fetchImpl(input, init);
+        if (mode === 'network') throw new Error('supabase-private');
+        return new Response('supabase-private', { status: mode === 'http' ? 403 : 200 });
       });
       await expect(observePreviewReadiness({ ...options, fetchImpl })).rejects.toThrow(
         /^Preview readiness: platform observation failed$/,

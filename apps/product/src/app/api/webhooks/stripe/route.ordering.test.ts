@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // The route and billing service are real. Only provider/DB transport and delivery
 // side effects are synthetic. This mutable profile carries state across events.
 const fixture = vi.hoisted(() => ({
+  emailEnabled: false,
   mode: 'durable' as 'durable' | 'legacy',
   profilePresent: true,
   deletionReceipt: false,
@@ -12,6 +13,7 @@ const fixture = vi.hoisted(() => ({
     account: null,
     created: 1_800_000_000,
     data: {
+      previous_attributes: undefined as { status: string } | undefined,
       object: {
         customer: 'cus_fixture',
         id: 'sub_old',
@@ -34,6 +36,8 @@ const fixture = vi.hoisted(() => ({
   },
 }));
 const retrieveSubscription = vi.hoisted(() => vi.fn());
+const deliveredEmail = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/email/send', () => ({ sendTransactionalEmail: deliveredEmail }));
 const processed = vi.hoisted(() => vi.fn());
 const released = vi.hoisted(() => vi.fn());
 
@@ -72,7 +76,14 @@ vi.mock('./stripe-webhook-idempotency', () => ({
 }));
 vi.mock('@/lib/supabase/oauth', () => ({
   createServiceRoleClient: () => ({
-    auth: { admin: { getUserById: async () => ({ data: { user: null }, error: null }) } },
+    auth: {
+      admin: {
+        getUserById: async () => ({
+          data: { user: fixture.emailEnabled ? { email: 'fixture@example.test' } : null },
+          error: null,
+        }),
+      },
+    },
     from: () => {
       let update: Record<string, unknown> | undefined;
       let customer: string | undefined;
@@ -160,6 +171,9 @@ function deliver() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  fixture.emailEnabled = false;
+  fixture.event.data.previous_attributes = undefined;
+  deliveredEmail.mockResolvedValue({ status: 'sent' });
   fixture.mode = 'durable';
   fixture.profilePresent = true;
   fixture.deletionReceipt = false;
@@ -186,6 +200,122 @@ beforeEach(() => {
 });
 
 describe('Stripe webhook delivery order', () => {
+  it.each(['durable', 'legacy'] as const)(
+    '%s: retry after receipt failure does not duplicate a delivered trial conversion notification',
+    async (mode) => {
+      fixture.mode = mode;
+      fixture.emailEnabled = true;
+      fixture.profile.subscription_status = 'trialing';
+      fixture.event.type = 'customer.subscription.updated';
+      fixture.event.data.object.status = 'active';
+      fixture.event.data.previous_attributes = { status: 'trialing' };
+      retrieveSubscription.mockResolvedValue({
+        id: 'sub_old',
+        customer: 'cus_fixture',
+        status: 'active',
+        livemode: false,
+      });
+      processed.mockRejectedValueOnce(new Error('Receipt temporarily unavailable'));
+      expect((await deliver()).status).toBe(500);
+      expect(released).toHaveBeenCalledTimes(1);
+      expect(fixture.profile.subscription_status).toBe('active');
+      expect((await deliver()).status).toBe(200);
+      expect(deliveredEmail).toHaveBeenCalledTimes(1);
+      for (const [delivery] of deliveredEmail.mock.calls) {
+        expect(delivery).toMatchObject({
+          to: 'fixture@example.test',
+          context: 'send_trial_conversion_email',
+        });
+      }
+      expect(processed).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each(['durable', 'legacy'] as const)(
+    '%s: recovery followed by an older active trial snapshot sends no trial conversion',
+    async (mode) => {
+      fixture.mode = mode;
+      fixture.emailEnabled = true;
+      fixture.profile.subscription_status = 'past_due';
+      fixture.event.type = 'customer.subscription.updated';
+      fixture.event.id = 'evt_newer_recovery';
+      fixture.event.data.object.status = 'active';
+      fixture.event.data.previous_attributes = { status: 'past_due' };
+      retrieveSubscription.mockResolvedValue({
+        id: 'sub_old',
+        customer: 'cus_fixture',
+        status: 'active',
+        livemode: false,
+      });
+      expect((await deliver()).status).toBe(200);
+      expect(fixture.profile.subscription_status).toBe('active');
+      expect(deliveredEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'fixture@example.test',
+          context: 'send_payment_recovered_email',
+        }),
+      );
+      fixture.event.id = 'evt_older_trial_end';
+      fixture.event.created -= 1;
+      fixture.event.data.object.status = 'active';
+      fixture.event.data.previous_attributes = { status: 'trialing' };
+      expect((await deliver()).status).toBe(200);
+      expect(fixture.profile.subscription_status).toBe('active');
+      expect(fixture.profile.subscription_id).toBe('sub_old');
+      expect(deliveredEmail).toHaveBeenCalledTimes(1);
+      expect(processed).toHaveBeenCalledTimes(2);
+      expect(released).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['durable', 'legacy'] as const)(
+    '%s: an old still-active subscription update and deletion preserve its replacement',
+    async (mode) => {
+      fixture.mode = mode;
+      fixture.emailEnabled = true;
+      fixture.profile.subscription_id = 'sub_new';
+      fixture.event.type = 'customer.subscription.updated';
+      fixture.event.data.object.status = 'active';
+      fixture.event.data.previous_attributes = { status: 'trialing' };
+      retrieveSubscription.mockResolvedValue({
+        id: 'sub_old',
+        customer: 'cus_fixture',
+        status: 'active',
+        livemode: false,
+      });
+      expect((await deliver()).status).toBe(200);
+      expect(fixture.profile.subscription_id).toBe('sub_new');
+      expect(fixture.profile.subscription_status).toBe('active');
+      fixture.event.type = 'customer.subscription.deleted';
+      fixture.event.id = 'evt_old_delete';
+      fixture.event.data.object.status = 'canceled';
+      expect((await deliver()).status).toBe(200);
+      expect(fixture.profile.subscription_id).toBe('sub_new');
+      expect(fixture.profile.subscription_status).toBe('active');
+      expect(deliveredEmail).not.toHaveBeenCalled();
+      expect(processed).toHaveBeenCalledTimes(2);
+      expect(released).not.toHaveBeenCalled();
+    },
+  );
+  it.each(['durable', 'legacy'] as const)(
+    '%s: authoritative checkout can install a replacement subscription',
+    async (mode) => {
+      fixture.mode = mode;
+      fixture.event.type = 'checkout.session.completed';
+      fixture.event.data.object.subscription = 'sub_new';
+      retrieveSubscription.mockResolvedValue({
+        id: 'sub_new',
+        customer: 'cus_fixture',
+        status: 'active',
+        livemode: false,
+      });
+      expect((await deliver()).status).toBe(200);
+      expect(fixture.profile.subscription_id).toBe('sub_new');
+      expect(fixture.profile.subscription_status).toBe('active');
+      expect(processed).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each(['durable', 'legacy'] as const)(
     '%s: a delayed active snapshot cannot restore a subscription already canceled at Stripe',
     async (mode) => {

@@ -101,7 +101,7 @@ protectedProcedure でログインを確かめる。contact.submit は利用権�
 - **コード**:
   - [`apps/product/src/lib/billing/operation-access.ts`](../../../apps/product/src/lib/billing/operation-access.ts) で `'contact.submit',` を探す
   - [`apps/product/src/features/contact/server/router.ts`](../../../apps/product/src/features/contact/server/router.ts) で `await enforceContactRateLimit(contactGlobalRateLimit, 'global');` を探す
-  - [`apps/product/src/lib/rate-limit/upstash.ts`](../../../apps/product/src/lib/rate-limit/upstash.ts) で `Ratelimit.slidingWindow(5, '1 h'),` を探す
+  - [`apps/product/src/lib/rate-limit/upstash.ts`](../../../apps/product/src/lib/rate-limit/upstash.ts) で `export const contactRateLimit = createRateLimiter(5, '1 h',` を探す
 - **この段を守るテスト**:
   - [`apps/product/src/features/contact/server/router.test.ts`](../../../apps/product/src/features/contact/server/router.test.ts) で `describe('contact router rate-limit availability'` を探す
 
@@ -164,11 +164,11 @@ VERCEL_ENV が production でなければ送らずに失敗する。RESEND_API_K
 - 画面: 送信失敗の toast。
 - データ: 送らない（仕様）。
 - 再試行: しない。何度送っても同じ。
-- 痕跡: 残らない（Function のログだけ）。サーバーの Sentry は VERCEL_ENV=production の時しか初期化されないので、CONTACT_DELIVERY_FAILED が「想定外」に分類されても Preview・開発環境では送られない。
+- 痕跡: 通常 Preview・開発環境では Function のログだけ。サーバーの Sentry は Production と識別済みの固定 Integration で、DSN がある時だけ初期化される。固定 Integration では CONTACT_DELIVERY_FAILED が Sentry に送られ得るが、問い合わせメールの配送は Production に限る。
 - **最初に見る場所**: 仕様どおり。Preview で配送を試す手段は無い。env が揃っているかは運用手順の preflight で見る。
 - 根拠:
   - [`docs/product/specs/contact.md`](../../product/specs/contact.md) で `credentialが存在してもProduction以外では配送しない` を探す
-  - [`apps/product/sentry.server.config.ts`](../../../apps/product/sentry.server.config.ts) で `const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';` を探す
+  - [`apps/product/sentry.server.config.ts`](../../../apps/product/sentry.server.config.ts) で `if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {` を探す
 
 </details>
 
@@ -425,7 +425,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
         },
         {
           "path": "apps/product/src/lib/rate-limit/upstash.ts",
-          "find": "Ratelimit.slidingWindow(5, '1 h'),"
+          "find": "export const contactRateLimit = createRateLimiter(5, '1 h',"
         }
       ],
       "tests": [
@@ -567,7 +567,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
           "screen": "送信失敗の toast。",
           "data": "送らない（仕様）。",
           "retry": "しない。何度送っても同じ。",
-          "trace": "残らない（Function のログだけ）。サーバーの Sentry は VERCEL_ENV=production の時しか初期化されないので、CONTACT_DELIVERY_FAILED が「想定外」に分類されても Preview・開発環境では送られない。",
+          "trace": "通常 Preview・開発環境では Function のログだけ。サーバーの Sentry は Production と識別済みの固定 Integration で、DSN がある時だけ初期化される。固定 Integration では CONTACT_DELIVERY_FAILED が Sentry に送られ得るが、問い合わせメールの配送は Production に限る。",
           "look": "仕様どおり。Preview で配送を試す手段は無い。env が揃っているかは運用手順の preflight で見る。",
           "refs": [
             {
@@ -576,7 +576,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
             },
             {
               "path": "apps/product/sentry.server.config.ts",
-              "find": "const IS_SENTRY_PRODUCTION = VERCEL_ENV === 'production';"
+              "find": "if (SENTRY_DSN && SENTRY_ENVIRONMENT !== null) {"
             }
           ],
           "tags": {

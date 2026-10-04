@@ -21,6 +21,20 @@ function fixture() {
   return root;
 }
 describe('agent preflight', () => {
+  it('reports missing service-account authentication without claiming runtime isolation', () => {
+    const root = fixture();
+    const previousToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
+    delete process.env.OP_SERVICE_ACCOUNT_TOKEN;
+    try {
+      const state = collectPreflight(root);
+      expect(state.onePassword.tokenPresent).toBe(false);
+      expect(state.onePassword.scope).toBe('unverified');
+      expect(state.onePassword.runtimeIsolation).toBe('unverified');
+      expect(renderPreflight(state)).toContain('Service Account 未設定');
+    } finally {
+      if (previousToken !== undefined) process.env.OP_SERVICE_ACCOUNT_TOKEN = previousToken;
+    }
+  });
   it('reports missing dependencies and hooks, never marks runtime hooks as active', () => {
     const root = fixture();
     const state = collectPreflight(root);

@@ -18,7 +18,7 @@
     "build:packages": "turbo run build --filter='./packages/*'",
     "start": "pnpm --filter @dayopt/product start",
     "check": "pnpm secrets:check && pnpm docs:check && pnpm typecheck && pnpm lint && pnpm check:static && pnpm quality:deadcode:ci && pnpm test:run",
-    "check:static": "pnpm auth-email:check && pnpm lint:boundaries && pnpm lint:tokens && pnpm format:check && pnpm license:check && pnpm license:credits:check && pnpm lint:i18n && pnpm copy:check:strict && pnpm storybook:taxonomy",
+    "check:static": "pnpm auth-email:check && pnpm lint:boundaries && pnpm lint:tokens && pnpm format:check && pnpm license:check && pnpm license:credits:check && pnpm lint:i18n && pnpm copy:check:strict && pnpm storybook:taxonomy && pnpm storybook:collect-files-check",
     "check:workspace": "pnpm typecheck && pnpm lint && pnpm build:packages && pnpm build-storybook",
     "lint": "turbo run lint",
     "lint:product": "pnpm --filter @dayopt/product lint",
@@ -113,10 +113,13 @@
     "build-storybook": "pnpm --filter @dayopt/storybook build",
     "build:web": "pnpm --filter @dayopt/web build",
     "test:web": "pnpm --filter @dayopt/web test",
-    "agent:preflight": "node scripts/tasks/agent-preflight.mjs"
+    "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
+    "agent:secrets:check": "node scripts/tasks/agent-service-account.mjs check",
+    "agent:run": "node scripts/tasks/agent-service-account.mjs run",
+    "storybook:collect-files-check": "tsx scripts/tasks/check-story-coverage.ts --collected-files"
   },
   "devDependencies": {
-    "@ai-sdk/gateway": "4.0.94",
+    "@ai-sdk/gateway": "4.0.96",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
     "@commitlint/cli": "^20.5.3",
@@ -143,7 +146,7 @@
     "@vitest/coverage-istanbul": "catalog:tooling",
     "@vitest/ui": "catalog:tooling",
     "@vueless/storybook-dark-mode": "catalog:tooling",
-    "ai": "7.0.116",
+    "ai": "7.0.118",
     "babel-plugin-react-compiler": "catalog:tooling",
     "eslint": "catalog:tooling",
     "eslint-config-next": "catalog:tooling",

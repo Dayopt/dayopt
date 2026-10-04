@@ -54,6 +54,36 @@ describe('PostHog server analytics', () => {
     expect(captureImmediate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      name: 'the persistent Integration database',
+      supabaseUrl: 'https://tilwaprottpyhlfoggbb.supabase.co',
+      branch: 'integration',
+    },
+    {
+      name: 'an Integration marker bound to another database',
+      supabaseUrl: 'https://yvglwblxrnrenfifsnje.supabase.co',
+      branch: 'integration',
+    },
+  ])('never schedules PostHog for $name', async ({ supabaseUrl, branch }) => {
+    vi.stubEnv('DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'integration');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('VERCEL_TARGET_ENV', 'production');
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', branch);
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', supabaseUrl);
+
+    await trackPostHogServerEvent({
+      eventName: 'plan_created',
+      userId: 'synthetic-user',
+      sourceId: 'synthetic-plan',
+    });
+
+    expect(scheduleAfter).not.toHaveBeenCalled();
+    expect(createServiceRoleClient).not.toHaveBeenCalled();
+    expect(captureImmediate).not.toHaveBeenCalled();
+  });
+
   it('does not send after refusal, revocation, or a failed consent lookup', async () => {
     consentQuery(false);
     await trackPostHogServerEvent({

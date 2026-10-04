@@ -4,6 +4,7 @@ import { after } from 'next/server';
 import { createHash } from 'node:crypto';
 import { PostHog } from 'posthog-node';
 
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import { createServiceRoleClient } from '@/lib/supabase/oauth';
 
@@ -18,6 +19,7 @@ type PostHogServerEventName =
   | 'first_payment_succeeded';
 
 type AnalyticsSource = 'manual' | 'external_calendar' | 'confirm_day' | 'plan_recording' | 'mcp';
+type AnalyticsEnvironment = 'production' | 'preview' | 'development';
 
 interface PostHogServerEvent {
   eventName: PostHogServerEventName;
@@ -37,20 +39,32 @@ export function postHogEventId(eventName: PostHogServerEventName, sourceId: stri
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-function eventEnvironment(): 'production' | 'preview' | 'development' {
-  if (process.env.VERCEL_ENV === 'production') return 'production';
-  if (process.env.VERCEL_ENV === 'preview') return 'preview';
-  return 'development';
+function eventEnvironment(): AnalyticsEnvironment | null {
+  const environment = resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    vercelUrl: process.env.VERCEL_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
+  if (environment === 'integration' || environment === 'unknown') return null;
+  return environment;
 }
 
 /** Optional and best-effort: analytics failures must never fail a Product write or Stripe webhook. */
 export async function trackPostHogServerEvent(input: PostHogServerEvent): Promise<void> {
   const projectKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_KEY;
-  if (process.env.POSTHOG_SERVER_ENABLED !== 'true' || !projectKey) return;
+  const environment = eventEnvironment();
+  if (environment === null || process.env.POSTHOG_SERVER_ENABLED !== 'true' || !projectKey) return;
 
   try {
     after(async () => {
-      await deliverPostHogServerEvent(input, projectKey);
+      await deliverPostHogServerEvent(input, projectKey, environment);
     });
   } catch {
     logger.warn('PostHog event scheduling failed', { eventName: input.eventName });
@@ -60,6 +74,7 @@ export async function trackPostHogServerEvent(input: PostHogServerEvent): Promis
 async function deliverPostHogServerEvent(
   input: PostHogServerEvent,
   projectKey: string,
+  environment: AnalyticsEnvironment,
 ): Promise<void> {
   try {
     const { data, error } = await createServiceRoleClient()
@@ -87,7 +102,7 @@ async function deliverPostHogServerEvent(
       uuid: postHogEventId(input.eventName, input.sourceId),
       ...(input.occurredAt ? { timestamp: new Date(input.occurredAt) } : {}),
       properties: {
-        environment: eventEnvironment(),
+        environment,
         surface: 'product',
         schema_version: 1,
         ...(input.source ? { source: input.source } : {}),

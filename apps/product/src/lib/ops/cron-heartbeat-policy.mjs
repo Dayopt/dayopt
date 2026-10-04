@@ -7,6 +7,7 @@ export const JOB_MAX_AGE_MINUTES = Object.freeze({
   'cleanup-calendar-authority-retention': 180,
   'expire-calendar-revoke-authority': 180,
   'finalize-calendar-revoke-guards': 180,
+  'billing-reconciliation': 1560,
 });
 
 /** A heartbeat is healthy only when each allowlisted job has one recent completion. */

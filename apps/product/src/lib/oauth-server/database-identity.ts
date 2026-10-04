@@ -1,5 +1,10 @@
 import 'server-only';
 
+import {
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  resolveSupabaseProjectRef,
+} from '@/lib/dayopt-environment';
+
 import type { OAuthEnvironmentConfig } from './identity';
 
 interface DatabaseOAuthIdentity {
@@ -40,13 +45,21 @@ export function matchesDatabaseOAuthIdentity(
 /**
  * Require the deployment identity and database identity to be the same exact
  * tuple. Errors deliberately omit either tuple so readiness logs cannot expose
- * configuration or credentials.
+ * configuration or credentials. This check never provisions an identity;
+ * provisioning belongs to the explicit environment setup after runtime/DB sync.
  */
 export async function assertDatabaseOAuthIdentity(
   expected: OAuthEnvironmentConfig,
   query: DatabaseIdentityQuery,
   expectedSupabaseProjectRef: string | null = null,
 ): Promise<void> {
+  if (
+    expected.environment === 'integration' &&
+    expectedSupabaseProjectRef !== PRODUCT_INTEGRATION_SUPABASE_REF
+  ) {
+    throw new DatabaseOAuthIdentityError();
+  }
+
   let result: DatabaseIdentityQueryResult;
 
   try {
@@ -68,31 +81,18 @@ export function resolveDatabaseOAuthProjectRef(input: {
   environment: OAuthEnvironmentConfig['environment'];
   supabaseUrl: string | undefined;
 }): string | null {
-  if (input.environment !== 'preview') return null;
+  if (input.environment === 'production') return null;
 
-  try {
-    if (!input.supabaseUrl) throw new Error();
-    const url = new URL(input.supabaseUrl);
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.port ||
-      url.pathname !== '/' ||
-      url.search ||
-      url.hash
-    ) {
-      throw new Error();
-    }
-
-    const hostMatch = /^([a-z]{20})[.]supabase[.]co$/u.exec(url.hostname);
-    if (!hostMatch?.[1]) throw new Error();
-
-    // Opaque API keys carry no project claims. The URL identifies the expected
-    // project; the authenticated identity RPC above must independently return
-    // the same project ref. A mismatched key fails authentication at that URL.
-    return hostMatch[1];
-  } catch {
+  const projectRef = resolveSupabaseProjectRef(input.supabaseUrl);
+  if (
+    !projectRef ||
+    (input.environment === 'integration' && projectRef !== PRODUCT_INTEGRATION_SUPABASE_REF)
+  ) {
     throw new DatabaseOAuthIdentityError();
   }
+
+  // Opaque API keys carry no project claims. The URL identifies the expected
+  // project; the authenticated identity RPC above must independently return
+  // the same project ref. A mismatched key fails authentication at that URL.
+  return projectRef;
 }
