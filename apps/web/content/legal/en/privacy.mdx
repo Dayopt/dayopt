@@ -1,7 +1,7 @@
 ---
 title: 'Privacy Policy'
 description: 'How Dayopt handles your personal information'
-lastUpdated: 'Review draft: 2026-10-01'
+lastUpdated: 'Review draft: 2026-10-04'
 ---
 
 <PrivacyDocument
@@ -88,8 +88,9 @@ lastUpdated: 'Review draft: 2026-10-01'
         deletion:
           'Account deletion also removes imported events retained for your history. Limited revocation and security records follow the retention table below. You can also revoke access from your Google account security settings.',
         limitedUse:
-          'Use and transfer of information received from Google APIs are subject to the Google API Services User Data Policy, including Limited Use requirements. We do not sell this information, use it for advertising or use it to train general AI models. External access to content derived from Google Calendar is described in the next section.',
+          'Use and transfer of information received from Google APIs are subject to the Google API Services User Data Policy, including Limited Use requirements, and the supplemental Google Workspace User Data and Developer Policy. We do not sell this information, use it for advertising or use it to train general AI models. External access to content derived from Google Calendar is described in the next section.',
         policyLink: 'Google API Services User Data Policy',
+        workspacePolicyLink: 'Google Workspace User Data and Developer Policy',
       },
       externalConnections: {
         title: 'External applications, MCP and AI assistants',
@@ -100,7 +101,7 @@ lastUpdated: 'Review draft: 2026-10-01'
         revoke:
           'Revoke a connection in Settings to stop future authorized access. Revocation or deleting your Dayopt account does not erase copies already received by an external client. Request deletion from that provider where necessary.',
         review:
-          '[HUMAN-04: publication is blocked until the Google-derived data transfer route, user disclosures and any required per-use consent or technical exclusion are verified against Google policies. Broad connection consent alone is not evidence of per-use opt-in.]',
+          '[HUMAN-04: publication is blocked until all Google-derived data routes and disclosures are checked against current Google policies. The current one-line pre-authorization text is shown only in Settings and says users can choose calendars to import; verify the required display location and add an in-app disclosure of data access, use and sharing immediately before Google authorization, since the Privacy Policy alone is insufficient. Confirm any required per-use opt-in or technical exclusion for MCP/API/feed transfers; rights to retain and use shared-calendar content and copies later converted into Plans or Records; Calendar API deletion and retention for ordinary deleted events versus cancelled recurring-instance exceptions (the current field mask omits recurringEventId/originalStartTime and sync marks cancelled rows without clearing their copied fields); the data-portability requirement, because the in-app export omits source event copies; downstream providers’ Limited Use and model-training restrictions; limits on staff/support access; an accurate user help page for managing and deleting Google-derived data; and the affirmative Limited Use disclosure. Broad Calendar connection consent alone is not evidence of per-use opt-in.]',
       },
       retention: {
         title: 'Retention and deletion',
@@ -116,6 +117,11 @@ lastUpdated: 'Review draft: 2026-10-01'
             period:
               'Kept while the account exists. Successful account deletion removes the account and associated primary data; provider cleanup failures may delay completion. Backups and limited technical records are separate.',
           },
+          calendarEvents: {
+            category: 'Google Calendar event copies',
+            period:
+              'Synchronization covers the 90 days before and after the current date. When Google reports a cancellation or deletion, Dayopt marks a known stored row as cancelled without immediately clearing its copied fields. Events linked to a Plan or Record may remain beyond the sync window and after disconnect to preserve history. After disconnect, a retained copy may remain even if its linked Plan or Record is later removed. The current system sets no separate time-based expiry for these history copies; account deletion removes the event rows. [HUMAN-05: Google distinguishes ordinary deleted events, whose local copies clients should remove, from cancelled recurring-instance exceptions that are retained for the parent event lifetime. Current sync does not request the recurrence identifiers needed to distinguish them and retains fields on cancelled rows. Verify production behavior, correct any mismatch, and confirm the lawful retention period before publication.]',
+          },
           google: {
             category: 'Google revocation records',
             period:
@@ -129,7 +135,7 @@ lastUpdated: 'Review draft: 2026-10-01'
           posthog: {
             category: 'PostHog analytics events',
             period:
-              'PostHog’s general Free plan rule provides a one-year event query window; this is not a guaranteed deletion deadline. Account deletion submits an asynchronous request to delete events associated with the Product account UUID; completion is controlled by PostHog. Unlinked anonymous browser events are not covered by the account deletion request. [HUMAN-05: verify the current plan, query window, actual deletion periods, and account-linked and anonymous-event deletion handling before publication.]',
+              'PostHog provides a read-only query window for project events that comes from the organization plan; this is not a guaranteed deletion deadline. Account deletion submits an asynchronous request to delete events associated with the Product account UUID; completion is controlled by PostHog. Unlinked anonymous browser events are not covered by the account deletion request. [HUMAN-05: verify the current contract plan, the project API query window, actual deletion periods and status, and account-linked and anonymous-event deletion handling. The current code skips the request if both analytics switches are off and no deletion key is configured, so retain deletion capability after any historical collection. Do not state a fixed plan window without current evidence.]',
           },
           backup: {
             category: 'Database and file backups',
@@ -144,7 +150,7 @@ lastUpdated: 'Review draft: 2026-10-01'
           billing: {
             category: 'Billing and support',
             period:
-              'Billing providers may retain records to meet accounting, fraud prevention and legal obligations after account deletion. Support correspondence is reviewed for deletion once no longer needed. [HUMAN-05: confirm applicable statutory periods and the support deletion schedule.]',
+              'For first-payment analytics deduplication, we retain an account-linked event identifier while the account exists and delete it with the account. Billing providers may retain records to meet accounting, fraud prevention and legal obligations after account deletion. Support correspondence is reviewed for deletion once no longer needed. [HUMAN-05: verify production retention and deletion of the first-payment marker, applicable statutory periods and the support deletion schedule.]',
           },
         },
         note: 'A deletion request does not override retention required by law. A backup restore must preserve completed deletion requests. We do not promise that all copies held by every provider disappear within 30 days.',
@@ -154,7 +160,7 @@ lastUpdated: 'Review draft: 2026-10-01'
         content:
           'Depending on applicable law, you may request access, correction, deletion, portability, restriction or objection, withdraw consent, and complain to the relevant supervisory authority. Contact support@dayopt.app; we may need proportionate identity verification. These rights may have legal exceptions.',
         export:
-          'Settings provides JSON export of your profile, plans, records, categories, activities and settings. CSV contains plan and record rows. This self-service export is not a complete copy of provider logs, correspondence or billing records; request other personal information through support.',
+          'Settings provides JSON export of your profile, plans, records, categories, activities and settings. CSV contains plan and record rows. The in-app export does not include the separate source copies of Google Calendar events that Dayopt may retain. It is also not a complete copy of provider logs, correspondence or billing records; request other personal information through support. [HUMAN-04: confirm whether Google data-portability requirements require an export or other change before publication.]',
         consent:
           'Change website browser analytics through Cookie settings in the footer. Change Product browser analytics in Settings > Data controls > Cookie settings; these browser choices are stored separately for each origin. Product Settings also has a separate account analytics setting for PostHog server events that you can change from any device. Internal Supabase service usage records and necessary server diagnostics continue independently of these switches. Browser withdrawal may reload the page, so save any unfinished input first. Withdrawal stops future consented processing; it does not itself delete events already collected. [HUMAN-09: verify browser traffic and cross-tab withdrawal before publication.]',
         california:

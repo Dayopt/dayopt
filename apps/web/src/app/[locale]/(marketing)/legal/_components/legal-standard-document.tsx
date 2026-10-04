@@ -84,6 +84,11 @@ const PRIVACY_SECTIONS: readonly SectionLayout[] = [
         labelKey: 'policyLink',
         href: 'https://developers.google.com/terms/api-services-user-data-policy',
       },
+      {
+        type: 'link',
+        labelKey: 'workspacePolicyLink',
+        href: 'https://developers.google.com/workspace/workspace-api-user-data-developer-policy',
+      },
     ],
   },
   {
@@ -101,7 +106,16 @@ const PRIVACY_SECTIONS: readonly SectionLayout[] = [
       {
         type: 'table',
         columns: ['category', 'period'],
-        rows: ['primary', 'google', 'technical', 'posthog', 'backup', 'providers', 'billing'],
+        rows: [
+          'primary',
+          'calendarEvents',
+          'google',
+          'technical',
+          'posthog',
+          'backup',
+          'providers',
+          'billing',
+        ],
       },
       { type: 'paragraph', key: 'note', position: 'after' },
     ],
@@ -195,7 +209,9 @@ function StandardLegalDocument({
           <section key={layout.key}>
             <h2 className="mb-4 text-2xl font-medium">{readLegalText(section, 'title')}</h2>
             {layout.blocks.map((block) => {
-              const blockKey = `${layout.key}-${block.type}-${'key' in block ? block.key : 'body'}`;
+              const identity =
+                'key' in block ? block.key : 'labelKey' in block ? block.labelKey : 'body';
+              const blockKey = `${layout.key}-${block.type}-${identity}`;
 
               switch (block.type) {
                 case 'paragraph':

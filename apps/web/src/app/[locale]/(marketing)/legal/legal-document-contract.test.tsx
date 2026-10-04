@@ -130,10 +130,11 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'Privacy Policy - Dayopt',
     metadataDescription: 'How Dayopt handles your personal information',
-    lastUpdated: 'Review draft: 2026-10-01',
-    bodyHash: 'db7ef1e221ff8ac2f4b9e5e774515a28af993160dc81deef5b4884afb4dc2f37',
+    lastUpdated: 'Review draft: 2026-10-04',
+    bodyHash: 'e299f4983960b48af5c78006a14806d6504f9a740a516ae734cf6729bfb12b54',
     hrefs: [
       'https://developers.google.com/terms/api-services-user-data-policy',
+      'https://developers.google.com/workspace/workspace-api-user-data-developer-policy',
       '/legal/cookies',
       '/legal/security',
     ],
@@ -215,10 +216,11 @@ const LEGAL_CONTRACT_CASES: readonly LegalContractCase[] = [
     slug: 'privacy',
     metadataTitle: 'プライバシーポリシー - Dayopt',
     metadataDescription: 'Dayoptにおける個人情報の取り扱いについて',
-    lastUpdated: 'レビュー原稿: 2026-10-01',
-    bodyHash: '0b8f413fb860771bce1fcc625aaed9a16d8ca57829ad7aaa531bf84023313467',
+    lastUpdated: 'レビュー原稿: 2026-10-04',
+    bodyHash: '2e0bd9ef0ddb5200a5a6123fcb31e975c7f323a9bc590be13d297902136a4321',
     hrefs: [
       'https://developers.google.com/terms/api-services-user-data-policy',
+      'https://developers.google.com/workspace/workspace-api-user-data-developer-policy',
       '/ja/legal/cookies',
       '/ja/legal/security',
     ],
@@ -399,6 +401,36 @@ describe('legal review factual boundaries', () => {
         );
         expect(container.textContent).toMatch(/Supabase.*consent choices|Supabase.*同意設定/);
         expect(container.textContent).toMatch(/linked.*account UUID|アカウントUUID.*関連付/);
+        expect(container.textContent).toMatch(
+          /first-payment analytics deduplication.*account exists.*delete it with the account|初回支払分析.*アカウントが存在する間.*アカウント削除時/,
+        );
+        expect(container.textContent).toMatch(
+          /PostHog provides a read-only query window.*comes from the organization plan.*not a guaranteed deletion deadline|PostHogは、組織プランに基づくプロジェクトのイベント参照期間.*読み取り専用.*削除期限を保証するものではありません/,
+        );
+        expect(container.textContent).toMatch(
+          /current one-line pre-authorization text is shown only in Settings and says.*choose calendars to import.*Privacy Policy alone is insufficient|現在の認可前の説明はSettingsにしかなく.*「取り込むカレンダーを選べる」とだけ.*Privacyだけでは足りません/,
+        );
+        expect(container.textContent).toMatch(
+          /ordinary deleted events.*local copies clients should remove.*cancelled recurring-instance exceptions|通常の削除予定のローカルコピー削除.*繰り返し予定の取消し例外/,
+        );
+        expect(container.textContent).not.toMatch(
+          /PostHog.{0,12}Free plan.{0,20}one-year|PostHogのFreeプラン.{0,30}1年/,
+        );
+        if (testCase.locale === 'en') {
+          expect(container.textContent).toMatch(
+            /Google Calendar event copies.*marks .* as cancelled.*no separate time-based expiry/i,
+          );
+          expect(container.textContent).toMatch(
+            /in-app export does not include the separate source copies of Google Calendar events/i,
+          );
+        } else {
+          expect(container.textContent).toMatch(
+            /Google Calendarの取り込み予定.*cancelled.*時間期限.*ありません/,
+          );
+          expect(container.textContent).toMatch(
+            /アプリ内の出力には.*Google Calendar.*元予定コピーは含まれません/,
+          );
+        }
       }
       if (testCase.slug === 'privacy' || testCase.slug === 'cookies') {
         expect(container.textContent).toMatch(/footer.*Cookie settings|フッター.*Cookie設定/);
