@@ -125,6 +125,7 @@ export const INTEGRATION_GLOBS = [
   'apps/product/src/lib/trpc/**',
   'apps/product/src/app/api/mcp/**',
   'supabase/migrations/**',
+  'supabase/tests/**',
   'apps/product/src/lib/test/integration/**',
   'apps/product/src/lib/test/integration-setup.ts',
   'apps/product/src/lib/test/trpc-test-helpers.ts',
@@ -179,6 +180,19 @@ const ROOT_BUILD_FILES = new Set([
 export const PRODUCT_BUILD_SCRIPTS = new Set([
   'scripts/tasks/check-client-bundle-secrets.mjs',
   'scripts/tasks/check-bundle-budget.ts',
+  'scripts/tasks/prepare-brand-docs.ts',
+]);
+
+// 文書だが app の配布物を作る正本。docs-only / scripts-neutral より先に判定する。
+export const PUBLIC_DOCUMENT_BUILD_INPUTS = new Set([
+  'docs/business/brand.md',
+  'scripts/tasks/prepare-brand-docs.ts',
+  'scripts/lib/docs-live/publish-brand.ts',
+  'scripts/lib/docs-live/brand-document.ts',
+  'scripts/lib/docs-live/render.ts',
+  'scripts/lib/docs-live/live-contract.ts',
+  'scripts/lib/docs-live/facts.ts',
+  'scripts/lib/create-deterministic-zip.ts',
 ]);
 
 // web の buildCommand（`pnpm generate:search-index && pnpm build`）が呼ぶのは
@@ -559,6 +573,14 @@ export function resolveImpact(changedFiles, options = {}) {
       mark('productUnit', file);
     }
 
+    if (PUBLIC_DOCUMENT_BUILD_INPUTS.has(file)) {
+      docsOnly = false;
+      product = true;
+      web = true;
+      mark('product', file);
+      mark('web', file);
+      continue;
+    }
     if (isDocsPath(file)) continue; // docsOnly を維持
 
     docsOnly = false;
@@ -827,11 +849,18 @@ export function resolveVercelIgnore({
     };
   }
 
-  // 差分 0 件は「変更が無い」という確定的な答え（production-release.mjs の
-  // resolveProjectImpact と同じ扱い）。resolveImpact へ空配列を渡すと「判定不能」として
-  // fail closed（全 affected）になってしまうため、ここで先に確定させる。
+  // 同じコードの再デプロイでも環境変数は変わりうる。Git の差分だけでは設定変更を
+  // 判定できないため build へ倒し、保存した設定を古い deployment に閉じ込めない。
   if (files.length === 0) {
-    return { shouldBuild: false, reason: `no file changes since ${shortSha(prevSha)}` };
+    return {
+      shouldBuild: true,
+      reason: `no file changes since ${shortSha(prevSha)}; rebuild to apply deployment configuration`,
+    };
+  }
+
+  // ビルド省略の判定自身が変わった場合は新しい判定で deployment を作り直す。
+  if (files.includes('scripts/ci/impact.mjs')) {
+    return { shouldBuild: true, reason: 'Vercel build decision script changed' };
   }
 
   let impact;

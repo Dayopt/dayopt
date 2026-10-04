@@ -10,7 +10,10 @@
  * - それ以外の gate 必須 env は、exact 名または prefix wildcard（`XXX_*`）で
  *   turbo.json に必ず載せる
  */
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -74,6 +77,118 @@ describe('turbo build env contract', () => {
 
       const uncovered = referencedEnvNames.filter((envName) => !isCoveredByBuildEnv(envName));
       expect(uncovered, gatePath).toEqual([]);
+    }
+  });
+});
+
+describe('turbo build artifact cache contract', () => {
+  it('clean checkout の cache hit で両 app の brand 配布物を復元する', () => {
+    const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'dayopt-turbo-brand-cache-'));
+    const cacheDir = join(fixtureRoot, 'cache');
+    const config = JSON.parse(readFileSync(join(repoRoot, 'turbo.json'), 'utf8'));
+    const { packageManager } = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+    const apps = ['product', 'web'];
+    const artifacts = {
+      'public/brand/README.md': '# Generated brand guide\n',
+      'public/brand/dayopt-brand-F.zip': 'deterministic-zip-fixture\n',
+    };
+
+    function createCheckout(name: string): string {
+      const checkout = join(fixtureRoot, name);
+      const write = (path: string, content: string) => {
+        mkdirSync(dirname(join(checkout, path)), { recursive: true });
+        writeFileSync(join(checkout, path), content);
+      };
+      write(
+        'package.json',
+        JSON.stringify({ name: 'brand-cache-fixture', private: true, packageManager }),
+      );
+      write('pnpm-workspace.yaml', "packages:\n  - 'apps/*'\n");
+      write(
+        'pnpm-lock.yaml',
+        "lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/product: {}\n  apps/web: {}\n",
+      );
+      write('turbo.json', JSON.stringify(config));
+      write(
+        '.gitignore',
+        '.turbo/\n.next/\npublic/brand/README.md\npublic/brand/dayopt-brand-F.zip\n.build-ran\n',
+      );
+      for (const dependency of config.globalDependencies) write(dependency, 'fixture input\n');
+      for (const app of apps) {
+        write(
+          `apps/${app}/package.json`,
+          JSON.stringify({ name: `@fixture/${app}`, scripts: { build: 'node build.cjs' } }),
+        );
+        write(
+          `apps/${app}/build.cjs`,
+          `const fs = require('node:fs');\nfs.mkdirSync('public/brand', { recursive: true });\nfs.mkdirSync('.next', { recursive: true });\nfs.writeFileSync('.next/built.txt', 'built');\nfs.writeFileSync('.build-ran', 'executed');\nfor (const [path, content] of Object.entries(${JSON.stringify(artifacts)})) fs.writeFileSync(path, content);\n`,
+        );
+      }
+      execFileSync('git', ['init', '--quiet'], { cwd: checkout });
+      execFileSync('git', ['add', '.'], { cwd: checkout });
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=Fixture',
+          '-c',
+          'user.email=fixture@example.invalid',
+          '-c',
+          'core.hooksPath=/dev/null',
+          'commit',
+          '--quiet',
+          '-m',
+          'fixture',
+        ],
+        { cwd: checkout },
+      );
+      return checkout;
+    }
+
+    function build(checkout: string): string {
+      return execFileSync(
+        join(repoRoot, 'node_modules/.bin/turbo'),
+        ['run', 'build', '--cache=local:rw', `--cache-dir=${cacheDir}`],
+        {
+          cwd: checkout,
+          encoding: 'utf8',
+          env: { ...process.env, TURBO_TELEMETRY_DISABLED: '1' },
+        },
+      );
+    }
+
+    try {
+      const initial = createCheckout('initial');
+      build(initial);
+      for (const app of apps) {
+        expect(existsSync(join(initial, 'apps', app, '.build-ran'))).toBe(true);
+        for (const [path, content] of Object.entries(artifacts)) {
+          expect(readFileSync(join(initial, 'apps', app, path), 'utf8')).toBe(content);
+        }
+      }
+
+      const clean = createCheckout('clean');
+      for (const app of apps) {
+        for (const path of Object.keys(artifacts))
+          expect(existsSync(join(clean, 'apps', app, path))).toBe(false);
+      }
+      const output = build(clean);
+      expect(output).toMatch(/Cached:\s+2 cached, 2 total/);
+      for (const app of apps) {
+        // A cache hit must restore artifacts without rerunning prepare/build.
+        expect(existsSync(join(clean, 'apps', app, '.build-ran'))).toBe(false);
+        expect(readFileSync(join(clean, 'apps', app, '.next/built.txt'), 'utf8')).toBe('built');
+        for (const [path, content] of Object.entries(artifacts)) {
+          expect(
+            existsSync(join(clean, 'apps', app, path)),
+            `${app}/${path} restored from cache`,
+          ).toBe(true);
+          expect(readFileSync(join(clean, 'apps', app, path), 'utf8')).toBe(content);
+        }
+      }
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
 });

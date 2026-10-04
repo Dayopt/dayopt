@@ -15,16 +15,7 @@ GitHub Actionsのセキュリティ設定、OWASP準拠のセキュリティ監�
 
 ## ワークフロー構成
 
-```
-.github/
-  dependabot.yml              # 依存関係自動更新
-  workflows/
-    ci.yml                    # impact（affected 判定）→ static（gitleaks + secrets:check + docs:check + lint/typecheck/knip）∥ unit（+ migration safety の検知）∥ integration（affected 時の RLS/integration）の並列 4 job + unit 後の migration-notice（検知時だけラベル + コメント）
-    production-config-audit.yml  # Vercel environment metadata 監査
-    nightly.yml               # workflow-status-sweep + replica-check + storage-backup-export の 3 job（#2483 で旧ファイルから統合。night-watch job は 2026-09-02、層 3 と integration は 2026-09-03 に撤去）
-    create-release.yml        # GitHub Release 作成
-    promote.yml               # main merge 連動の promote。impact → 層 3（E2E / Web Build & E2E）→ release の 3 job
-```
+現在のファイル一覧は末尾の生成領域で確認する。job と権限の定義はリンク先の workflow が正本。
 
 ## 権限設計
 
@@ -49,7 +40,6 @@ credential audit P2-6）。`ci.yml` の job が checkout / setup（`pnpm install
 | `ci.yml`（migration-notice job）                                                   | `contents: read` / `pull-requests: write` / `issues: write`  | migration safety の通知。checkout・依存 install をせず、unit の output は allowlist 検証する  |
 | `ci.yml`（integration job）                                                        | `contents: read`                                             | gh を呼ばないため job 単位で最小へ絞る（PR コードを実行する job に書き込み token を置かない） |
 | `nightly.yml`（replica-check / storage-backup job）                                | `contents: read`                                             | コード読み取りのみ                                                                            |
-| `nightly.yml`（workflow-status-sweep job）                                         | `issues: write` / `contents: read`                           | closed issue の Workflow status field cleanup                                                 |
 | `nightly.yml`（notify-failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
 | `production-config-audit.yml`（deploy-health / notify-supabase-audit-failure job） | `issues: write` ほか                                         | 失敗時の issue 通知                                                                           |
 | `promote.yml`（notify_failure job）                                                | `issues: write` / `contents: read`                           | 失敗時の issue 通知                                                                           |
@@ -142,14 +132,7 @@ pin-github-action .github/workflows/*.yml
 
 ### 使用中の Secrets
 
-| Secret                                 | 用途              | ワークフロー                   |
-| -------------------------------------- | ----------------- | ------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase 接続     | ci, e2e                        |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase 匿名キー | ci, e2e                        |
-| `NEXT_PUBLIC_APP_URL`                  | アプリ URL        | ci, e2e                        |
-| `SUPABASE_ACCESS_TOKEN`                | Supabase CLI 認証 | emergency only / local scripts |
-| `VERCEL_TOKEN`                         | Vercel API 監査   | production-config-audit        |
-| `VERCEL_ORG_ID`                        | Vercel team 特定  | production-config-audit        |
+期待するキーと用途は [env schema](../../scripts/tasks/env/schema.ts)、参照する workflow は末尾の一覧から確認する。ここでは登録済み・実在する secret と断定しない。実値は取得・表示しない。
 
 `GEMINI_API_KEY` は外部モデル diff レビュー（ai-review）専用だったが、2026-08-03 の撤去に
 合わせて **key 自体を失効させた**。GitHub repo secret の削除に加え、Google AI Studio 側の
@@ -422,3 +405,11 @@ deleted rowはauthenticated clientへ露出しない。
 - `auto_migrated` Recordのdelete/restore拒否
 - 別ユーザーのカテゴリーを指すアクティビティのINSERT / UPDATE拒否（`activities_category_owner_fkey`）
 - [RLS snapshot](../engineering/data/db/rls-snapshot.md)のdrift check
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/operations/security.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

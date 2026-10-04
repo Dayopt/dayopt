@@ -23,6 +23,7 @@ import {
 } from '@dayopt/components';
 import { Link } from '@dayopt/i18n/navigation';
 
+import { isMfaChallengeExpired, resolveMfaVerifyErrorKey } from '@/lib/auth/mfa-verify-error';
 import { logger } from '@/lib/logger';
 import { captureUnexpectedError, observeAuthOperation } from '@/lib/sentry';
 import { createClient } from '@/lib/supabase/client';
@@ -138,6 +139,7 @@ export function ResetPasswordForm({ className, ...props }: React.ComponentProps<
   const startMfaStepUp = useCallback(async () => {
     setMfaStepUp(true);
     setMfaError(null);
+    setMfaChallengeId(null);
     try {
       const { data: factors, error: factorsError } = await observeAuthOperation(
         'reset_password_mfa_list_factors',
@@ -163,12 +165,12 @@ export function ResetPasswordForm({ className, ...props }: React.ComponentProps<
         'reset_password_mfa_challenge',
         () => supabase.auth.mfa.challenge({ factorId: verifiedFactor.id }),
       );
-      if (challengeError) {
+      if (challengeError || !challengeData) {
         setMfaStepUp(false);
         setError(t('auth.errors.unexpectedError'));
         return;
       }
-      if (challengeData) setMfaChallengeId(challengeData.id);
+      setMfaChallengeId(challengeData.id);
     } catch (err) {
       const original = err instanceof Error ? err : new Error('Reset password MFA init failed');
       captureUnexpectedError(original, { feature: 'auth', operation: 'reset_password_mfa_init' });
@@ -228,16 +230,30 @@ export function ResetPasswordForm({ className, ...props }: React.ComponentProps<
         }),
       );
       if (verifyError) {
-        throw new Error(verifyError.message);
+        if (isMfaChallengeExpired(verifyError.code)) {
+          // 初期化と同じ復帰経路を使い、再発行に失敗したらpassword入力へ戻す。
+          await startMfaStepUp();
+        }
+        setMfaError(t(resolveMfaVerifyErrorKey(verifyError.code)));
+        setMfaVerificationCode('');
+        return;
       }
       await finishAfterStepUp();
-    } catch (err) {
-      setMfaError(err instanceof Error ? err.message : t('common.errors.mfa.codeInvalid'));
+    } catch {
+      setMfaError(t('common.errors.mfa.verificationFailed'));
       setMfaVerificationCode('');
     } finally {
       setMfaVerifying(false);
     }
-  }, [mfaFactorId, mfaChallengeId, mfaVerificationCode, supabase, finishAfterStepUp, t]);
+  }, [
+    mfaFactorId,
+    mfaChallengeId,
+    mfaVerificationCode,
+    supabase,
+    finishAfterStepUp,
+    startMfaStepUp,
+    t,
+  ]);
 
   const handleVerifyRecovery = useCallback(async () => {
     const trimmed = mfaRecoveryCode.trim().toUpperCase();

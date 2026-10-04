@@ -152,6 +152,7 @@ export const CalendarLayout = memo<CalendarLayoutProps>(
     const [sideRailSpaceRecoveryPhase, setSideRailSpaceRecoveryPhase] =
       useState<SideRailSpaceRecoveryPhase>('idle');
     const [sideRailResizing, setSideRailResizing] = useState(false);
+    const finishSideRailResizeRef = useRef<(() => void) | null>(null);
     const layoutRef = useRef<HTMLDivElement | null>(null);
     const sidebarSuppressionAppliedRef = useRef(false);
     const sideRailSpaceRecoveryChangeRef = useRef(onSideRailSpaceRecoveryChange);
@@ -244,6 +245,11 @@ export const CalendarLayout = memo<CalendarLayoutProps>(
           : desktopSideRailNeedsSpace && !desktopSideRailCanRecover
       : false;
     const desktopSideRailOpen = desktopSideRailRequested && !desktopSideRailSheet;
+    useEffect(() => {
+      if (!desktopSideRailOpen) finishSideRailResizeRef.current?.();
+    }, [desktopSideRailOpen]);
+    useEffect(() => () => finishSideRailResizeRef.current?.(), []);
+
     const contentStyle = {
       marginRight: desktopSideRailOpen ? effectiveSideRailWidth : 0,
     } satisfies React.CSSProperties;
@@ -336,6 +342,8 @@ export const CalendarLayout = memo<CalendarLayoutProps>(
 
         event.preventDefault();
 
+        finishSideRailResizeRef.current?.();
+
         const startX = event.clientX;
         const startWidth = sideRailWidth;
         const previousCursor = document.body.style.cursor;
@@ -356,10 +364,14 @@ export const CalendarLayout = memo<CalendarLayoutProps>(
           document.body.style.userSelect = previousUserSelect;
           window.removeEventListener('pointermove', handlePointerMove);
           window.removeEventListener('pointerup', handlePointerUp);
+          window.removeEventListener('pointercancel', handlePointerUp);
+          finishSideRailResizeRef.current = null;
         };
 
+        finishSideRailResizeRef.current = handlePointerUp;
         window.addEventListener('pointermove', handlePointerMove);
         window.addEventListener('pointerup', handlePointerUp, { once: true });
+        window.addEventListener('pointercancel', handlePointerUp, { once: true });
       },
       [sideRailMaxWidth, sideRailWidth],
     );

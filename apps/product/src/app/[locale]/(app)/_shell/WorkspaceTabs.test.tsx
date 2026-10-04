@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/calendar'));
 const navigationMock = vi.hoisted(() =>
-  vi.fn((): { currentDate: Date; viewType: 'week' } | null => ({
+  vi.fn((): { currentDate: Date; viewType: 'week' | 'day'; isViewReady?: boolean } | null => ({
     currentDate: new Date(2026, 2, 25),
     viewType: 'week',
   })),
@@ -57,6 +57,30 @@ describe('WorkspaceTabs', () => {
 
     const tabs = screen.getAllByRole('tab');
     expect(tabs[0]).toHaveAttribute('href', '/calendar?view=week&date=2026-03-25');
+  });
+
+  it('復元前はカレンダーへ遷移できず、復元後は保存済みビューへのリンクになる', () => {
+    pathnameMock.mockReturnValue('/report');
+    navigationMock.mockReturnValue({
+      currentDate: new Date(2026, 2, 25),
+      viewType: 'week',
+      isViewReady: false,
+    });
+    const { rerender } = render(<WorkspaceTabs />);
+    const calendarTab = screen.getAllByRole('tab')[0];
+    expect(calendarTab).toBeDisabled();
+    expect(calendarTab).not.toHaveAttribute('href');
+
+    navigationMock.mockReturnValue({
+      currentDate: new Date(2026, 2, 25),
+      viewType: 'day',
+      isViewReady: true,
+    });
+    rerender(<WorkspaceTabs />);
+    expect(screen.getAllByRole('tab')[0]).toHaveAttribute(
+      'href',
+      '/calendar?view=day&date=2026-03-25',
+    );
   });
 
   it('carries the current date into the report tab href (no view)', () => {

@@ -236,6 +236,30 @@ describe('OAuth token endpoint rate limit', () => {
       }),
     ).toBe(true);
     expect(requiresDistributedOAuthTokenRateLimit({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(
+      requiresDistributedOAuthTokenRateLimit({
+        VERCEL_ENV: 'preview',
+        DAYOPT_ENVIRONMENT: 'integration',
+      }),
+    ).toBe(true);
+    expect(
+      requiresDistributedOAuthTokenRateLimit({
+        VERCEL_ENV: 'preview',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+      }),
+    ).toBe(true);
+    expect(
+      requiresDistributedOAuthTokenRateLimit({
+        VERCEL_ENV: 'preview',
+        MCP_OAUTH_ENVIRONMENT: 'integration',
+      }),
+    ).toBe(true);
+    expect(
+      requiresDistributedOAuthTokenRateLimit({
+        VERCEL_ENV: 'preview',
+        DAYOPT_ENVIRONMENT: 'preview',
+      }),
+    ).toBe(false);
     expect(requiresDistributedOAuthTokenRateLimit({})).toBe(false);
   });
 });

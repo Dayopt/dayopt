@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+import { isOrdinaryProductPreview, resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import {
   assertDatabaseOAuthIdentity,
@@ -114,6 +115,7 @@ async function checkDatabase(): Promise<'ok' | 'error' | 'warning'> {
  * Redis（Upstash）接続チェック
  */
 async function checkRedis(): Promise<'ok' | 'error' | 'warning' | 'skipped'> {
+  if (isOrdinaryProductPreview(process.env)) return 'skipped';
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
   const isUpstashEnabled = Boolean(redisUrl && redisToken);
@@ -158,15 +160,18 @@ function getVersion(): string {
  * 環境名を取得
  */
 function getEnvironment(): string {
-  if (process.env.VERCEL_TARGET_ENV) {
-    return process.env.VERCEL_TARGET_ENV;
-  }
-
-  if (process.env.VERCEL_ENV) {
-    return process.env.VERCEL_ENV;
-  }
-
-  return process.env.NODE_ENV || 'development';
+  return resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    vercelUrl: process.env.VERCEL_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
 }
 
 /**
@@ -176,7 +181,8 @@ function isOperationalDeployment(): boolean {
   if (
     process.env.VERCEL_ENV === 'preview' &&
     process.env.VERCEL_TARGET_ENV === 'preview' &&
-    process.env.MCP_OAUTH_ENVIRONMENT === 'preview'
+    (process.env.MCP_OAUTH_ENVIRONMENT === 'preview' ||
+      process.env.MCP_OAUTH_ENVIRONMENT === 'integration')
   ) {
     return true;
   }

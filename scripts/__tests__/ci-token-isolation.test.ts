@@ -34,13 +34,17 @@ import { afterEach, describe, expect, it } from 'vitest';
  *
  * 保証しないこと:
  * - flow style（`{ contents: read }`）の permissions、anchor / alias、reusable workflow
- * - ci.yml 以外の workflow（promote.yml / nightly.yml は push / schedule で main の
+ * - ci.yml / calendar-navigation-e2e.yml 以外の workflow（promote.yml / nightly.yml は push / schedule で main の
  *   信頼済みコードを実行する前提。`pull_request` で PR コードを動かす workflow を足したら
  *   ここへ加えること）
  * - run script が curl 等で外部コードを取得して実行するケース
  */
 
 const CI_YML = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+const CALENDAR_E2E_YML = readFileSync(
+  join(process.cwd(), '.github/workflows/calendar-navigation-e2e.yml'),
+  'utf8',
+);
 const FINISH_BRANCH = readFileSync(join(process.cwd(), 'scripts/tasks/finish-branch.sh'), 'utf8');
 
 const withoutCommentLines = (text: string) =>
@@ -136,6 +140,17 @@ const jobById = (id: string) => {
   return job;
 };
 
+describe('calendar-navigation-e2e.yml の token 分離', () => {
+  it('PR コードは read-only token で実行し、外部秘密値を渡さない', () => {
+    expect(jobsOf(CALENDAR_E2E_YML)).toHaveLength(1);
+    expect(writeTokenOffenders(CALENDAR_E2E_YML)).toEqual([]);
+    expect(CALENDAR_E2E_YML).not.toMatch(/secrets\s*[.[]/);
+    expect(CALENDAR_E2E_YML).toContain('persist-credentials: false');
+    expect(CALENDAR_E2E_YML).toContain('ref: ${{ github.event.pull_request.head.sha }}');
+    expect(CALENDAR_E2E_YML).not.toContain('pull_request_target:');
+  });
+});
+
 describe('ci.yml の token 分離（credential audit P2-6）', () => {
   it('repo のコードや依存を実行する job は write 権限の token を持たない', () => {
     expect(writeTokenOffenders(CI_YML)).toEqual([]);
@@ -146,7 +161,15 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
     const tokenJobs = ciJobs.filter((job) => /github\.token|secrets\.GITHUB_TOKEN/.test(job.text));
 
     // impact / unit（read-only で PR files を読む）と migration-notice（コードを実行しない）
-    expect(tokenJobs.map((job) => job.id)).toEqual(['impact', 'unit', 'migration-notice']);
+    expect(tokenJobs.map((job) => job.id)).toEqual([
+      'impact',
+      'unit',
+      'migration-notice',
+      'preview-trust',
+      'preview-e2e',
+      'preview-recovery-trust',
+      'preview-recovery',
+    ]);
     for (const job of tokenJobs) {
       const effective = readPermissions(job.lines, 4) ?? workflowPermissions;
       if (repositoryCodeMarkers(job).length > 0) {
@@ -259,7 +282,7 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
       expect(writeTokenOffenders(fine)).toEqual([]);
     });
 
-    it('実ファイルから 6 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
+    it('実ファイルから 10 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
       expect(ciJobs.map((job) => job.id)).toEqual([
         'impact',
         'static',
@@ -267,6 +290,10 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
         'migration-notice',
         'integration',
         'db-upgrade',
+        'preview-trust',
+        'preview-e2e',
+        'preview-recovery-trust',
+        'preview-recovery',
       ]);
     });
   });
@@ -294,8 +321,8 @@ function runScriptOf(job: Job): string {
 const FAKE_GH = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$GH_LOG"
 if [ "$1" = api ] && [ "$2" != --method ]; then
-  [ "\${FAKE_LABELS_FAIL:-}" = 1 ] && exit 1
-  echo "\${FAKE_HAS_LABEL:-false}"
+  [ "\${FAKE_COMMENTS_FAIL:-}" = 1 ] && exit 1
+  [ "\${FAKE_HAS_COMMENT:-}" = true ] && echo 123
   exit 0
 fi
 if [ "$1" = pr ] && [ "$2" = comment ]; then
@@ -353,42 +380,40 @@ describe('migration-notice job の run script', () => {
     return { ...result, log, body, dir };
   }
 
-  it('未付与ならラベル作成 → コメント投稿 → ラベル付与の順で通知し、本文は decode した summary そのもの', () => {
+  it('未通知なら bot コメントを確認して投稿し、本文を shell に評価しない', () => {
     const result = runNotice({});
 
     expect(result.status).toBe(0);
     expect(result.log).toEqual([
-      'api repos/Dayopt/dayopt/issues/7/labels --jq [.[] | select(.name == "db:destructive-migration")] | length > 0',
-      'label create db:destructive-migration --repo Dayopt/dayopt --color B60205 --description 破壊的 migration を検知（EXPLICIT AUTHORITY 要確認）',
+      'api repos/Dayopt/dayopt/issues/7/comments --paginate --jq .[] | select(.user.login == "github-actions[bot]" and ((.body // "") | contains("<!-- dayopt:migration-safety-notice -->"))) | .id',
       `pr comment 7 --repo Dayopt/dayopt --body-file ${join(result.dir, 'migration-safety-comment.md')}`,
-      'api --method POST repos/Dayopt/dayopt/issues/7/labels -f labels[]=db:destructive-migration',
     ]);
-    expect(result.body).toBe(SUMMARY);
+    expect(result.body).toBe(`${SUMMARY}\n<!-- dayopt:migration-safety-notice -->\n`);
     // 本文はシェルに評価されない
     expect(existsSync(join(result.dir, 'pwned'))).toBe(false);
   });
 
-  it('付与済みなら再通知しない', () => {
-    const result = runNotice({ FAKE_HAS_LABEL: 'true' });
+  it('bot の通知コメントがあれば再通知しない', () => {
+    const result = runNotice({ FAKE_HAS_COMMENT: 'true' });
 
     expect(result.status).toBe(0);
     expect(result.log).toHaveLength(1);
     expect(result.body).toBeNull();
   });
 
-  it('ラベル確認の gh api が失敗しても fail open で通知する', () => {
-    const result = runNotice({ FAKE_LABELS_FAIL: '1' });
+  it('コメント確認の gh api が失敗しても fail open で通知する', () => {
+    const result = runNotice({ FAKE_COMMENTS_FAIL: '1' });
 
     expect(result.status).toBe(0);
+    expect(result.log.some((line) => line.includes('issues/7/comments'))).toBe(true);
     expect(result.log.some((line) => line.startsWith('pr comment 7'))).toBe(true);
-    expect(result.log.some((line) => line.startsWith('api --method POST'))).toBe(true);
   });
 
-  it('コメント投稿が失敗（fork PR の read-only token 等）したらラベルは付与せず、job も落とさない', () => {
+  it('コメント投稿が失敗（fork PR の read-only token 等）しても job を落とさない', () => {
     const result = runNotice({ FAKE_COMMENT_STATUS: '1' });
 
     expect(result.status).toBe(0);
-    expect(result.log.some((line) => line.startsWith('api --method POST'))).toBe(false);
+    expect(result.log.some((line) => line.startsWith('label create'))).toBe(false);
     expect(result.stdout).toContain('::warning::migration safety のコメント投稿に失敗しました');
   });
 

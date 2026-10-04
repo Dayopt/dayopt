@@ -1,16 +1,36 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["eslint.config.packages.mjs", "tsconfig.base.json"],
+  "globalDependencies": [
+    "eslint.config.packages.mjs",
+    "tsconfig.base.json",
+    "docs/business/brand.md",
+    "scripts/tasks/prepare-brand-docs.ts",
+    "scripts/lib/docs-live/publish-brand.ts",
+    "scripts/lib/docs-live/brand-document.ts",
+    "scripts/lib/docs-live/render.ts",
+    "scripts/lib/docs-live/live-contract.ts",
+    "scripts/lib/docs-live/facts.ts",
+    "scripts/lib/create-deterministic-zip.ts"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "storybook-static/**", "dist/**"],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "storybook-static/**",
+        "dist/**",
+        "public/brand/README.md",
+        "public/brand/dayopt-brand-F.zip"
+      ],
       "env": [
         "ANALYZE",
         "BILLING_ENFORCED",
         "CALENDAR_TOKEN_ENCRYPTION_KEY",
         "CI",
+        "CONTACT_INTEGRATION_RECIPIENT",
         "CRON_SECRET",
+        "DAYOPT_ENVIRONMENT",
         "GOOGLE_CALENDAR_*",
         "GOOGLE_SITE_VERIFICATION",
         "MCP_*",
@@ -30,6 +50,8 @@
         "VERCEL_ENV",
         "VERCEL_GIT_COMMIT_REF",
         "VERCEL_GIT_COMMIT_SHA",
+        "VERCEL_PROJECT_ID",
+        "VERCEL_PROJECT_PRODUCTION_URL",
         "VERCEL_TARGET_ENV",
         "VERCEL_URL",
         "YAHOO_VERIFICATION",

@@ -394,6 +394,7 @@ describe('runDbUpgradeCheck orchestration', () => {
     resetFails = false,
     rowsAfter = 'public.activities,(a1)\npublic.activities,(a2)\npublic.activities,(a3)\n',
     freshCatalog = 'index:public.activities_pkey CREATE UNIQUE INDEX ...\n',
+    env = { GITHUB_EVENT_NAME: 'pull_request', GITHUB_REF: 'refs/pull/2926/merge' },
   } = {}) {
     const calls: Call[] = [];
     const moves: [string, string][] = [];
@@ -404,6 +405,7 @@ describe('runDbUpgradeCheck orchestration', () => {
     const exec = (file: string, args: string[]) => {
       calls.push([file, args]);
       const joined = `${file} ${args.join(' ')}`;
+      if (joined.startsWith('git rev-parse --verify origin/main')) return 'c'.repeat(40);
       if (joined.startsWith('git rev-parse --verify HEAD^1')) return 'b'.repeat(40);
       if (joined.startsWith('git rev-parse --verify HEAD^2')) return 'a'.repeat(40);
       if (joined.startsWith('git ls-tree'))
@@ -443,6 +445,7 @@ describe('runDbUpgradeCheck orchestration', () => {
       throw new Error(`unexpected exec: ${joined}`);
     };
     const result = runDbUpgradeCheck({
+      env,
       exec,
       readFile: (path) => (path === SEED_PATH ? files.get(SEED_PATH)! : freshTypes),
       writeFile: (path, text) => files.set(path, text),
@@ -485,6 +488,26 @@ describe('runDbUpgradeCheck orchestration', () => {
       'oldConsumer',
       'catalogEquivalence',
     ]);
+  });
+
+  it('uses main for a manually dispatched branch whose HEAD is a main-sync merge commit', () => {
+    const { result, calls } = harness({
+      env: {
+        GITHUB_EVENT_NAME: 'workflow_dispatch',
+        GITHUB_REF: 'refs/heads/codex/preview-shared-db-2910',
+      },
+    });
+    expect(result.baseSha).toBe('c'.repeat(40));
+    expect(calls).not.toContainEqual(['git', ['rev-parse', '--verify', 'HEAD^1^{commit}']]);
+  });
+
+  it('uses the base parent only for the GitHub PR merge ref', () => {
+    expect(harness().result.baseSha).toBe('b'.repeat(40));
+    expect(
+      harness({
+        env: { GITHUB_EVENT_NAME: 'pull_request', GITHUB_REF: 'refs/heads/codex/candidate' },
+      }).result.baseSha,
+    ).toBe('c'.repeat(40));
   });
 
   it('stashes an added migration with an older timestamp so the base reset cannot apply it before seed', () => {

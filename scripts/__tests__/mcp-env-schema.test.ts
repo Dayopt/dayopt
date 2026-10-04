@@ -121,7 +121,8 @@ describe('MCP OAuth env inventory', () => {
     }
   });
 
-  it('常設Stagingを前提にしないことをSecrets文書で宣言する', () => {
-    expect(secretsDocumentation).toContain('常設Stagingは作らない');
+  it('persistent Integrationの接続先をSecrets文書で宣言する', () => {
+    expect(secretsDocumentation).toContain('https://product-git-integration-dayopt.vercel.app');
+    expect(secretsDocumentation).toContain('tilwaprottpyhlfoggbb');
   });
 });

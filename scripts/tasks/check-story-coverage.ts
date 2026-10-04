@@ -12,6 +12,7 @@
  *   npx tsx scripts/tasks/check-story-coverage.ts             # レポート表示
  *   npx tsx scripts/tasks/check-story-coverage.ts --strict    # カバレッジ低下で exit 1
  *   npx tsx scripts/tasks/check-story-coverage.ts --collected # collect 漏れで exit 1（ブラウザ起動を伴い数分かかる）
+ *   npx tsx scripts/tasks/check-story-coverage.ts --collected-files # 両テーマの include 漏れで exit 1（ブラウザ不要。tag/play/a11y は検査しない）
  */
 
 import { execFileSync } from 'node:child_process';
@@ -19,7 +20,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { hasExcludedMetaTag } from '../lib/story-test-collection';
+import { hasExcludedMetaTag, parseCollectedStoryFiles } from '../lib/story-test-collection';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,7 @@ const SCAN_DIRS = [
 
 const isStrict = process.argv.includes('--strict');
 const isCollected = process.argv.includes('--collected');
+const isCollectedFiles = process.argv.includes('--collected-files');
 
 /**
  * `apps/storybook/.storybook/main.ts` の `stories` glob が指す Story ファイルの置き場所。
@@ -189,36 +191,41 @@ function findStoryFilesByPattern(dir: string): string[] {
   return results;
 }
 
-function parseCollectedStoryFiles(listOutput: string, storybookRoot: string): Set<string> {
-  const files = new Set<string>();
-  for (const line of listOutput.split('\n')) {
-    const match = line.match(/^\[storybook \(chromium\)\] (\S+)/);
-    if (match?.[1]) files.add(path.resolve(storybookRoot, match[1]));
-  }
-  return files;
-}
-
-function checkCollected(): number {
+function checkCollected(project: 'storybook' | 'storybook-dark'): number {
   const expected = new Set(
     COLLECT_SCAN_ROOTS.flatMap(findStoryFilesByPattern).filter(
-      (file) => !hasExcludedMetaTag(fs.readFileSync(file, 'utf-8'), EXCLUDED_STORY_TAGS),
+      // --filesOnly は runtime tag 除外前の include 集合。両辺とも全 Story で比較する。
+      (file) =>
+        isCollectedFiles ||
+        !hasExcludedMetaTag(fs.readFileSync(file, 'utf-8'), EXCLUDED_STORY_TAGS),
     ),
   );
 
   // vitest list の表示パスは storybook project の root（apps/storybook）基準
-  const output = execFileSync('pnpm', ['exec', 'vitest', 'list', '--project', 'storybook'], {
-    cwd: APP_ROOT,
-    encoding: 'utf-8',
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 15 * 60 * 1000,
-  });
-  const collected = parseCollectedStoryFiles(output, STORYBOOK_ROOT);
+  const output = execFileSync(
+    'pnpm',
+    ['exec', 'vitest', 'list', '--project', project, ...(isCollectedFiles ? ['--filesOnly'] : [])],
+    {
+      cwd: APP_ROOT,
+      encoding: 'utf-8',
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: isCollectedFiles ? 60 * 1000 : 15 * 60 * 1000,
+    },
+  );
+  // --filesOnly の表示は cwd、browser collect は project root 基準。
+  const collected = parseCollectedStoryFiles(
+    output,
+    isCollectedFiles ? APP_ROOT : STORYBOOK_ROOT,
+    project,
+  );
 
   const missing = [...expected].filter((file) => !collected.has(file)).sort();
   const unexpected = [...collected].filter((file) => !expected.has(file)).sort();
 
-  console.log('\n━━━ Storybook Test Collection ━━━\n');
+  console.log(
+    `\n━━━ Storybook ${isCollectedFiles ? 'File' : 'Test'} Collection (${project}) ━━━\n`,
+  );
   console.log(`Expected: ${expected.size} files / Collected: ${collected.size} files\n`);
 
   for (const [label, files] of [
@@ -232,7 +239,11 @@ function checkCollected(): number {
   }
 
   if (missing.length === 0 && unexpected.length === 0) {
-    console.log('All testable story files are collected.\n');
+    console.log(
+      isCollectedFiles
+        ? 'All story files are included (runtime tags/play/a11y not checked).\n'
+        : 'All testable story files are collected.\n',
+    );
   }
   return missing.length + unexpected.length;
 }
@@ -242,8 +253,9 @@ function checkCollected(): number {
 // ─────────────────────────────────────────────────────────
 
 function main(): void {
-  if (isCollected) {
-    const mismatches = checkCollected();
+  if (isCollected || isCollectedFiles) {
+    const mismatches =
+      checkCollected('storybook') + (isCollectedFiles ? checkCollected('storybook-dark') : 0);
     if (mismatches > 0) {
       console.error(
         `ERROR: storybook project の collect 集合が Story ファイルと ${mismatches} 件食い違う`,

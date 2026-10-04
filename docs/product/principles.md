@@ -70,7 +70,8 @@ diff（予定と記録のズレ）を軸に据えるのは、ターゲット（A
 ## つながる(MCP / API)
 
 - MCP / API で全データを読み書きできる。ユーザーのチャット画面で「今これやってるからアクティビティで2時間つけておいて」が動く
-- API の書き込みはデフォルトでゴースト経由([strategy.md §4-3](../strategy.md))。直接確定の許可は要検討(下記未決リスト)
+- MCP の write scope を持つ対応 client の操作は正規データへ直接反映する。操作ごとの確認は client が担い、Dayopt は確認済みという自己申告を要求・検証しない。接続・scope・利用権・gate・時間規則・再送を検証し、Dayopt 内に proposal / approval URL / 承認待ち状態を追加しない（[現行契約 #1754](https://github.com/Dayopt/dayopt/issues/1754)）。外部カレンダーの自動取り込みと明示変換は [別の契約](./specs/external-calendar.md)
+- 直接書き込みは 2026-08-26 の User 裁定。完了間近の scope を動かさず出荷するため、proposal-only への切替提案は現 phase で採らなかった。将来 phase で検討する場合は、実 consumer 数・deprecation 期間・移行実装の費用と出荷速度の利点を比較する（[判断原典](https://github.com/Dayopt/dayopt/issues/1754#issuecomment-5418236863)）。この判断は write gate の開放や本番変更の許可ではない
 - 週次の補正という目標は上の「v1『完成』の定義」と末尾の未決リストで扱う。観測値の定義と現行の配置は [`specs/review.md`](./specs/review.md)を正本とし、目標を実装済みの API / UI 契約として説明しない
 
 ## 設計上の未決リスト
@@ -79,4 +80,4 @@ diff（予定と記録のズレ）を軸に据えるのは、ターゲット（A
 - 2レーンの視覚表現の磨き込み(Week「予定+記録」の密度対応、差分数字の添え方)
 - 作成時フィードフォワードの表示形式(どこに・どのくらい静かに出すか。表現する数値は [`specs/review.md`](./specs/review.md) が正本)
 - ゴーストの視覚表現と有効期限の挙動
-- ゴースト経由 API 書き込みの詳細(直接確定を許す `confirmed` フラグの是非、外部カレンダー同期の繰り返しイベントの扱い)
+- MCP を将来 proposal-only へ移すか。現 phase の直接書き込みは決定済みであり、`confirmed` フラグや追加承認 UI を現行契約へ足す根拠にはしない。外部カレンダーの繰り返しイベントは [外部カレンダー仕様](./specs/external-calendar.md)を参照する

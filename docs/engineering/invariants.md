@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-09-25
 ---
 
 # Dayopt 不変条件カタログ
@@ -25,6 +25,13 @@ last_verified: 2026-09-22
 自動レビュー（ai-review）は撤去したが、カタログ自体はレビュアーに依存しない資産なので
 docs へ残している。
 
+## Agent の 1Password 起動契約
+
+- 秘密注入を使う専用環境の agent 起動は、確認済みの active Service Account と `agent` vault の ID・名前・全件数を照合し、token 未設定 / 認証失敗 / 許可外 vault では作業 command を起動しない（2026-09-30、`scripts/tasks/agent-service-account.mjs`）。
+- ローカルの通常の `op` 用 entry point は、注入済み token または専用 Keychain 項目からの取得と SA 検証に成功した場合だけ要求 command を SA で実行する。人間用 CLI による bootstrap を使わず、取得失敗時に人間用認証へ fallback させない。この entry point は OS / MCP / UI の隔離を保証しない（2026-09-30、`scripts/tasks/agent-op.mjs`）。
+- Connect / 人間用 CLI session / desktop 統合を起動 process に継承せず、検査の raw stdout / stderr を記録しない。SA は 1Password 側で `agent` read-only に限定し、人間用の認証・UI・ファイルへの別経路は専用クラウド、または人間用ホームへのアクセスを拒否した専用の標準 Mac ユーザーで閉じる。
+- wrapper / preflight の存在や fixture test の成功を実環境の隔離完了と扱わない。CLI の vault 一覧は書き込み・共有・vault 作成・Environments 権限を証明しない。権限と platform の検証・移行状態の正本は [secrets.md](../operations/secrets.md#service-account)。
+
 ## 課金・entitlement
 
 - **利用権が終わった後に server が拒否する mutation（`lib/billing/operation-access.ts` の
@@ -47,7 +54,7 @@ docs へ残している。
 
 - 公開エンドポイント（OAuth callback / webhook / contact）は rate limit を持つ
 - `app/api/health/cron/route.ts` は UptimeRobot 用の無認証・production-only monitor。
-  service-role で読むのは `cron_heartbeats` の allowlist 8件の job 名と完了時刻だけで、
+  service-role で読むのは `cron_heartbeats` の allowlist 9件の job 名と完了時刻だけで、
   OAuth identity を照合してから評価する。全体 30回/分、DB query は5秒で打ち切り、
   応答は `healthy` / `unhealthy` のみ・`no-store`・失敗時503。上限超過時は60秒以内の
   成功/失敗結果だけ再生し、新しい結果が無ければ503を返す。
@@ -61,8 +68,8 @@ docs へ残している。
   握って Sentry へ送るだけなので **行は永遠に作られない**。監査
   （`production-cron-heartbeat-audit.mjs` の `JOB_MAX_AGE_MINUTES`）へ job を足すのは、
   制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
-  現状 **Vercel cron 4 本のうち `billing-reconciliation` だけ heartbeat を持たない**ため、
-  止まっても検知されない（2026-09-20 に PR #2863 の `@codex review` で判明、#2864 で塞ぐ）
+  監査対象の全job名を実DBのCHECK制約と照合するintegration testで追加漏れを検出する
+  （#2864）。`billing-reconciliation` は差分検出の503とは独立に、照合完了を記録する。
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
 
 ## メール通知
@@ -99,6 +106,8 @@ docs へ残している。
 - **永続化するクライアント cache は認証主体に束縛する。** ブラウザに残す query cache は
   user id で名前空間を分け、別 principal の blob を復元せず、sign-out で破棄する。
   key に所有者が無いと、共有端末で前のユーザーのデータが次のユーザーへ復元される（#2619）
+  破棄時は進行中の保存・復元も無効化する。破棄前に始まった読み取り結果を後からhydrateせず、
+  開始済みの書き込みが完了してからstorageを消し、旧blobを復活させない（#2963）。
 - **所有者付きリソースを跨いで参照する行は、単一 ID ではなく `(id, user_id)` の複合 FK で
   束縛する。** トリガーではなく FK で守るので、他人の行を紐づけることが構造的に不可能になる。
   参照先には `UNIQUE (id, user_id)` の anchor が要る（`categories` / `activities` /
@@ -136,15 +145,18 @@ docs へ残している。
 - 外部 OAuth では `openid` scope を要求し、ユーザーの同定は id_token 側で行う
   （メールアドレスの一致で同定しない）
 - token 暗号化の鍵は起動時に長さを検証する（32 bytes 以上）
-- 外部カレンダーの再接続は、callback で検証した Google `sub` が保存済み
-  `provider_account_id` と一致する既存の `reauth_required` 行だけを条件付き更新する。
-  generic upsert で削除済み接続を復活させず、切断との競合では切断を勝たせる
+- 外部カレンダーの OAuth callback は、一回限りの code を交換する前に server-side attempt を claim する。
+  新規接続は ready な project / subject fence と開始時の user data generation を検証する DB command で保存し、
+  authority fence を伴わない接続は確定しない。再接続は callback で検証した Google `sub` が保存済み
+  `provider_account_id` と一致する同一 user / provider の `reauth_required` 行、または fence が欠けた legacy
+  `active` 行だけを条件付き更新する。generic upsert で再接続対象を復活させず、切断との競合では切断を勝たせる
 - iCal feed token は URL を知るだけで購読できる bearer-style credential として扱い、client query を
   永続 cache へ保存しない。Settings を開く時と focus 復帰時は再取得し、取得中の cached URL は操作させない
 - **ユーザーが明示した外部カレンダーの切断は、provider revoke の試行と行の削除の両方に必ず到達する。**
   authority fence（`authority_fence_id` / `authority_epoch`）の欠落を「切断済み」と解釈しない。
-  fence を書く接続作成経路が無い以上、fence を要求すると全ての新規接続で切断が空振りし、
-  UI が成功を表示したまま Google 側の grant が無期限に生き残る（#2620）
+  新規保存・再接続は DB command が ready な subject fence を付け、legacy の fence 欠落は user data generation と
+  project / quarantine / subject fence の ready 状態を確認する RPC で一覧・選択・同期の前に修復する。
+  切断は legacy の fence 欠落行でも revoke と削除を続ける（#2620、#2673）
 - **auth メールの token 配送先 origin は Edge Function 自身の allowlist で閉じる。** GoTrue の
   redirect allowlist（production は Dashboard が正本で repo から強制できず、CI 監査も fail-open）
   だけに依存しない。`redirect_to` の origin が allowlist 外なら `NEXT_PUBLIC_APP_URL` へ落とし、
@@ -330,7 +342,8 @@ docs へ残している。
     （REST + service role key）から送る（2026-09-21 実測、`supabase` skill §実測で分かった罠）
 - Plan は時間軸のどこにでも置ける。過去 Plan もドラッグ移動・リサイズ・時間編集ができ、
   編集しても Plan のままで Record にはならない。過去スロットへ新規に引いたブロックは
-  Record になる（宛先は `end_at` だけで決まる）
+  既定では Record になる。既定は `end_at` だけで決まり、終了が現在以前なら作成 Inspector で
+  Plan / Record を選べる（`resolveTimeblockKindChoice`）。未来は Plan のみ
 
 ### 規則の写しと、その分類
 
@@ -345,7 +358,7 @@ grep 対象にする。
 | (a) 契約変換  | `features/timeblock/server/mcp-mutation-client.ts` の `EXPECTED_ERROR_CODES`            | DT コード → `McpMutationErrorCode`                | 不可（MCP の公開契約）                        |
 | (a) 契約変換  | `features/timeblock/server/timeblock-context-contract.ts` の `TIMEBLOCK_CONTEXT_RULES`  | MCP `constraints.get` が返す規則の宣言            | 不可（公開契約）                              |
 | (b) UX 先回り | `features/timeblock/schemas/timeblock.ts` の `timeRangeRefine`                          | 往復前に `end > start` を弾く                     | 可（server が同じ規則で拒否する）             |
-| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から Plan / Record の宛先を決める        | 不可（規則の写しではなく宛先の決定そのもの）  |
+| (b) UX 先回り | `features/timeblock/domain/timeblock-destination.ts`                                    | `end_at` から既定の宛先と種別の選択可否を決める   | 不可（規則の写しではなく宛先の決定そのもの）  |
 | (b) UX 先回り | `features/calendar/lib/overlap.ts` + `lib/time/time-conflict.ts`                        | 重なりの事前表示                                  | 可（overlap は DB 側 `TIME_OVERLAP` が正）    |
 | (b) UX 先回り | `features/calendar/hooks/operations/useTimeblockOperations.ts` の record 未来移動ガード | ドラッグ中に `timeLocked` を出す                  | 可（server 拒否でも同じ toast が出る。#2628） |
 | (b) UX 先回り | `features/calendar/interaction/interaction-effects.ts` の `case 'DROP'` の記録化経路    | Record レーンへの drop 先が未来なら記録を作らない | 可（server が `DT005` で拒否する。#2645）     |

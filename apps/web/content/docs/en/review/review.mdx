@@ -65,7 +65,7 @@ Comparisons with the previous period add up only the activities you currently ha
 
 For each activity, a recorded bar sits next to a planned bar (dashed), with the ratio between them alongside.
 
-**Estimation mirror** surfaces up to three activities where your estimates are furthest off. To qualify, a row must have at least 30 minutes of ended Plans, at least one Record, and at least three ended Plans. There is no combined accuracy score.
+**Estimation mirror** surfaces up to three activities where your estimates are furthest off. To qualify, a row must have at least 30 minutes of elapsed planned time, at least one Record, and at least three started Plans. There is no combined accuracy score. A Plan that has started but not ended contributes only the time elapsed up to now.
 
 ### Reflection
 
@@ -85,12 +85,12 @@ Margin — time you did not record — does not move when you filter. It is the 
 
 Dayopt will not build a ratio out of too few observations. When there isn't enough, you get a dash rather than a blank or a 0%.
 
-| Where                 | Stays silent when                                   |
-| --------------------- | --------------------------------------------------- |
-| Plan vs. record ratio | Ended Plans total under 15 minutes                  |
-| Estimation mirror     | Ended Plans total under 30 minutes, or fewer than 3 |
-| Compass point         | Fewer than 5 fulfillment answers                    |
-| Length distribution   | Fewer than 3 Records                                |
+| Where                 | Stays silent when                                                           |
+| --------------------- | --------------------------------------------------------------------------- |
+| Plan vs. record ratio | Elapsed planned time totals under 15 minutes                                |
+| Estimation mirror     | Elapsed planned time totals under 30 minutes, or fewer than 3 started Plans |
+| Compass point         | Fewer than 5 fulfillment answers                                            |
+| Length distribution   | Fewer than 3 Records                                                        |
 
 Averages are never shown. Dayopt speaks in medians and counts.
 

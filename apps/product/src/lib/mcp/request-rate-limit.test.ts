@@ -67,6 +67,27 @@ describe('checkMcpUserRateLimit', () => {
       }),
     ).toBe(true);
     expect(requiresDistributedMcpRateLimit({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(
+      requiresDistributedMcpRateLimit({ VERCEL_ENV: 'preview', DAYOPT_ENVIRONMENT: 'integration' }),
+    ).toBe(true);
+    expect(
+      requiresDistributedMcpRateLimit({
+        VERCEL_ENV: 'preview',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+      }),
+    ).toBe(true);
+    expect(
+      requiresDistributedMcpRateLimit({
+        VERCEL_ENV: 'preview',
+        MCP_OAUTH_ENVIRONMENT: 'integration',
+      }),
+    ).toBe(true);
+    expect(
+      requiresDistributedMcpRateLimit({
+        VERCEL_ENV: 'preview',
+        DAYOPT_ENVIRONMENT: 'preview',
+      }),
+    ).toBe(false);
     expect(requiresDistributedMcpRateLimit({})).toBe(false);
   });
 });

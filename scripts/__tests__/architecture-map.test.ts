@@ -1060,6 +1060,9 @@ verify_jwt = false
       ),
     ).toEqual([{ id: 'trpcUserRateLimit', limit: 300, window: '1 m' }]);
     expect(
+      parseRateLimits("export const mcpPreAuthRateLimit = createRateLimiter(1_200, '1 m', 'mcp');"),
+    ).toEqual([{ id: 'mcpPreAuthRateLimit', limit: 1200, window: '1 m' }]);
+    expect(
       parseProcedureBuilders(
         'export const protectedProcedure = t.procedure\nexport function entitledProcedure(key) {}',
       ),

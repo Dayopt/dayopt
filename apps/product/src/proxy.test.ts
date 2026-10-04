@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  PRODUCT_INTEGRATION_APP_ORIGIN,
+  PRODUCT_INTEGRATION_SUPABASE_REF,
+  PRODUCT_VERCEL_PROJECT_ID,
+} from '@/lib/dayopt-environment';
+
 const mocks = vi.hoisted(() => ({
   updateSession: vi.fn(),
   captureUnexpectedError: vi.fn(),
@@ -21,6 +27,8 @@ vi.mock('@/lib/sentry', () => ({
 }));
 
 vi.mock('@/lib/supabase/middleware', () => ({ updateSession: mocks.updateSession }));
+
+import { getOAuthEnvironmentConfig } from '@/lib/oauth-server/identity-env';
 
 import { config, proxy } from './proxy';
 
@@ -52,6 +60,69 @@ function mockUnauthenticatedSession() {
     supabase: { auth: {} },
   });
 }
+
+function stubIntegrationOAuthEnvironment() {
+  const integrationEnvironment = {
+    DAYOPT_ENVIRONMENT: 'integration',
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+    MCP_OAUTH_ENVIRONMENT: 'integration',
+    MCP_OAUTH_PREVIEW_BRANCH: '',
+    OAUTH_AUTHORIZATION_SERVER_URI: PRODUCT_INTEGRATION_APP_ORIGIN,
+    MCP_CANONICAL_RESOURCE_URI: PRODUCT_INTEGRATION_APP_ORIGIN,
+    VERCEL_ENV: 'preview',
+    VERCEL_TARGET_ENV: 'preview',
+    VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+    VERCEL_BRANCH_URL: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
+    VERCEL_GIT_COMMIT_REF: 'integration',
+    NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+  };
+
+  for (const [name, value] of Object.entries(integrationEnvironment)) {
+    vi.stubEnv(name, value);
+  }
+}
+
+describe('proxy OAuth host boundary for fixed Integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubIntegrationOAuthEnvironment();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('allows OAuth surfaces on the exact Integration deployment binding', async () => {
+    const response = await proxy(
+      new NextRequest(`${PRODUCT_INTEGRATION_APP_ORIGIN}/.well-known/oauth-authorization-server`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['private Dayopt marker', 'DAYOPT_ENVIRONMENT', 'preview'],
+    ['public Dayopt marker', 'NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'preview'],
+    ['Vercel project', 'VERCEL_PROJECT_ID', 'prj_untrusted'],
+    [
+      'Supabase project ref',
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'https://yvglwblxrnrenfifsnje.supabase.co',
+    ],
+  ])('rejects the Integration OAuth surface when the %s binding drifts', async (_, name, value) => {
+    vi.stubEnv(name, value);
+
+    const response = await proxy(
+      new NextRequest(`${PRODUCT_INTEGRATION_APP_ORIGIN}/.well-known/oauth-authorization-server`),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+});
 
 describe('proxy MFA gate', () => {
   beforeEach(() => {
@@ -673,5 +744,61 @@ describe('proxy が OG 画像を locale 解決から外す（#2573）', () => {
 
     expect(response.status).toBe(200);
     expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('proxy and OAuth handlers share environment normalization', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    {
+      label: 'trailing whitespace',
+      issuer: ' https://app.dayopt.app\n',
+      resource: 'https://mcp.dayopt.app\n',
+    },
+    { label: 'blank optional origins', issuer: ' \n', resource: '' },
+  ])(
+    '$label keeps the configured Production MCP endpoint reachable',
+    async ({ issuer, resource }) => {
+      vi.stubEnv('VERCEL_ENV', 'production');
+      vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'production');
+      vi.stubEnv('MCP_OAUTH_PREVIEW_BRANCH', '');
+      vi.stubEnv('OAUTH_AUTHORIZATION_SERVER_URI', issuer);
+      vi.stubEnv('MCP_CANONICAL_RESOURCE_URI', resource);
+
+      const identity = getOAuthEnvironmentConfig();
+      expect(identity.resourceUri).toBe('https://mcp.dayopt.app');
+      const response = await proxy(new NextRequest(`${identity.resourceUri}/api/mcp`));
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-middleware-next')).toBe('1');
+    },
+  );
+
+  it.each([true, false])('Preview branch binding remains exact (matching=%s)', async (matching) => {
+    const host = 'product-git-codex-mcp-preview-dayopt.vercel.app';
+    vi.stubEnv('VERCEL_ENV', 'preview\n');
+    vi.stubEnv('VERCEL_TARGET_ENV', 'preview\n');
+    vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'preview\n');
+    vi.stubEnv('MCP_OAUTH_PREVIEW_BRANCH', 'codex/mcp-preview\n');
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', matching ? 'codex/mcp-preview\n' : 'codex/other\n');
+    vi.stubEnv('VERCEL_BRANCH_URL', `${host}\n`);
+    vi.stubEnv('OAUTH_AUTHORIZATION_SERVER_URI', `https://${host}\n`);
+    vi.stubEnv('MCP_CANONICAL_RESOURCE_URI', `https://${host}\n`);
+
+    if (matching) expect(getOAuthEnvironmentConfig().resourceHost).toBe(host);
+    else expect(() => getOAuthEnvironmentConfig()).toThrow();
+    const response = await proxy(new NextRequest(`https://${host}/api/mcp`));
+    expect(response.status).toBe(matching ? 200 : 503);
+  });
+
+  it('keeps a foreign resource rejected after whitespace normalization', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('MCP_OAUTH_ENVIRONMENT', 'production');
+    vi.stubEnv('MCP_OAUTH_PREVIEW_BRANCH', '');
+    vi.stubEnv('OAUTH_AUTHORIZATION_SERVER_URI', 'https://app.dayopt.app');
+    vi.stubEnv('MCP_CANONICAL_RESOURCE_URI', ' https://attacker.example\n');
+
+    expect(() => getOAuthEnvironmentConfig()).toThrow();
+    expect((await proxy(new NextRequest('https://mcp.dayopt.app/api/mcp'))).status).toBe(503);
   });
 });

@@ -44,12 +44,12 @@ function parseSecretUses(file: string, text: string): SecretUse[] {
   for (const job of jobs) {
     let environment: string | null = null;
     job.lines.forEach((line, index) => {
-      const scalar = line.match(/^ {4}environment:\s*([A-Za-z0-9_.-]+)\s*$/);
+      const scalar = line.match(/^ {4}environment:\s*([^{}]+?)\s*$/);
       if (scalar) environment = scalar[1];
       if (/^ {4}environment:\s*$/.test(line)) {
         for (const child of job.lines.slice(index + 1)) {
           if (!/^ {6}/.test(child)) break;
-          const name = child.match(/^ {6}name:\s*([A-Za-z0-9_.-]+)\s*$/);
+          const name = child.match(/^ {6}name:\s*([^{}]+?)\s*$/);
           if (name) environment = name[1];
         }
       }
@@ -74,7 +74,7 @@ const ledgerByName = new Map(
 );
 
 describe('CI secret ledger（workflow の secrets.* ⇔ 1Password ci vault）', () => {
-  it('workflow が参照する GitHub Secret はすべて ci 台帳に master を持つ', () => {
+  it('workflow が参照する GitHub Secret はすべて ci 台帳に master 参照を持つ（実在は別確認）', () => {
     const missing = allSecretUses()
       .filter((use) => !ledgerByName.has(use.secret))
       .map((use) => `${use.secret}（${use.file} / ${use.job}）`);
@@ -111,8 +111,10 @@ describe('CI secret ledger（workflow の secrets.* ⇔ 1Password ci vault）', 
       join(rootDir, 'scripts/runbook/sync-ci-environment-secrets.sh'),
       'utf8',
     );
-    const scripted = [...script.matchAll(/^secret (\S+) (\S+) "(op:\/\/[^"]+)"$/gm)]
-      .map(([, environment, name, ref]) => `${environment} ${name} ${ref}`)
+    const scripted = [
+      ...script.matchAll(/^(?:# pending-)?secret ("[^"]+"|\S+) (\S+) "(op:\/\/[^"]+)"$/gm),
+    ]
+      .map(([, environment, name, ref]) => `${environment.replace(/^"|"$/g, '')} ${name} ${ref}`)
       .sort();
     const ledger = ciSecretSchema
       .flatMap((entry) =>

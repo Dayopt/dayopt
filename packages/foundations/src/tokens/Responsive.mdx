@@ -99,14 +99,17 @@ Calendar のメインコンテンツには `pb-16`（64px）でタグフッタ�
 
 ### ビュー表示ルール
 
-| デバイス     | 画面幅       | Day | Multi-day 上限 | Week（7列） |
-| ------------ | ------------ | --- | -------------- | ----------- |
-| モバイル     | < 768px      | ✅  | 最大3日        | ❌ → 3日    |
-| タブレット   | 768 - 1023px | ✅  | 最大5日        | ❌ → 5日    |
-| デスクトップ | ≥ 1024px     | ✅  | 制限なし       | ✅          |
+ユーザーが選択できるビューと、renderer が受け取ったビューを描く時のフォールバックは区別する。
 
-- モバイルでは `day` ビューのみ許可。URL直アクセスで `week` が指定された場合、`day` に強制リダイレクト
-- `CalendarViewRenderer` が `MOBILE_MAX_DAYS`（3）/ `TABLET_MAX_DAYS`（5）で列数を制限
+| 条件         | ナビゲーション / 描画の責務                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| モバイル     | Navigation は Day のみを許可する。Renderer の Week 分岐も Day に収束させる                                    |
+| タブレット   | Week の描画は狭い列を避けるため Multi-Day にフォールバックする。明示的に選んだ Multi-Day は指定列数を維持する |
+| デスクトップ | 選択された Day / Week / Multi-Day を描画する                                                                  |
+
+選択可否と URL の補正は [CalendarNavigationContext](../../../../apps/product/src/features/calendar/hooks/navigation/CalendarNavigationContext.tsx)、列数と描画フォールバックは [CalendarViewRenderer](../../../../apps/product/src/features/calendar/components/controller/components/CalendarViewRenderer.tsx) を正本とする。Renderer のモバイル Multi-Day 制限は、ナビゲーションがそのビューを提供するという意味ではない。
+
+製品として提供する表示範囲と操作の意味は [Calendar仕様](../../../../docs/product/specs/calendar.md) を確認し、実装との相違は別途照合する。ここには列数定数や分岐コードの写しを置かない。
 
 ### グリッド密度（時間あたり高さ）
 
@@ -119,14 +122,6 @@ Calendar のメインコンテンツには `pb-16`（64px）でタグフッタ�
 | spacious | 2.0                  | フィットの2倍。意図的にスクロールを許容        |
 
 `hourHeight = Math.max(MIN_LEGIBLE_HOUR_HEIGHT, Math.floor((containerHeight / 24) * DENSITY_FACTOR[density]))`
-
-```tsx
-// CalendarViewRenderer.tsx
-const MOBILE_MAX_DAYS = 3;
-const TABLET_MAX_DAYS = 5;
-
-const maxDays = isMobile ? MOBILE_MAX_DAYS : isTablet ? TABLET_MAX_DAYS : Infinity;
-```
 
 ---
 

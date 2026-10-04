@@ -1,6 +1,47 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { classifyAllScripts } from '../lib/scripts-taxonomy';
+
+describe('手順書と機械データの参照境界', () => {
+  const temporaryRoots: string[] = [];
+  afterEach(() => {
+    for (const root of temporaryRoots.splice(0)) fs.rmSync(root, { recursive: true });
+  });
+
+  it('JSON のファイル一覧は実行手順に数えず、Markdown の手順は引き続き検出する', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dayopt-taxonomy-'));
+    temporaryRoots.push(root);
+    fs.mkdirSync(path.join(root, 'scripts/lib'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'scripts/lib/helper.ts'), 'export const helper = 1;');
+    fs.writeFileSync(path.join(root, 'scripts/main.ts'), "import { helper } from './lib/helper';");
+    fs.writeFileSync(path.join(root, 'scripts/unused.ts'), 'export const unused = 1;');
+    fs.writeFileSync(
+      path.join(root, 'docs/inventory.json'),
+      JSON.stringify(['scripts/lib/helper.ts', 'scripts/unused.ts']),
+    );
+
+    const before = classifyAllScripts(root);
+    expect(before.find((entry) => entry.path === 'scripts/lib/helper.ts')).toMatchObject({
+      category: 'lib',
+      hits: { docs: [], importedBy: ['scripts/main.ts'] },
+    });
+    expect(before.find((entry) => entry.path === 'scripts/unused.ts')?.category).toBe(
+      'unreferenced',
+    );
+
+    fs.writeFileSync(path.join(root, 'docs/runbook.md'), 'Run `tsx scripts/lib/helper.ts`.');
+    expect(
+      classifyAllScripts(root).find((entry) => entry.path === 'scripts/lib/helper.ts'),
+    ).toMatchObject({
+      category: 'runbook',
+      hits: { docs: ['docs/runbook.md'] },
+    });
+  });
+});
 
 /**
  * scripts/ 呼ばれ方別再編（#2476）の常設 contract test。
@@ -26,6 +67,10 @@ const CATEGORY_DIR: Record<string, string> = {
  * #2476 Phase B/C の issue コメントで都度説明済み（各行にコメントを付す）。
  */
 const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
+  // agent-op.mjs: インストール済みのローカル op launcher から import する
+  // agent-service-account.mjs の adapter。repo 内の importer がなく docs 参照で
+  // runbook 判定になるが、起動 task と同じ unit・既存 launcher の参照先を保つ。
+  'scripts/tasks/agent-op.mjs',
   // boundaries/: check.ts が root package.json "lint:boundaries" を持つ tasks unit。
   // budget.ts / checks/*.ts / config.ts は内部 lib・runbook 判定だが分割しない。
   'scripts/tasks/boundaries/budget.ts',
@@ -42,6 +87,7 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/tasks/docs-guard/checks/learn-refs.ts',
   'scripts/tasks/docs-guard/checks/likec4-validate.ts',
   'scripts/tasks/docs-guard/checks/link-check.ts',
+  'scripts/tasks/docs-guard/checks/live-docs.ts',
   'scripts/tasks/docs-guard/checks/naming-check.ts',
   'scripts/tasks/docs-guard/config.ts',
   'scripts/tasks/docs-guard/git-changes.ts',
@@ -78,6 +124,13 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // 案内であって実行手順ではない（storage-objects-app-policy-names.mjs と同型）。
   'scripts/lib/glossary/core.ts',
   'scripts/lib/glossary/terms.ts',
+  // docs-live/render.ts: CLI と docs-guard が import する lib。
+  // docs/README の実装リンクは runbook の実行手順ではなく、glossary/ と同じ案内。
+  'scripts/lib/docs-live/render.ts',
+  // live-contract.ts: docs が保存形式の正本へ案内するが、実行するのは docs-guard の import。
+  'scripts/lib/docs-live/live-contract.ts',
+  // facts.ts: 保存stubが所在を示すだけで、readerからimportされる抽出ライブラリ。
+  'scripts/lib/docs-live/facts.ts',
   // vocabulary-scope.ts: concept-map.ts / likec4-model.ts から import される lib だが、
   // architecture.md と生成物が「判定規則はここが持つ」と名指しするため docs 参照が
   // 先に当たって runbook 判定になる。terms.ts と同型（読者への案内であって手順ではない）。
@@ -108,6 +161,9 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   // family と同型のペア構成（内部結合の強い unit）。loader は settings.json から
   // 参照されるため hooks 判定になり、rules だけがこの例外で hooks/ に揃える。
   'scripts/hooks/pre-tool-guard-rules.mjs',
+  // preview-e2e-recovery.mjs: Preview runbook CLI と unit tests の両方から使う内部 helper。
+  // importedBy 判定は lib に分類するが、運用コマンドと密結合しているため CLI の隣に置く。
+  'scripts/runbook/preview-e2e-recovery.mjs',
 ]);
 
 describe('scripts/ 呼ばれ方別 taxonomy', () => {

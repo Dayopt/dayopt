@@ -7,6 +7,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 - **Cloud-first、Local-optional**。開発・画面確認はクラウドを基本とし、必要ならローカルも使う。作業中の別 worktree・branch・未コミット差分を勝手に変更しない。
 - 提案・変更前に既存実装と関連判断を調べる。Issue の有無を問わず [判断の入口](docs/decisions.md#判断する前に読む)から現行の正本・理由・却下案を確認し、履歴の撤回済み判断を復活させない。検索は `rg` を優先し、repo 全体は `rg --hidden --glob '!.git/**'`。構造は [architecture.md](docs/engineering/architecture.md)、技術規約は [conventions.md](docs/engineering/conventions.md)、用語は [glossary.md](docs/product/glossary.md) を参照する。
 - Issue / PR がある非自明な作業は `pnpm ctx <N> --reuse-brief-l1` から始める。Issue 本文が要求の正本。Brief は助言であり、古い・取得できない場合は報告して一次資料で進める。詳細は `routing`。
+- 文書の現状説明を根拠にする時は `pnpm --silent docs:read <repo-relative-path>` で正本から読む。生成本文は手編集せず正本を更新する。読取失敗を保存済み本文で補わない。読取・更新・検証の手順は [docs 運用規約](docs/README.md#ai-の標準手順)に従う。
 - 秘密情報は [secrets.md](docs/operations/secrets.md) の境界に従う。`.env` / `.env.local` は読み書きしない。`.op-env.agent` / `.op-env.human` を使う。
 - 変更した挙動を対象 test / E2E / Storybook 等で確かめる。同じ差分・環境の成功済み検査を根拠なく繰り返さない。ready 化前の `pnpm check` と pre-push は必須。詳細は [testing.md](docs/engineering/testing.md)。
 - commit は対象 path だけ stage して差分を確認する。日本語 Conventional Commits を使い、hook を迂回しない。
@@ -18,6 +19,12 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 - **AUTONOMOUS**: 承認済み範囲の可逆な作業は進めて報告する。
 - **CHECKPOINT**: 顧客挙動・公開契約・権限/プライバシーの未決判断は、選択肢・推奨・最悪ケースをまとめて確認する。
 - **EXPLICIT AUTHORITY**: production mutation・release・データ削除・不可逆 migration・実課金は、明示指示 + 独立レビュー + dry-run/backup が揃うまで実行しない。
+
+## Issue の進め方
+
+- 作業対象の Issue には `type:mission` / `type:task` / `type:bug` / `type:question` を 1 つ付ける。Mission は子 Issue へ分解し、Mission 自体では実装しない。Task は合意済みの範囲を実装・検証する。Bug は再現して回帰を防ぐ検証を加え、修正する。Question は証拠を Issue コメントに残して人の判断を待ち、実装 PR を作らない。
+- 着手・続行を妨げる前提がある open Issue だけに `status:blocked` を付け、解除条件を本文へ書く。解除条件を確認してから外す。進行は Issue の open / closed、リンク済み PR、コメントと worktree で確認する。PR に分類ラベルを複製しない。
+- 作業順はユーザーの指定、進行中の作業、依存関係、期限や障害の実態から決める。ラベルの優先度からエージェントが自動決定しない。不可逆操作の許可とレビュー要否は上記の権限境界と変更内容から判断する。
 
 ## Dayopt のコア不変条件
 
@@ -60,7 +67,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 - 全 PR をリスクに比例してセルフレビューする。main の ruleset（required checks、最新 main への追従、review thread 解決）を満たし、bypass しない。
 - `scripts/ci/protected-path-gate.mjs` が外部契約・不可逆・ガードレール変更と判定した PR だけ、CI 成功・head 安定後に `pr-cross-review` で独立レビューを依頼する。追加 reviewer は明示指示なしに起動しない。
 - 指摘は修正・根拠付き反論・Issue 化で解決する。根拠のある不具合は直し、保証境界の外への点追加を繰り返さない。merge の基準は main より安全か。
-- timeblock / lib/time 配下の test を削除・skip する PR は `review:full` を付け User の確認を受ける。この label は reviewer の自動起動条件にしない。
+- timeblock / lib/time 配下の test を削除・skip する PR は変更理由と代替検証を PR に明記し、User の確認を受ける。
 
 ### レーン運用
 
@@ -81,7 +88,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 | skill                  | 使う場面                       |
 | ---------------------- | ------------------------------ |
 | `routing`              | 作業方針・委譲の判断           |
-| `dispatch`             | Issue 起票・割り当て           |
+| `dispatch`             | Issue 起票・担当への引き渡し   |
 | `mcp-usage`            | 外部ツールの利用               |
 | `skill-design`         | skill の作成・整理             |
 | `supabase`             | migration・RLS・DB             |

@@ -18,7 +18,7 @@ const i18n = {
     body: 'We received a request to reset your Dayopt password. Click the button below to choose a new password.',
     ctaButton: 'Reset Password',
     buttonFallback: "If the button doesn't work, copy and paste this link into your browser:",
-    expiryNote: 'This link will expire in 24 hours.',
+    expiryNote: 'This link expires. If it has expired, request a new link.',
     ignoreLine:
       "If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.",
     securityNote: (appUrl: string) =>
@@ -33,7 +33,8 @@ const i18n = {
     ctaButton: 'パスワードをリセット',
     buttonFallback:
       'ボタンが機能しない場合は、以下のリンクをブラウザにコピー＆ペーストしてください：',
-    expiryNote: 'このリンクは24時間で有効期限が切れます。',
+    expiryNote:
+      'このリンクには有効期限があります。期限が切れた場合は、再度リンクをリクエストしてください。',
     ignoreLine:
       'パスワードリセットをリクエストした覚えがない場合は、このメールを無視してください。パスワードは変更されません。',
     securityNote: (appUrl: string) =>

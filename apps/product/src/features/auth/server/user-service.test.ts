@@ -1,6 +1,8 @@
+import { createClient } from '@supabase/supabase-js';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { publicRecordSelect, publicUserSettingsSelect } from '@/lib/database';
+import { type Database, publicRecordSelect, publicUserSettingsSelect } from '@/lib/database';
 import { createChainableMock } from '@/lib/test/trpc-test-helpers';
 
 const deleteUser = vi.hoisted(() => vi.fn());
@@ -692,6 +694,69 @@ describe('createUserService', () => {
       expect(adminQueries.get('records')?.select).toHaveBeenCalledWith(publicRecordSelect);
       expect(query('user_settings').select).toHaveBeenCalledWith(publicUserSettingsSelect);
     });
+
+    // Query builderもページ取得helperもmockせず、Data APIの上限だけをHTTP境界で再現する。
+    function createCappedExport(failingTable?: string) {
+      const tables = ['plans', 'records', 'categories', 'activities'] as const;
+      const rows = Array.from({ length: 1201 }, (_, index) => ({
+        id: String(index).padStart(8, '0'),
+        user_id: USER_ID,
+      }));
+      const requests: URL[] = [];
+      const client = createClient<Database>('https://export.example.test', 'synthetic-key', {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: {
+          fetch: async (input) => {
+            const url = new URL(String(input));
+            requests.push(url);
+            const table = url.pathname.split('/').at(-1);
+            if (table === 'profiles' || table === 'user_settings') {
+              return Response.json({ id: USER_ID, user_id: USER_ID });
+            }
+            if (!tables.some((name) => name === table)) throw new Error('Unexpected table');
+            // service-role取得を含め、全ページが同じ認証主体に限定されることを確認する。
+            expect(url.searchParams.get('user_id')).toBe(`eq.${USER_ID}`);
+            const offset = Number(url.searchParams.get('offset') ?? 0);
+            if (table === failingTable && offset > 0) {
+              return Response.json(
+                { message: 'later page failed', code: 'XX000', details: '', hint: '' },
+                { status: 500 },
+              );
+            }
+            const limit = Math.min(Number(url.searchParams.get('limit') ?? 1000), 1000);
+            return Response.json(rows.slice(offset, offset + limit));
+          },
+        },
+      });
+      adminFrom.mockImplementation((table) => client.from(table));
+      return {
+        service: createUserService(client, { beforeIdentityDeletion }),
+        rows,
+        requests,
+        tables,
+      };
+    }
+
+    it('Data API上限を越す1201件を4種類とも欠落なくexportする', async () => {
+      const { service, rows, requests, tables } = createCappedExport();
+      const result = await service.exportData({ userId: USER_ID });
+      for (const table of tables) {
+        expect(result.data[table]).toEqual(rows);
+        const pages = requests.filter((url) => url.pathname.endsWith(`/${table}`));
+        expect(pages.length).toBeGreaterThan(1);
+        expect(pages.every((url) => url.searchParams.get('order') === 'id.asc')).toBe(true);
+      }
+    });
+
+    it.each(['plans', 'records', 'categories', 'activities'])(
+      '%sの後続ページが失敗したら部分exportを返さない',
+      async (table) => {
+        const { service } = createCappedExport(table);
+        await expect(service.exportData({ userId: USER_ID })).rejects.toMatchObject({
+          code: 'EXPORT_FAILED',
+        });
+      },
+    );
 
     it('profileが未作成ならnullとしてexportする', async () => {
       mockAdminTables({ plans: { data: [] }, records: { data: [] } });

@@ -135,6 +135,8 @@
         "deleteFailed": "削除できませんでした。もう一度お試しください",
         "restored": "復元しました",
         "restoreFailed": "復元できませんでした。もう一度お試しください",
+        "externalCalendarAlreadyConverted": "この外部予定は取り込み済みです",
+        "externalCalendarRestoreConflict": "同じ外部予定を取り込み済みのため、復元できません",
         "planCreated": "予定を追加しました ✓",
         "planCreatedShifted": "{time} に予定を追加しました",
         "recordedShifted": "{time} に記録しました"

@@ -162,7 +162,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: ${{ steps.supabase-version.outputs.version }}
 
@@ -244,6 +244,8 @@ jobs:
         run: pnpm --filter @dayopt/product exec playwright install --with-deps chromium
       - name: Check Storybook collection
         run: pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
+      - name: Build Storybook
+        run: pnpm build-storybook
       - name: Test Storybook light and dark
         run: pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark --reporter=default --reporter=json --outputFile=storybook-results.json
       - name: Upload Storybook results
@@ -392,16 +394,9 @@ jobs:
           else
             issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:deployment" \
+              --label "type:bug,area:deployment" \
               --body "$body")
             issue_number="${issue_url##*/}"
-          fi
-
-          current_priority=$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" \
-            --jq '.[] | select(.issue_field_id == 38713666) | .single_select_option.name // empty')
-          if [ -z "$current_priority" ]; then
-            printf '%s\n' '{"issue_field_values":[{"field_id":38713666,"value":"High"}]}' |
-              gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$issue_number/issue-field-values" --input -
           fi
 
   # ─── promote 本体（層 4）────────────────────────────────────────────────
