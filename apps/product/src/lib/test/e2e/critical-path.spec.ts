@@ -470,7 +470,12 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
 
   test('言語変更後にカレンダーへ戻り、設定をリロード後も保持する', async ({ page }) => {
     await page.goto('/ja/settings/display');
-    await page.getByRole('combobox', { name: '言語', exact: true }).click();
+    // Desktop settings routes open a modal, then replace the URL with /calendar.
+    // Wait for that navigation and the active control before changing locale.
+    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    const japaneseLanguage = page.getByRole('combobox', { name: '言語', exact: true });
+    await expect(japaneseLanguage).toBeVisible();
+    await japaneseLanguage.click();
     await page.getByRole('option', { name: 'English', exact: true }).click();
     await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
     await expect
@@ -487,10 +492,10 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await page.reload();
     await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
     await page.goto('/settings/display');
-    await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toContainText(
-      'English',
-    );
-    await page.getByRole('combobox', { name: 'Language', exact: true }).click();
+    await expect(page).toHaveURL(/\/calendar(?:\?.*)?$/);
+    const englishLanguage = page.getByRole('combobox', { name: 'Language', exact: true });
+    await expect(englishLanguage).toContainText('English');
+    await englishLanguage.click();
     await page.getByRole('option', { name: '日本語', exact: true }).click();
     await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
     await expect
@@ -503,6 +508,11 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
         return result.error === null ? result.data?.preferred_locale : null;
       })
       .toBe('ja');
+    await page.reload();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
+    await page.goto('/ja/settings/display');
+    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await expect(page.getByRole('combobox', { name: '言語', exact: true })).toContainText('日本語');
   });
 
   test.describe('Activity management', () => {
