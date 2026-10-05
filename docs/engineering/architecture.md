@@ -802,7 +802,7 @@ erDiagram
     string created_at
     string event_name
     string id
-    NonNullable_Json properties
+    json properties
     string user_id
   }
   profiles {
@@ -838,7 +838,7 @@ erDiagram
     string user_id FK
   }
   reports {
-    NonNullable_Json content
+    json content
     string created_at
     string id
     string period_end
@@ -877,8 +877,8 @@ erDiagram
     string user_id FK
   }
   undo_receipt_field_changes {
-    NonNullable_Json after_value
-    NonNullable_Json before_value
+    json after_value
+    json before_value
     string effect_id FK
     string field_name
     string user_id FK

@@ -10,7 +10,12 @@ export type Database = {
     };
     Functions: {
       graphql: {
-        Args: { extensions?: Json; operationName?: string; query?: string; variables?: Json };
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
         Returns: Json;
       };
     };
@@ -821,21 +826,21 @@ export type Database = {
           created_at: string;
           event_name: string;
           id: string;
-          properties: NonNullable<Json>;
+          properties: Json;
           user_id: string;
         };
         Insert: {
           created_at?: string;
           event_name: string;
           id?: string;
-          properties?: NonNullable<Json>;
+          properties?: Json;
           user_id: string;
         };
         Update: {
           created_at?: string;
           event_name?: string;
           id?: string;
-          properties?: NonNullable<Json>;
+          properties?: Json;
           user_id?: string;
         };
         Relationships: [];
@@ -959,7 +964,7 @@ export type Database = {
       };
       reports: {
         Row: {
-          content: NonNullable<Json>;
+          content: Json;
           created_at: string;
           id: string;
           period_end: string;
@@ -969,7 +974,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
-          content: NonNullable<Json>;
+          content: Json;
           created_at?: string;
           id?: string;
           period_end: string;
@@ -979,7 +984,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
-          content?: NonNullable<Json>;
+          content?: Json;
           created_at?: string;
           id?: string;
           period_end?: string;
@@ -1090,7 +1095,7 @@ export type Database = {
           plan_id?: string | null;
           receipt_id: string;
           record_id?: string | null;
-          resource_type?: never;
+          resource_type?: string | null;
           user_id: string;
         };
         Update: {
@@ -1099,7 +1104,7 @@ export type Database = {
           plan_id?: string | null;
           receipt_id?: string;
           record_id?: string | null;
-          resource_type?: never;
+          resource_type?: string | null;
           user_id?: string;
         };
         Relationships: [
@@ -1128,22 +1133,22 @@ export type Database = {
       };
       undo_receipt_field_changes: {
         Row: {
-          after_value: NonNullable<Json>;
-          before_value: NonNullable<Json>;
+          after_value: Json;
+          before_value: Json;
           effect_id: string;
           field_name: string;
           user_id: string;
         };
         Insert: {
-          after_value: NonNullable<Json>;
-          before_value: NonNullable<Json>;
+          after_value: Json;
+          before_value: Json;
           effect_id: string;
           field_name: string;
           user_id: string;
         };
         Update: {
-          after_value?: NonNullable<Json>;
-          before_value?: NonNullable<Json>;
+          after_value?: Json;
+          before_value?: Json;
           effect_id?: string;
           field_name?: string;
           user_id?: string;
@@ -1485,7 +1490,11 @@ export type Database = {
         }[];
       };
       apply_undo_receipt_v1: {
-        Args: { p_apply_operation_id: string; p_receipt_id: string; p_user_id: string };
+        Args: {
+          p_apply_operation_id: string;
+          p_receipt_id: string;
+          p_user_id: string;
+        };
         Returns: undefined;
       };
       assert_active_timeblock_activity_v1: {
@@ -1500,8 +1509,8 @@ export type Database = {
         Args: { p_external_calendar_event_id: string; p_user_id: string };
         Returns: undefined;
       };
-      authorize_owned_storage_read_v1: { Args: Record<PropertyKey, never>; Returns: boolean };
-      authorize_owned_storage_write_v1: { Args: Record<PropertyKey, never>; Returns: boolean };
+      authorize_owned_storage_read_v1: { Args: never; Returns: boolean };
+      authorize_owned_storage_write_v1: { Args: never; Returns: boolean };
       begin_account_deletion_v1: {
         Args: { p_user_id: string };
         Returns: {
@@ -1512,7 +1521,11 @@ export type Database = {
         }[];
       };
       begin_calendar_account_deletion_v1: {
-        Args: { p_deletion_id: string; p_project_key: string; p_user_id: string };
+        Args: {
+          p_deletion_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
         Returns: {
           deletion_id: string;
           item_id: string;
@@ -1534,7 +1547,11 @@ export type Database = {
         }[];
       };
       begin_calendar_sync_run_v1: {
-        Args: { p_connection_id: string; p_project_key: string; p_user_id: string };
+        Args: {
+          p_connection_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
         Returns: {
           authority_epoch: number;
           authority_fence_id: string;
@@ -1563,6 +1580,15 @@ export type Database = {
         Args: { p_deletion_id: string; p_user_id: string };
         Returns: boolean;
       };
+      check_supabase_rate_limit_poc: {
+        Args: {
+          p_identifier_hash: string;
+          p_limit_count: number;
+          p_scope: string;
+          p_window_seconds: number;
+        };
+        Returns: Json;
+      };
       claim_account_deletion_step_v1: {
         Args: { p_deletion_id: string; p_step: string; p_user_id: string };
         Returns: {
@@ -1572,7 +1598,11 @@ export type Database = {
         }[];
       };
       claim_billing_customer_provisioning_v1: {
-        Args: { p_email_digest: string; p_operation_id: string; p_user_id: string };
+        Args: {
+          p_email_digest: string;
+          p_operation_id: string;
+          p_user_id: string;
+        };
         Returns: {
           lease_expires_at: string;
           lease_id: string;
@@ -1582,7 +1612,11 @@ export type Database = {
         }[];
       };
       claim_billing_customer_provisioning_v2: {
-        Args: { p_email_digest: string; p_operation_id: string; p_user_id: string };
+        Args: {
+          p_email_digest: string;
+          p_operation_id: string;
+          p_user_id: string;
+        };
         Returns: {
           lease_expires_at: string;
           lease_id: string;
@@ -1641,7 +1675,11 @@ export type Database = {
         }[];
       };
       claim_calendar_revoke_direct_attempt_v1: {
-        Args: { p_operation_id: string; p_project_key: string; p_user_id: string };
+        Args: {
+          p_operation_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
         Returns: {
           attempt_deadline_at: string;
           lease_expires_at: string;
@@ -1678,7 +1716,15 @@ export type Database = {
       };
       claim_posthog_signup_v1: { Args: { p_user_id: string }; Returns: boolean };
       claim_stripe_webhook_event: {
-        Args: { p_event_id: string; p_event_type: string; p_stale_before: string };
+        Args: {
+          p_event_id: string;
+          p_event_type: string;
+          p_stale_before: string;
+        };
+        Returns: string;
+      };
+      claim_supabase_webhook_event_poc: {
+        Args: { p_event_hash: string; p_processing_token: string };
         Returns: string;
       };
       classify_billing_customer_event_v1: {
@@ -1692,7 +1738,10 @@ export type Database = {
           has_more: boolean;
         }[];
       };
-      cleanup_billing_mutation_claims_v1: { Args: { p_limit?: number }; Returns: number };
+      cleanup_billing_mutation_claims_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
       cleanup_billing_mutation_claims_v2: {
         Args: { p_limit?: number };
         Returns: {
@@ -1713,12 +1762,30 @@ export type Database = {
         Args: { p_limit?: number; p_project_key: string };
         Returns: number;
       };
-      cleanup_integration_security_events_v1: { Args: { p_limit?: number }; Returns: number };
-      cleanup_mcp_mutation_receipts_v1: { Args: { p_limit?: number }; Returns: number };
-      cleanup_oauth_access_tokens_v1: { Args: { p_limit?: number }; Returns: number };
-      cleanup_oauth_authorization_codes_v1: { Args: { p_limit?: number }; Returns: number };
-      cleanup_oauth_connections_v1: { Args: { p_limit?: number }; Returns: number };
-      cleanup_oauth_refresh_tokens_v1: { Args: { p_limit?: number }; Returns: number };
+      cleanup_integration_security_events_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
+      cleanup_mcp_mutation_receipts_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
+      cleanup_oauth_access_tokens_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
+      cleanup_oauth_authorization_codes_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
+      cleanup_oauth_connections_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
+      cleanup_oauth_refresh_tokens_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
       clear_calendar_sync_cursor_command_v1: {
         Args: {
           p_calendar_selection_id: string;
@@ -1735,23 +1802,45 @@ export type Database = {
         Returns: string;
       };
       complete_account_deletion_step_v1: {
-        Args: { p_deletion_id: string; p_lease_id: string; p_step: string; p_user_id: string };
+        Args: {
+          p_deletion_id: string;
+          p_lease_id: string;
+          p_step: string;
+          p_user_id: string;
+        };
         Returns: boolean;
       };
       complete_billing_customer_provisioning_v1: {
-        Args: { p_operation_id: string; p_provider_customer_id: string; p_user_id: string };
+        Args: {
+          p_operation_id: string;
+          p_provider_customer_id: string;
+          p_user_id: string;
+        };
         Returns: string;
       };
       complete_billing_customer_provisioning_v2: {
-        Args: { p_operation_id: string; p_provider_customer_id: string; p_user_id: string };
+        Args: {
+          p_operation_id: string;
+          p_provider_customer_id: string;
+          p_user_id: string;
+        };
         Returns: string;
       };
       complete_calendar_revoke_outbox_v1: {
         Args: { p_lease_id: string; p_outbox_id: string };
         Returns: boolean;
       };
+      complete_supabase_webhook_event_poc: {
+        Args: { p_event_hash: string; p_processing_token: string };
+        Returns: boolean;
+      };
       confirm_day_plans_command_v1: {
-        Args: { p_confirmed_at?: string; p_end_at: string; p_start_at: string; p_user_id: string };
+        Args: {
+          p_confirmed_at?: string;
+          p_end_at: string;
+          p_start_at: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -1775,7 +1864,12 @@ export type Database = {
         };
       };
       confirm_day_plans_to_records: {
-        Args: { p_confirmed_at?: string; p_end_at: string; p_start_at: string; p_user_id: string };
+        Args: {
+          p_confirmed_at?: string;
+          p_end_at: string;
+          p_start_at: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -1798,7 +1892,10 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      count_unused_recovery_codes: { Args: { p_user_id: string }; Returns: number };
+      count_unused_recovery_codes: {
+        Args: { p_user_id: string };
+        Returns: number;
+      };
       create_oauth_authorization_grant_v2: {
         Args: {
           p_client_id: string;
@@ -1903,7 +2000,10 @@ export type Database = {
         };
       };
       custom_access_token_hook: { Args: { event: Json }; Returns: Json };
-      delete_all_user_data_command_v3: { Args: { p_user_id: string }; Returns: boolean };
+      delete_all_user_data_command_v3: {
+        Args: { p_user_id: string };
+        Returns: boolean;
+      };
       delete_all_user_data_command_v4: {
         Args: { p_project_key: string; p_user_id: string };
         Returns: boolean;
@@ -1918,7 +2018,11 @@ export type Database = {
         Returns: boolean;
       };
       delete_plan_command_v1: {
-        Args: { p_expected_updated_at: string; p_plan_id: string; p_user_id: string };
+        Args: {
+          p_expected_updated_at: string;
+          p_plan_id: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -1941,7 +2045,11 @@ export type Database = {
         };
       };
       delete_record_command_v1: {
-        Args: { p_expected_updated_at: string; p_record_id: string; p_user_id: string };
+        Args: {
+          p_expected_updated_at: string;
+          p_record_id: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -1974,7 +2082,7 @@ export type Database = {
         Returns: string;
       };
       ensure_mcp_integration_environment_identity_v1: {
-        Args: Record<PropertyKey, never>;
+        Args: never;
         Returns: {
           authorization_server_uri: string;
           environment: string;
@@ -2018,7 +2126,10 @@ export type Database = {
           ciphertexts_deleted: number;
         }[];
       };
-      expire_calendar_revoke_outbox_v1: { Args: { p_limit?: number }; Returns: number };
+      expire_calendar_revoke_outbox_v1: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
       finalize_calendar_account_delete_revoke_v1: {
         Args: {
           p_deletion_id: string;
@@ -2031,7 +2142,12 @@ export type Database = {
         Returns: string;
       };
       finalize_calendar_revoke_attempt_v2: {
-        Args: { p_lease_id: string; p_outbox_id: string; p_outcome: string; p_project_key: string };
+        Args: {
+          p_lease_id: string;
+          p_outbox_id: string;
+          p_outcome: string;
+          p_project_key: string;
+        };
         Returns: string;
       };
       finalize_calendar_revoke_guards_v1: {
@@ -2064,7 +2180,7 @@ export type Database = {
         }[];
       };
       get_account_deletion_readiness_v1: {
-        Args: Record<PropertyKey, never>;
+        Args: never;
         Returns: {
           activated: boolean;
           active_operations: number;
@@ -2083,7 +2199,7 @@ export type Database = {
         }[];
       };
       get_external_authority_maintenance_status_v1: {
-        Args: Record<PropertyKey, never>;
+        Args: never;
         Returns: {
           access_tokens_due: boolean;
           authorization_codes_due: boolean;
@@ -2097,11 +2213,11 @@ export type Database = {
           security_events_due: boolean;
         }[];
       };
-      get_external_lifecycle_app_version_v1: { Args: Record<PropertyKey, never>; Returns: number };
-      get_external_lifecycle_app_version_v2: { Args: Record<PropertyKey, never>; Returns: number };
-      get_external_lifecycle_app_version_v3: { Args: Record<PropertyKey, never>; Returns: number };
+      get_external_lifecycle_app_version_v1: { Args: never; Returns: number };
+      get_external_lifecycle_app_version_v2: { Args: never; Returns: number };
+      get_external_lifecycle_app_version_v3: { Args: never; Returns: number };
       get_mcp_environment_identity_v1: {
-        Args: Record<PropertyKey, never>;
+        Args: never;
         Returns: {
           authorization_server_uri: string;
           environment: string;
@@ -2118,7 +2234,10 @@ export type Database = {
           timezone: string;
         }[];
       };
-      get_user_data_generation_v1: { Args: { p_user_id: string }; Returns: number };
+      get_user_data_generation_v1: {
+        Args: { p_user_id: string };
+        Returns: number;
+      };
       get_user_timezone: { Args: { p_user_id: string }; Returns: string };
       issue_oauth_token_pair: {
         Args: {
@@ -2204,7 +2323,11 @@ export type Database = {
         Returns: string;
       };
       normalize_calendar_account_deletion_intent_v1: {
-        Args: { p_deletion_id: string; p_project_key: string; p_user_id: string };
+        Args: {
+          p_deletion_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
         Returns: string;
       };
       persist_calendar_sync_result_command_v1: {
@@ -2296,6 +2419,10 @@ export type Database = {
           supabase_project_ref: string;
         }[];
       };
+      prune_supabase_rate_limit_poc: {
+        Args: { p_batch_size?: number };
+        Returns: Json;
+      };
       reconcile_billing_mutation_v2: {
         Args: {
           p_operation_id: string;
@@ -2343,7 +2470,11 @@ export type Database = {
         Returns: string;
       };
       record_plan_command_v1: {
-        Args: { p_expected_updated_at: string; p_plan_id: string; p_user_id: string };
+        Args: {
+          p_expected_updated_at: string;
+          p_plan_id: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -2378,8 +2509,16 @@ export type Database = {
         };
         Returns: string;
       };
+      release_supabase_webhook_event_poc: {
+        Args: { p_event_hash: string; p_processing_token: string };
+        Returns: boolean;
+      };
       repair_calendar_connection_authority_fence_v1: {
-        Args: { p_connection_id: string; p_project_key: string; p_user_id: string };
+        Args: {
+          p_connection_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
         Returns: string;
       };
       replace_mfa_recovery_codes_v1: {
@@ -2398,9 +2537,16 @@ export type Database = {
         };
         Returns: string;
       };
-      restore_plan: { Args: { p_plan_id: string; p_user_id: string }; Returns: undefined };
+      restore_plan: {
+        Args: { p_plan_id: string; p_user_id: string };
+        Returns: undefined;
+      };
       restore_plan_command_v1: {
-        Args: { p_expected_updated_at: string; p_plan_id: string; p_user_id: string };
+        Args: {
+          p_expected_updated_at: string;
+          p_plan_id: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -2422,9 +2568,16 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      restore_record: { Args: { p_record_id: string; p_user_id: string }; Returns: undefined };
+      restore_record: {
+        Args: { p_record_id: string; p_user_id: string };
+        Returns: undefined;
+      };
       restore_record_command_v1: {
-        Args: { p_expected_updated_at: string; p_record_id: string; p_user_id: string };
+        Args: {
+          p_expected_updated_at: string;
+          p_record_id: string;
+          p_user_id: string;
+        };
         Returns: {
           activity_id: string | null;
           created_at: string;
@@ -2451,7 +2604,10 @@ export type Database = {
         Args: { p_lease_id: string; p_outbox_id: string };
         Returns: string;
       };
-      revoke_oauth_connection: { Args: { p_connection_id: string }; Returns: boolean };
+      revoke_oauth_connection: {
+        Args: { p_connection_id: string };
+        Returns: boolean;
+      };
       rotate_oauth_refresh_token_v2: {
         Args: {
           p_client_id: string;
@@ -2527,11 +2683,19 @@ export type Database = {
         Returns: boolean;
       };
       seal_billing_account_deletion_v1: {
-        Args: { p_generic_deletion_id: string; p_provider_outcome: string; p_user_id: string };
+        Args: {
+          p_generic_deletion_id: string;
+          p_provider_outcome: string;
+          p_user_id: string;
+        };
         Returns: boolean;
       };
       seal_calendar_account_deletion_v1: {
-        Args: { p_deletion_id: string; p_project_key: string; p_user_id: string };
+        Args: {
+          p_deletion_id: string;
+          p_project_key: string;
+          p_user_id: string;
+        };
         Returns: boolean;
       };
       set_mcp_billing_enforcement_v1: {
@@ -2543,7 +2707,11 @@ export type Database = {
         }[];
       };
       set_mcp_client_write_control_v1: {
-        Args: { p_client_id: string; p_enabled: boolean; p_expected_revision: number };
+        Args: {
+          p_client_id: string;
+          p_enabled: boolean;
+          p_expected_revision: number;
+        };
         Returns: {
           changed_at: string;
           enabled_client_ids: string[];
@@ -2586,8 +2754,14 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      soft_delete_plan: { Args: { p_plan_id: string; p_user_id: string }; Returns: undefined };
-      soft_delete_record: { Args: { p_record_id: string; p_user_id: string }; Returns: undefined };
+      soft_delete_plan: {
+        Args: { p_plan_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      soft_delete_record: {
+        Args: { p_record_id: string; p_user_id: string };
+        Returns: undefined;
+      };
       start_billing_customer_provisioning_v1: {
         Args: { p_lease_id: string; p_operation_id: string; p_user_id: string };
         Returns: string;
@@ -2619,7 +2793,10 @@ export type Database = {
         Args: { p_stripe_customer_id: string; p_subscription_id: string };
         Returns: string;
       };
-      trunc_week_tz: { Args: { ts: string; tz: string; week_start?: number }; Returns: string };
+      trunc_week_tz: {
+        Args: { ts: string; tz: string; week_start?: number };
+        Returns: string;
+      };
       update_personalization: {
         Args: { p_path: string; p_user_id: string; p_value: Json };
         Returns: undefined;
@@ -2696,7 +2873,10 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      use_recovery_code: { Args: { p_code_hash: string; p_user_id: string }; Returns: boolean };
+      use_recovery_code: {
+        Args: { p_code_hash: string; p_user_id: string };
+        Returns: boolean;
+      };
       vault_secret_exists: { Args: { p_name: string }; Returns: boolean };
     };
     Enums: {
@@ -2722,7 +2902,9 @@ export type Tables<
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R;
@@ -2745,7 +2927,9 @@ export type TablesInsert<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I;
     }
@@ -2767,7 +2951,9 @@ export type TablesUpdate<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U;
     }
@@ -2789,7 +2975,9 @@ export type Enums<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never) = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
     ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
@@ -2803,7 +2991,9 @@ export type CompositeTypes<
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never) = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
     ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
