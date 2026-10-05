@@ -2,8 +2,7 @@
   "sidebar": {
     "pageNav": {
       "label": "Workspace",
-      "calendar": "Calendar",
-      "report": "Report"
+      "calendar": "Calendar"
     }
   }
 }

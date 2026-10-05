@@ -22,6 +22,7 @@ export {
 } from './components/CategoryAppearanceMenuItems';
 
 // 確認ダイアログ（作成 / 改名モーダルは Global ラッパー経由でだけ開くので barrel に出さない）
+export { ConnectedActivitySummaryPanel } from './components/activity-summary/ConnectedActivitySummaryPanel';
 export { ActivityDeleteConfirmDialog } from './components/ActivityDeleteConfirmDialog';
 
 // 選択ピッカー（Inspector / 作成ポップオーバー / インラインパレットから開く）
@@ -40,6 +41,10 @@ export {
   useArchivedActivities,
   useArchivedCategories,
 } from './hooks/useActivitiesQuery';
+export {
+  ACTIVITY_DETAIL_PANEL_DEFAULT_WIDTH,
+  ACTIVITY_DETAIL_SLOT_KEY,
+} from './lib/activity-detail-slot';
 
 // 更新（すべて楽観的更新つき）
 export {

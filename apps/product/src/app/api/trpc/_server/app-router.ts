@@ -9,7 +9,6 @@ import { activitiesRouter } from '@/features/activities/server/router';
 import { createUserRouter } from '@/features/auth/server/router';
 import { contactRouter } from '@/features/contact/server/router';
 import { externalCalendarRouter } from '@/features/external-calendar/server/router';
-import { reviewRouter } from '@/features/review/server/router';
 import { billingRouter } from '@/features/settings/server/billing-router';
 import { mcpConnectionsRouter } from '@/features/settings/server/mcp-connections-router';
 import { userSettingsRouter } from '@/features/settings/server/router';
@@ -38,7 +37,6 @@ export const appRouter = createTRPCRouter({
   planTemplates: planTemplatesRouter,
   recordCommands: recordCommandsRouter,
   records: recordsRouter,
-  review: reviewRouter,
   plans: plansRouter,
   statistics: statisticsRouter,
   timeblockContext: timeblockContextRouter,

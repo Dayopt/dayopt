@@ -134,16 +134,10 @@ for (const { timezone, offset } of CASES) {
         throw new Error(`magic link 発行に失敗: ${error?.message ?? 'no hashed_token'}`);
       }
       await page.goto(
-        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/ja/calendar')}`,
+        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/ja/')}`,
       );
-      await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+      await page.waitForURL(/\/ja\/?(?:\?.*)?$/, { timeout: 15_000 });
       await page.waitForLoadState('networkidle');
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
-      // Cookie 未設定の magic-link 初回着地でも、表示日はブラウザーの当日になる。
-      await expect(page.locator('a[aria-label="レポートを開く"]').first()).toHaveAttribute(
-        'href',
-        `/ja/report?date=${today}`,
-      );
 
       // ここから数える。ログイン直後の「今日」の週とは別の範囲なので、先に温まった cache は使えない
       const rangeRequests: string[] = [];
@@ -159,7 +153,7 @@ for (const { timezone, offset } of CASES) {
         }
       });
 
-      await page.goto(`/ja/calendar?view=week&date=${TARGET_DATE}`);
+      await page.goto(`/ja/?view=week&date=${TARGET_DATE}`);
       await expect(page.locator('[data-calendar-grid]')).toHaveCount(5, { timeout: 15_000 });
       // 0 件が「query が撃たれなかった」ではなく「hydrate された data で描画した」ことの証拠
       const seededCard = page
@@ -171,10 +165,10 @@ for (const { timezone, offset } of CASES) {
 
       expect(rangeRequests, '初回表示で範囲系 procedure を取り直していないこと').toEqual([]);
       for (const route of [
-        `/ja/report?date=${TARGET_DATE}`,
+        `/ja/?view=week&date=${TARGET_DATE}`,
         '/ja/settings',
-        '/ja/calendar',
-        `/en/calendar?view=week&date=${TARGET_DATE}`,
+        '/ja/',
+        `/?view=week&date=${TARGET_DATE}`,
       ]) {
         rangeRequests.length = 0;
         await page.goto(route);
@@ -213,15 +207,11 @@ for (const { timezone, offset } of CASES) {
       });
       if (error || !data.properties?.hashed_token) throw new Error('magic link failed');
       await page.goto(
-        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=%2Fja%2Fcalendar`,
+        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=%2Fja%2F`,
       );
-      await page.waitForURL(/\/ja\/calendar/);
+      await page.waitForURL(/\/ja\/?(?:\?.*)?$/);
       await page.waitForLoadState('networkidle');
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
-      await expect(page.locator('a[aria-label="レポートを開く"]').first()).toHaveAttribute(
-        'href',
-        `/ja/report?date=${today}`,
-      );
       expect(new URL(page.url()).searchParams.get('date')).toBe(today);
       expect(new URL(page.url()).searchParams.get('view')).toBe('day');
       expect(hydrationErrors).toEqual([]);

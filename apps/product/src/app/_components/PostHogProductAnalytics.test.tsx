@@ -16,7 +16,7 @@ const analytics = vi.hoisted(() => ({
   captureUnexpectedError: vi.fn(),
 }));
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/calendar' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
 vi.mock('@/lib/trpc/client', () => ({
   vanillaTrpc: { userSettings: { claimSignupCompletion: { mutate: analytics.signupClaim } } },
 }));
@@ -50,7 +50,7 @@ describe('PostHog Product registration boundary', () => {
     analytics.loading = false;
     analytics.identifiedUserId = null;
     window.sessionStorage.clear();
-    window.history.replaceState({}, '', '/calendar?signup_claim=1&view=week');
+    window.history.replaceState({}, '', '/?signup_claim=1&view=week');
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_PROJECT_KEY', 'phc_test');
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED', 'true');
     vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'preview');
@@ -72,7 +72,7 @@ describe('PostHog Product registration boundary', () => {
     expect(analytics.capture).not.toHaveBeenCalledWith('signup_completed', expect.anything());
 
     unmount();
-    window.history.replaceState({}, '', '/calendar?registered=email');
+    window.history.replaceState({}, '', '/?registered=email');
     render(<PostHogProductAnalytics />);
     await waitFor(() => expect(analytics.identify).toHaveBeenCalledTimes(2));
     expect(analytics.signupClaim).toHaveBeenCalledOnce();
@@ -80,7 +80,7 @@ describe('PostHog Product registration boundary', () => {
 
   it('does not initialize or capture without browser consent', () => {
     analytics.consent = false;
-    window.history.replaceState({}, '', '/calendar');
+    window.history.replaceState({}, '', '/');
     render(<PostHogProductAnalytics />);
     expect(analytics.start).not.toHaveBeenCalled();
     expect(analytics.stop).toHaveBeenCalledWith('phc_test');

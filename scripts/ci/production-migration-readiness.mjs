@@ -87,7 +87,10 @@ if (isDirectExecution(import.meta.url)) {
       console.error(`::error::Migration readiness: ${result.detail}`);
       process.exitCode = 1;
     } else if (result.status === 'unverified') {
-      console.log(`::warning::Migration readiness: ${result.detail}`);
+      if (process.env.MIGRATION_READINESS_REQUIRED === 'true') {
+        console.error(`::error::Migration readiness: ${result.detail}`);
+        process.exitCode = 1;
+      } else console.log(`::warning::Migration readiness: ${result.detail}`);
     } else console.log(`Migration readiness verified: ${result.detail}`);
   } catch (error) {
     console.error(

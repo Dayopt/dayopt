@@ -12,15 +12,15 @@ describe('getTimeblockMenuItems', () => {
     expect(
       keys({
         activityId: 'activity-1',
-        onViewStats: noop,
+        onViewActivityDetails: noop,
         onDuplicate: noop,
         onDelete: noop,
       }),
-    ).toEqual(['viewStats', 'duplicate', 'delete']);
+    ).toEqual(['viewActivityDetails', 'duplicate', 'delete']);
   });
 
   it('アクティビティがなければ振り返りを省き、複製を表示する', () => {
-    expect(keys({ onViewStats: noop, onDuplicate: noop })).toEqual(['duplicate']);
+    expect(keys({ onViewActivityDetails: noop, onDuplicate: noop })).toEqual(['duplicate']);
   });
 
   it('ハンドラがなければ項目を返さない', () => {

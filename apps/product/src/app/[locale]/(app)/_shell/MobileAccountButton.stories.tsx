@@ -1,4 +1,4 @@
-import { BarChart3, Redo2 } from 'lucide-react';
+import { Redo2 } from 'lucide-react';
 
 import { Button } from '@dayopt/components';
 
@@ -50,7 +50,7 @@ export const AllPatterns: Story = {
 };
 
 /**
- * モバイルヘッダー右端の並び（カレンダー / レポート共通）。
+ * モバイルカレンダーヘッダー右端の並び。
  *
  * ここが**この component の主戦場**なのに、長らく単体でしか story が無く、隣に並ぶ
  * アイコンとの釣り合いを誰も見ていなかった。2026-09-07 に「アバターだけ 32px で箱を
@@ -62,15 +62,6 @@ export const InHeaderCluster: Story = {
     <div className="flex h-8 items-center gap-1">
       <Button variant="ghost" icon size="sm" className="text-muted-foreground" aria-label="今日へ">
         <Redo2 className="size-5" />
-      </Button>
-      <Button
-        variant="ghost"
-        icon
-        size="sm"
-        className="text-muted-foreground"
-        aria-label="レポートへ"
-      >
-        <BarChart3 className="size-5" />
       </Button>
       <MobileAccountButton href="/ja/settings" displayName="Tomoya Tanaka" ariaLabel="アカウント" />
     </div>

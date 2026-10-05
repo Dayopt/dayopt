@@ -228,7 +228,7 @@ gateを有効にした後は、同じユーザーの操作をDB内で直列化�
 
 判定は `data.session?.access_token` で行う。auth-js は `access_token` を伴う session だけを保存する（cookie が書かれる）ので、truthy 判定だと token 無しの session オブジェクトで保護ページへ送ってしまう。
 
-**着地先を login ページにはしない。** `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/calendar` へ送るため、ログイン中の browser で確認リンクを開くとメッセージが出る前に弾かれる。`/auth/confirmed` は `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に登録してあり、認証済み・未認証のどちらでも表示できる。**このページを allowlist から外すと本件が再発する。**
+**着地先を login ページにはしない。** `proxy.ts` は認証済みユーザーが auth 系 path に来るとホーム `/` へ送るため、ログイン中の browser で確認リンクを開くとメッセージが出る前に弾かれる。`/auth/confirmed` は `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に登録してあり、認証済み・未認証のどちらでも表示できる。**このページを allowlist から外すと本件が再発する。**
 
 ## Auth REST API は存在しない
 

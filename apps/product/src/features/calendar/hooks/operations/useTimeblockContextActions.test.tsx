@@ -4,19 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalendarDisplayEvent } from '../../types/calendar.types';
 
 const mocks = vi.hoisted(() => ({
-  push: vi.fn(),
   deletePlanMutate: vi.fn(),
   deleteRecordMutate: vi.fn(),
   showDeleteUndo: vi.fn(),
-}));
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mocks.push }),
-}));
-
-vi.mock('next-intl', () => ({
-  useLocale: () => 'ja',
-  useTranslations: () => (key: string) => key,
+  closeInspector: vi.fn(),
 }));
 
 vi.mock('@/features/timeblock', () => ({
@@ -25,41 +16,65 @@ vi.mock('@/features/timeblock', () => ({
     deletePlan: { mutate: mocks.deletePlanMutate },
   }),
   useTimeblockDeleteUndo: () => mocks.showDeleteUndo,
+  useTimeblockInspectorStore: {
+    getState: () => ({ closeInspector: mocks.closeInspector }),
+  },
+}));
+
+vi.mock('@/features/activities', () => ({
+  useActivitiesMap: () => ({
+    getActivityById: (id: string) =>
+      id === 'activity-1'
+        ? { id, name: 'Writing', categoryName: 'Work', color: 'blue' }
+        : undefined,
+  }),
 }));
 
 vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn() },
 }));
 
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 import { useTimeblockContextActions } from './useTimeblockContextActions';
 
 const classifiedTimeblock = {
   id: 'timeblock-1',
+  title: 'Planning',
   kind: 'plan',
   activityId: 'activity-1',
   startDate: new Date(2026, 2, 25, 9),
   actualStartDate: null,
 } as unknown as CalendarDisplayEvent;
 
-describe('useTimeblockContextActions - Review navigation', () => {
+describe('useTimeblockContextActions - activity details', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useActivityDetailStore.getState().close();
   });
 
-  it('/report へ遷移する（カレンダー内パネルは廃止済み、#2181 Step 4）', () => {
+  it('opens the selected activity detail without leaving the calendar', () => {
     const { result } = renderHook(() => useTimeblockContextActions());
 
-    act(() => result.current.handleViewStats(classifiedTimeblock));
+    act(() => result.current.handleViewActivityDetails(classifiedTimeblock));
 
-    expect(mocks.push).toHaveBeenCalledWith('/ja/report?date=2026-03-25');
+    expect(useActivityDetailStore.getState().target).toEqual({
+      activityId: 'activity-1',
+      name: 'Writing',
+      categoryName: 'Work',
+      color: 'blue',
+    });
+    expect(useActivityDetailStore.getState().isOpen).toBe(true);
+    expect(mocks.closeInspector).toHaveBeenCalledOnce();
   });
 
-  it('tagなしtimeblockではReviewを開かない', () => {
+  it('アクティビティ未設定のtimeblockでは詳細を開かない', () => {
     const { result } = renderHook(() => useTimeblockContextActions());
 
-    act(() => result.current.handleViewStats({ ...classifiedTimeblock, activityId: null }));
+    act(() =>
+      result.current.handleViewActivityDetails({ ...classifiedTimeblock, activityId: null }),
+    );
 
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(useActivityDetailStore.getState().isOpen).toBe(false);
   });
 });
 

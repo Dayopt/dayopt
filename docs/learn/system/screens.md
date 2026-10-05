@@ -21,9 +21,7 @@ flowchart LR
     session_error["セッション確認エラー"]
   end
   subgraph g_app["アプリ"]
-    root["トップ（/ja）"]
-    calendar["カレンダー"]
-    report["レポート"]
+    calendar["ホーム（カレンダー）"]
     settings["設定"]
     integrations["設定 › 連携"]
   end
@@ -33,7 +31,6 @@ flowchart LR
     oauth_consent["MCP の同意"]
     offline["オフライン"]
   end
-  root -->|"常に"| calendar
   signup -->|"サインインへ"| login
   signup -->|"確認リンク（成功）"| calendar
   signup -->|"確認リンク（session なし）"| confirmed
@@ -47,8 +44,6 @@ flowchart LR
   calendar -->|"aal2 が必要（proxy）"| mfa_verify
   calendar -->|"AAL の確認に失敗"| session_error
   session_error -->|"もう一度試す"| calendar
-  calendar -->|"タブ"| report
-  report -->|"タブ"| calendar
   calendar -->|"設定を開く"| settings
   settings -->|"連携"| integrations
   integrations -->|"接続（/start）"| google
@@ -61,11 +56,11 @@ flowchart LR
 
 メールとパスワード、または Google でサインインする。
 
-- **ここへ来る条件**: サインインしていない人が保護された画面を開くと、proxy.ts がここへ送る（元のパスは redirect に残る）。サインイン済みの人が開くと /calendar へ戻される。
+- **ここへ来る条件**: サインインしていない人が保護された画面を開くと、proxy.ts がここへ送る（元のパスは redirect に残る）。サインイン済みの人が開くと / へ戻される。
 - **読み込むデータ**: なし（Supabase Auth を直接呼ぶ）
 - **触るサービス**: ブラウザ、Supabase、その他の外部
 - **壊れた時**: 認証エラーはフォームの下に文言で出る。想定内のエラーは Sentry に出ない。
-- **移る先**: 多要素認証（MFA が必要）、カレンダー（サインイン成功）、パスワード再設定の依頼（パスワードを忘れた）
+- **移る先**: 多要素認証（MFA が必要）、ホーム（カレンダー）（サインイン成功）、パスワード再設定の依頼（パスワードを忘れた）
 - **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)、[パスワードを再設定する](../journeys/password-reset.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(auth)/auth/login/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/login/page.tsx>) で `LoginForm` を探す
@@ -79,7 +74,7 @@ flowchart LR
 - **読み込むデータ**: なし
 - **触るサービス**: ブラウザ、Supabase、Resend
 - **壊れた時**: 確認メールを送れないと登録エラーになる。
-- **移る先**: サインイン（サインインへ）、カレンダー（確認リンク（成功））、メール確認の結果（確認リンク（session なし））
+- **移る先**: サインイン（サインインへ）、ホーム（カレンダー）（確認リンク（成功））、メール確認の結果（確認リンク（session なし））
 - **この画面を通る経路**: [サインアップ → ウェルカムメール](../journeys/signup.md)
 - **コードと文書**:
   - [`apps/product/src/features/auth/components/SignupForm.tsx`](../../../apps/product/src/features/auth/components/SignupForm.tsx) で `safeCheckPasswordPwned` を探す
@@ -130,7 +125,7 @@ flowchart LR
 - **読み込むデータ**: Supabase Auth（listFactors / challenge / verify）。リカバリーコードだけ tRPC。
 - **触るサービス**: ブラウザ、Supabase、Vercel（Next.js）
 - **壊れた時**: challenge の失敗は「もう一度試す」ボタン付きで出る。
-- **移る先**: カレンダー（認証成功）
+- **移る先**: ホーム（カレンダー）（認証成功）
 - **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)、[パスワードを再設定する](../journeys/password-reset.md)
 - **コードと文書**:
   - [`apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx`](<../../../apps/product/src/app/[locale]/(auth)/auth/mfa-verify/page.tsx>) で `supabase.auth.mfa.challenge` を探す
@@ -139,59 +134,33 @@ flowchart LR
 
 セッションの確認そのものが失敗した時の逃げ場。もう一度試すか、サインアウトする。
 
-- **ここへ来る条件**: proxy.ts で AAL の確認に失敗した時、または proxy の処理そのものが例外で落ちた時（Supabase の障害など）。/calendar と /auth/login の無限往復を防ぐための画面。
+- **ここへ来る条件**: proxy.ts で AAL の確認に失敗した時、または proxy の処理そのものが例外で落ちた時（Supabase の障害など）。/ と /auth/login の無限往復を防ぐための画面。
 - **読み込むデータ**: なし
 - **触るサービス**: Vercel（Next.js）
 - **壊れた時**: ここに来ること自体が障害の兆候。
-- **移る先**: カレンダー（もう一度試す）
+- **移る先**: ホーム（カレンダー）（もう一度試す）
 - **この画面を通る経路**: [ログイン（MFA 含む）](../journeys/login.md)
 - **コードと文書**:
   - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `MFA assurance lookup failed; redirecting to session error page` を探す
   - [`apps/product/src/proxy.ts`](../../../apps/product/src/proxy.ts) で `Proxy request failed` を探す
 
-### トップ（/ja）（`/ja`）
+### ホーム（カレンダー）（`/ja`）
 
-入口。必ずカレンダーへ送る。
+ホーム画面。Plan・Record・Google の予定を時間軸に並べ、作成・編集は Inspector で行う。アクティビティ詳細は必要な時だけ開く。
 
-- **ここへ来る条件**: URL を直接開いた時。
-- **読み込むデータ**: なし
-- **触るサービス**: Vercel（Next.js）
-- **壊れた時**: なし。
-- **移る先**: カレンダー（常に）
-- **コードと文書**:
-  - [`apps/product/src/app/[locale]/page.tsx`](../../../apps/product/src/app/[locale]/page.tsx) で ``redirect(`/${locale}/calendar`)`` を探す
-
-### カレンダー（`/ja/calendar`）
-
-主画面。Plan・Record・Google の予定を時間軸に並べ、作成・編集は右の Inspector で行う。
-
-- **ここへ来る条件**: サインイン・MFA の後の既定の着地点。トップからも。
+- **ここへ来る条件**: サインイン・MFA の後の既定の着地点。ホーム URL を直接開く。
 - **読み込むデータ**: server で先に取る: plans.list / records.list / externalCalendar.listEvents / statistics.getActivityStats
 - **触るサービス**: ブラウザ、Vercel（Next.js）、Supabase
-- **壊れた時**: セグメント単位の error.tsx（CalendarError）が受ける。回線が無ければ Service Worker が /offline を出す。
-- **移る先**: サインイン（未ログイン / サインアウト）、多要素認証（aal2 が必要（proxy））、セッション確認エラー（AAL の確認に失敗）、レポート（タブ）、設定（設定を開く）、オフライン（回線なし（SW））
+- **壊れた時**: workspace の error.tsx（CalendarError）が受ける。回線が無ければ Service Worker が /offline を出す。
+- **移る先**: サインイン（未ログイン / サインアウト）、多要素認証（aal2 が必要（proxy））、セッション確認エラー（AAL の確認に失敗）、設定（設定を開く）、オフライン（回線なし（SW））
 - **この画面を通る経路**: [Plan を保存](../journeys/save-plan.md)、[Plan / Record を動かす・直す](../journeys/edit-timeblock.md)、[Record を作る・Plan を記録する](../journeys/record-plan.md)、[削除と取り消し](../journeys/delete-undo.md)、[AI クライアントから Plan を作る（MCP）](../journeys/mcp.md)、[ログイン（MFA 含む）](../journeys/login.md)、[Google Calendar 連携](../journeys/google-calendar.md)、[merge → 本番公開](../journeys/deploy.md)
 - **コードと文書**:
-  - [`apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts>) で `helpers.plans.list.prefetch` を探す
-  - [`apps/product/src/app/[locale]/(app)/(workspace)/calendar/error.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/error.tsx>) で `CalendarError` を探す
-
-### レポート（`/ja/report`）
-
-計画と実績の差をふり返る。
-
-- **ここへ来る条件**: ワークスペースのタブで切り替える。
-- **読み込むデータ**: client で取る: review.getReportPeriod / review.getReportActivityDetail（server で先に取らない）
-- **触るサービス**: ブラウザ、Vercel（Next.js）、Supabase
-- **壊れた時**: カレンダーと同じ CalendarError。読み込み中は loading.tsx。
-- **移る先**: カレンダー（タブ）
-- **この画面を通る経路**: [レポートを開く（集計）](../journeys/report.md)
-- **コードと文書**:
-  - [`apps/product/src/features/review/hooks/useReportPeriod.ts`](../../../apps/product/src/features/review/hooks/useReportPeriod.ts) で `review.getReportPeriod.useQuery` を探す
-  - [`apps/product/src/app/[locale]/(app)/_shell/WorkspaceTabs.tsx`](<../../../apps/product/src/app/[locale]/(app)/_shell/WorkspaceTabs.tsx>) で `/report` を探す
+  - [`apps/product/src/app/[locale]/(app)/(workspace)/page.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) で `export const dynamic = 'force-dynamic';` を探す
+  - [`apps/product/src/app/[locale]/(app)/(workspace)/error.tsx`](<../../../apps/product/src/app/[locale]/(app)/(workspace)/error.tsx>) で `CalendarError` を探す
 
 ### 設定（`/ja/settings`）
 
-アカウント・表示・データ・連携・課金の 5 分類。デスクトップではカレンダーの上にモーダルで開き、URL は /calendar に戻す。スマホでは画面として開く。
+アカウント・表示・データ・連携・課金の 5 分類。デスクトップではカレンダーの上にモーダルで開き、URL は / に戻す。スマホでは画面として開く。
 
 - **ここへ来る条件**: サイドバーやメニューから。
 - **読み込むデータ**: 分類ごとに異なる（連携なら externalCalendar.listConnections、課金なら billing.getOverview）
@@ -286,7 +255,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       "row": 2,
       "group": "auth",
       "what": "メールとパスワード、または Google でサインインする。",
-      "arrive": "サインインしていない人が保護された画面を開くと、proxy.ts がここへ送る（元のパスは redirect に残る）。サインイン済みの人が開くと /calendar へ戻される。",
+      "arrive": "サインインしていない人が保護された画面を開くと、proxy.ts がここへ送る（元のパスは redirect に残る）。サインイン済みの人が開くと / へ戻される。",
       "loads": "なし（Supabase Auth を直接呼ぶ）",
       "svcs": ["browser", "supabase", "external"],
       "fails": "認証エラーはフォームの下に文言で出る。想定内のエラーは Sentry に出ない。",
@@ -463,7 +432,7 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       "row": 7,
       "group": "auth",
       "what": "セッションの確認そのものが失敗した時の逃げ場。もう一度試すか、サインアウトする。",
-      "arrive": "proxy.ts で AAL の確認に失敗した時、または proxy の処理そのものが例外で落ちた時（Supabase の障害など）。/calendar と /auth/login の無限往復を防ぐための画面。",
+      "arrive": "proxy.ts で AAL の確認に失敗した時、または proxy の処理そのものが例外で落ちた時（Supabase の障害など）。/ と /auth/login の無限往復を防ぐための画面。",
       "loads": "なし",
       "svcs": ["vercel"],
       "fails": "ここに来ること自体が障害の兆候。",
@@ -488,45 +457,20 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       "flows": ["login"]
     },
     {
-      "id": "root",
-      "label": "トップ（/ja）",
+      "id": "calendar",
+      "label": "ホーム（カレンダー）",
       "url": "/ja",
       "col": 2,
       "row": 1,
       "group": "app",
-      "what": "入口。必ずカレンダーへ送る。",
-      "arrive": "URL を直接開いた時。",
-      "loads": "なし",
-      "svcs": ["vercel"],
-      "fails": "なし。",
-      "screen": {
-        "t": "blank",
-        "url": "/ja",
-        "text": "→ /ja/calendar"
-      },
-      "refs": [
-        {
-          "path": "apps/product/src/app/[locale]/page.tsx",
-          "find": "redirect(`/${locale}/calendar`)"
-        }
-      ],
-      "flows": []
-    },
-    {
-      "id": "calendar",
-      "label": "カレンダー",
-      "url": "/ja/calendar",
-      "col": 2,
-      "row": 2,
-      "group": "app",
-      "what": "主画面。Plan・Record・Google の予定を時間軸に並べ、作成・編集は右の Inspector で行う。",
-      "arrive": "サインイン・MFA の後の既定の着地点。トップからも。",
+      "what": "ホーム画面。Plan・Record・Google の予定を時間軸に並べ、作成・編集は Inspector で行う。アクティビティ詳細は必要な時だけ開く。",
+      "arrive": "サインイン・MFA の後の既定の着地点。ホーム URL を直接開く。",
       "loads": "server で先に取る: plans.list / records.list / externalCalendar.listEvents / statistics.getActivityStats",
       "svcs": ["browser", "vercel", "supabase"],
-      "fails": "セグメント単位の error.tsx（CalendarError）が受ける。回線が無ければ Service Worker が /offline を出す。",
+      "fails": "workspace の error.tsx（CalendarError）が受ける。回線が無ければ Service Worker が /offline を出す。",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
@@ -542,11 +486,11 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       },
       "refs": [
         {
-          "path": "apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts",
-          "find": "helpers.plans.list.prefetch"
+          "path": "apps/product/src/app/[locale]/(app)/(workspace)/page.tsx",
+          "find": "export const dynamic = 'force-dynamic';"
         },
         {
-          "path": "apps/product/src/app/[locale]/(app)/(workspace)/calendar/error.tsx",
+          "path": "apps/product/src/app/[locale]/(app)/(workspace)/error.tsx",
           "find": "CalendarError"
         }
       ],
@@ -562,44 +506,13 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
       ]
     },
     {
-      "id": "report",
-      "label": "レポート",
-      "url": "/ja/report",
-      "col": 2,
-      "row": 3,
-      "group": "app",
-      "what": "計画と実績の差をふり返る。",
-      "arrive": "ワークスペースのタブで切り替える。",
-      "loads": "client で取る: review.getReportPeriod / review.getReportActivityDetail（server で先に取らない）",
-      "svcs": ["browser", "vercel", "supabase"],
-      "fails": "カレンダーと同じ CalendarError。読み込み中は loading.tsx。",
-      "screen": {
-        "t": "page",
-        "url": "/ja/report",
-        "tone": "neutral",
-        "title": "レポート",
-        "body": "計画と実績の差"
-      },
-      "refs": [
-        {
-          "path": "apps/product/src/features/review/hooks/useReportPeriod.ts",
-          "find": "review.getReportPeriod.useQuery"
-        },
-        {
-          "path": "apps/product/src/app/[locale]/(app)/_shell/WorkspaceTabs.tsx",
-          "find": "/report"
-        }
-      ],
-      "flows": ["report"]
-    },
-    {
       "id": "settings",
       "label": "設定",
       "url": "/ja/settings",
       "col": 2,
       "row": 4,
       "group": "app",
-      "what": "アカウント・表示・データ・連携・課金の 5 分類。デスクトップではカレンダーの上にモーダルで開き、URL は /calendar に戻す。スマホでは画面として開く。",
+      "what": "アカウント・表示・データ・連携・課金の 5 分類。デスクトップではカレンダーの上にモーダルで開き、URL は / に戻す。スマホでは画面として開く。",
       "arrive": "サイドバーやメニューから。",
       "loads": "分類ごとに異なる（連携なら externalCalendar.listConnections、課金なら billing.getOverview）",
       "svcs": ["browser", "vercel", "supabase"],
@@ -771,7 +684,6 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
     }
   ],
   "edges": [
-    ["root", "calendar", "常に"],
     ["signup", "login", "サインインへ"],
     ["signup", "calendar", "確認リンク（成功）"],
     ["signup", "confirmed", "確認リンク（session なし）"],
@@ -785,8 +697,6 @@ MCP クライアントに渡す権限（scope）を利用者が承認する。
     ["calendar", "mfa-verify", "aal2 が必要（proxy）"],
     ["calendar", "session-error", "AAL の確認に失敗"],
     ["session-error", "calendar", "もう一度試す"],
-    ["calendar", "report", "タブ"],
-    ["report", "calendar", "タブ"],
     ["calendar", "settings", "設定を開く"],
     ["settings", "integrations", "連携"],
     ["integrations", "google", "接続（/start）"],

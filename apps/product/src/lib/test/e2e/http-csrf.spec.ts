@@ -61,7 +61,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     await page.locator('input[type="email"]').first().fill(user.email);
     await page.locator('input[type="password"]').first().fill(user.password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
     const endpoint = new URL('/api/trpc/userSettings.update', baseURL).href;
     const write = (timeFormat: string) => JSON.stringify({ json: { timeFormat } });
     const initial = await page.evaluate(
@@ -122,7 +122,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     expect(outcomes).toEqual(['browser-blocked', 'browser-blocked', 'browser-blocked']);
 
     // 同じcookieが失効したから拒否された、という偽陽性を除く。
-    await page.goto('/ja/calendar');
+    await page.goto('/ja/');
     const final = await page.evaluate(
       async ({ endpoint, body }) => {
         return (
@@ -151,7 +151,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
       ([, action]) => action.exportedName === 'generateAndSaveRecoveryCodesAction',
     )?.[0];
     expect(actionId, '実際に配信されるServer Actionが存在すること').toBeTruthy();
-    const actionUrl = new URL('/ja/calendar', baseURL).href;
+    const actionUrl = new URL('/ja/', baseURL).href;
     const sameOriginAction = await page.evaluate(
       async ({ actionId, actionUrl }) => {
         const form = new FormData();

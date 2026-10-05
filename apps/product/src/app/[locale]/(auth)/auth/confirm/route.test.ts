@@ -97,9 +97,9 @@ describe('auth confirm route', () => {
   it('signup は session が立てば従来どおり next へ送る', async () => {
     verifyOtp.mockResolvedValue({ data: { session: SESSION }, error: null });
 
-    const response = await GET(request('token_hash=hash&type=signup&next=%2Fcalendar'));
+    const response = await GET(request('token_hash=hash&type=signup&next=%2F'));
 
-    expect(locationOf(response).pathname).toBe('/calendar');
+    expect(locationOf(response).pathname).toBe('/');
   });
 
   it('確認済みの新規登録だけに署名付きの一時claimを設定する', async () => {

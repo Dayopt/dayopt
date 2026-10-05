@@ -189,13 +189,13 @@ describe('settings route hydration guards', () => {
     render(<SettingsPage />);
 
     expect(mockOpenSettings).toHaveBeenCalledWith('account');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('renders mobile settings content without redirect', () => {
     mockHasMounted = true;
     mockIsMobile = true;
-    mockSearchParams = new URLSearchParams('returnTo=%2Fweek%3Fdate%3D2026-06-22%26panel%3Dreview');
+    mockSearchParams = new URLSearchParams('returnTo=%2F%3Fview%3Dweek%26date%3D2026-06-22');
 
     render(<SettingsPage />);
 
@@ -204,7 +204,7 @@ describe('settings route hydration guards', () => {
     expect(screen.getByText('Tester').closest('a')).toBeNull();
     expect(screen.getByRole('link', { name: 'common.back' })).toHaveAttribute(
       'href',
-      '/week?date=2026-06-22&panel=review',
+      '/?view=week&date=2026-06-22',
     );
     expect(
       screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.settings' }),
@@ -223,10 +223,7 @@ describe('settings route hydration guards', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'settings.dialog.categories.account' }),
-    ).toHaveAttribute(
-      'href',
-      '/settings/account?returnTo=%2Fweek%3Fdate%3D2026-06-22%26panel%3Dreview',
-    );
+    ).toHaveAttribute('href', '/settings/account?returnTo=%2F%3Fview%3Dweek%26date%3D2026-06-22');
     expect(
       screen.getByRole('link', { name: 'settings.accountPage.documentation' }),
     ).toHaveAttribute('href', 'https://dayopt.app/docs');
@@ -246,7 +243,7 @@ describe('settings route hydration guards', () => {
     render(<SettingsCategoryPage />);
 
     expect(mockOpenSettings).toHaveBeenCalledWith('billing');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('handles a desktop calendar callback before opening Integrations', () => {
@@ -261,7 +258,7 @@ describe('settings route hydration guards', () => {
     );
     expect(mockInvalidateConnections).toHaveBeenCalled();
     expect(mockOpenSettings).toHaveBeenCalledWith('integrations');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('handles a desktop checkout return before reopening Billing', () => {
@@ -275,19 +272,19 @@ describe('settings route hydration guards', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('settings.subscription.checkoutSuccess');
     expect(mockInvalidateBillingOverview).toHaveBeenCalled();
     expect(mockOpenSettings).toHaveBeenCalledWith('billing');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('cleans only checkout callback params on mobile', () => {
     mockHasMounted = true;
     mockIsMobile = true;
     mockCategory = 'billing';
-    mockSearchParams = new URLSearchParams('canceled=true&panel=review');
+    mockSearchParams = new URLSearchParams('canceled=true&view=week');
 
     render(<SettingsCategoryPage />);
 
     expect(mockToastSuccess).toHaveBeenCalledWith('settings.subscription.checkoutCanceled');
-    expect(mockReplace).toHaveBeenCalledWith('/settings/billing?panel=review');
+    expect(mockReplace).toHaveBeenCalledWith('/settings/billing?view=week');
   });
 
   it('invalidates the billing overview when returning from the customer portal', () => {
@@ -321,7 +318,7 @@ describe('settings route hydration guards', () => {
     mockIsMobile = true;
     mockCategory = 'integrations';
     mockSearchParams = new URLSearchParams(
-      'returnTo=%2Fweek%3Fdate%3D2026-08-01&calendar=error&reason=account_mismatch&panel=review',
+      'returnTo=%2F%3Fview%3Dweek%26date%3D2026-08-01&calendar=error&reason=account_mismatch&view=week',
     );
 
     render(<SettingsCategoryPage />);
@@ -330,7 +327,7 @@ describe('settings route hydration guards', () => {
       'settings.integrations.googleCalendar.callback.accountMismatch',
     );
     expect(mockReplace).toHaveBeenCalledWith(
-      '/settings/integrations?returnTo=%2Fweek%3Fdate%3D2026-08-01&panel=review',
+      '/settings/integrations?returnTo=%2F%3Fview%3Dweek%26date%3D2026-08-01&view=week',
     );
   });
 
