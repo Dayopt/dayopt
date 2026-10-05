@@ -50,11 +50,12 @@ describeWithEnv('Isolated Record lifecycle', () => {
     return result.data;
   };
   const openRecord = async (page: Page) => {
-    await page.locator('[data-record-lane-card]').first().click();
+    const timeblockParam = `record:${recordId}`;
+    if (new URL(page.url()).searchParams.get('timeblock') !== timeblockParam) {
+      await page.locator(`[data-record-lane-card][data-timeblock-id="${recordId}"]`).click();
+    }
     await expect(page.getByRole('textbox', { name: 'メモ', exact: true })).toBeVisible();
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
-      .toBe(`record:${recordId}`);
+    await expect.poll(() => new URL(page.url()).searchParams.get('timeblock')).toBe(timeblockParam);
   };
   const setTime = async (page: Page, name: string, value: string) => {
     const input = page.getByRole('combobox', { name, exact: true });
@@ -194,6 +195,7 @@ describeWithEnv('Isolated Record lifecycle', () => {
       .poll(async () => new Date((await readRecord()).end_at).toISOString())
       .toBe(isoAt('10:30'));
     expect(new Date((await readRecord()).start_at).toISOString()).toBe(isoAt('09:00'));
+    await expect.poll(() => new URL(page.url()).searchParams.get('timeblock')).toBeNull();
     await page.reload();
     await revealHour(page, 9);
     await openRecord(page);

@@ -231,6 +231,9 @@ describeWithEnv('Isolated consent and iCal', () => {
       new URL(newUrl).pathname === `/api/v1/calendar/${result.data!.ical_feed_token}.ics`,
     ).toBe(true);
     await page.reload();
-    await expect.poll(async () => (await feedInput.inputValue()) === newUrl).toBe(true);
+    // Desktop settings are a shell dialog. Reload returns to Calendar, so reopen
+    // Integrations before asserting that the rotated token is still rendered.
+    await page.goto('/ja/settings/integrations');
+    await expect(feedInput).toHaveValue(newUrl);
   });
 });

@@ -52,6 +52,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
 
   test('same-origin write works; cross-origin simple/multipart/GET requests cannot change it', async ({
     page,
+    request,
     baseURL,
     allowIsolatedOrigin,
   }) => {
@@ -102,8 +103,11 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     expect(await storedFormat()).toBe('12h');
 
     for (const contentType of ['text/plain', 'multipart/form-data']) {
-      const serverResponsePromise = page.waitForResponse(
-        (response) => response.url() === endpoint && response.request().method() === 'POST',
+      const browserRequestPromise = page.waitForRequest(
+        (browserRequest) =>
+          new URL(browserRequest.url()).origin === new URL(endpoint).origin &&
+          new URL(browserRequest.url()).pathname === new URL(endpoint).pathname &&
+          browserRequest.method() === 'POST',
       );
       const outcome = await page.evaluate(
         async ({ endpoint, body, contentType }) => {
@@ -127,15 +131,31 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
         },
         { endpoint, body: write('24h'), contentType },
       );
-      const serverResponse = await serverResponsePromise;
+      const browserRequest = await browserRequestPromise;
       expect(outcome).toBe('browser-blocked');
-      expect(serverResponse.status()).toBe(403);
-      expect((await serverResponse.request().allHeaders()).origin).toBe(attackerOrigin);
+      expect((await browserRequest.allHeaders()).origin).toBe(attackerOrigin);
+
+      // CORS may hide the server's response from page.waitForResponse even when the
+      // request reached the app. Verify the rejection directly with the same forged
+      // Origin and payload so the guard's HTTP status is observable.
+      const rejected = await request.post(endpoint, {
+        headers: {
+          origin: attackerOrigin,
+          ...(contentType === 'text/plain' ? { 'content-type': contentType } : {}),
+        },
+        ...(contentType === 'multipart/form-data'
+          ? { multipart: { input: write('24h') } }
+          : { data: write('24h') }),
+      });
+      expect(rejected.status()).toBe(403);
       expect(await storedFormat()).toBe('12h');
     }
     const getEndpoint = endpoint + '?input=' + encodeURIComponent(write('24h'));
-    const getResponsePromise = page.waitForResponse(
-      (response) => response.url() === getEndpoint && response.request().method() === 'GET',
+    const getBrowserRequestPromise = page.waitForRequest(
+      (browserRequest) =>
+        new URL(browserRequest.url()).origin === new URL(getEndpoint).origin &&
+        new URL(browserRequest.url()).pathname === new URL(getEndpoint).pathname &&
+        browserRequest.method() === 'GET',
     );
     const getOutcome = await page.evaluate(async (endpoint) => {
       return fetch(endpoint, { credentials: 'include' }).then(
@@ -143,11 +163,15 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
         () => 'browser-blocked',
       );
     }, getEndpoint);
-    const getResponse = await getResponsePromise;
+    const getBrowserRequest = await getBrowserRequestPromise;
     expect(await storedFormat()).toBe('12h');
     expect(getOutcome).toBe('browser-blocked');
+    expect((await getBrowserRequest.allHeaders()).origin).toBe(attackerOrigin);
+    const getResponse = await request.get(getEndpoint, {
+      headers: { origin: attackerOrigin },
+    });
     expect(getResponse.status()).toBe(405);
-    expect((await getResponse.request().allHeaders()).origin).toBe(attackerOrigin);
+    expect(await storedFormat()).toBe('12h');
 
     // 同じcookieが失効したから拒否された、という偽陽性を除く。
     await page.goto('/ja/');
