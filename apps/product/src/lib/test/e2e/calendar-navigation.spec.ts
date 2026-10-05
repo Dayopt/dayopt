@@ -94,8 +94,23 @@ describeWithEnv('Calendar navigation', () => {
     await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, TEST_USER_ID);
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.beforeEach(async ({ page, context, baseURL }, testInfo) => {
     test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+    if (process.env.E2E_ISOLATED_RUN === '1') {
+      const origins = [new URL(baseURL!), new URL(SUPABASE_URL!)];
+      if (
+        process.env.E2E_PREVIEW_ORIGIN ||
+        origins.some((origin) => !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))
+      ) {
+        throw new Error('Isolated calendar navigation requires loopback origins');
+      }
+      const allowed = new Set(origins.map((origin) => origin.origin));
+      await context.route('**/*', (route) =>
+        allowed.has(new URL(route.request().url()).origin)
+          ? route.continue()
+          : route.abort('blockedbyclient'),
+      );
+    }
     await login(page);
     await page.goto(`/ja?view=day&date=${TEST_DATE}`);
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });

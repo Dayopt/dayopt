@@ -11,7 +11,7 @@ async function fillContact(page: Page) {
 for (const locale of ['', '/ja']) {
   const ja = locale === '/ja';
 
-  test(`${locale || 'en'} contact validation is associated with its fields and every category submits its selected value`, async ({
+  test(`${locale || 'en'} contact validation is associated with its fields and every category submits its selected value @mobile`, async ({
     page,
   }) => {
     const categories: string[] = [];

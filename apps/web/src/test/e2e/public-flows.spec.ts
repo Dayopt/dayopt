@@ -16,6 +16,10 @@ for (const locale of ['', '/ja']) {
     await expect(calendar).toContainText(
       japanese ? '前日の記録 45分' : "Yesterday's record: 45 min",
     );
+    await calendar.getByRole('button').nth(1).click();
+    await expect(calendar.locator('figure')).toHaveAttribute('data-step', 'record');
+    await expect(calendar.getByRole('button').nth(1)).toHaveAttribute('aria-pressed', 'true');
+    await expect(calendar.locator('figure')).toContainText(japanese ? '45分' : '45 min');
     const learning = page.locator('#learning');
     await learning
       .getByRole('button', { name: japanese ? /明日に並べてみる/ : /Arrange tomorrow/ })
@@ -25,7 +29,9 @@ for (const locale of ['', '/ja']) {
     await expect(learning).toContainText(japanese ? '予定を並べる前' : 'Before adding plans');
   });
 
-  test(`${locale || 'en'}: docs navigation opens a getting-started article`, async ({ page }) => {
+  test(`${locale || 'en'}: docs navigation opens a getting-started article @mobile`, async ({
+    page,
+  }) => {
     await page.goto(locale || '/');
     await page.locator(`a[href="${locale}/docs/getting-started"]`).first().click();
     await expect(page).toHaveURL(new RegExp(`${locale}/docs/?$`));

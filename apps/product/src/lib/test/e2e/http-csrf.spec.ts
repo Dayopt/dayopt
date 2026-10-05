@@ -2,20 +2,20 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { z } from 'zod';
 
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
-import {
-  assertServiceRoleSuiteRunnable,
-  resolveServiceRoleTarget,
-} from '../service-role-target-guard';
+import { resolveIsolatedServiceRoleTarget } from '../isolated-service-role-target';
+import { cleanupIsolatedTestUser } from '../isolated-user-cleanup';
+import { assertServiceRoleSuiteRunnable } from '../service-role-target-guard';
 import { createScopedTestUser, type ScopedTestUser } from './create-scoped-test-user';
+import { test } from './isolated-product-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY;
-const target = resolveServiceRoleTarget(url, key);
+const target = resolveIsolatedServiceRoleTarget(url, key);
 assertServiceRoleSuiteRunnable(target, 'HTTP CSRF boundary');
 const describeWithEnv = target.safe ? test.describe : test.describe.skip;
 
@@ -46,16 +46,17 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
         server.close((error) => (error ? reject(error) : resolve())),
       );
     if (user) {
-      const { error } = await admin.auth.admin.deleteUser(user.userId);
-      if (error) throw new Error(error.message);
+      await cleanupIsolatedTestUser(admin, url!, key!, user);
     }
   });
 
   test('same-origin write persists, cross-origin simple/JSON/GET requests cannot change it', async ({
     page,
     baseURL,
+    allowIsolatedOrigin,
   }) => {
     test.setTimeout(60_000);
+    allowIsolatedOrigin(attackerOrigin);
     await suppressConsentBanner(page);
     await page.goto('/ja/auth/login');
     await page.locator('input[type="email"]').first().fill(user.email);
@@ -154,13 +155,25 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     const actionUrl = new URL('/ja/', baseURL).href;
     const sameOriginAction = await page.evaluate(
       async ({ actionId, actionUrl }) => {
-        const form = new FormData();
-        form.set('$ACTION_ID_' + actionId, '');
-        return (await fetch(actionUrl, { method: 'POST', body: form })).status;
+        const response = await fetch(actionUrl, {
+          method: 'POST',
+          headers: { 'Next-Action': actionId, 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: '[]',
+        });
+        return { status: response.status, text: await response.text() };
       },
       { actionId: actionId!, actionUrl },
     );
-    expect(sameOriginAction).toBe(200);
+    expect(sameOriginAction.status).toBe(200);
+    // This disposable user has no second factor: the real handler must reach
+    // its AAL2 guard, not issue recovery credentials or merely render the page.
+    expect(sameOriginAction.text).toContain('MFA verification is required to issue recovery codes');
+    const recovery = await admin
+      .from('mfa_recovery_codes')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.userId);
+    expect(recovery.error).toBeNull();
+    expect(recovery.count).toBe(0);
 
     await page.goto(attackerOrigin);
     const rejectedAction = page.waitForResponse(
