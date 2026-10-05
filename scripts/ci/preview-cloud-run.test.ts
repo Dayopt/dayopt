@@ -23,6 +23,25 @@ const request = {
 const runId = 'b617105b-9c87-44c0-b5f8-18071be8c0f9';
 const userId = 'd707d390-8ad2-4776-8e46-7364f6cd7145';
 const roots: string[] = [];
+type PublicDiagnosticArtifact = {
+  tests: Array<{
+    procedureBudget?: {
+      procedures: number;
+      budget: number;
+      rateLimitedResponses: number;
+      mixedBatchResponses: number;
+    };
+    failedSteps: Array<{
+      category: 'expect' | 'pw:api' | 'test.step' | 'fixture' | 'hook' | 'other';
+      file: 'critical-path.spec.ts' | 'mobile-critical-path.spec.ts' | null;
+      line: number | null;
+      duration: number;
+    }>;
+  }>;
+};
+function readPublicDiagnostics(destination: string): PublicDiagnosticArtifact {
+  return JSON.parse(readFileSync(join(destination, 'preview.json'), 'utf8'));
+}
 function fixture(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cloud-evidence-test-'));
   roots.push(root);
@@ -186,44 +205,134 @@ describe('Cloud Preview evidence and cleanup', () => {
     const serialized = readFileSync(join(options.destination, 'preview.json'), 'utf8');
     expect(serialized).not.toContain('PRIVATE_');
   });
-  it.each(['reviewed', 'old-twelve', 'old-seven', 'duplicate', 'wrong-pair', 'missing'])(
-    'publisher independently enforces reviewed coverage: %s',
-    (kind) => {
+  it('retains only four numeric procedure-budget fields from the candidate report', () => {
+    const options = fixture();
+    writeFileSync(
+      join(options.directory, 'evidence', 'e2e.json'),
+      JSON.stringify({
+        tests: [
+          {
+            file: 'critical-path.spec.ts',
+            project: 'chromium',
+            line: 471,
+            retry: 0,
+            status: 'failed',
+            expectedPassed: true,
+            procedureBudget: {
+              procedures: 31,
+              budget: 26,
+              rateLimitedResponses: 0,
+              mixedBatchResponses: 0,
+              counts: { PRIVATE_PROCEDURE: 31 },
+              title: 'PRIVATE_TITLE',
+              error: 'PRIVATE_ERROR',
+            },
+          },
+        ],
+      }),
+    );
+    publishCloudEvidence(options);
+    const result = readPublicDiagnostics(options.destination);
+    expect(result.tests[0]?.procedureBudget).toEqual({
+      procedures: 31,
+      budget: 26,
+      rateLimitedResponses: 0,
+      mixedBatchResponses: 0,
+    });
+    expect(readFileSync(join(options.destination, 'preview.json'), 'utf8')).not.toContain(
+      'PRIVATE_',
+    );
+  });
+  it.each([-1, 1.5, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, '26'])(
+    'publisher independently drops an invalid procedure-budget value: %s',
+    (budget) => {
       const options = fixture();
-      const tests = [
-        ...Array.from({ length: 16 }, (_, index) => ({
-          file: 'critical-path.spec.ts',
-          project: 'chromium',
-          line: index + 1,
-        })),
-        ...Array.from({ length: 4 }, (_, index) => ({
-          file: 'mobile-critical-path.spec.ts',
-          project: 'Mobile Chrome',
-          line: index + 1,
-        })),
-      ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-      if (kind === 'old-twelve') {
-        tests.splice(9, 5);
-        tests.pop();
-      }
-      if (kind === 'old-seven') {
-        tests.splice(4, 10);
-        tests.splice(7, 1);
-      }
-      if (kind === 'duplicate') tests[8] = { ...tests[0]! };
-      if (kind === 'wrong-pair') tests[0]!.file = 'mobile-critical-path.spec.ts';
-      if (kind === 'missing') tests.splice(8, 1);
       writeFileSync(
         join(options.directory, 'evidence', 'e2e.json'),
         JSON.stringify({
-          status: 'passed',
-          expected: tests.length,
-          tests,
+          tests: [
+            {
+              file: 'critical-path.spec.ts',
+              project: 'chromium',
+              line: 471,
+              retry: 0,
+              status: 'failed',
+              expectedPassed: true,
+              procedureBudget: {
+                procedures: 31,
+                budget,
+                rateLimitedResponses: 0,
+                mixedBatchResponses: 0,
+              },
+              failedSteps: [
+                {
+                  category: 'test.step',
+                  file: 'critical-path.spec.ts',
+                  line: 482,
+                  duration: 5000,
+                  title: 'PRIVATE_TITLE',
+                  error: 'PRIVATE_ERROR',
+                },
+              ],
+            },
+          ],
         }),
       );
-      expect(publishCloudEvidence(options)).toMatchObject({ testsPassed: kind === 'reviewed' });
+      publishCloudEvidence(options);
+      const result = readPublicDiagnostics(options.destination);
+      expect(result.tests[0]).not.toHaveProperty('procedureBudget');
+      expect(result.tests[0]?.failedSteps).toEqual([
+        { category: 'test.step', file: 'critical-path.spec.ts', line: 482, duration: 5000 },
+      ]);
+      expect(readFileSync(join(options.destination, 'preview.json'), 'utf8')).not.toContain(
+        'PRIVATE_',
+      );
     },
   );
+  it.each([
+    'reviewed',
+    'old-twenty',
+    'old-twelve',
+    'old-seven',
+    'duplicate',
+    'wrong-pair',
+    'missing',
+  ])('publisher independently enforces reviewed coverage: %s', (kind) => {
+    const options = fixture();
+    const tests = [
+      ...Array.from({ length: 17 }, (_, index) => ({
+        file: 'critical-path.spec.ts',
+        project: 'chromium',
+        line: index + 1,
+      })),
+      ...Array.from({ length: 4 }, (_, index) => ({
+        file: 'mobile-critical-path.spec.ts',
+        project: 'Mobile Chrome',
+        line: index + 1,
+      })),
+    ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
+    if (kind === 'old-twenty') tests.splice(16, 1);
+    if (kind === 'old-twelve') {
+      tests.splice(9, 8);
+      tests.pop();
+    }
+    if (kind === 'old-seven') {
+      tests.splice(4, 13);
+      tests.pop();
+    }
+    if (kind === 'duplicate') tests[8] = { ...tests[0]! };
+    if (kind === 'wrong-pair') tests[0]!.file = 'mobile-critical-path.spec.ts';
+    if (kind === 'missing') tests.splice(8, 1);
+    writeFileSync(
+      join(options.directory, 'evidence', 'e2e.json'),
+      JSON.stringify({
+        status: 'passed',
+        expected: tests.length,
+        tests,
+      }),
+    );
+    expect(publishCloudEvidence(options)).toMatchObject({ testsPassed: kind === 'reviewed' });
+  });
   it('refuses a changed candidate binding before recovery and before artifact creation', async () => {
     const options = fixture({ before: { ...request, sha: 'b'.repeat(40) } });
     const recover = vi.fn();

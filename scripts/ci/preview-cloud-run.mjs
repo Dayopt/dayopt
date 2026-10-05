@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
-import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
+import {
+  isPassingPreviewReport,
+  safePreviewFailedSteps,
+  safePreviewProcedureBudget,
+} from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { runPreviewE2E } from '../runbook/preview-e2e.mjs';
 import { validateCloudIntent } from './preview-cloud-intent.mjs';
@@ -45,26 +49,6 @@ const STATES = new Set([
 const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 const TEST_STATES = new Set(['passed', 'failed', 'timedOut', 'skipped', 'interrupted', 'unknown']);
-const STEP_CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook', 'other']);
-const MAX_PUBLIC_FAILED_STEPS = 40;
-const MAX_PLAYWRIGHT_DURATION_MS = 7 * 60 * 1000;
-
-function publicFailedSteps(test) {
-  if (test.status === 'passed' || test.status === 'skipped' || !Array.isArray(test.steps))
-    return [];
-  return test.steps
-    .filter((step) => step?.failed === true)
-    .slice(0, MAX_PUBLIC_FAILED_STEPS)
-    .map((step) => ({
-      category: STEP_CATEGORIES.has(step.category) ? step.category : 'other',
-      file: FILES.has(step.file) ? step.file : null,
-      line: Number.isSafeInteger(step.line) && step.line > 0 ? step.line : null,
-      duration:
-        Number.isFinite(step.duration) && step.duration >= 0
-          ? Math.min(Math.round(step.duration), MAX_PLAYWRIGHT_DURATION_MS)
-          : 0,
-    }));
-}
 const safeGitEnv = () =>
   Object.fromEntries(
     ['PATH', 'HOME', 'LANG'].flatMap((key) => (process.env[key] ? [[key, process.env[key]]] : [])),
@@ -222,6 +206,7 @@ export function publishCloudEvidence({ directory, destination, request, intent =
         !Number.isSafeInteger(test.retry)
       )
         throw new Error();
+      const procedureBudget = safePreviewProcedureBudget(test.procedureBudget);
       return {
         file: test.file,
         project: test.project,
@@ -229,7 +214,8 @@ export function publishCloudEvidence({ directory, destination, request, intent =
         status: test.status,
         retry: test.retry,
         expectedPassed: test.expectedPassed === true,
-        failedSteps: publicFailedSteps(test),
+        failedSteps: safePreviewFailedSteps(test),
+        ...(procedureBudget ? { procedureBudget } : {}),
       };
     });
   } catch {

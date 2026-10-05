@@ -19,6 +19,7 @@ import {
   seedCriticalPathUser,
   TIMEZONE,
 } from './critical-path-fixture';
+import { REPORT_ALLOCATION, REPORT_EXECUTION } from './report-selectors';
 import { test } from './trpc-budget-fixture';
 
 test.use({ trpcProcedureBudget: 26 });
@@ -205,6 +206,76 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
 
     await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
+  });
+
+  test('Report の明細・差分・振り返りと表示フィルタが同じ記録を示し、保存行を変更しない', async ({
+    page,
+  }) => {
+    // This serial case consumes the preceding UI-created two Plans and one Record.
+    const readRecords = () =>
+      adminSupabase
+        .from('records')
+        .select('id, activity_id, start_at, end_at, note')
+        .eq('user_id', IDENTITY.userId)
+        .order('id');
+    const readPlans = () =>
+      adminSupabase
+        .from('plans')
+        .select('id, activity_id, start_at, end_at, note')
+        .eq('user_id', IDENTITY.userId)
+        .order('id');
+    const beforeRecords = await readRecords();
+    const beforePlans = await readPlans();
+    expect(beforeRecords.error === null && beforePlans.error === null).toBe(true);
+    expect(beforeRecords.data).toHaveLength(1);
+    expect(beforePlans.data).toHaveLength(2);
+    const recordId = beforeRecords.data![0]!.id;
+
+    await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
+    await expectReportAllocationShowsOneHour(page, ACTIVITY_NAME);
+    const usageRow = page.locator(REPORT_ALLOCATION.usageRows).filter({ hasText: ACTIVITY_NAME });
+    await usageRow.getByRole('button').click();
+    const detail = page.locator('[data-report-panel="detail"]');
+    await expect(detail).toBeVisible();
+    const stats = detail.locator('[data-report-stats="detail"] > li');
+    await expect(stats.filter({ hasText: '記録合計' })).toContainText('1:00');
+    await expect(stats.filter({ hasText: '予定との差' })).toContainText('予定比 100%');
+    await expect(detail.locator(`[data-record-id="${recordId}"]`)).toContainText('09:00–10:00');
+
+    await page.getByRole('tab', { name: '差分', exact: true }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('diff');
+    const executionRow = page.locator(REPORT_EXECUTION.rows).filter({ hasText: ACTIVITY_NAME });
+    await expect(executionRow).toContainText('予定比 100%');
+    await expect(detail.locator(`[data-record-id="${recordId}"]`)).toBeVisible();
+
+    await page.getByRole('tab', { name: '振り返り', exact: true }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('reflect');
+    await expect(page.locator('[data-report-chapter="quality"]')).toContainText(
+      '記録の詳細で充実度を選ぶと',
+    );
+    await expect(detail.locator(`[data-record-id="${recordId}"]`)).toBeVisible();
+    await detail.getByRole('button', { name: '閉じる', exact: true }).click();
+    await expect(detail).toHaveCount(0);
+
+    await page.getByRole('tab', { name: '差分', exact: true }).click();
+    const filter = page
+      .locator('[data-report-filter-row="activity"]')
+      .getByRole('button', { name: ACTIVITY_NAME, exact: true });
+    await expect(filter).toHaveAttribute('aria-pressed', 'true');
+    await filter.click();
+    await expect(filter).toHaveAttribute('aria-pressed', 'false');
+    await expect(executionRow).toHaveCount(0);
+    await filter.click();
+    await expect(filter).toHaveAttribute('aria-pressed', 'true');
+    await expect(executionRow).toContainText('予定比 100%');
+    await page.getByRole('tab', { name: '時間の使い方', exact: true }).click();
+    await expectReportAllocationShowsOneHour(page, ACTIVITY_NAME);
+
+    const afterRecords = await readRecords();
+    const afterPlans = await readPlans();
+    expect(afterRecords.error === null && afterPlans.error === null).toBe(true);
+    expect(afterRecords.data).toEqual(beforeRecords.data);
+    expect(afterPlans.data).toEqual(beforePlans.data);
   });
 
   test('表示名と時間表示を変更するとリロード後も UI と DB に残る', async ({ page }) => {
@@ -469,50 +540,59 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
   });
 
   test('言語変更後にカレンダーへ戻り、設定をリロード後も保持する', async ({ page }) => {
-    await page.goto('/ja/settings/display');
-    // Desktop settings routes open a modal, then replace the URL with /calendar.
-    // Wait for that navigation and the active control before changing locale.
-    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
     const japaneseLanguage = page.getByRole('combobox', { name: '言語', exact: true });
-    await expect(japaneseLanguage).toBeVisible();
-    await japaneseLanguage.click();
-    await page.getByRole('option', { name: 'English', exact: true }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
-    await expect
-      .poll(async () => {
-        const result = await adminSupabase
-          .from('user_settings')
-          .select('preferred_locale')
-          .eq('user_id', IDENTITY.userId)
-          .single();
-        expect(result.error === null).toBe(true);
-        return result.data?.preferred_locale;
-      })
-      .toBe('en');
-    await page.reload();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
-    await page.goto('/settings/display');
-    await expect(page).toHaveURL(/\/calendar(?:\?.*)?$/);
     const englishLanguage = page.getByRole('combobox', { name: 'Language', exact: true });
-    await expect(englishLanguage).toContainText('English');
-    await englishLanguage.click();
-    await page.getByRole('option', { name: '日本語', exact: true }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
-    await expect
-      .poll(async () => {
-        const result = await adminSupabase
-          .from('user_settings')
-          .select('preferred_locale')
-          .eq('user_id', IDENTITY.userId)
-          .single();
-        return result.error === null ? result.data?.preferred_locale : null;
-      })
-      .toBe('ja');
-    await page.reload();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
-    await page.goto('/ja/settings/display');
-    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
-    await expect(page.getByRole('combobox', { name: '言語', exact: true })).toContainText('日本語');
+    await test.step('初期の表示設定を開く', async () => {
+      await page.goto('/ja/settings/display');
+      // Desktop settings routes open a modal, then replace the URL with /calendar.
+      await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+      await expect(japaneseLanguage).toBeVisible();
+    });
+    await test.step('英語へ変更して保存を確認する', async () => {
+      await japaneseLanguage.click();
+      await page.getByRole('option', { name: 'English', exact: true }).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
+      await expect
+        .poll(async () => {
+          const result = await adminSupabase
+            .from('user_settings')
+            .select('preferred_locale')
+            .eq('user_id', IDENTITY.userId)
+            .single();
+          expect(result.error === null).toBe(true);
+          return result.data?.preferred_locale;
+        })
+        .toBe('en');
+    });
+    await test.step('再読込して英語の表示設定を開く', async () => {
+      await page.reload();
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
+      await page.goto('/settings/display');
+      await expect(page).toHaveURL(/\/calendar(?:\?.*)?$/);
+      await expect(englishLanguage).toContainText('English');
+    });
+    await test.step('日本語へ戻して保存を確認する', async () => {
+      await englishLanguage.click();
+      await page.getByRole('option', { name: '日本語', exact: true }).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
+      await expect
+        .poll(async () => {
+          const result = await adminSupabase
+            .from('user_settings')
+            .select('preferred_locale')
+            .eq('user_id', IDENTITY.userId)
+            .single();
+          return result.error === null ? result.data?.preferred_locale : null;
+        })
+        .toBe('ja');
+    });
+    await test.step('再読込後の日本語設定を確認する', async () => {
+      await page.reload();
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
+      await page.goto('/ja/settings/display');
+      await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+      await expect(japaneseLanguage).toContainText('日本語');
+    });
   });
 
   test.describe('Activity management', () => {

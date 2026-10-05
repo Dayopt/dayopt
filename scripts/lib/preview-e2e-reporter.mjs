@@ -5,12 +5,47 @@ const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts'])
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 // Reviewed browser acceptance scope. Changes require a reviewed trusted harness rollout.
 const COVERAGE = [
-  { file: 'critical-path.spec.ts', project: 'chromium', count: 16 },
+  { file: 'critical-path.spec.ts', project: 'chromium', count: 17 },
   { file: 'mobile-critical-path.spec.ts', project: 'Mobile Chrome', count: 4 },
 ];
 const EXPECTED_COUNT = COVERAGE.reduce((sum, row) => sum + row.count, 0);
 
 const CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook']);
+const BUDGET_FIELDS = ['procedures', 'budget', 'rateLimitedResponses', 'mixedBatchResponses'];
+const MAX_PUBLIC_FAILED_STEPS = 40;
+const MAX_PLAYWRIGHT_DURATION_MS = 7 * 60 * 1000;
+
+/** Numeric diagnostics only: discard procedure names and arbitrary candidate fields. */
+export function safePreviewProcedureBudget(value) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !BUDGET_FIELDS.every((key) => Number.isSafeInteger(value[key]) && value[key] >= 0)
+  )
+    return null;
+  return Object.fromEntries(BUDGET_FIELDS.map((key) => [key, value[key]]));
+}
+
+/** The candidate reporter and trusted publisher reconstruct the same allowlisted failure rows. */
+export function safePreviewFailedSteps(test) {
+  if (test.status === 'passed' || test.status === 'skipped') return [];
+  const steps = Array.isArray(test.steps)
+    ? test.steps.filter((step) => step?.failed === true)
+    : Array.isArray(test.failedSteps)
+      ? test.failedSteps
+      : [];
+  return steps.slice(0, MAX_PUBLIC_FAILED_STEPS).map((step) => ({
+    category: CATEGORIES.has(step?.category) ? step.category : 'other',
+    file: FILES.has(step?.file) ? step.file : null,
+    line:
+      FILES.has(step?.file) && Number.isSafeInteger(step.line) && step.line > 0 ? step.line : null,
+    duration:
+      Number.isFinite(step?.duration) && step.duration >= 0
+        ? Math.min(Math.round(step.duration), MAX_PLAYWRIGHT_DURATION_MS)
+        : 0,
+  }));
+}
 
 /** Do not serialize titles, parameters, error messages, stdout, headers, cookies, or bodies. */
 export function safePreviewStep(step) {
@@ -107,9 +142,22 @@ export default class PreviewE2EReporter {
     if (!FILES.has(file) || !PROJECTS.has(project)) this.infrastructureFailure = true;
     const screenshots = [];
     let network = null;
+    let procedureBudget = null;
     for (const attachment of result.attachments) {
       if (attachment.name === 'preview-network' && attachment.body) {
         network = safePreviewNetwork(attachment.body);
+      }
+      if (
+        attachment.name === 'trpc-procedure-budget' &&
+        attachment.body &&
+        attachment.body.length <= 2048
+      ) {
+        try {
+          procedureBudget = safePreviewProcedureBudget(JSON.parse(attachment.body.toString()));
+        } catch {
+          // Malformed diagnostic data is omitted; never expose parse errors or raw contents.
+          procedureBudget = null;
+        }
       }
       if (
         attachment.name === 'screenshot' &&
@@ -125,6 +173,7 @@ export default class PreviewE2EReporter {
       }
     }
     if (!network?.length) this.infrastructureFailure = true;
+    const steps = this.steps.get(test.id) ?? [];
     this.tests.push({
       file: FILES.has(file) ? file : null,
       project: PROJECTS.has(project) ? project : null,
@@ -135,7 +184,9 @@ export default class PreviewE2EReporter {
       expectedPassed: test.expectedStatus === 'passed',
       duration: result.duration,
       retry: result.retry,
-      steps: this.steps.get(test.id) ?? [],
+      steps,
+      failedSteps: safePreviewFailedSteps({ status: result.status, steps }),
+      ...(procedureBudget ? { procedureBudget } : {}),
       network,
       screenshots,
     });

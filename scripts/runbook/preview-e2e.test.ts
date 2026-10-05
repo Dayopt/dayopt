@@ -15,7 +15,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import PreviewE2EReporter, {
   isPassingPreviewReport,
+  safePreviewFailedSteps,
   safePreviewNetwork,
+  safePreviewProcedureBudget,
   safePreviewStep,
 } from '../lib/preview-e2e-reporter.mjs';
 import { previewWorkerEnvironment, runPreviewE2E } from './preview-e2e.mjs';
@@ -66,7 +68,7 @@ const env = {
 
 function reviewedReport() {
   const tests = [
-    ...Array.from({ length: 16 }, (_, index) => ({
+    ...Array.from({ length: 17 }, (_, index) => ({
       file: 'critical-path.spec.ts',
       project: 'chromium',
       line: index + 1,
@@ -77,31 +79,36 @@ function reviewedReport() {
       line: index + 1,
     })),
   ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-  return { status: 'passed', expected: 20, tests };
+  return { status: 'passed', expected: 21, tests };
 }
 
 describe('Reviewed Preview declaration matrix', () => {
-  it('accepts exactly the reviewed sixteen desktop and four mobile declarations', () => {
+  it('accepts exactly the reviewed seventeen desktop and four mobile declarations', () => {
     expect(isPassingPreviewReport(reviewedReport())).toBe(true);
+  });
+  it('rejects the previous sixteen desktop and four mobile contract', () => {
+    const report = reviewedReport();
+    report.tests.splice(16, 1);
+    report.expected = 20;
+    expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects the previous nine desktop and three mobile contract', () => {
     const report = reviewedReport();
-    report.tests.splice(9, 5);
+    report.tests.splice(9, 8);
     report.tests.pop();
     report.expected = 12;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects the old seven declarations even if their dynamic expected count agrees', () => {
     const report = reviewedReport();
-    report.tests.splice(4, 10);
-    report.tests.splice(7, 1);
+    report.tests = [...report.tests.slice(0, 4), ...report.tests.slice(17, 20)];
     report.expected = 7;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects missing added coverage despite a matching dynamic count', () => {
     const report = reviewedReport();
     report.tests.splice(8, 1);
-    report.expected = 17;
+    report.expected = report.tests.length;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects duplicate declaration locations that replace a new case', () => {
@@ -114,9 +121,9 @@ describe('Reviewed Preview declaration matrix', () => {
     report.tests[0]!.file = 'mobile-critical-path.spec.ts';
     expect(isPassingPreviewReport(report)).toBe(false);
   });
-  it('rejects eighteen distinct declarations split as thirteen desktop and five mobile', () => {
+  it('rejects twenty-one distinct declarations split as sixteen desktop and five mobile', () => {
     const report = reviewedReport();
-    report.tests[8] = { ...report.tests[14]!, line: 5 };
+    report.tests[8] = { ...report.tests[17]!, line: 5 };
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
@@ -320,6 +327,65 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
 });
 
 describe('Safe failure evidence', () => {
+  it('retains only finite nonnegative safe integer procedure-budget fields', () => {
+    expect(
+      safePreviewProcedureBudget({
+        procedures: 31,
+        budget: 26,
+        rateLimitedResponses: 0,
+        mixedBatchResponses: 0,
+        counts: { PRIVATE_PROCEDURE: 31 },
+        title: 'PRIVATE_TITLE',
+        error: 'PRIVATE_ERROR',
+      }),
+    ).toEqual({ procedures: 31, budget: 26, rateLimitedResponses: 0, mixedBatchResponses: 0 });
+  });
+  it.each([
+    -1,
+    1.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+    '26',
+    undefined,
+  ])('rejects unsafe budget numbers in every public numeric field: %s', (value) => {
+    for (const field of ['procedures', 'budget', 'rateLimitedResponses', 'mixedBatchResponses']) {
+      expect(
+        safePreviewProcedureBudget({
+          procedures: 31,
+          budget: 26,
+          rateLimitedResponses: 0,
+          mixedBatchResponses: 0,
+          [field]: value,
+        }),
+      ).toBeNull();
+    }
+  });
+  it('caps failed steps and hides source lines from files outside the spec allowlist', () => {
+    const steps = [
+      { category: 'expect', file: 'trpc-budget-fixture.ts', line: 56, duration: -1, failed: true },
+      ...Array.from({ length: 45 }, () => ({
+        category: 'test.step',
+        file: 'critical-path.spec.ts',
+        line: 482,
+        duration: Number.MAX_SAFE_INTEGER,
+        failed: true,
+        title: 'PRIVATE_TITLE',
+      })),
+    ];
+    const result = safePreviewFailedSteps({ status: 'failed', steps });
+    expect(result).toHaveLength(40);
+    expect(result[0]).toEqual({ category: 'expect', file: null, line: null, duration: 0 });
+    expect(result[1]).toEqual({
+      category: 'test.step',
+      file: 'critical-path.spec.ts',
+      line: 482,
+      duration: 420000,
+    });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_');
+    expect(safePreviewFailedSteps({ status: 'passed', steps })).toEqual([]);
+    expect(safePreviewFailedSteps({ status: 'skipped', steps })).toEqual([]);
+  });
   it('stepのtitle/引数/error本文を捨てて位置と結果だけ残す', () => {
     const result = safePreviewStep({
       category: 'pw:api',
@@ -358,6 +424,91 @@ describe('Safe failure evidence', () => {
 });
 
 describe('Preview reporter completeness', () => {
+  it.each(['not-json', '{"procedures":null}', 'x'.repeat(2049)])(
+    'omits malformed or oversized budget attachments without publishing raw contents',
+    (body) => {
+      const root = mkdtempSync(join(tmpdir(), 'preview-reporter-invalid-budget-'));
+      roots.push(root);
+      const reporter = new PreviewE2EReporter({ directory: root });
+      reporter.onTestEnd(
+        {
+          id: 'invalid-budget',
+          expectedStatus: 'passed',
+          location: { file: '/repo/critical-path.spec.ts', line: 471 },
+          parent: { project: () => ({ name: 'chromium' }) },
+        },
+        {
+          status: 'failed',
+          duration: 1,
+          retry: 0,
+          attachments: [{ name: 'trpc-procedure-budget', body: Buffer.from(body) }],
+        },
+      );
+      reporter.onEnd({ status: 'failed' });
+      expect(JSON.parse(readFileSync(join(root, 'e2e.json'), 'utf8')).tests[0]).not.toHaveProperty(
+        'procedureBudget',
+      );
+    },
+  );
+  it('preserves sanitized failed steps and numeric budget evidence without procedure names', () => {
+    const root = mkdtempSync(join(tmpdir(), 'preview-reporter-diagnosis-'));
+    roots.push(root);
+    const reporter = new PreviewE2EReporter({ directory: root });
+    const test = {
+      id: 'diagnosis',
+      expectedStatus: 'passed',
+      location: { file: '/repo/critical-path.spec.ts', line: 471 },
+      parent: { project: () => ({ name: 'chromium' }) },
+    };
+    reporter.onStepEnd(
+      test,
+      {},
+      {
+        category: 'test.step',
+        location: { file: '/repo/critical-path.spec.ts', line: 482 },
+        duration: 5000,
+        error: { message: 'PRIVATE_ERROR' },
+        title: 'PRIVATE_TITLE',
+      },
+    );
+    reporter.onTestEnd(test, {
+      status: 'failed',
+      duration: 5000,
+      retry: 0,
+      attachments: [
+        {
+          name: 'preview-network',
+          body: Buffer.from('[{"at":1,"target":"preview","status":200}]'),
+        },
+        {
+          name: 'trpc-procedure-budget',
+          body: Buffer.from(
+            JSON.stringify({
+              procedures: 31,
+              budget: 26,
+              rateLimitedResponses: 0,
+              mixedBatchResponses: 0,
+              counts: { PRIVATE_PROCEDURE: 31 },
+              error: 'PRIVATE_ERROR',
+            }),
+          ),
+        },
+      ],
+    });
+    reporter.onEnd({ status: 'failed' });
+    const source = readFileSync(join(root, 'e2e.json'), 'utf8');
+    const row = JSON.parse(source).tests[0];
+    expect(row.failedSteps).toEqual([
+      { category: 'test.step', file: 'critical-path.spec.ts', line: 482, duration: 5000 },
+    ]);
+    expect(row.procedureBudget).toEqual({
+      procedures: 31,
+      budget: 26,
+      rateLimitedResponses: 0,
+      mixedBatchResponses: 0,
+    });
+    expect(source).not.toContain('PRIVATE_');
+  });
   it.each(['passed', 'skipped', 'failed'])(
     '全件の結果を判定し、生の例外を保存しない: %s',
     (status) => {
