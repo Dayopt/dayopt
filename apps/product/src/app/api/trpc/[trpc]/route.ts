@@ -19,6 +19,7 @@ import { trackProductEvents } from '@/lib/analytics/product-events';
 import { logger } from '@/lib/logger';
 import { createFetchTRPCContext } from '@/lib/trpc/context';
 import { captureUnexpectedTrpcAdapterError } from '@/lib/trpc/errors';
+import { rejectCrossOriginMutation } from '@/lib/trpc/http-mutation-origin';
 
 export const runtime = 'nodejs';
 /**
@@ -31,6 +32,9 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 function handler(req: Request) {
+  const rejected = rejectCrossOriginMutation(req);
+  if (rejected) return rejected;
+
   return fetchRequestHandler({
     endpoint: '/api/trpc',
     req,

@@ -50,7 +50,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     }
   });
 
-  test('same-origin write persists, cross-origin simple/JSON/GET requests cannot change it', async ({
+  test('same-origin write works; cross-origin simple/multipart/GET requests cannot change it', async ({
     page,
     baseURL,
     allowIsolatedOrigin,
@@ -63,6 +63,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     await page.locator('input[type="password"]').first().fill(user.password);
     await page.locator('button[type="submit"]').first().click();
     await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
+    await page.waitForLoadState('networkidle');
     const endpoint = new URL('/api/trpc/userSettings.update', baseURL).href;
     const write = (timeFormat: string) => JSON.stringify({ json: { timeFormat } });
     const initial = await page.evaluate(
@@ -90,37 +91,63 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
 
     // 同一hostnameの別portなのでSameSiteだけには頼らない境界を試す。
     await page.goto(attackerOrigin);
-    const outcomes: string[] = [];
-    for (const contentType of ['text/plain', 'application/json']) {
-      outcomes.push(
-        await page.evaluate(
-          async ({ endpoint, body, contentType }) => {
-            return fetch(endpoint, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'content-type': contentType },
-              body,
-            }).then(
-              (response) => String(response.status),
-              () => 'browser-blocked',
-            );
-          },
-          { endpoint, body: write('24h'), contentType },
-        ),
+    await page.waitForLoadState('networkidle');
+    // Login hydration may still have a settings write in flight. Reset the disposable
+    // user's sentinel after leaving Dayopt so it cannot race the attack.
+    const reset = await admin
+      .from('user_settings')
+      .update({ time_format: '12h' })
+      .eq('user_id', user.userId);
+    expect(reset.error).toBeNull();
+    expect(await storedFormat()).toBe('12h');
+
+    for (const contentType of ['text/plain', 'multipart/form-data']) {
+      const serverResponsePromise = page.waitForResponse(
+        (response) => response.url() === endpoint && response.request().method() === 'POST',
       );
+      const outcome = await page.evaluate(
+        async ({ endpoint, body, contentType }) => {
+          const payload =
+            contentType === 'multipart/form-data'
+              ? (() => {
+                  const form = new FormData();
+                  form.set('input', body);
+                  return form;
+                })()
+              : body;
+          return fetch(endpoint, {
+            method: 'POST',
+            credentials: 'include',
+            ...(contentType === 'text/plain' ? { headers: { 'content-type': contentType } } : {}),
+            body: payload,
+          }).then(
+            (response) => String(response.status),
+            () => 'browser-blocked',
+          );
+        },
+        { endpoint, body: write('24h'), contentType },
+      );
+      const serverResponse = await serverResponsePromise;
+      expect(outcome).toBe('browser-blocked');
+      expect(serverResponse.status()).toBe(403);
+      expect((await serverResponse.request().allHeaders()).origin).toBe(attackerOrigin);
       expect(await storedFormat()).toBe('12h');
     }
     const getEndpoint = endpoint + '?input=' + encodeURIComponent(write('24h'));
-    outcomes.push(
-      await page.evaluate(async (endpoint) => {
-        return fetch(endpoint, { credentials: 'include' }).then(
-          (response) => String(response.status),
-          () => 'browser-blocked',
-        );
-      }, getEndpoint),
+    const getResponsePromise = page.waitForResponse(
+      (response) => response.url() === getEndpoint && response.request().method() === 'GET',
     );
+    const getOutcome = await page.evaluate(async (endpoint) => {
+      return fetch(endpoint, { credentials: 'include' }).then(
+        (response) => String(response.status),
+        () => 'browser-blocked',
+      );
+    }, getEndpoint);
+    const getResponse = await getResponsePromise;
     expect(await storedFormat()).toBe('12h');
-    expect(outcomes).toEqual(['browser-blocked', 'browser-blocked', 'browser-blocked']);
+    expect(getOutcome).toBe('browser-blocked');
+    expect(getResponse.status()).toBe(405);
+    expect((await getResponse.request().allHeaders()).origin).toBe(attackerOrigin);
 
     // 同じcookieが失効したから拒否された、という偽陽性を除く。
     await page.goto('/ja/');

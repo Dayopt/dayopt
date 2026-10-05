@@ -149,6 +149,9 @@ describeWithEnv('Isolated consent and iCal', () => {
     await expect.poll(async () => (await read()).analytics_consent).toBe(true);
     expect((await read()).analytics_consent_updated_at).not.toBeNull();
     await page.reload();
+    // Desktop settings are a shell dialog. Reload returns to Calendar, so reopen the
+    // category route before asserting that the saved preference is rendered again.
+    await page.goto('/ja/settings/data');
     await expect(section.getByText('許可中', { exact: true })).toBeVisible();
     expect(
       await page.evaluate(
@@ -158,6 +161,7 @@ describeWithEnv('Isolated consent and iCal', () => {
     await section.getByRole('button', { name: '撤回する', exact: true }).click();
     await expect.poll(async () => (await read()).analytics_consent).toBe(false);
     await page.reload();
+    await page.goto('/ja/settings/data');
     await expect(section.getByText('許可していません', { exact: true })).toBeVisible();
   });
 
