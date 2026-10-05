@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   CANDIDATE_SUITES,
+  POC_MIGRATION_ACTIVE_SHA256,
+  POC_MIGRATION_PATH,
+  POC_MIGRATION_TOMBSTONE,
   assertCandidate,
+  assertCandidatePocMigrationRetired,
   assertCandidateStart,
   createCandidate,
+  isTrustedCandidateWorkflowPath,
+  pinCandidate,
 } from './release-candidate.mjs';
 
 const sha = 'a'.repeat(40);
@@ -105,6 +111,23 @@ describe('release candidate contract', () => {
 
   it('accepts a fresh candidate when every required suite and source run succeeded', () => {
     expect(assertInput()).toEqual(candidate());
+  });
+
+  it('accepts the REST path with @main while keeping other refs and workflows untrusted', () => {
+    expect(isTrustedCandidateWorkflowPath('.github/workflows/release-candidate.yml')).toBe(true);
+    expect(isTrustedCandidateWorkflowPath('.github/workflows/release-candidate.yml@main')).toBe(
+      true,
+    );
+    expect(
+      isTrustedCandidateWorkflowPath('.github/workflows/release-candidate.yml@integration'),
+    ).toBe(false);
+    expect(
+      isTrustedCandidateWorkflowPath('.github/workflows/release-candidate.yml@refs/heads/main'),
+    ).toBe(false);
+    expect(isTrustedCandidateWorkflowPath('.github/workflows/nightly.yml@main')).toBe(false);
+    expect(
+      assertInput({ run: { ...run(), path: '.github/workflows/release-candidate.yml@main' } }),
+    ).toEqual(candidate());
   });
 
   it.each(CANDIDATE_SUITES)('holds the candidate when suite %s is missing', (suite) => {
@@ -239,5 +262,104 @@ describe('release candidate start window', () => {
         maxDelaySeconds,
       }),
     ).toThrow();
+  });
+});
+
+describe('Production candidate POC migration blocker', () => {
+  const entryFor = (contents: string) => {
+    const object = 'f'.repeat(40);
+    return {
+      gitImpl: (...args: string[]) => {
+        expect(args).toEqual(['ls-tree', sha, '--', POC_MIGRATION_PATH]);
+        return `100644 blob ${object}\t${POC_MIGRATION_PATH}`;
+      },
+      readBlob: (actualObject: string) => {
+        expect(actualObject).toBe(object);
+        return Buffer.from(contents);
+      },
+    };
+  };
+
+  it('allows a candidate without the experimental migration', () => {
+    expect(() =>
+      assertCandidatePocMigrationRetired({
+        candidateSha: sha,
+        gitImpl: () => '',
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects the original active migration by its known content hash', () => {
+    const entry = entryFor('original active migration bytes');
+    expect(() =>
+      assertCandidatePocMigrationRetired({
+        candidateSha: sha,
+        ...entry,
+        hashContents: () => POC_MIGRATION_ACTIVE_SHA256,
+      }),
+    ).toThrow(/canonical retired tombstone/);
+  });
+
+  it('allows only the exact canonical tombstone with its final newline', () => {
+    expect(() =>
+      assertCandidatePocMigrationRetired({
+        candidateSha: sha,
+        ...entryFor(POC_MIGRATION_TOMBSTONE),
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertCandidatePocMigrationRetired({
+        candidateSha: sha,
+        ...entryFor(POC_MIGRATION_TOMBSTONE.trimEnd()),
+      }),
+    ).toThrow(/canonical retired tombstone/);
+  });
+
+  it('applies the POC blocker while pinning the integration SHA', () => {
+    vi.stubEnv('GITHUB_REF', 'refs/heads/main');
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('GITHUB_EVENT_PATH', '');
+
+    const calls: string[][] = [];
+    const gitImpl = (...args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'ls-tree') {
+        const object = 'f'.repeat(40);
+        return `100644 blob ${object}\t${POC_MIGRATION_PATH}`;
+      }
+      if (args[0] === 'rev-parse') return tree;
+      return '';
+    };
+
+    try {
+      expect(() =>
+        pinCandidate({
+          repository: 'Dayopt/dayopt',
+          runId,
+          attempt,
+          controlSha: mainSha,
+          now: () => capturedAt,
+          api: (path: string) => ({ object: { sha: path.endsWith('main') ? mainSha : sha } }),
+          gitImpl,
+          readBlob: () => Buffer.from(POC_MIGRATION_TOMBSTONE),
+          hashContents: () => POC_MIGRATION_ACTIVE_SHA256,
+        }),
+      ).toThrow(/canonical retired tombstone/);
+      expect(calls).toContainEqual(['ls-tree', sha, '--', POC_MIGRATION_PATH]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.each([
+    ['edited tombstone', `${POC_MIGRATION_TOMBSTONE}-- edited\n`],
+    ['changed POC DDL', 'CREATE TABLE public.rate_limit_poc(id integer);\n'],
+  ])('rejects %s', (_label, contents) => {
+    expect(() =>
+      assertCandidatePocMigrationRetired({
+        candidateSha: sha,
+        ...entryFor(contents),
+      }),
+    ).toThrow(/canonical retired tombstone/);
   });
 });

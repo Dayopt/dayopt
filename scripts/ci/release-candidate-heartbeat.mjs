@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
-import { verifyCandidateEvidence } from './release-candidate.mjs';
+import { isTrustedCandidateWorkflowPath, verifyCandidateEvidence } from './release-candidate.mjs';
 
 export function checkCandidateHeartbeat({
   repository = process.env.GITHUB_REPOSITORY,
@@ -29,7 +29,7 @@ export function checkCandidateHeartbeat({
     !run ||
     run.repository?.full_name !== repository ||
     run.head_branch !== 'main' ||
-    run.path !== '.github/workflows/release-candidate.yml' ||
+    !isTrustedCandidateWorkflowPath(run.path) ||
     run.status !== 'completed' ||
     run.conclusion !== 'success'
   )

@@ -47,32 +47,25 @@ jobs:
     needs: pin
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: read
     steps:
-      - name: Checkout trusted control
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.pin.outputs.main_sha }}
-          persist-credentials: false
+      # Candidate source and dependencies run only in this disposable job.
       - name: Checkout the fixed candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.pin.outputs.sha }}
-          path: candidate
           fetch-depth: 0
           persist-credentials: false
-      - name: Download this attempt snapshot
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "candidate-pin-$GITHUB_RUN_ATTEMPT"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: candidate-pin-${{ github.run_attempt }}
+          path: candidate-pin
       - uses: ./.github/actions/setup
-      - name: Install candidate dependencies
-        working-directory: candidate
-        run: pnpm install --frozen-lockfile
       - name: Install browsers
-        working-directory: candidate
         run: pnpm exec playwright install --with-deps chromium chromium-headless-shell
       - id: supabase_version
-        working-directory: candidate
         run: |
           version=$(node -p "require('./package.json').devDependencies.supabase")
           test -n "$version" && test "$version" != undefined
@@ -81,21 +74,18 @@ jobs:
         with:
           version: ${{ steps.supabase_version.outputs.version }}
       - name: Start disposable runner database
-        working-directory: candidate
         run: supabase start
+      - name: Record untrusted runner DB report before suites
+        run: node scripts/ci/release-candidate-db.mjs . db-before.json
       - name: Rehearse the pinned main to candidate migration upgrade
         id: db_upgrade
-        working-directory: candidate
         env:
           DB_UPGRADE_RESULT_PATH: db-upgrade-result.json
           CI: true
         run: |
           git update-ref refs/remotes/origin/main "${{ needs.pin.outputs.main_sha }}"
           node scripts/ci/db-upgrade-check.mjs
-      - name: Record database identity and schema
-        run: node scripts/ci/release-candidate-db.mjs candidate db-before.json
       - name: Export disposable database endpoints
-        working-directory: candidate
         run: |
           status=$(supabase status --output json)
           {
@@ -106,11 +96,9 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Full unit and workspace tests
         id: unit
-        working-directory: candidate
         run: pnpm test:run
       - name: Full integration and RLS tests
         id: integration
-        working-directory: candidate
         env:
           INTEGRATION_AFFECTED: 'true'
           USE_LOCAL_DB: 'true'
@@ -119,7 +107,6 @@ jobs:
         run: node scripts/ci/check.mjs integration
       - name: Full Product E2E
         id: e2e
-        working-directory: candidate
         env:
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_e2e_dummy
@@ -127,30 +114,25 @@ jobs:
         run: pnpm --dir apps/product exec playwright test --project=chromium --project="Mobile Chrome"
       - name: Web build and E2E
         id: web
-        working-directory: candidate
         run: pnpm build:web && pnpm --filter @dayopt/web test:e2e:smoke
       - name: Storybook light and dark
         id: storybook
-        working-directory: candidate
         run: |
           pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
           pnpm build-storybook
           pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark
-      - name: Recheck database identity and schema
-        run: node scripts/ci/release-candidate-db.mjs candidate db-after.json
-      - name: Seal evidence only when every suite passed
-        env:
-          CANDIDATE_RESULTS: '{"unit":"${{ steps.unit.outcome }}","integration":"${{ steps.integration.outcome }}","db_upgrade":"${{ steps.db_upgrade.outcome }}","e2e":"${{ steps.e2e.outcome }}","web":"${{ steps.web.outcome }}","storybook":"${{ steps.storybook.outcome }}"}'
-        run: node scripts/ci/release-candidate.mjs seal candidate-pin.json db-before.json db-after.json
+      - name: Record untrusted runner DB report after suites
+        run: node scripts/ci/release-candidate-db.mjs . db-after.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: candidate-evidence-${{ github.run_attempt }}
-          path: candidate-evidence.json
+          name: candidate-db-reports-${{ github.run_attempt }}
+          path: |
+            db-before.json
+            db-after.json
           if-no-files-found: error
           retention-days: 7
       - name: Stop disposable database
         if: always()
-        working-directory: candidate
         run: supabase stop
       - name: Save diagnostic reports
         if: always()
@@ -158,14 +140,60 @@ jobs:
         with:
           name: candidate-diagnostics-${{ github.run_attempt }}
           path: |
-            candidate/db-upgrade-result.json
-            candidate/apps/product/test-results/
-            candidate/apps/web/test-results/
+            db-upgrade-result.json
+            apps/product/test-results/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  seal:
+    needs: [pin, verify]
+    if: ${{ needs.pin.result == 'success' && needs.verify.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # A new runner checks out trusted control at the pinned main SHA. It never
+      # installs or executes candidate code; candidate files are read as Git data only.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.main_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout candidate source for read-only Git inspection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.sha }}
+          path: candidate-source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Download this attempt inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p seal-inputs/pin seal-inputs/db
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "candidate-pin-$GITHUB_RUN_ATTEMPT" --dir seal-inputs/pin
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "candidate-db-reports-$GITHUB_RUN_ATTEMPT" --dir seal-inputs/db
+      - name: Seal only trusted job results and independently matched migration content
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
+        run: node scripts/ci/release-candidate.mjs seal seal-inputs/pin/candidate-pin.json seal-inputs/db/db-before.json seal-inputs/db/db-after.json candidate-source
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-evidence-${{ github.run_attempt }}
+          path: candidate-evidence.json
+          if-no-files-found: error
           retention-days: 7
 
   notify_failure:
-    needs: [pin, verify]
-    if: ${{ always() && (needs.pin.result != 'success' || needs.verify.result != 'success') }}
+    needs: [pin, verify, seal]
+    if: ${{ always() && (needs.pin.result != 'success' || needs.verify.result != 'success' || needs.seal.result != 'success') }}
     runs-on: ubuntu-latest
     concurrency:
       group: candidate-failure-issue

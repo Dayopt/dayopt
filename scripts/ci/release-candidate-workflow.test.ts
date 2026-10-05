@@ -15,6 +15,10 @@ describe('release candidate workflow contract', () => {
   const pinJob = candidate.slice(candidate.indexOf('\n  pin:'), candidate.indexOf('\n  verify:'));
   const verifyJob = candidate.slice(
     candidate.indexOf('\n  verify:'),
+    candidate.indexOf('\n  seal:'),
+  );
+  const sealJob = candidate.slice(
+    candidate.indexOf('\n  seal:'),
     candidate.indexOf('\n  notify_failure:'),
   );
   const failureJob = candidate.slice(candidate.indexOf('\n  notify_failure:'));
@@ -44,17 +48,22 @@ describe('release candidate workflow contract', () => {
     expect(pinScript).toContain("gitImpl('rev-parse', `${sha}^{tree}`)");
   });
 
-  it('records an outcome for every required suite and seals only their exact set', () => {
-    const results = candidate.slice(
-      candidate.indexOf('CANDIDATE_RESULTS:'),
-      candidate.indexOf('\n        run: node scripts/ci/release-candidate.mjs seal'),
-    );
+  it('keeps candidate execution separate from trusted API-backed sealing', () => {
     for (const suite of CANDIDATE_SUITES) {
-      expect(results).toContain(`"${suite}":"\${{ steps.${suite}.outcome }}"`);
       expect(verifyJob).toMatch(new RegExp(`^\\s*id: ${suite}\\s*$`, 'm'));
     }
-    expect(verifyJob).toContain('node scripts/ci/release-candidate.mjs seal');
-    expect(verifyJob).toContain('if-no-files-found: error');
+    expect(verifyJob).toContain('name: candidate-db-reports-${{ github.run_attempt }}');
+    expect(verifyJob).not.toContain('candidate-evidence-${{ github.run_attempt }}');
+    expect(verifyJob).not.toContain('release-candidate.mjs seal');
+    expect(verifyJob).not.toContain('GH_TOKEN:');
+    expect(sealJob).toContain('ref: ${{ needs.pin.outputs.main_sha }}');
+    expect(sealJob).toContain('path: candidate-source');
+    expect(sealJob).toContain('release-candidate.mjs seal');
+    expect(sealJob).toContain('name: candidate-evidence-${{ github.run_attempt }}');
+    expect(pinScript).toContain('attempts/${attempt}/jobs?per_page=100');
+    expect(pinScript).toContain('attempts/${attempt}`');
+    expect(pinScript).toContain('suiteResultsFromJobs');
+    expect(pinScript).toContain('migrationContentMatched: true');
   });
 
   it('runs candidate tests with read-only workflow permissions and only disposable DB credentials', () => {
@@ -71,9 +80,10 @@ describe('release candidate workflow contract', () => {
     expect(verifyJob).toContain('run: supabase start');
     expect(verifyJob).toContain('NEXT_PUBLIC_SUPABASE_URL=');
     expect(verifyJob).toContain('USE_LOCAL_DB:');
-    expect(checkoutCredentials).toHaveLength(2);
+    expect(checkoutCredentials).toHaveLength(1);
     expect(verifyJob).not.toMatch(/^\s*ref:\s*\$\{\{.*inputs\./m);
     expect(failureJob).toContain('issues: write');
+    expect(failureJob).toContain('needs: [pin, verify, seal]');
   });
 
   it('keeps candidate failure Issue updates idempotent per workflow attempt', () => {

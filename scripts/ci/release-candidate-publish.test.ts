@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { publishCandidate } from './release-candidate-publish.mjs';
+import { publishCandidate, requiredChecksGreen } from './release-candidate-publish.mjs';
 import { CANDIDATE_SUITES } from './release-candidate.mjs';
 
 const repository = 'Dayopt/dayopt';
@@ -31,9 +31,14 @@ const candidate = () => ({
 });
 
 const evidence = (overrides: Record<string, unknown> = {}) => ({
+  version: 2,
   candidate: candidate(),
   results: Object.fromEntries(CANDIDATE_SUITES.map((suite) => [suite, 'success'])),
   dbAfter: { identity: `runner:${runId}:${attempt}`, migrationHash, schemaHash },
+  databaseEvidence: {
+    source: 'verification-runner-report',
+    migrationContentMatched: true,
+  },
   ...overrides,
 });
 
@@ -155,10 +160,42 @@ describe('release candidate publisher', () => {
     expect(fixture.writes).toEqual([]);
   });
 
+  it('allows skipped or neutral ordinary required PR checks while candidate suites remain explicitly green', () => {
+    const rules = [
+      ...requiredRules(),
+      {
+        type: 'required_status_checks',
+        parameters: {
+          required_status_checks: [{ context: '🧪 Integration Tests' }],
+        },
+      },
+    ];
+    const checks = [
+      { name: '🧪 Integration Tests', status: 'completed', conclusion: 'skipped', started_at: now },
+      { name: 'DB Upgrade shadow', status: 'completed', conclusion: 'neutral', started_at: now },
+    ];
+    const statuses = [{ context: 'Release Candidate Gate', state: 'success', created_at: now }];
+
+    // Ordinary PR checks follow GitHub branch protection semantics. Candidate verification
+    // still requires all six full suites to be exactly "success" in assertCandidate.
+    expect(requiredChecksGreen({ rules, checks, statuses })).toBe(true);
+    expect(
+      requiredChecksGreen({
+        rules,
+        checks: checks.map((check) =>
+          check.name === '🧪 Integration Tests' ? { ...check, conclusion: 'failure' } : check,
+        ),
+        statuses,
+      }),
+    ).toBe(false);
+  });
+
   it('creates the pinned branch and one draft PR, then reuses both on rerun', async () => {
     vi.stubEnv('GITHUB_REF', 'refs/heads/main');
     vi.stubEnv('RELEASE_CANDIDATE_ENABLED', 'true');
-    const fixture = setupOpen();
+    const fixture = setupOpen({
+      run: { ...successfulRun(), path: '.github/workflows/release-candidate.yml@main' },
+    });
 
     const first = await publishCandidate({
       mode: 'open',

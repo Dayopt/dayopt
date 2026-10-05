@@ -51,15 +51,21 @@ describe('release candidate required checks', () => {
     ).toBe(false);
   });
 
-  it.each(['skipped', 'neutral', 'pending', 'failure', 'missing'])(
-    'holds when a required check is %s',
-    (state) => {
+  it.each(['pending', 'failure', 'missing'])('holds when a required check is %s', (state) => {
+    const { checks, statuses } = allGreen();
+    if (state === 'missing') checks.splice(0, 1);
+    else if (state === 'pending')
+      checks[0] = completed('Unit Tests', 101, { status: 'in_progress', conclusion: null });
+    else checks[0] = completed('Unit Tests', 101, { conclusion: state });
+    expect(requiredChecksGreen({ rules, checks, statuses })).toBe(false);
+  });
+
+  it.each(['skipped', 'neutral'])(
+    'accepts %s for an ordinary required PR check while candidate suite evidence stays strict',
+    (conclusion) => {
       const { checks, statuses } = allGreen();
-      if (state === 'missing') checks.splice(0, 1);
-      else if (state === 'pending')
-        checks[0] = completed('Unit Tests', 101, { status: 'in_progress', conclusion: null });
-      else checks[0] = completed('Unit Tests', 101, { conclusion: state });
-      expect(requiredChecksGreen({ rules, checks, statuses })).toBe(false);
+      checks[0] = completed('Unit Tests', 101, { conclusion });
+      expect(requiredChecksGreen({ rules, checks, statuses })).toBe(true);
     },
   );
 

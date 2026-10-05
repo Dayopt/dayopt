@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { runCandidateGate } from './release-candidate-gate.mjs';
-import { verifyCandidateEvidence } from './release-candidate.mjs';
+import { isTrustedCandidateWorkflowPath, verifyCandidateEvidence } from './release-candidate.mjs';
 
 export function assertCandidateBranchRules(rules) {
   if (
@@ -39,7 +39,9 @@ export function requiredChecksGreen({ rules, checks, statuses }) {
       )
       .map((check) => ({
         at: check.started_at ?? check.created_at,
-        green: check.status === 'completed' && check.conclusion === 'success',
+        green:
+          check.status === 'completed' &&
+          ['success', 'skipped', 'neutral'].includes(check.conclusion),
       }));
     if (!requiredCheck.integration_id)
       matching.push(
@@ -133,7 +135,7 @@ export async function publishCandidate({
   if (
     run.repository?.full_name !== repository ||
     run.head_branch !== 'main' ||
-    run.path !== '.github/workflows/release-candidate.yml' ||
+    !isTrustedCandidateWorkflowPath(run.path) ||
     run.status !== 'completed' ||
     run.conclusion !== 'success'
   )

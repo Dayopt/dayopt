@@ -82,7 +82,7 @@ function fixture(mode: 'pr' | 'production' = 'pr', options: GateOptions = {}) {
     id: Number(runId),
     run_attempt: Number(attempt),
     repository: { full_name: repository },
-    path: '.github/workflows/release-candidate.yml',
+    path: '.github/workflows/release-candidate.yml@main',
     head_branch: 'main',
     head_sha: mainSha,
     status: 'completed',
@@ -90,6 +90,7 @@ function fixture(mode: 'pr' | 'production' = 'pr', options: GateOptions = {}) {
     ...options.run,
   };
   const evidence = {
+    version: 2,
     candidate: {
       version: 1,
       sha: candidateSha,
@@ -108,6 +109,10 @@ function fixture(mode: 'pr' | 'production' = 'pr', options: GateOptions = {}) {
       e2e: 'success',
       web: 'success',
       storybook: 'success',
+    },
+    databaseEvidence: {
+      source: 'verification-runner-report',
+      migrationContentMatched: true,
     },
     dbAfter: db,
     ...options.evidence,

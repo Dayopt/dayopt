@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
-import { verifyCandidateEvidence } from './release-candidate.mjs';
+import { isTrustedCandidateWorkflowPath, verifyCandidateEvidence } from './release-candidate.mjs';
 
 export function candidateReference(body) {
   const markers = [
@@ -82,7 +82,7 @@ export function runCandidateGate({
   if (
     run.repository?.full_name !== repository ||
     String(run.run_attempt) !== reference.attempt ||
-    run.path !== '.github/workflows/release-candidate.yml' ||
+    !isTrustedCandidateWorkflowPath(run.path) ||
     run.head_branch !== 'main' ||
     run.status !== 'completed' ||
     run.conclusion !== 'success'

@@ -411,12 +411,13 @@ Vercel の rollback はビルド成果物だけを戻す。**DB migration と変
 
 全体 unit/workspace、integration/RLS、base→candidate の DB upgrade、Product desktop/mobile E2E、Web E2E、Storybook light/dark を同じ SHA で実行する。現在の full suite は GitHub-hosted runner 内の使い捨て Supabase を対象とする。DB container identity と実適用 migration 集合、migration 内容 hash、schema hash を前後で照合し、共有 Persistent DB の hosted runtime を検証したと主張しない。#3011/#2910 が所有する hosted Preview の受入は別途必要。
 
-成功時だけ attempt ごとの `candidate-evidence-<attempt>` を保存する。gate は artifact の記述に加え、GitHub 上の repo、trusted main workflow、最新 attempt の完了/成功、commit/tree、PR の両親と proposed merge tree を照合する。欠測・期限超過・DB/schema の変化・main の前進・再実行中・結果不明は全体保留。
+候補コードと依存は disposable verify job で実行する。seal は別 runner の pinned main checkout で実行し、候補コードを起動しない。GitHub Jobs API の exact run/attempt の6 suiteがすべて success であることと、Git blobから独立計算した migration内容 hash を確認してから attempt ごとの `candidate-evidence-<attempt>` を保存する。DB前後の値は verification runner のレポートであり、独立したリモートDB証明ではない。gate は artifact の記述に加え、GitHub 上の repo、trusted main workflow、最新 attempt の完了/成功、commit/tree、PR の両親と proposed merge tree を照合する。欠測・期限超過・DB/schema の変化・main の前進・再実行中・結果不明は全体保留。
 
-成功候補の完了イベントは `candidate-promotion.yml` に渡る。main の trusted controller が draft PR を作って ready 化し、既存の required checks を最大60分待ち、全件が明示的に成功した場合だけ同じ候補を通常 merge する。赤・欠測・期限超過は全体保留。candidate code は merge credential を持つ worker で実行しない。
+成功候補の完了イベントは `candidate-promotion.yml` に渡る。main の trusted controller が draft PR を作って ready 化し、既存の required checks を最大60分待ち、通常 required checks が completed の success/skipped/neutral を満たす場合だけ同じ候補を通常 merge する。候補の6 full suiteは skipped/neutralを許可せずすべてsuccessを要求する。赤・欠測・期限超過は全体保留。candidate code は merge credential を持つ worker で実行しない。
 
 有効化前に確認する条件:
 
+- #3022 の POC 退役を完了する。原本・改変 POC migration が active path にある中間候補は pin が拒否し、固定 tombstoneだけを許可する。
 - integration の既存差分と POC migration を通常 PR で整理し、main を含む状態にする。freeze の解除は独立して承認する。
 - main の strict required checks に `Release Candidate Gate` を追加する。integration の intake enforcement も #3017 で確定する。ruleset を実装作業から無断更新しない。
 - 候補検証の UTC cron と最大開始遅延（`RELEASE_CANDIDATE_MAX_DELAY_SECONDS`）、証拠有効期間（`RELEASE_CANDIDATE_MAX_AGE_SECONDS`）を実測に基づいて合意する。日次 cron は minute/hour が固定された形式を使う。

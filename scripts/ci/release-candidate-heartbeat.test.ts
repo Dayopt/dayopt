@@ -23,7 +23,7 @@ const run = (overrides: Record<string, unknown> = {}) => ({
   repository: { full_name: repository },
   head_branch: 'main',
   head_sha: sha,
-  path: '.github/workflows/release-candidate.yml',
+  path: '.github/workflows/release-candidate.yml@main',
   status: 'completed',
   conclusion: 'success',
   ...overrides,
@@ -50,12 +50,17 @@ const candidate = (overrides: Record<string, unknown> = {}) => ({
 const validEvidence = (candidateOverride: Record<string, unknown> = {}) => {
   const recordedCandidate = candidate(candidateOverride);
   return {
+    version: 2,
     candidate: recordedCandidate,
     results: Object.fromEntries(CANDIDATE_SUITES.map((suite) => [suite, 'success'])),
     dbAfter: {
       identity: (recordedCandidate.db as { identity: string }).identity,
       migrationHash,
       schemaHash,
+    },
+    databaseEvidence: {
+      source: 'verification-runner-report',
+      migrationContentMatched: true,
     },
   };
 };
