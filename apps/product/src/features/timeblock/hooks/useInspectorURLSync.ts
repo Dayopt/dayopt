@@ -31,6 +31,9 @@ export function useInspectorURLSync() {
   const closeInspector = useTimeblockInspectorStore((state) => state.closeInspector);
 
   // 前回の状態を追跡（無限ループ防止）
+  // This handler can load after the calendar card has already opened the store. Sync
+  // that initial open once without treating a normally closed mount as a state change.
+  const initialOpenRef = useRef(isOpen && timeblockId !== null);
   const prevIsOpenRef = useRef(isOpen);
   const prevTimeblockIdRef = useRef(timeblockId);
   const prevTimeblockKindRef = useRef(timeblockKind);
@@ -65,7 +68,9 @@ export function useInspectorURLSync() {
       prevIsOpenRef.current !== isOpen ||
       prevTimeblockIdRef.current !== timeblockId ||
       prevTimeblockKindRef.current !== timeblockKind;
-    if (!stateChanged) return;
+    const shouldSyncInitialOpen = initialOpenRef.current && isOpen && timeblockId !== null;
+    if (!stateChanged && !shouldSyncInitialOpen) return;
+    initialOpenRef.current = false;
 
     // 状態を更新
     prevIsOpenRef.current = isOpen;

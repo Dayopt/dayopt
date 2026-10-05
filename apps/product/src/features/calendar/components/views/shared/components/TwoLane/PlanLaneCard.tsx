@@ -246,6 +246,7 @@ export function PlanLaneCard({
               e.preventDefault();
               onResizeStart(event, direction, e);
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <span className="calendar-resize-handle-indicator" />
           </div>
