@@ -392,10 +392,6 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
-  dbfunction fn_check_supabase_rate_limit_poc 'check_supabase_rate_limit_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
   dbfunction fn_claim_account_deletion_step_v1 'claim_account_deletion_step_v1' {
     metadata { inventoryKind 'db-function' detail 'used by app' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -442,10 +438,6 @@ model {
   }
   dbfunction fn_claim_stripe_webhook_event 'claim_stripe_webhook_event' {
     metadata { inventoryKind 'db-function' detail 'used by app' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_claim_supabase_webhook_event_poc 'claim_supabase_webhook_event_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_classify_billing_customer_event_v1 'classify_billing_customer_event_v1' {
@@ -514,10 +506,6 @@ model {
   }
   dbfunction fn_complete_calendar_revoke_outbox_v1 'complete_calendar_revoke_outbox_v1' {
     metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_complete_supabase_webhook_event_poc 'complete_supabase_webhook_event_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_confirm_day_plans_command_v1 'confirm_day_plans_command_v1' {
@@ -712,10 +700,6 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
-  dbfunction fn_prune_supabase_rate_limit_poc 'prune_supabase_rate_limit_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
   dbfunction fn_reconcile_billing_mutation_v2 'reconcile_billing_mutation_v2' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -737,10 +721,6 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_record_undo_receipt_v1 'record_undo_receipt_v1' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_release_supabase_webhook_event_poc 'release_supabase_webhook_event_poc' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
