@@ -108,7 +108,7 @@ describeWithEnv('Calendar navigation', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
     await login(page);
-    await page.goto(`/ja/?view=day&date=${TEST_DATE}`);
+    await page.goto(`/ja?view=day&date=${TEST_DATE}`);
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
   });
 
