@@ -1,7 +1,7 @@
+import { Link } from '@dayopt/i18n/navigation';
 import { createMDXComponents } from '@web/components/content/ContentMDXComponents';
 import { generateAnchorId } from '@web/features/docs/lib/toc';
 import type { MDXComponents } from 'mdx/types';
-import Link from 'next/link';
 import type { ComponentPropsWithoutRef, ReactElement, ReactNode } from 'react';
 import { CopyCodeButton } from './CopyCodeButton';
 

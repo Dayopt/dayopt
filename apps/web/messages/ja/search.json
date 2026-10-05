@@ -16,6 +16,22 @@
     "toSelect": "選択",
     "toClose": "閉じる",
     "close": "検索を閉じる",
-    "poweredBy": "Dayopt Search による検索"
+    "poweredBy": "Dayopt Search による検索",
+    "page": {
+      "title": "検索結果",
+      "inputPlaceholder": "検索キーワードを入力...",
+      "submit": "検索",
+      "filterLabel": "フィルター:",
+      "all": "すべて",
+      "resultCount": "「{query}」の検索結果: {count}件",
+      "loading": "検索中...",
+      "updated": "最終更新: {date}",
+      "details": "詳細を見る →",
+      "emptyTitle": "検索結果が見つかりませんでした",
+      "emptyDescription": "別のキーワードで検索してみてください",
+      "clear": "検索をクリア",
+      "startTitle": "検索を開始してください",
+      "startDescription": "ドキュメントとブログ記事を横断検索できます。"
+    }
   }
 }

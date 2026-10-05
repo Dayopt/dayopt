@@ -60,28 +60,31 @@ export function previewWorkerEnvironment(
 /** @returns {Promise<number>} */
 // The privileged harness, config and every transitive import belong to this
 // trusted checkout. The candidate application is reached only over HTTPS.
-function executePlaywright(env) {
+export function executePreviewProcess(
+  env,
+  {
+    command = 'pnpm',
+    args = [
+      '--dir',
+      'apps/product',
+      'exec',
+      'playwright',
+      'test',
+      '--config',
+      'playwright.preview.config.ts',
+    ],
+    cwd = ROOT,
+  } = {},
+) {
   // Cloud runners and the optional Mac path are POSIX. Own the process group so
   // a deadline cannot leave browsers running after private output is removed.
   return new Promise((resolveExit) => {
-    const child = spawn(
-      'pnpm',
-      [
-        '--dir',
-        'apps/product',
-        'exec',
-        'playwright',
-        'test',
-        '--config',
-        'playwright.preview.config.ts',
-      ],
-      {
-        cwd: ROOT,
-        env,
-        stdio: 'ignore',
-        detached: true,
-      },
-    );
+    const child = spawn(command, args, {
+      cwd,
+      env,
+      stdio: 'ignore',
+      detached: true,
+    });
     let timedOut = false;
     let settled = false;
     let deadline;
@@ -148,19 +151,21 @@ function executePlaywright(env) {
  *   runDirectory?: string,
  *   runId?: string,
  *   cloudUserIds?: { desktop: string, mobile: string },
+ *   validateReport?: (report: any) => boolean,
  * }} options
  */
 export async function runPreviewE2E({
   request,
   env = process.env,
   observe = observePreviewReadiness,
-  execute = (workerEnv) => executePlaywright(workerEnv),
+  execute = (workerEnv) => executePreviewProcess(workerEnv),
   recover = recoverPreviewUsers,
   tempRoot = previewE2EStateRoot(env),
   onStarted = () => {},
   runDirectory = undefined,
   runId = randomUUID(),
   cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  validateReport = isPassingPreviewReport,
 }) {
   if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
@@ -236,7 +241,7 @@ export async function runPreviewE2E({
   const passed =
     exitCode === 0 &&
     after !== null &&
-    isPassingPreviewReport(report) &&
+    validateReport(report) &&
     cleanup.status === 'clean' &&
     cleanup.checked >= 2;
   const result = {

@@ -1,10 +1,10 @@
 'use client';
 
+import { Link } from '@dayopt/i18n/navigation';
 import { SearchDialog } from '@web/features/search';
 import { type NavigationItem, type NavigationSection } from '@web/shell/navigation';
 import { ExternalLink, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
