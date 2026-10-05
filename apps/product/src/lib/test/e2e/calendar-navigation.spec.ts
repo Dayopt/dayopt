@@ -115,7 +115,7 @@ describeWithEnv('Calendar navigation', () => {
   test('viewを実UI操作・reload・browser backで復元する', async ({ page }) => {
     await page.getByRole('button', { name: '日', exact: true }).click();
     await page.getByRole('menuitem', { name: /^3日\s*3$/ }).click();
-    await expectCalendarUrl(page, { pathname: '/ja', date: TEST_DATE, view: '3day' });
+    await expectCalendarUrl(page, { pathname: '/ja/', date: TEST_DATE, view: '3day' });
     await expect(page.locator('[data-calendar-grid]')).toHaveCount(3);
 
     await page.goBack();
