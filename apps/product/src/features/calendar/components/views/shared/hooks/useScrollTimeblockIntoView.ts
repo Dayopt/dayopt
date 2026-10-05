@@ -19,13 +19,12 @@ function scrollToTopPx(container: HTMLDivElement, topPx: number) {
 }
 
 /**
- * Mobile + Inspector / Tag draft open のとき、対象 timeblock / draft が Drawer の上に
- * visible になるよう scroll する。
+ * Inspector を開いた時は、Desktop で画面外の対象だけ scroll して見える位置へ移動する。
  *
- * Mobile では Drawer が下半分を覆うため、選択された timeblock や作成中の選択範囲が隠れる。
- * 対象を viewport の上端から ~25% の位置に置く。
+ * Mobile では Drawer の表示に合わせて背景を動かさない。新規作成の選択範囲は、
+ * 下の pendingSelection effect で作成操作時にだけ所定の位置へ移動する。
  *
- * PC では検索などで画面外の対象を開いた場合だけ scroll する。
+ * Desktop では検索などで画面外の対象を開いた場合だけ scroll する。
  */
 export function useScrollTimeblockIntoView({
   scrollContainerRef,
@@ -38,7 +37,7 @@ export function useScrollTimeblockIntoView({
 
   // Inspector 開時: 該当 timeblock を viewport の 25% に置く
   useEffect(() => {
-    if (!inspectorIsOpen || !inspectorTimeblockId) return;
+    if (isMobile || !inspectorIsOpen || !inspectorTimeblockId) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -50,11 +49,7 @@ export function useScrollTimeblockIntoView({
       observer.disconnect();
       const containerRect = container.getBoundingClientRect();
       const timeblockRect = timeblockEl.getBoundingClientRect();
-      if (
-        !isMobile &&
-        timeblockRect.top >= containerRect.top &&
-        timeblockRect.bottom <= containerRect.bottom
-      )
+      if (timeblockRect.top >= containerRect.top && timeblockRect.bottom <= containerRect.bottom)
         return;
       const timeblockTopInContainer = timeblockRect.top - containerRect.top + container.scrollTop;
       scrollToTopPx(container, timeblockTopInContainer);

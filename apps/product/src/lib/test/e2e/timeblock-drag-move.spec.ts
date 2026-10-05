@@ -139,7 +139,7 @@ describeWithEnv('Timeblock drag move', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(email);
     await page.locator('input[type="password"]').first().fill(password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
   /**
@@ -147,7 +147,7 @@ describeWithEnv('Timeblock drag move', () => {
    * 「過去の予定を過去の範囲内で動かせない」という報告そのものを踏むのが目的。
    */
   test('過去 Plan をドラッグ移動すると新しい時刻が保存される', async ({ page }) => {
-    await page.goto(`/ja/calendar?view=day&date=${PAST_DATE}`);
+    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
     await page.waitForLoadState('networkidle');
 
     const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();

@@ -40,14 +40,58 @@ import { api } from '@/lib/trpc';
 import { getAvatarUrl, getDisplayName, getInitials } from '@/lib/user';
 
 import { SETTINGS_CATEGORIES } from '../constants';
+import type { SettingsCategory } from '../types';
 
 interface MobileAccountOverviewProps {
   returnPath: string;
   settingsReturnQuery: string;
 }
 
+const CATEGORY_GROUPS: readonly {
+  id: string;
+  labelKey: MessageKey;
+  categories: readonly SettingsCategory[];
+}[] = [
+  {
+    id: 'settings',
+    labelKey: 'settings.accountPage.sections.settings',
+    categories: ['account', 'display'],
+  },
+  {
+    id: 'data',
+    labelKey: 'settings.accountPage.sections.data',
+    categories: ['data', 'integrations'],
+  },
+  {
+    id: 'plan',
+    labelKey: 'settings.accountPage.sections.plan',
+    categories: ['billing'],
+  },
+];
+
+interface SettingsSectionProps {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}
+
+function SettingsSection({ id, title, children }: SettingsSectionProps) {
+  const headingId = `settings-section-${id}`;
+
+  return (
+    <section className="space-y-2">
+      <h2 id={headingId} className="text-muted-foreground px-1 text-xs font-medium">
+        {title}
+      </h2>
+      <Card className="border-border-subtle gap-0 overflow-hidden rounded-lg py-0 shadow-sm">
+        <nav aria-labelledby={headingId}>{children}</nav>
+      </Card>
+    </section>
+  );
+}
+
 /**
- * Mobile: Instagram風アカウント概要ページ
+ * Mobile: プロフィールと設定をグループ表示するアカウント概要ページ
  *
  * settings/page.tsx から mobile 判定後に呼ばれる。
  */
@@ -138,21 +182,16 @@ export function MobileAccountOverview({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        {/* B. ヒーローエリア */}
-        <div className="px-4 pt-4 pb-6">
+        <div className="space-y-6 px-4 pt-4 pb-24">
           <Card className="border-border-subtle gap-0 overflow-hidden rounded-lg py-0 shadow-sm">
-            {/* Row 1: Avatar + Name/Email + Plan Badge */}
-            <Link
-              href={`/settings/account${settingsReturnQuery}`}
-              className="hover:bg-state-hover active:bg-state-hover flex items-center gap-4 px-4 py-4 transition-colors duration-150"
-            >
+            <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
               <Avatar size="lg">
                 {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
                 <AvatarFallback className="bg-foreground text-background text-base">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <div className="min-w-0 flex-1">
+              <div className="max-w-full min-w-0">
                 <p className="truncate text-base font-medium">{displayName}</p>
                 {user?.email && (
                   <p className="text-muted-foreground truncate text-xs">{user.email}</p>
@@ -165,14 +204,13 @@ export function MobileAccountOverview({
                   {t('settings.subscription.singlePlan.name')}
                 </Badge>
               )}
-            </Link>
+            </div>
 
-            {/* Row 2: Upgrade CTA(Free時のみ) */}
             {!isLoadingBilling && !canAccessPro && (
               <button
                 type="button"
                 onClick={() => router.push(`/settings/billing${settingsReturnQuery}`)}
-                className="border-border-subtle hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 border-t px-4 py-4 transition-colors duration-150"
+                className="border-border-subtle hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 border-t px-4 py-3 text-left transition-colors duration-150"
               >
                 <Crown className="text-primary size-5 shrink-0" />
                 <div className="min-w-0 flex-1 text-left">
@@ -187,114 +225,143 @@ export function MobileAccountOverview({
               </button>
             )}
           </Card>
-        </div>
 
-        {/* 設定カテゴリ */}
-        <nav className="flex flex-col p-2">
-          {SETTINGS_CATEGORIES.map((category) => {
-            const Icon = category.icon;
-            return (
-              <Link
-                key={category.id}
-                href={`/settings/${category.id}${settingsReturnQuery}`}
-                className="text-foreground hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 rounded-lg px-4 py-4 text-left text-base transition-colors"
-              >
-                {/* C. カテゴリアイコン色 */}
-                <Icon className="text-muted-foreground size-5 shrink-0" />
-                <span className="flex-1 font-normal">{t(category.labelKey)}</span>
-                <ChevronRight className="text-muted-foreground size-4" />
-              </Link>
-            );
-          })}
-        </nav>
+          <div className="space-y-6">
+            {CATEGORY_GROUPS.map((group) => {
+              const categories = SETTINGS_CATEGORIES.filter((category) =>
+                group.categories.includes(category.id),
+              );
 
-        {/* ヘルプ & サポート */}
-        <div className="border-border border-t px-2 pt-1">
-          <nav className="flex flex-col">
-            {helpLinks.map((link) => {
-              const Icon = link.icon;
-              if (link.onPress) {
-                return (
-                  <button
-                    key={link.labelKey}
-                    type="button"
-                    onClick={link.onPress}
-                    className="text-foreground hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 rounded-lg px-4 py-4 text-left text-base transition-colors"
-                  >
-                    {/* C. アイコン色 */}
-                    <Icon className="text-muted-foreground size-5 shrink-0" />
-                    <span className="flex-1 font-normal">{t(link.labelKey)}</span>
-                  </button>
-                );
-              }
               return (
-                <a
-                  key={link.labelKey}
-                  href={link.href}
-                  target={link.external ? '_blank' : undefined}
-                  rel={link.external ? 'noopener noreferrer' : undefined}
-                  className="text-foreground hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 rounded-lg px-4 py-4 text-left text-base transition-colors"
-                >
-                  {/* C. アイコン色 */}
-                  <Icon className="text-muted-foreground size-5 shrink-0" />
-                  <span className="flex-1 font-normal">{t(link.labelKey)}</span>
-                  {link.external && <ExternalLink className="text-muted-foreground size-3.5" />}
-                </a>
+                <SettingsSection key={group.id} id={group.id} title={t(group.labelKey)}>
+                  <ul className="divide-border divide-y">
+                    {categories.map((category) => {
+                      const Icon = category.icon;
+
+                      return (
+                        <li key={category.id}>
+                          <Link
+                            href={`/settings/${category.id}${settingsReturnQuery}`}
+                            className="text-foreground hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 px-4 py-3 text-left text-base transition-colors duration-150"
+                          >
+                            <Icon className="text-muted-foreground size-5 shrink-0" />
+                            <span className="flex-1 font-normal">{t(category.labelKey)}</span>
+                            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </SettingsSection>
               );
             })}
 
-            {/* E. 法的情報の折りたたみ */}
-            <button
-              type="button"
-              onClick={() => setLegalOpen((prev) => !prev)}
-              className="text-foreground hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 rounded-lg px-4 py-4 text-left text-base transition-colors"
-            >
-              <Scale className="text-muted-foreground size-5 shrink-0" />
-              <span className="flex-1 font-normal">{t('settings.accountPage.legal')}</span>
-              <ChevronDown
-                className={`text-muted-foreground size-4 transition-transform ${legalOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            <div
-              // eslint-disable-next-line tailwindcss/no-arbitrary-value -- grid expand/collapse animation
-              className={`grid transition-[grid-template-rows] duration-200 ${legalOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-            >
-              <div className="overflow-hidden">
-                {legalLinks.map((link) => (
-                  <a
-                    key={link.labelKey}
-                    href={link.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-foreground hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 rounded-lg py-4 pr-4 pl-12 text-left text-base transition-colors"
+            <SettingsSection id="support" title={t('settings.accountPage.sections.support')}>
+              <ul className="divide-border divide-y">
+                {helpLinks.map((link) => {
+                  const Icon = link.icon;
+                  if (link.onPress) {
+                    return (
+                      <li key={link.labelKey}>
+                        <button
+                          type="button"
+                          onClick={link.onPress}
+                          className="text-foreground hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 px-4 py-3 text-left text-base transition-colors duration-150"
+                        >
+                          <Icon className="text-muted-foreground size-5 shrink-0" />
+                          <span className="flex-1 font-normal">{t(link.labelKey)}</span>
+                        </button>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={link.labelKey}>
+                      <a
+                        href={link.href}
+                        target={link.external ? '_blank' : undefined}
+                        rel={link.external ? 'noopener noreferrer' : undefined}
+                        className="text-foreground hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 px-4 py-3 text-left text-base transition-colors duration-150"
+                      >
+                        <Icon className="text-muted-foreground size-5 shrink-0" />
+                        <span className="flex-1 font-normal">{t(link.labelKey)}</span>
+                        {link.external && (
+                          <ExternalLink className="text-muted-foreground size-3.5 shrink-0" />
+                        )}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </SettingsSection>
+
+            <SettingsSection id="other" title={t('settings.accountPage.sections.other')}>
+              <ul>
+                <li>
+                  <button
+                    type="button"
+                    aria-expanded={legalOpen}
+                    aria-controls="settings-legal-links"
+                    onClick={() => setLegalOpen((prev) => !prev)}
+                    className="text-foreground hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 px-4 py-3 text-left text-base transition-colors duration-150"
                   >
-                    <span className="flex-1 font-normal">{t(link.labelKey)}</span>
-                    <ExternalLink className="text-muted-foreground size-3.5" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          </nav>
-        </div>
+                    <Scale className="text-muted-foreground size-5 shrink-0" />
+                    <span className="flex-1 font-normal">{t('settings.accountPage.legal')}</span>
+                    <ChevronDown
+                      className={`text-muted-foreground size-4 shrink-0 transition-transform ${legalOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  <div
+                    id="settings-legal-links"
+                    aria-hidden={!legalOpen}
+                    inert={!legalOpen}
+                    // eslint-disable-next-line tailwindcss/no-arbitrary-value -- grid expand/collapse animation
+                    className={`grid transition-[grid-template-rows] duration-200 ${legalOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+                  >
+                    <div className="overflow-hidden">
+                      <ul className="divide-border divide-y">
+                        {legalLinks.map((link) => (
+                          <li key={link.labelKey}>
+                            <a
+                              href={link.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-foreground hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 py-3 pr-4 pl-12 text-left text-base transition-colors duration-150"
+                            >
+                              <span className="flex-1 font-normal">{t(link.labelKey)}</span>
+                              <ExternalLink className="text-muted-foreground size-3.5 shrink-0" />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </SettingsSection>
+          </div>
 
-        {/* ログアウト */}
-        <div className="border-border border-t px-2 pt-1 pb-24">
-          <button
-            type="button"
-            onClick={logout}
-            disabled={isLoggingOut}
-            className="text-destructive hover:bg-state-hover active:bg-state-hover flex w-full items-center gap-4 rounded-lg px-4 py-4 text-left text-base transition-colors"
-          >
-            <LogOut className="text-destructive size-5 shrink-0" />
-            <span className="flex-1 font-normal">
-              {isLoggingOut ? t('navigation.navUser.loggingOut') : t('navigation.navUser.logout')}
-            </span>
-          </button>
+          <div className="space-y-2">
+            <Card className="border-border-subtle gap-0 overflow-hidden rounded-lg py-0 shadow-sm">
+              <button
+                type="button"
+                onClick={logout}
+                disabled={isLoggingOut}
+                className="text-destructive hover:bg-state-hover active:bg-state-hover flex min-h-12 w-full items-center gap-4 px-4 py-3 text-left text-base transition-colors duration-150"
+              >
+                <LogOut className="text-destructive size-5 shrink-0" />
+                <span className="flex-1 font-normal">
+                  {isLoggingOut
+                    ? t('navigation.navUser.loggingOut')
+                    : t('navigation.navUser.logout')}
+                </span>
+                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+              </button>
+            </Card>
 
-          {/* バージョン表示 */}
-          <p className="text-muted-foreground mt-2 px-4 text-xs">
-            {APP_NAME} v{APP_VERSION}
-          </p>
+            <p className="text-muted-foreground px-4 text-xs">
+              {APP_NAME} v{APP_VERSION}
+            </p>
+          </div>
         </div>
       </ScrollArea>
     </>

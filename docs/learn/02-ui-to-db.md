@@ -24,7 +24,7 @@ flowchart TD
   DB -->|"応答"| UI
 ```
 
-**楽観的更新**: サーバーの返事を待たずに画面を変え、失敗したら変える前の状態（snapshot）へ戻す。Dayopt の書き込み mutation は原則これを持つ（AGENTS.md の規則。不可逆な操作は除く）。ただし先に描かない例外もある: Plan を記録する時と、削除を取り消す時は snapshot だけ取り、返事を待ってから描く。
+**楽観的更新**: サーバーの返事を待たずに画面を変え、失敗したらその操作の変更だけを取り消す。timeblock は並行する別操作の確定結果を保ち、同じ行の後続編集を失敗前の値へ重ね直す。認証切り替えで消去したcacheには古いcallbackから書き込まない。Dayopt の書き込み mutation は原則これを持つ（AGENTS.md の規則。不可逆な操作は除く）。ただし先に描かない例外もある: Plan を記録する時と、削除を取り消す時は返事を待ってから描く。
 
 **規則の強制点と写し**: 「Record は未来に終われない」を実際に止めるのは DB の trigger（`DT005`）。UI の「未来の枠では記録タブを押せない」はその写しで、往復を減らすための先回り。写しだけを変えても規則は変わらず、DB だけを緩めると「押せるのに保存されない」になる。
 
@@ -41,7 +41,6 @@ flowchart TD
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) — 他の場所で先に変わっていたら（`DT002`）どうなるか
 - [Record を作る・Plan を記録する](journeys/record-plan.md)
 - [削除と取り消し](journeys/delete-undo.md) — 取り消しに使う version の罠
-- [レポートを開く](journeys/report.md) — 読み取りの経路。集計は SQL ではなく TypeScript
 
 ## 手を動かして確かめる
 
@@ -89,7 +88,7 @@ flowchart TD
   },
   {
     "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-    "find": "onSettled: invalidate"
+    "find": "onSettled: settleAndInvalidate"
   },
   {
     "path": "apps/product/src/lib/trpc/context.ts",

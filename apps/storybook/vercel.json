@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "pnpm build-storybook",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": "storybook-static",
+  "ignoreCommand": "node ../../scripts/ci/storybook-impact.mjs",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
+  ]
+}

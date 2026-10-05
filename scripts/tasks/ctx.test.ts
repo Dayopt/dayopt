@@ -678,7 +678,7 @@ describe('buildJudgmentHint', () => {
         verification: false,
       }),
     ).toBe(
-      '判断の記録が欠けている: 受け入れ条件・検証コマンド（dispatch §status:ready の機械判定）（routing skill 手順 1 / dispatch 手順 7）',
+      '判断の記録が欠けている: 受け入れ条件・検証コマンド（dispatch issue contract の機械判定）（routing skill 手順 1 / dispatch 手順 7）',
     );
     expect(
       buildJudgmentHint({
@@ -1485,7 +1485,7 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       missingContractSections: ['背景', 'やること', '注意'],
     });
     expect(pack.nextStepSecondary).toBe(
-      '判断の記録が欠けている: DoD・分解表・brief・受け入れ条件・検証コマンド（dispatch §status:ready の機械判定）（routing skill 手順 1 / dispatch 手順 7）',
+      '判断の記録が欠けている: DoD・分解表・brief・受け入れ条件・検証コマンド（dispatch issue contract の機械判定）（routing skill 手順 1 / dispatch 手順 7）',
     );
   });
 
@@ -1714,6 +1714,83 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(pack.header.title).toBeNull();
     expect(pack.comments).toBeNull();
     expect(pack.protectedRequired).toBe(false);
+  });
+});
+
+describe('Issue context uses labels and open/closed state', () => {
+  it('does not request Workflow status values and treats an open unblocked issue as available', () => {
+    const calls: string[][] = [];
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'api' && args[1] === 'repos/Dayopt/dayopt/issues/2500') {
+        return JSON.stringify({
+          title: 'Blocked issue',
+          state: 'open',
+          labels: [{ name: 'type:task' }],
+          html_url: 'https://github.com/Dayopt/dayopt/issues/2500',
+          body: '## 背景\n理由\n## やること\n受け入れ条件: scripts/tasks/ctx.mjs を確認\n## 注意\n該当なし: local only\n## 検証\n`pnpm test:scripts`',
+        });
+      }
+      if (
+        args[0] === 'api' &&
+        args[1] === 'repos/Dayopt/dayopt/issues/2500/comments?per_page=100'
+      ) {
+        return '[]';
+      }
+      if (args[0] === 'search') return '[]';
+      throw new Error(`unexpected args: ${args.join(' ')}`);
+    });
+
+    const pack = buildContextPack(
+      { number: 2500, comments: 5, bodyLines: 60, allComments: false },
+      {
+        execFileImpl,
+        existsFn: (path: string) => path.endsWith('scripts/tasks/ctx.mjs'),
+        readFileImpl: () => '',
+      },
+    );
+
+    expect(pack.header).toMatchObject({
+      state: 'open',
+      labels: ['type:task'],
+    });
+    expect(pack.routing.ready).toBe(true);
+    expect(renderMarkdown(pack)).not.toContain('Workflow status');
+    expect(calls.some((args) => args[1]?.includes('/issue-field-values'))).toBe(false);
+  });
+
+  it('status:blocked だけが凍結ラベルとして扱われる', () => {
+    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
+      if (args[0] === 'api' && args[1] === 'repos/Dayopt/dayopt/issues/2500') {
+        return JSON.stringify({
+          title: 'Blocked issue',
+          state: 'open',
+          labels: [{ name: 'status:blocked' }],
+          html_url: 'https://github.com/Dayopt/dayopt/issues/2500',
+          body: '',
+        });
+      }
+      if (
+        args[0] === 'api' &&
+        args[1] === 'repos/Dayopt/dayopt/issues/2500/comments?per_page=100'
+      ) {
+        return '[]';
+      }
+      if (args[0] === 'search') return '[]';
+      throw new Error(`unexpected args: ${args.join(' ')}`);
+    });
+
+    const pack = buildContextPack(
+      { number: 2500, comments: 5, bodyLines: 60, allComments: false },
+      {
+        execFileImpl,
+        existsFn: (path: string) => path.endsWith('scripts/tasks/ctx.mjs'),
+        readFileImpl: () => '',
+      },
+    );
+
+    expect(pack.routing.ready).toBe(false);
+    expect(pack.routing.missing).toContain('OPEN かつ凍結されていない状態');
   });
 });
 

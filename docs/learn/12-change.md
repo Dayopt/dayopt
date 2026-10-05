@@ -46,7 +46,7 @@ last_verified: 2026-09-21
 - [merge → 本番公開](journeys/deploy.md) の 2. migration 適用 — ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。
 - [merge → 本番公開](journeys/deploy.md) の 4. 影響判定 — 影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。
 - [merge → 本番公開](journeys/deploy.md) の 5. E2E などで検証 — ここが merge 後の本番を守る唯一の実行検証。遅くすると、migration と旧コードが共存する時間も伸びる。
-- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
+- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
 
 #### `AGENTS.md`
 
@@ -62,27 +62,11 @@ last_verified: 2026-09-21
 
 #### `apps/product/sentry.server.config.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/_server/CalendarError.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
 
 #### `apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts`
 
 - [Google Calendar 連携](journeys/google-calendar.md) の 12. カレンダーに薄く表示 — 変換した Plan には source: external_calendar と元の予定の ID が付く。Google の予定を消しても、変換済みの Plan は残る。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/report/error.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
 
 #### `apps/product/src/app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`
 
@@ -167,11 +151,11 @@ last_verified: 2026-09-21
 #### `apps/product/src/app/api/mcp/_tools/registry.ts`
 
 - [削除と取り消し](journeys/delete-undo.md) の 6. 取り消しを出す — 取り消しの出し方はカレンダーと Inspector で 1 つにする意図（useTimeblockDeleteUndo）だが、Inspector は自前で同じトーストを組んでいる。変える時は両方を見る。「元に戻す」付きのトーストが出ている間、action の無い成功トーストは出さない（lib/toast）ので、「復元しました」が出ないこともある。
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 
 #### `apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts`
 
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 10. 受領証を受け取る — 受領証の field と schemaVersion は外部契約。変えると、保存済みの受領証を再送で返す時に outputSchema の検証が失敗し、全 mutation tool が壊れる（timeblock-mutations.ts のコメント）。
 
 #### `apps/product/src/app/api/mcp/_tools/tool-result.ts`
@@ -206,7 +190,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/app/api/webhooks/resend/route.ts`
 
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 7. 配送結果を受ける — ここが止まると、新しい bounce が記録されず、届かない宛先へ送り続ける。
-- [問い合わせを送る](journeys/contact.md) の 8. 配送結果の通知 — Production の問い合わせ判定は source と support 宛先の両方に依存する。Integration のイベントは別宛先のため同じ判定を通らず、通常の event 処理に進む。
+- [問い合わせを送る](journeys/contact.md) の 8. 配送結果の通知 — tags の source や宛先を変えると、ここで問い合わせと判定できず、support 宛てのアドレスが送信停止リストに入りうる。
 
 #### `apps/product/src/app/api/webhooks/stripe/route.ts`
 
@@ -250,7 +234,7 @@ last_verified: 2026-09-21
 
 - [パスワードを再設定する](journeys/password-reset.md) の 6. 新しいパスワードを送る — エラー code の読み分けは ResetPasswordForm の RECOVERY_UPDATE_BLOCKED_CODES と isMfaBlocked。message の文字列で判定しない方針。
 - [パスワードを再設定する](journeys/password-reset.md) の 7. MFA で昇格（有効時だけ） — リカバリーコードで通すと MFA は無効になる（recovery-service.ts の既存の副作用）。成功画面に警告を出すのはそのため。MFA 画面の部品は dynamic import で、MFA の無い大多数の訪問者には読み込まない。
-- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
 #### `apps/product/src/features/auth/components/SignupForm.tsx`
 
@@ -267,7 +251,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/auth/server/router.ts`
 
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 2. 本人を確かめ直す — captcha を免除している経路なので、呼び出し元を増やす前に password-reauthentication.ts の契約と docs/product/specs/auth.md の保証境界を読む。検証用の session は scope: 'local' で消す（既定の global だと全端末がログアウトする）。
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `apps/product/src/features/auth/server/user-service.ts`
 
@@ -276,8 +260,8 @@ last_verified: 2026-09-21
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 4. 削除を開始（閉鎖へ） — DB の RPC は失敗 code が 40P01 / 55P03 / 57014（deadlock・lock 待ち・timeout）なら 3 回まで呼び直す。それでも取れなければ contention として利用者に押し直してもらう。
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 8. 封をして本体を消す — auth.users から ON DELETE CASCADE で届かないテーブルは、ここでは消えない。email_suppressions は削除後も残す扱いで未裁定（invariants.md）。この trigger は gate が有効な時だけ働く。
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 9. 削除完了メール — 削除のあとは user_settings も profiles も無い。メールに要る値はすべて削除の前に控えておく。
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/features/auth/server/welcome-email.ts`
 
@@ -289,9 +273,9 @@ last_verified: 2026-09-21
 - [ログイン（MFA 含む）](journeys/login.md) の 2. パスワードを確かめる — 想定内の認証エラー（401 / 422 / 429 など）は Sentry に送らない。送る対象を変える時は isExpectedAuthError を見る。
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 2. Auth に登録 — 認証は Supabase に最も深く依存している部分。乗り換えの重さは出口コスト台帳。
 - [パスワードを再設定する](journeys/password-reset.md) の 1. リセットを依頼 — 画面の出し分けを足すと列挙防止が崩れる。保証境界は docs/product/specs/auth.md のパスワードリセットの節。失敗の観測は画面ではなく store 側の Sentry が持つ。
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 6. 新しいパスワードを送る — エラー code の読み分けは ResetPasswordForm の RECOVERY_UPDATE_BLOCKED_CODES と isMfaBlocked。message の文字列で判定しない方針。
-- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
 #### `apps/product/src/features/calendar/components/controller/hooks/useCalendarData.ts`
 
@@ -300,14 +284,11 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`
 
 - [Plan を保存](journeys/save-plan.md) の 2. 作成を依頼 — 作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
 
 #### `apps/product/src/features/calendar/components/create/useInlineCreate.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 2. 作成を依頼 — 作成の入口はここと、サイドバーのアクティビティタップの 2 つ。手数を変える時は両方を見る。
-
-#### `apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.tsx`
-
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 列へ落とす — 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
 
 #### `apps/product/src/features/calendar/hooks/keyboard/useCalendarTimeblockKeyboard.ts`
 
@@ -329,26 +310,20 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/calendar/interaction/GhostRenderer.tsx`
 
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
+- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 
 #### `apps/product/src/features/calendar/interaction/interaction-effects.ts`
 
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
+- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 
 #### `apps/product/src/features/calendar/interaction/useInteraction.ts`
 
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan を Record の列へ落とした時だけは更新ではなく記録になる（「Record を作る・Plan を記録する」）。重なりの判定を変える時は、DB の排他制約（Plan 同士・Record 同士、半開区間 [start, end)）と揃っているかを見る。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 列へ落とす — 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
-
-#### `apps/product/src/features/calendar/lib/plan-record-drop.ts`
-
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 列へ落とす — 「そのまま記録」と違い、成功時に取り消しトーストが出ない。揃える時は useTimeblockRecordMutations の取り消しを流用する。
+- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す — Plan のドラッグはレーンにかかわらずPlanの時刻更新になる。Plan同士・Record同士の重複は拒否し、PlanとRecordの重複は許可する。重なりの判定を変える時は、DB の排他制約（同種同士、半開区間 [start, end)）と揃っているかを見る。
 
 #### `apps/product/src/features/contact/components/ContactDialog.tsx`
 
 - [問い合わせを送る](journeys/contact.md) の 2. 送信 ID を決める — ID を使い回す条件を広げると、別の問い合わせが前の送信と同じ扱いになって Resend に捨てられる。狭めると、再送で同じメールが 2 通届く。
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
 - [問い合わせを送る](journeys/contact.md) の 7. 結果を出す — エラーの種類ごとに文言を増やす時は、error.data.code の分岐をここに足す。
 
 #### `apps/product/src/features/contact/components/ContactDialogContent.tsx`
@@ -361,12 +336,12 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/contact/server/contact-service.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
-- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — Production 宛先は packages/config の supportEmail が正本。Integration は別受信先を使うため、Product webhook の問い合わせ Sentry 判定（support 宛て一致）には入らない。
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — 宛先は packages/config の supportEmail が正本。変えると Resend webhook の判定（宛先一致）も同時に変わる。
 
 #### `apps/product/src/features/contact/server/router.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
 - [問い合わせを送る](journeys/contact.md) の 4. 送り主を確かめる — 返信先のアドレスは service 側でも検査する（改行やカンマで宛先を増やせないように）。
 
 #### `apps/product/src/features/external-calendar/components/GoogleCalendarSettings.tsx`
@@ -424,49 +399,6 @@ last_verified: 2026-09-21
 
 - [Google Calendar 連携](journeys/google-calendar.md) の 10. 予定を差分で取得 — refresh token の回転（新しい token の保存）はこの同期の中で行う。別の cron ではない。
 
-#### `apps/product/src/features/review/components/detail/ReportDetailBody.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/components/report/ReportBody.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
-#### `apps/product/src/features/review/domain/report/report-view-model.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 2. 集計を問い合わせる — 集計の項目を足す時は、保存済みの古い形が復元されても落ちないよう normalizeReportPeriodPayload に既定値を足す。タブごとに別の query を作ると、仕様（review.md §5）の「1 期間 1 往復」が崩れる。
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
-#### `apps/product/src/features/review/hooks/useReportActivityDetail.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/hooks/useReportPeriod.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
-- [レポートを開く（集計）](journeys/report.md) の 2. 集計を問い合わせる — 集計の項目を足す時は、保存済みの古い形が復元されても落ちないよう normalizeReportPeriodPayload に既定値を足す。タブごとに別の query を作ると、仕様（review.md §5）の「1 期間 1 往復」が崩れる。
-
-#### `apps/product/src/features/review/lib/report-period.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 5. 期間の境界を出す — 日付境界の組み方を変えるなら timezone.md の禁止パターン（ブラウザ TZ の 0 時を UTC 変換する等）を先に読む。ここの規則は詳細パネルの集計と共有している。
-
-#### `apps/product/src/features/review/server/report-aggregation-service.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
-
-#### `apps/product/src/features/review/server/report-detail-service.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/server/report-fetchers.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/server/router.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 4. Router で検証 — timezone の正当性は長さしか見ておらず、実在しない名前は日付計算の側で失敗する（その時の挙動は未確認）。検証を足すなら ANCHOR_DATE / TIMEZONE の定義を変える。
-
 #### `apps/product/src/features/settings/components/AccountDeletionDialog.tsx`
 
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 1. 確認ダイアログ — どの再認証手段を出すかは画面の推定（hasPasswordIdentity）。実際に何を求めるかはサーバーが user の identity から決め直すので、画面だけ変えても再認証は緩まない。
@@ -480,18 +412,14 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/settings/components/DataSettings.tsx`
 
 - [データを書き出す](journeys/data-export.md) の 1. 形式と範囲を選ぶ — 同じ画面の下に、全件削除（deleteBlocks / deleteAllData）がある。こちらは不可逆なので、エクスポートとは別の経路として扱い、ここを変える時に巻き込まない。
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
-- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
+- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 - [データを書き出す](journeys/data-export.md) の 8. CSV か JSON にする — CSV の列を足すと、既存のスプレッドシートの取り込み手順が壊れうる（外部に渡る形式）。列は TIMEBLOCK_CSV_COLUMNS 1 か所で決まる。CSV にはカテゴリとアクティビティの名前が入らず、activity_id だけになる。
 - [データを書き出す](journeys/data-export.md) の 9. ファイルを保存する — 成功のトーストは click を呼んだ時点で出していて、ブラウザが実際に保存したかは確かめていない。
 
 #### `apps/product/src/features/settings/components/PasswordChangeDialog.tsx`
 
 - [パスワードを再設定する](journeys/password-reset.md) の 10. （別入口）設定から変更 — production の require_current_password が off になると、current_password は黙って無視され、現在のパスワードを知らなくても変えられる。Auth config audit がこの値を固定している。他端末のサインアウトに失敗した時は、こちらは画面に警告を出す（リセット経路とは違う）。
-
-#### `apps/product/src/features/settings/components/UserSettingsInitializer.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
 
 #### `apps/product/src/features/settings/lib/billing-operation.ts`
 
@@ -539,21 +467,21 @@ last_verified: 2026-09-21
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 3. Inspector で直す — まとめ方を変えると、競合時にどの変更を捨てるか（古い版の待ち行列は捨てる）と、結果が分からない時に止めるか（止めて自動再送しない）の 2 つが崩れる。Inspector は自前の取り消しトーストを出さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 4. 先に書き換える — 書き換える項目はタイトル・メモ・開始・終了（Record は充実度も）だけ。アクティビティの変更はここでは一覧へ反映せず、返事で差し替わる。書き換える項目を足す時はここと onSuccess の差し替えを揃える。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 7. 版と規則を確かめる — 版の比較を緩めると、別の場所の変更を古い入力が潰す。規則を変える時は DB → service → UI の写しを 1 変更で全部変える。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
 - [削除と取り消し](journeys/delete-undo.md) の 1. 入口を選ぶ — 入口を足したら、useTimeblockDeleteUndo を通して同じ取り消しを出す。messages には「完全に削除されます。取り消せません」という確認文言が残っているが、Plan / Record の削除からは使われていない（未使用の文言）。
 - [削除と取り消し](journeys/delete-undo.md) の 2. 編集を保存しきる — カレンダー側の入口はこの準備をしない（キャッシュの版を使う）。Inspector を開いたままのキーボード削除は、保存が走っている最中だと版が古くなりうる（未確認・推測）。
 - [削除と取り消し](journeys/delete-undo.md) の 6. 取り消しを出す — 取り消しの出し方はカレンダーと Inspector で 1 つにする意図（useTimeblockDeleteUndo）だが、Inspector は自前で同じトーストを組んでいる。変える時は両方を見る。「元に戻す」付きのトーストが出ている間、action の無い成功トーストは出さない（lib/toast）ので、「復元しました」が出ないこともある。
 
 #### `apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.tsx`
 
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 2. 編集を保存しきる — 記録を Plan の最新内容と揃える要。ここを飛ばすと版が古くなり、記録は DT002 で弾かれる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
 
 #### `apps/product/src/features/timeblock/domain/timeblock-destination.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 1. Plan か Record か決める — 時刻の規則を強制しているのは DB trigger で、ここはその写し。ここだけ変えても保存できるかどうかは変わらない。規則を撤去・変更する時は invariants.md §時刻 の写し表を全部たどる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — 出す条件は DB 規則の写し。規則を変える時は invariants.md §時刻 の写し表に沿って 3 つとも見る。日の単位でまとめて記録する ConfirmDayButton も部品としてはあるが、画面に置いている箇所は見つからなかった（未確認）。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 1. 入口を選ぶ — Record の未来終了制約は Inspector の記録操作と作成 UI の選択可否に反映する。Plan のドラッグ移動では Record を作らず、種別を保ったまま時刻を更新する。ConfirmDayButton は画面に置いている箇所を確認できていない。
 
 #### `apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.ts`
 
@@ -565,9 +493,9 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.ts`
 
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 8. 出して取り消しを出す — 取り消しは recordCommands.delete（ソフト削除）を通るので、「削除と取り消し」の規則がそのまま効く。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 3. 記録を依頼 — 楽観的に描く形へ変えるなら、DB の写し方（タイトル・メモ・アクティビティ・時刻）と一致させる必要がある。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. 出して取り消しを出す — 取り消しは recordCommands.delete（ソフト削除）を通るので、「削除と取り消し」の規則がそのまま効く。
 
 #### `apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`
 
@@ -595,7 +523,7 @@ last_verified: 2026-09-21
 
 - [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service — schema に項目を足す時は、Service で埋める処理と command の引数を揃える。userId を input から受け取る形にしない（REVIEW-1）。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 
 #### `apps/product/src/features/timeblock/server/record-commands-router.ts`
@@ -608,8 +536,8 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 9. 時刻の規則で検査 — 規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 6. RPC で更新 — 訳したコードは client-safe-service-code.ts の許可一覧に載っているものだけがブラウザへ届く。載っていないコードは「結果不明」として扱われ、Inspector が止まる側に倒れる。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 7. 版と規則を確かめる — 版の比較を緩めると、別の場所の変更を古い入力が潰す。規則を変える時は DB → service → UI の写しを 1 変更で全部変える。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. RPC で記録 — 版付きの操作を足したら VERSIONED_TARGET_OPERATIONS に入れる。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. RPC で記録 — 版付きの操作を足したら VERSIONED_TARGET_OPERATIONS に入れる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
 - [削除と取り消し](journeys/delete-undo.md) の 5. deleted_at を付ける — deleted_at の付いた行は一覧・重なりの判定（排他制約は deleted_at IS NULL だけが対象）から外れる。削除済みの行を自動で物理削除する仕組みは見つからなかった（未確認）。
 - [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
 
@@ -617,8 +545,12 @@ last_verified: 2026-09-21
 
 - [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service — schema に項目を足す時は、Service で埋める処理と command の引数を揃える。userId を input から受け取る形にしない（REVIEW-1）。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
+
+#### `apps/product/src/lib/analytics/posthog-server.ts`
+
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 9. 画面と同じ関数で書く — create_plan_command_v1 の規則を変えると、画面と MCP の両方が同時に変わる。MCP のエラーコード対応表（EXPECTED_ERROR_CODES）は画面側の表とは別にあるので、新しい SQLSTATE を足したら両方に足さないと MCP だけ MUTATION_FAILED になる。
 
 #### `apps/product/src/lib/auth-error.ts`
 
@@ -652,19 +584,20 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/billing/operation-access.ts`
 
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
 
 #### `apps/product/src/lib/database/collect-query-pages.ts`
 
-- [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/database/public-projections.ts`
 
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+
+#### `apps/product/src/lib/date/core.ts`
+
+- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る — timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 
 #### `apps/product/src/lib/email/notifications.ts`
 
@@ -694,7 +627,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/mcp/trpc-bridge.ts`
 
-- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 5. plans.create を呼ぶ — tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 
 #### `apps/product/src/lib/oauth-server/clients.ts`
 
@@ -724,7 +657,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/rate-limit/upstash.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — 固定 Product Integration は専用の hosted Upstash を build 時に必須にしている。通常の PR Preview / 開発環境では Upstash が無い場合に回数制限が省略されることがあるが、問い合わせの配送は環境 identity check で拒否される。
+- [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
 
 #### `apps/product/src/lib/safe-redirect.ts`
 
@@ -747,12 +680,8 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/tanstack-query/should-persist-query.ts`
 
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
-
-#### `apps/product/src/lib/time/derived-model.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
 
 #### `apps/product/src/lib/toast.ts`
 
@@ -774,13 +703,12 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/trpc/context.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける — ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 
 #### `apps/product/src/lib/trpc/error-code-map.ts`
 
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 6. RPC で更新 — 訳したコードは client-safe-service-code.ts の許可一覧に載っているものだけがブラウザへ届く。載っていないコードは「結果不明」として扱われ、Inspector が止まる側に倒れる。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/trpc/errors.ts`
 
@@ -790,7 +718,6 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/trpc/procedures.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [ログイン（MFA 含む）](journeys/login.md) の 4. 6 桁のコード入力 — リカバリーコードの tRPC だけは、まだ aal1 のままでも protectedProcedure を通れるよう例外にしてある。MFA の関門を変える時はこの例外を壊さない。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [Pro を契約する（課金）](journeys/billing.md) の 8. 利用権を判定 — BILLING_ENFORCED は既定 false で、公開手順の文書は本番を false のまま保つと書く（本番の実値はこの教材では未確認）。つまり今の利用者は、画面では契約してもしなくても全機能を使え、45 日体験も始まらない。ただし MCP からの書き込みは DB 側の mcp_mutation_control.billing_enforced（既定 false）の判定で契約中だけに限られ、未契約者は DM005 になる。契約すれば Stripe での課金は実際に走る。true へ切り替える時は DB 側と MCP の切り替えを先に行う順序がある（rollout §公開順序 6）。env だけ変えると MCP と書き込みの判定がずれる。
@@ -801,9 +728,7 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 4. tRPC で送る — link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける — ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
-- [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 11. Dayopt の画面に現れる — すぐ反映したくなったら Realtime を足す判断になるが、infra.md は Realtime を現状の構成に含めていない。staleTime を短くすると全 query の取得回数が増える。
@@ -823,7 +748,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/proxy.ts`
 
 - [ログイン（MFA 含む）](journeys/login.md) の 6. proxy がセッションを確認 — 保護する画面を足す時は access-policy の protectedProductPaths に入れる。入れ忘れると未ログインでも開ける。
-- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
 #### `apps/product/vercel.json`
 
@@ -833,7 +758,7 @@ last_verified: 2026-09-21
 
 #### `apps/web/src/app/api/contact/contact-email.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は Production では [Dayopt Contact][Product][カテゴリ]、Integration では [Integration] を加える。両方で tags の source は contact-product、environment tag は環境を示す。Product webhook の問い合わせ配送判定は source と support@dayopt.app 宛ての両方を条件にするため、専用受信先を使う Integration のイベントはその Sentry 判定に入らない。LP（apps/web）は別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
+- [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
 
 #### `packages/billing/src/subscription.ts`
 
@@ -841,7 +766,7 @@ last_verified: 2026-09-21
 
 #### `packages/config/src/constants.ts`
 
-- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — Production 宛先は packages/config の supportEmail が正本。Integration は別受信先を使うため、Product webhook の問い合わせ Sentry 判定（support 宛て一致）には入らない。
+- [問い合わせを送る](journeys/contact.md) の 6. Resend が受け付ける — 宛先は packages/config の supportEmail が正本。変えると Resend webhook の判定（宛先一致）も同時に変わる。
 
 #### `scripts/ci/production-auth-config-audit.mjs`
 
@@ -859,7 +784,7 @@ last_verified: 2026-09-21
 
 #### `scripts/ci/production-release.mjs`
 
-- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
+- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
 
 #### `scripts/ci/release-impact.mjs`
 
@@ -869,20 +794,20 @@ last_verified: 2026-09-21
 
 - [パスワードを再設定する](journeys/password-reset.md) の 2. Auth が token を発行 — リンクの有効時間（mailer_otp_exp）や再送間隔は repo ではなく Supabase の Auth 設定が正本。production の値は Auth config audit が監視している（mailer_otp_exp は 3600 秒で固定）。
 - [パスワードを再設定する](journeys/password-reset.md) の 9. 変更通知メール — production で通知が有効かどうか（mailer_notifications_password_changed_enabled）は Auth config audit が監視する。リセットでも設定画面からの変更でも同じ通知が出る。
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む — PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `supabase/functions/send-auth-email/PasswordResetEmail.tsx`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/functions/send-auth-email/confirm-url.ts`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/functions/send-auth-email/index.ts`
 
 - [サインアップ → ウェルカムメール](journeys/signup.md) の 3. 確認メール送信 — この Function は Vercel ではなく Supabase にデプロイされる（supabase functions deploy --use-api）。アプリの deploy とは別に動く。
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 9. 変更通知メール — production で通知が有効かどうか（mailer_notifications_password_changed_enabled）は Auth config audit が監視する。リセットでも設定画面からの変更でも同じ通知が出る。
 
 #### `supabase/functions/send-auth-email/password-changed-notification.ts`
@@ -891,7 +816,7 @@ last_verified: 2026-09-21
 
 #### `supabase/functions/send-auth-email/subjects.ts`
 
-- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 
 #### `supabase/migrations/20260708232500_add_time_model_tables.sql`
 
@@ -900,7 +825,7 @@ last_verified: 2026-09-21
 #### `supabase/migrations/20260729062435_timeblock_atomic_commands.sql`
 
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 7. 版と規則を確かめる — 版の比較を緩めると、別の場所の変更を古い入力が潰す。規則を変える時は DB → service → UI の写しを 1 変更で全部変える。
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
 - [削除と取り消し](journeys/delete-undo.md) の 5. deleted_at を付ける — deleted_at の付いた行は一覧・重なりの判定（排他制約は deleted_at IS NULL だけが対象）から外れる。削除済みの行を自動で物理削除する仕組みは見つからなかった（未確認）。
 - [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
 
@@ -939,7 +864,7 @@ last_verified: 2026-09-21
 
 #### `supabase/migrations/20260809015344_optimize_soft_delete_rls_initplan.sql`
 
-- [データを書き出す](journeys/data-export.md) の 4. Service が 6 本読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
+- [データを書き出す](journeys/data-export.md) の 4. Service が6種類を読む — service role は RLS を越えるので、Plan / Record では .eq('user_id', userId) だけが他人のデータとの境界になる（REVIEW-1）。userId は必ず ctx から取り、入力で受けない。列は public-projections の select に限っているので、列を足す時はそこを変える。
 
 #### `supabase/migrations/20260824090000_detach_tag_id_from_timeblock_write_path.sql`
 
@@ -952,7 +877,7 @@ last_verified: 2026-09-21
 
 #### `supabase/migrations/20260907081237_independent_plan_record_commands.sql`
 
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 7. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 6. Plan を写して作る — Plan と Record を独立させた後（2026-09-07）の形。紐付けを戻す・写す項目を変える時は、MCP の records.create と日次確定（confirm_day）も同じ規則か確かめる。
 - [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
 
 #### `supabase/migrations/20260908022927_add_mcp_billing_access_switch.sql`
@@ -972,7 +897,7 @@ last_verified: 2026-09-21
 
 ## 正本
 
-- [AGENTS.md](../../AGENTS.md) — 実装 plan の必須セクション（Reversibility Table ほか）、レビュー規則
+- [AGENTS.md](../../AGENTS.md) — 実装 Plan に示す目的・方針・検証方法と、レビュー規則。固定の書式は要求しない
 - [docs/engineering/invariants.md](../engineering/invariants.md)
 - [docs/engineering/architecture.md](../engineering/architecture.md) の Feature 間の依存
 

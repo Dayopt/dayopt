@@ -24,6 +24,7 @@ vi.mock('@/lib/trpc', () => ({
       userSettings: { getAnalyticsConsent: { setData: accountConsent.setData } },
     }),
     userSettings: {
+      get: { useQuery: () => ({ data: undefined }) },
       getAnalyticsConsent: {
         useQuery: () => ({ data: { allowed: false }, isLoading: false, isError: false }),
       },

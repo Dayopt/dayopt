@@ -17,30 +17,11 @@ vi.mock('@/lib/logger', () => ({
 
 async function importService(envOverrides: Record<string, string> = {}) {
   vi.resetModules();
-  const testEnv = {
-    VERCEL_ENV: 'production',
-    VERCEL_GIT_COMMIT_REF: 'main',
-    NEXT_PUBLIC_SUPABASE_URL: 'https://yvglwblxrnrenfifsnje.supabase.co',
-    RESEND_API_KEY: 'resend-test-key',
-    RESEND_FROM_EMAIL: 'noreply@dayopt.app',
-    ...envOverrides,
-  };
-  for (const [key, value] of Object.entries(testEnv)) vi.stubEnv(key, value);
+  vi.stubEnv('VERCEL_ENV', envOverrides.VERCEL_ENV ?? 'production');
+  vi.stubEnv('RESEND_API_KEY', envOverrides.RESEND_API_KEY ?? 'resend-test-key');
+  vi.stubEnv('RESEND_FROM_EMAIL', envOverrides.RESEND_FROM_EMAIL ?? 'noreply@dayopt.app');
   return import('./contact-service');
 }
-
-const integrationEnv = {
-  DAYOPT_ENVIRONMENT: 'integration',
-  NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
-  VERCEL_ENV: 'preview',
-  VERCEL_TARGET_ENV: 'preview',
-  VERCEL_PROJECT_ID: 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa',
-  VERCEL_BRANCH_URL: 'product-git-integration-dayopt.vercel.app',
-  VERCEL_GIT_COMMIT_REF: 'integration',
-  NEXT_PUBLIC_SUPABASE_URL: 'https://tilwaprottpyhlfoggbb.supabase.co',
-  NEXT_PUBLIC_APP_URL: 'https://product-git-integration-dayopt.vercel.app',
-  CONTACT_INTEGRATION_RECIPIENT: 'qa+integration@example.com',
-};
 
 const defaultParams = {
   userEmail: 'test@example.com',
@@ -115,7 +96,6 @@ describe('sendContactEmail', () => {
       tags: [
         { name: 'source', value: 'contact-product' },
         { name: 'category', value: 'bug' },
-        { name: 'environment', value: 'production' },
       ],
     });
     expect(body).not.toHaveProperty('html');
@@ -142,56 +122,11 @@ describe('sendContactEmail', () => {
 
       await expect(sendContactEmail(defaultParams)).rejects.toMatchObject({
         code: 'CONTACT_DELIVERY_FAILED',
-        message: 'Contact email delivery is not available in this environment',
+        message: 'Contact email delivery is available only in Production',
       });
       expect(mocks.fetch).not.toHaveBeenCalled();
     },
   );
-
-  it('routes Integration contact mail only to its configured test recipient', async () => {
-    const { sendContactEmail } = await importService(integrationEnv);
-
-    await sendContactEmail(defaultParams);
-
-    const request = mocks.fetch.mock.calls[0]?.[1] as RequestInit;
-    const body = JSON.parse(String(request.body)) as {
-      to: string[];
-      subject: string;
-      tags: Array<{ name: string; value: string }>;
-    };
-    expect(body.to).toEqual(['qa+integration@example.com']);
-    expect(body.subject).toBe('[Dayopt Contact][Product][Integration][Bug]');
-    expect(body.tags).toContainEqual({ name: 'environment', value: 'integration' });
-    expect(request.headers).toMatchObject({
-      'Idempotency-Key': 'contact-product-550e8400-e29b-41d4-a716-446655440000-integration',
-    });
-  });
-
-  it('fails closed when Integration has no dedicated contact recipient', async () => {
-    const { sendContactEmail } = await importService({
-      ...integrationEnv,
-      CONTACT_INTEGRATION_RECIPIENT: '',
-    });
-
-    await expect(sendContactEmail(defaultParams)).rejects.toMatchObject({
-      code: 'CONTACT_DELIVERY_FAILED',
-      message: 'Contact email configuration is missing or invalid',
-    });
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
-
-  it('refuses to route Integration contact mail to the Production support address', async () => {
-    const { sendContactEmail } = await importService({
-      ...integrationEnv,
-      CONTACT_INTEGRATION_RECIPIENT: 'support@dayopt.app',
-    });
-
-    await expect(sendContactEmail(defaultParams)).rejects.toMatchObject({
-      code: 'CONTACT_DELIVERY_FAILED',
-      message: 'Contact email configuration is missing or invalid',
-    });
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
 
   it.each([
     { RESEND_API_KEY: '', RESEND_FROM_EMAIL: 'noreply@dayopt.app' },

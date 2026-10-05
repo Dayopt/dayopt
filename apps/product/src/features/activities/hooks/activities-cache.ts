@@ -19,7 +19,10 @@ import {
 import type { Activity, Category } from '../types';
 import { ACTIVITY_LIST_INPUT, CATEGORY_LIST_INPUT } from './useActivitiesQuery';
 
-type ActivitiesUtils = ReturnType<typeof trpc.useUtils>;
+type ActivitiesUtils = Pick<
+  ReturnType<typeof trpc.useUtils>,
+  'activities' | 'plans' | 'records' | 'statistics'
+>;
 
 /** ロールバック用のスナップショット */
 interface ActivitiesSnapshot {
@@ -148,16 +151,14 @@ export function deleteCategoryFromCaches(utils: ActivitiesUtils, categoryId: str
 }
 
 /**
- * 3 キャッシュを invalidate する。
- *
- * `statistics` は router 単位で invalidate する。削除件数の集計（`getActivityStats`）は
- * レーン H1 が追加する procedure で、F2 の実装時点では main に存在しない。
- * router 単位なら型が今も通り、H1 merge 後は新しい procedure も対象に入る。
+ * 分類一覧と、表示中のアクティビティ詳細を再取得する。
+ * アーカイブの取り消しもこの経路を通す。
  */
 export function invalidateActivityCaches(utils: ActivitiesUtils): void {
   void utils.activities.listTree.invalidate();
   void utils.activities.listActivities.invalidate();
   void utils.activities.listCategories.invalidate();
+  void utils.activities.getActivitySummary.invalidate();
 }
 
 /** アクティビティの割り当てが変わる操作の後始末（予定・記録の表示と集計も動く） */

@@ -3,8 +3,8 @@ name: Nightly
 # CI ファイル統合（#2483 Phase 1）: 旧 heavy-post-merge.yml / integration.yml
 # （integration job のみ。migration-safety は ci.yml の unit job へ移設済み）/
 # replica-check.yml / storage-backup-export.yml の cron を 1 ファイルへ統合し、
-# status:* ラベルの close-time 剥がし漏れを掃除する batch sweep を新設 job として
-# 追加した（統合時に同居していた night-watch job は 2026-09-02 に撤去済み）。
+# product unit の full 実行を追加した（統合時に同居していた night-watch job は
+# 2026-09-02 に撤去済み）。
 #
 # **同じ schedule 配列に複数 cron を書くと、どの cron でもこの workflow 全体が
 # 起動する。job 単位の `if: github.event.schedule == '<cron>'` 振り分けが
@@ -26,7 +26,7 @@ name: Nightly
 
 on:
   schedule:
-    # 04:30 JST — status:* ラベルの batch sweep（close 時の剥がし漏れ backstop）。
+    # 04:30 JST — product unit tests (full)。
     - cron: '30 19 * * *'
     # 06:30 JST — replica-check（production-config-audit の 06:00 JST cron と
     # 同日、時間をずらして外部 API 呼び出し衝突を避ける）。
@@ -36,11 +36,10 @@ on:
   workflow_dispatch:
     inputs:
       jobs:
-        description: '実行する job を選ぶ。replica-check / status-label-sweep / storage-backup は各 job を単独で手動代行したい時に選ぶ（既定は replica-check）。all は一括検証専用——storage-backup-export の実転送・status label sweep も同時に走るため、単独の job だけ再実行したい時に選ばないこと（内製クロスレビュー risk-reviewer 指摘、P2、PR #2484: jobs=all しか無いと、単独 job の手動代行のつもりで実データ転送を誤爆させうる）'
+        description: '実行する job を選ぶ。replica-check / unit-full / storage-backup は各 job を単独で手動代行したい時に選ぶ（既定は replica-check）。all は一括検証専用で storage-backup-export の実転送も走るため、単独の job だけ再実行したい時に選ばないこと（PR #2484）'
         type: choice
         options:
           - replica-check
-          - status-label-sweep
           - storage-backup
           - unit-full
           - all
@@ -51,46 +50,32 @@ on:
         default: false
 
 jobs:
-  # ─── status:* ラベルの batch sweep（新設）────────────────────────────
-  # #2483 で issue-status-label-cleanup.yml（issue close webhook 起点の
-  # per-close 即時剥がし）を廃止し、この nightly 一括 sweep が**唯一の経路**
-  # になった（旧「per-close イベントの backstop」という位置づけは正しくない
-  # ——close イベントを直接 trigger にする workflow はもう存在しない）。残留は
-  # 最長 1 日だが、queue 検索は `is:open` 付きが通常のため実害は無い（#2483
-  # issue 本文で確定済みのトレードオフ）。scripts/ci/strip-status-labels.mjs の
-  # bulk サブコマンドは #2440 の初期実装から既に存在する（KNOWN_STATUS_LABELS
-  # の全 closed issue を走査して重複除去する設計）。
-  status-label-sweep:
-    name: status:* ラベルの batch sweep
-    if: github.event.schedule == '30 19 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'status-label-sweep' || github.event.inputs.jobs == 'all'))
+  candidate_heartbeat:
+    name: Candidate missing or stale evidence
+    # A monitoring tick, never a candidate test trigger or a backup trigger.
+    if: vars.RELEASE_CANDIDATE_ENABLED == 'true' && (github.event.schedule == '30 21 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.jobs == 'replica-check' || inputs.jobs == 'all')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    concurrency:
-      group: nightly-status-label-sweep
-      cancel-in-progress: false
     permissions:
       contents: read
-      issues: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      # --budget-seconds は上の timeout-minutes より短くする。予算に達した時点で
-      # script 側が次の 1 件を始めずに打ち切り、残件と再開コマンドを Step Summary
-      # へ残して exit 0 する（#2506）。余白が要るのは、予算ちょうどにすると最後の
-      # 1 件の処理中に job timeout の SIGKILL が来て打ち切り報告ごと消えるため。
-      # timeout-minutes を変える時はこの値も一緒に見直すこと。
-      - name: status:* ラベルの batch sweep を実行
-        env:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/strip-status-labels.mjs bulk --execute --budget-seconds 480
+          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
+        run: node scripts/ci/release-candidate-heartbeat.mjs
 
   # ─── product unit の full 実行（#2743）──────────────────────────────
   # PR の Unit job は product unit を `vitest related`（変更が import graph で届く test）に
   # 絞っている（scripts/ci/check.mjs resolveProductUnitScope）。graph で追えない漏れ
   # （削除した module を vi.mock の文字列で参照する等）を最大 1 日で拾う backstop。
-  # 04:30 JST の cron（status-label-sweep と同じ枠）に同居させ、cron を増やさない。
+  # 04:30 JST の cron に同居させ、cron を増やさない。
   product-unit-full:
     name: Product unit tests (full)
     if: github.event.schedule == '30 19 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.jobs == 'unit-full' || github.event.inputs.jobs == 'all'))
@@ -101,14 +86,29 @@ jobs:
       cancel-in-progress: true
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      # 毎日同じ main SHA を全件再検査しない。同じ SHA で全件テストの成功を
+      # API から確認できない場合は実行する。手動実行は常に全件。
+      - id: previous-full-unit
+        name: Check same-SHA full-unit evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/ci/nightly-unit-reuse.mjs
+
       - uses: ./.github/actions/setup
+        if: steps.previous-full-unit.outputs.run_full_tests == 'true'
 
       - name: Run unit tests (full)
+        if: steps.previous-full-unit.outputs.run_full_tests == 'true'
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           CI_UNIT_MODE: full
@@ -240,13 +240,13 @@ jobs:
   # skipped（cron 振り分けで走らない job）は失敗ではない。
   notify-failure:
     name: File nightly failure
-    needs: [status-label-sweep, product-unit-full, replica-check, storage-backup-export]
+    needs: [product-unit-full, replica-check, storage-backup-export, candidate_heartbeat]
     if: >-
       ${{ !cancelled()
-          && ( needs.status-label-sweep.result == 'failure'
-               || needs.product-unit-full.result == 'failure'
+          && ( needs.product-unit-full.result == 'failure'
                || needs.replica-check.result == 'failure'
-               || needs.storage-backup-export.result == 'failure' ) }}
+               || needs.storage-backup-export.result == 'failure'
+               || needs.candidate_heartbeat.result == 'failure' ) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -257,15 +257,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SWEEP_RESULT: ${{ needs.status-label-sweep.result }}
           UNIT_RESULT: ${{ needs.product-unit-full.result }}
           REPLICA_RESULT: ${{ needs.replica-check.result }}
           BACKUP_RESULT: ${{ needs.storage-backup-export.result }}
+          CANDIDATE_RESULT: ${{ needs.candidate_heartbeat.result }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           title_prefix="[auto] Nightly job が失敗しました"
           hints=""
+          if [ "$CANDIDATE_RESULT" = "failure" ]; then
+            hints="$hints
+          - **candidate_heartbeat**: #3009 の候補証拠が欠測・stale・red・未完了。候補全体を保留し、再検証する。原因 PR の自動除外や部分 release は行わない。"
+          fi
           if [ "$BACKUP_RESULT" = "failure" ]; then
             hints="$hints
           - **storage-backup-export**: Supabase Storage → Cloudflare R2 の日次搬出が止まっている。**連続すると DR の復元元（\`docs/operations/disaster-recovery-drill.md\` §Storage）が古くなる。** secrets 未投入なら run log の \`未設定の GitHub Secrets\` を見る。rclone の失敗なら \`scripts/ci/storage-backup.sh\` の \`--max-delete\` 上限（暫定 1000）に当たっていないか確認する"
@@ -278,18 +282,14 @@ jobs:
             hints="$hints
           - **product-unit-full**: PR では related に絞った product unit が main の full 実行で落ちた。PR の判定（\`scripts/ci/check.mjs\` の \`resolveProductUnitScope\`）が拾えなかった依存があるので、落ちた test を直すのに加え、その依存の種類を full 側へ倒す規則に足す（docs/engineering/testing.md §いつ回すか）"
           fi
-          if [ "$SWEEP_RESULT" = "failure" ]; then
-            hints="$hints
-          - **status-label-sweep**: \`scripts/ci/strip-status-labels.mjs bulk\` の失敗。実害は closed issue に \`status:*\` が残るだけ（queue 検索は \`is:open\` 付きが通常）。翌日の cron で再試行される"
-          fi
           body="nightly の job が失敗した（起動: \`$EVENT_NAME\`）。
 
           | job | result |
           | --- | --- |
-          | status:* ラベルの batch sweep | \`$SWEEP_RESULT\` |
           | Product unit tests (full) | \`$UNIT_RESULT\` |
           | Check Vercel replica against 1Password ledger | \`$REPLICA_RESULT\` |
           | Export Supabase Storage to R2 | \`$BACKUP_RESULT\` |
+          | Candidate missing or stale evidence | \`$CANDIDATE_RESULT\` |
 
           run: $RUN_URL
           $hints
@@ -303,10 +303,12 @@ jobs:
             --jq '[.[] | select(.title | startswith(env.TITLE_PREFIX))][0].number // empty')
 
           if [ -n "$existing" ]; then
+            issue_number="$existing"
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" \
+            issue_url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title_prefix" \
-              --label "area:operations,priority:p2" \
-              --body "$body"
+              --label "type:bug,area:operations" \
+              --body "$body")
+            issue_number="${issue_url##*/}"
           fi

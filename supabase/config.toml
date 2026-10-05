@@ -4,16 +4,13 @@
 # 各設定値には「なぜそうしたか」を記載。
 # 公式リファレンス: https://supabase.com/docs/guides/local-development/cli/config
 #
-# 運用モデル: 通常Previewは共有非本番DB、DB/共有設定変更だけPR専用Branchで隔離
-#   - Local:      optional。supabase start または明示した非本番DBを使用
-#   - PR Preview: 既存Product projectのPreview。通常はpersistent integrationを使用
-#   - Integration: 同じProduct projectのintegration branchの固定Preview入口
-#                  共有非本番Supabase (ref: tilwaprottpyhlfoggbb) を使用
-#   - Production: dayopt main (ref: yvglwblxrnrenfifsnje)
-#
-# Production の GitHub branch は引き続き main。Integration は合成データ専用で
-# Production credentials / user data を複製しない。
-# 詳細: docs/engineering/infra.md の Cloud-first Integration 節
+# 運用モデル: optional local / persistent nonproduction / isolated PR Preview / production
+#   - Local:          supabase start（この config.toml を使用。完全なアプリ開発が必要な時だけ）
+#   - Persistent:     通常のProduct Preview・固定Integration・必要時のlocal appが共有する非本番branch
+#   - PR Preview:     migrationなど共有backendの隔離が必要な変更だけに作成
+#   - Production:     dayopt main (ref: yvglwblxrnrenfifsnje)
+# Supabase Preview branchを全PRの必須経路にはせず、既存のpersistent nonproduction branchを再利用する。
+# 詳細: .agents/skills/supabase/SKILL.md
 # ============================================================
 
 project_id = "dayopt"

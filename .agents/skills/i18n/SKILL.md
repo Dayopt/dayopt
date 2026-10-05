@@ -139,17 +139,7 @@ t('items', { count: 5 }); // → "5 items"
 
 ### common.json の内部構造（最重要）
 
-`common.json` は複数のトップレベルキーを持つ特殊なファイル:
-
-| トップレベルキー | 用途                                          |
-| ---------------- | --------------------------------------------- |
-| `common`         | ナビゲーション・状態・ユーティリティ          |
-| `actions`        | 汎用アクション動詞（save, cancel, delete 等） |
-| `aria`           | アクセシビリティラベル                        |
-| `status`         | ステータス表示                                |
-| `time`           | 相対時間表現                                  |
-| `validation`     | バリデーションメッセージ                      |
-| `errors`         | サービスエラー                                |
+`common.json` の現在のキー階層は末尾で実 JSON から生成して確認する。トップレベルと `common` 内の子キーを混同せず、キー配置の意味は次の判断フローに従う。
 
 ### キー配置の判断フロー
 
@@ -283,3 +273,11 @@ t('actions.save');
 - `apps/product/src/lib/i18n/scripts/check-keys.ts` - キー差分チェック（`pnpm i18n:check`）
 - `apps/product/src/lib/i18n/scripts/find-unused.ts` - 未使用キー検出（`pnpm i18n:unused`）
 - `scripts/tasks/check-glossary.ts` - 禁止表記スキャン（`pnpm copy:check`）
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read .agents/skills/i18n/SKILL.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

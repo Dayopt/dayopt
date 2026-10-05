@@ -54,88 +54,49 @@ describe('useTrialEndedDialog', () => {
     expect(queries.updateSettings).not.toHaveBeenCalled();
   });
 
-  it('Stripe customerがなくても本当の期限終了を案内する', () => {
-    access = { ...access, state: 'expired', canUseProduct: false };
+  it.each(['not_started', 'trial', 'expired', 'subscribed'] as const)(
+    '単一有料プランの%sでは旧ダイアログを表示しない',
+    (state) => {
+      access = { ...access, state };
+      const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
+      expect(result.current.open).toBe(false);
+      expect(queries.updateSettings).not.toHaveBeenCalled();
+    },
+  );
+
+  it('旧方式はcustomerがなければ表示しない', () => {
+    access = { ...access, enforced: false };
     queries.billingInfo.stripeCustomerId = null;
     const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-
-    expect(result.current.open).toBe(true);
-  });
-
-  it.each(['not_started', 'trial', 'subscribed'] as const)('%sでは終了案内を出さない', (state) => {
-    access = { ...access, state };
-    const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-
     expect(result.current.open).toBe(false);
   });
 
-  it('課金制御OFFでは期限終了の状態でも案内を出さない', () => {
-    access = { ...access, state: 'expired', canUseProduct: true, enforced: false };
-    const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-
-    expect(result.current.open).toBe(false);
-  });
-
-  it('設定の取得が完了してから未dismissの期限終了を案内する', () => {
-    access = { ...access, state: 'expired', canUseProduct: false };
+  it('旧方式は設定取得後だけ表示する', () => {
+    access = { ...access, enforced: false };
     queries.settings = undefined;
     const { result, rerender } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
     expect(result.current.open).toBe(false);
-
     queries.settings = { personalization: { dismissedTrialEndedDialog: false } };
     rerender();
-
     expect(result.current.open).toBe(true);
   });
 
-  it('設定行がない場合も未dismissとして本当の期限終了を案内する', () => {
-    access = { ...access, state: 'expired', canUseProduct: false };
-    queries.settings = null;
-    const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-
-    expect(result.current.open).toBe(true);
-  });
-
-  it('保存済みのdismissで案内を出さない', () => {
-    access = { ...access, state: 'expired', canUseProduct: false };
+  it('旧方式も保存済みdismissを尊重する', () => {
+    access = { ...access, enforced: false };
     queries.settings = { personalization: { dismissedTrialEndedDialog: true } };
     const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-
     expect(result.current.open).toBe(false);
   });
 
-  it('closeで直ちに閉じてflagを保存し、保存完了前の再描画でも閉じたままにする', () => {
-    access = { ...access, state: 'expired', canUseProduct: false };
+  it('旧方式のcloseは保存完了前から閉じる', () => {
+    access = { ...access, enforced: false };
     const { result, rerender } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
     expect(result.current.open).toBe(true);
-
     act(() => result.current.close());
     rerender();
-
     expect(result.current.open).toBe(false);
     expect(queries.updateSettings).toHaveBeenCalledExactlyOnceWith({
       dismissedTrialEndedDialog: true,
     });
-    expect(queries.settings?.personalization.dismissedTrialEndedDialog).toBe(false);
-  });
-
-  it('利用権のtrialからexpiredへの変化で開き、購入完了のsubscribedで閉じる', () => {
-    const { result, rerender } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-    expect(result.current.open).toBe(false);
-
-    access = { ...access, state: 'expired', canUseProduct: false };
-    rerender();
-    expect(result.current.open).toBe(true);
-
-    access = { ...access, state: 'subscribed', canUseProduct: true };
-    rerender();
-    expect(result.current.open).toBe(false);
-  });
-
-  it('有効な体験中に読み取り失敗で一時拒否されても終了と誤判定しない', () => {
-    access = { ...access, canUseProduct: false };
-    const { result } = renderHook(() => useTrialEndedDialog(), { wrapper: Wrapper });
-
-    expect(result.current.open).toBe(false);
   });
 });

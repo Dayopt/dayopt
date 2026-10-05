@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const pathnameMock = vi.hoisted(() => vi.fn(() => '/calendar'));
+const pathnameMock = vi.hoisted(() => vi.fn(() => '/'));
 const navigationMock = vi.hoisted(() =>
   vi.fn((): { currentDate: Date } | null => ({ currentDate: new Date(2026, 2, 25) })),
 );
@@ -11,8 +11,7 @@ vi.mock('@dayopt/i18n/navigation', () => ({
 }));
 
 vi.mock('@/features/calendar', () => ({
-  resolveWorkspaceTab: (pathname: string) =>
-    pathname === '/calendar' ? 'calendar' : pathname === '/report' ? 'report' : 'other',
+  isCalendarViewPath: (pathname: string) => pathname === '/',
   useCalendarNavigation: () => navigationMock(),
 }));
 
@@ -24,17 +23,11 @@ import { SidebarPinnedContent } from './SidebarPinnedContent';
 
 describe('SidebarPinnedContent', () => {
   beforeEach(() => {
-    pathnameMock.mockReturnValue('/calendar');
+    pathnameMock.mockReturnValue('/');
     navigationMock.mockReturnValue({ currentDate: new Date(2026, 2, 25) });
   });
 
-  it('shows MiniCalendar on the calendar tab', () => {
-    render(<SidebarPinnedContent />);
-    expect(screen.getByTestId('mini-calendar')).toBeInTheDocument();
-  });
-
-  it('shows MiniCalendar on the report tab too (both tabs share ?date=)', () => {
-    pathnameMock.mockReturnValue('/report');
+  it('shows MiniCalendar on the home calendar', () => {
     render(<SidebarPinnedContent />);
     expect(screen.getByTestId('mini-calendar')).toBeInTheDocument();
   });

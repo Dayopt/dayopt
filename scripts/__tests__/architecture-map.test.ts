@@ -1060,6 +1060,9 @@ verify_jwt = false
       ),
     ).toEqual([{ id: 'trpcUserRateLimit', limit: 300, window: '1 m' }]);
     expect(
+      parseRateLimits("export const mcpPreAuthRateLimit = createRateLimiter(1_200, '1 m', 'mcp');"),
+    ).toEqual([{ id: 'mcpPreAuthRateLimit', limit: 1200, window: '1 m' }]);
+    expect(
       parseProcedureBuilders(
         'export const protectedProcedure = t.procedure\nexport function entitledProcedure(key) {}',
       ),
@@ -1241,9 +1244,10 @@ describe('call-graph: 型チェッカーで呼び出し経路を辿る', () => {
   });
 
   it('画面から使う procedure は barrel を辿らず宣言元で絞る', () => {
-    const calendar = graph.pages.find((page) => page.route.endsWith('/calendar'));
+    const calendar = graph.pages.find((page) => page.route.endsWith('/[locale]'));
     expect(calendar?.procedures).toContain('plans.list');
     expect(calendar?.procedures).toContain('statistics.getActivityStats');
+    expect(calendar?.procedures).toContain('activities.getActivitySummary');
     // calendar から billing / MCP 設定の procedure は使わない（barrel 経由で混ざらないこと）
     expect(calendar?.procedures.some((id) => id.startsWith('billing.'))).toBe(false);
     expect(calendar?.procedures.some((id) => id.startsWith('mcpConnections.'))).toBe(false);

@@ -293,26 +293,9 @@ export const useLocalUiSettingsStore = create<LocalUiSettingsState>()(
 const CalendarNavigationContext = createContext<CalendarNavigationContextValue | null>(null);
 ```
 
-### 現在の使用状況
+### 現在の使用状況を調べる
 
-#### Zustand
-
-| ストア            | 説明           | 理由                           |
-| ----------------- | -------------- | ------------------------------ |
-| `useAuthStore`    | 認証状態       | 頻繁な更新、アプリ全体で使用   |
-| `useSidebarStore` | サイドバー開閉 | 多数のコンポーネントから参照   |
-| `useEventStore`   | イベント管理   | 複雑な状態、デバッグツール必要 |
-| `useTaskStore`    | タスク管理     | 複雑な状態、デバッグツール必要 |
-
-#### Context API（正当な理由あり）
-
-| Context                          | 理由                   |
-| -------------------------------- | ---------------------- |
-| `ThemeProvider` (next-themes)    | 外部ライブラリ         |
-| `FormProvider` (react-hook-form) | 外部ライブラリ         |
-| `DndProvider` (react-dnd)        | 外部ライブラリ         |
-| `CalendarNavigationContext`      | 特定機能内、低頻度更新 |
-| `ToastProvider`                  | UIライブラリパターン   |
+実在する store と利用元は [Architecture Inventory](./data/architecture-inventory.md) の生成一覧から確認する。個々の Context / Provider は利用箇所の実装を確認する。ここには現行名の写しを置かず、上の Zustand / Context API の選択基準と例を適用する。
 
 ### パフォーマンスの違い
 

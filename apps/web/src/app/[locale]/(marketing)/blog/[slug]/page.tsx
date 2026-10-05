@@ -76,6 +76,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
       url: `/${locale}/blog/${slug}`,
       locale,
       type: 'website',
+      category: slug.toLowerCase() === 'release' ? 'release' : 'journal',
     });
   }
 
@@ -90,6 +91,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
           : 'The article you are looking for could not be found.',
       url: `/${locale}/blog/${slug}`,
       locale: locale,
+      category: 'journal',
     });
   }
 
@@ -111,7 +113,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     publishedTime: frontMatter.publishedAt,
     modifiedTime: frontMatter.updatedAt || frontMatter.publishedAt,
     authors: [frontMatter.author],
-    image: frontMatter.coverImage,
+    category: frontMatter.category.toLowerCase() === 'release' ? 'release' : 'journal',
     section: frontMatter.category,
     alternateLocales,
   });
@@ -192,6 +194,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       title: post.frontMatter.title,
       type: 'blog',
       date: post.frontMatter.publishedAt,
+      locale,
     }).toString()}`;
 
   // JSON-LD は platform/seo/structured-data.ts を正本にする（記事系で定義を重複させない）

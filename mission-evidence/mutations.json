@@ -1,0 +1,1855 @@
+{
+  "before": {
+    "seed": 20260929,
+    "head": "5b93a735d5f97d1ec090b29907d5572b1156bcf6",
+    "candidateCount": 323,
+    "baseline": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 292,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    "restoration": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 292,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    "restored": true,
+    "killed": 18,
+    "results": [
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 106,
+        "before": "<",
+        "after": "<=",
+        "expression": "previousDates.length < offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 274,
+        "failed": 18,
+        "pending": 0,
+        "id": 1,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 週末非表示では表示する営業日を飛ばさず query 範囲へ含める",
+            "message": "AssertionError: expected [ 14, 15, 16, 19 ] to deeply equal [ 15, 16, 19 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/view-range.test.ts:73:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          },
+          {
+            "name": "calculateViewDateRange multi-day view 7dayかつ週末非表示では中央日を基準に7営業日を返す",
+            "message": "AssertionError: expected [ 2026-01-09T12:00:00.000Z, …(7) ] to have a length of 7 but got 8\n    at Proxy.<anonymous> (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/s"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/plan-template-anchor.ts",
+        "line": 78,
+        "before": "-",
+        "after": "+",
+        "expression": "wallAsUtcMs - MS_PER_DAY",
+        "sha256": "b725b6fe26a8365a1ef410c72ba8bda3cfd6a1647202287df3a1fa9c99a3fa2e",
+        "status": "survived",
+        "exitCode": 0,
+        "passed": 292,
+        "failed": 0,
+        "pending": 0,
+        "id": 2,
+        "failureExamples": []
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/activity-visibility.ts",
+        "line": 7,
+        "before": "||",
+        "after": "&&",
+        "expression": "!initialized || activityId === null",
+        "sha256": "402290a4babb9667f769397dd1b9c19fa0ff14775526dec35d0ec722b86c9ed7",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 290,
+        "failed": 2,
+        "pending": 0,
+        "id": 3,
+        "failureExamples": [
+          {
+            "name": "initial activity visibility shows a known activity before filter initialization, so SSR can render the card",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/activity-visibility.test.ts:6:61\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chu"
+          },
+          {
+            "name": "initial activity visibility always shows records without an activity",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/activity-visibility.test.ts:16:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/ch"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 49,
+        "before": "*",
+        "after": "/",
+        "expression": "start.hour * 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 285,
+        "failed": 7,
+        "pending": 0,
+        "id": 4,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: +0, …(3) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+r"
+          },
+          {
+            "name": "calculateSelection 下方向のみ: current が start より手前でも最低 1 snap 分の長さを保証する",
+            "message": "AssertionError: expected { startHour: +0, …(3) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:16:81\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "line": 45,
+        "before": "/",
+        "after": "*",
+        "expression": "prevMinutes / HAPTIC_BOUNDARY_MINUTES",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 291,
+        "failed": 1,
+        "pending": 0,
+        "id": 5,
+        "failureExamples": [
+          {
+            "name": "crossedHapticBoundary 同一 5 分区画内の移動では発火しない（601 → 604）",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/precision.test.ts:39:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "line": 45,
+        "before": "!==",
+        "after": "===",
+        "expression": "Math.floor(prevMinutes / HAPTIC_BOUNDARY_MINUTES) !==\n    Math.floor(nextMinutes / HAPTIC_BOUNDARY_MINUTES)",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 288,
+        "failed": 4,
+        "pending": 0,
+        "id": 6,
+        "failureExamples": [
+          {
+            "name": "crossedHapticBoundary 同一 5 分区画内の移動では発火しない（601 → 604）",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/precision.test.ts:39:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          },
+          {
+            "name": "crossedHapticBoundary 5 分境界を跨ぐと発火する（604 → 605）",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/precision.test.ts:43:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 173,
+        "before": "*",
+        "after": "/",
+        "expression": "(snappedTop / hourHeight) * 60",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 288,
+        "failed": 4,
+        "pending": 0,
+        "id": 7,
+        "failureExamples": [
+          {
+            "name": "day-end boundary regression grid selection at 23:56 は 23:45 から始まり翌日 00:00 で終わる",
+            "message": "AssertionError: expected 15 to be 16 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:379:50\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/d"
+          },
+          {
+            "name": "Grid selection (mouse) GRID_POINTER_DOWN → selecting with initial minimum-duration range",
+            "message": "AssertionError: expected +0 to be 9 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-selection.test.ts:27:51\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dis"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 26,
+        "before": "===",
+        "after": "!==",
+        "expression": "anchor.getDay() === 0",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 274,
+        "failed": 18,
+        "pending": 0,
+        "id": 8,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 週末非表示では表示する営業日を飛ばさず query 範囲へ含める",
+            "message": "AssertionError: expected [ 16, 18, 19 ] to deeply equal [ 15, 16, 19 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/view-range.test.ts:73:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chun"
+          },
+          {
+            "name": "calculateViewDateRange multi-day view 7dayかつ週末非表示では中央日を基準に7営業日を返す",
+            "message": "AssertionError: expected [ 3, 4, 5, +0, 1, 2, 3 ] to deeply equal [ 1, 2, 3, 4, 5, 1, 2 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/view-range.test.ts:83:53\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vite"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 154,
+        "before": "-",
+        "after": "+",
+        "expression": "endMinutes - startMinutes",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 286,
+        "failed": 6,
+        "pending": 0,
+        "id": 9,
+        "failureExamples": [
+          {
+            "name": "precision regression: 移動 / リサイズは相対 snap で元の分を保持する resize 10:07-11:07 timeblock を +15px → 10:07-11:22（開始は動かさず終端だけ 15 分伸ばす）",
+            "message": "AssertionError: expected 1289 to be 75 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:303:35\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner"
+          },
+          {
+            "name": "POINTER_MOVE while resizing updates height snapped to grid",
+            "message": "AssertionError: expected 1170 to be 90 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-resize.test.ts:112:35\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/di"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
+        "line": 24,
+        "before": "===",
+        "after": "!==",
+        "expression": "resolveTimeblockDestination(endAt, now) === 'record'",
+        "sha256": "2cfd5244f1c6756dbd13608af75f299c74b4886f8891783023860eb75ff92fc9",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 289,
+        "failed": 3,
+        "pending": 0,
+        "id": 10,
+        "failureExamples": [
+          {
+            "name": "resolveTimeblockKindChoice 未来スロットは要求に関わらず Plan で、記録は選べない",
+            "message": "AssertionError: expected { kind: 'record', canRecord: true } to deeply equal { kind: 'plan', canRecord: false }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/timeblock/domain/timeblock-destination.test.ts:21:64\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          },
+          {
+            "name": "resolveTimeblockKindChoice 過去スロットの既定は Record で、Plan へ切り替えられる",
+            "message": "AssertionError: expected { kind: 'plan', canRecord: false } to deeply equal { kind: 'record', canRecord: true }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/timeblock/domain/timeblock-destination.test.ts:34:62\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 50,
+        "before": "+",
+        "after": "-",
+        "expression": "current.hour * 60 + current.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 290,
+        "failed": 2,
+        "pending": 0,
+        "id": 11,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: 9, startMinute: +0, …(2) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules"
+          },
+          {
+            "name": "calculateSelection 1 snap 分を超える current はそのまま end になる",
+            "message": "AssertionError: expected { Object (startHour, startMinute, ...) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:52:83\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modu"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 55,
+        "before": "/",
+        "after": "*",
+        "expression": "startMin / 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 285,
+        "failed": 7,
+        "pending": 0,
+        "id": 12,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: 32400, …(3) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          },
+          {
+            "name": "calculateSelection 下方向のみ: current が start より手前でも最低 1 snap 分の長さを保証する",
+            "message": "AssertionError: expected { startHour: 36000, …(3) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:16:81\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vit"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/time-math.ts",
+        "line": 90,
+        "before": "/",
+        "after": "*",
+        "expression": "Math.max(0, yPx) / hourHeight",
+        "sha256": "6b867ee22413f70f18b07c82fb977e96289a8858c457f86f3c3b3c8be636f8d4",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 267,
+        "failed": 25,
+        "pending": 0,
+        "id": 13,
+        "failureExamples": [
+          {
+            "name": "LONGPRESS_FIRED transitions to dragging with haptic and drag store effects",
+            "message": "AssertionError: expected 1380 to be 540 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts:101:32\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest"
+          },
+          {
+            "name": "LONGPRESS_FIRED computes overlap for the snapped long-press preview before any pointer move",
+            "message": "AssertionError: expected +0 to be 7 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts:131:52\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/run"
+          }
+        ]
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "line": 46,
+        "before": "===",
+        "after": "!==",
+        "expression": "state === 'subscribed'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 287,
+        "failed": 5,
+        "pending": 0,
+        "id": 14,
+        "failureExamples": [
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1792497599999",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          },
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1796385600000",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/activity-estimation-factor.ts",
+        "line": 40,
+        "before": "*",
+        "after": "/",
+        "expression": "Math.round(projected / PROJECTION_STEP_MINUTES) * PROJECTION_STEP_MINUTES",
+        "sha256": "a389878b1a751843882d596b86a9353b1b245fff24bed8cd0c32b972fc6bfdc7",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 290,
+        "failed": 2,
+        "pending": 0,
+        "id": 15,
+        "failureExamples": [
+          {
+            "name": "projectActualMinutes 係数を draft の予定時間に掛けて 5 分刻みに丸める",
+            "message": "AssertionError: expected 5 to be 45 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts:38:43\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          },
+          {
+            "name": "projectActualMinutes 端数は最も近い 5 分へ寄せる",
+            "message": "AssertionError: expected 5 to be 35 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts:45:43\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/lib/time/time-conflict.ts",
+        "line": 38,
+        "before": "||",
+        "after": "&&",
+        "expression": "firstStartMs == null || firstEndMs == null",
+        "sha256": "2abce227e9b7c85ef3765f152e955c6a59578670e62efd36440cb057be6045a3",
+        "status": "survived",
+        "exitCode": 0,
+        "passed": 292,
+        "failed": 0,
+        "pending": 0,
+        "id": 16,
+        "failureExamples": []
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 74,
+        "before": "+",
+        "after": "-",
+        "expression": "time.hour * 60 + time.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 291,
+        "failed": 1,
+        "pending": 0,
+        "id": 17,
+        "failureExamples": [
+          {
+            "name": "createInstantSelection minute 跨ぎ（35 + 30 = 65）で hour を繰り上げる",
+            "message": "AssertionError: expected { Object (date, startHour, ...) } to deeply equal { Object (date, startHour, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:105:72\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vi"
+          }
+        ]
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "line": 46,
+        "before": "||",
+        "after": "&&",
+        "expression": "!enforced || state === 'trial'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 289,
+        "failed": 3,
+        "pending": 0,
+        "id": 18,
+        "failureExamples": [
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1792497600000",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          },
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1796385599999",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 126,
+        "before": "-",
+        "after": "+",
+        "expression": "index - offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 291,
+        "failed": 1,
+        "pending": 0,
+        "id": 19,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 3day: currentDateを中心に3日分を返す",
+            "message": "AssertionError: expected 16 to be 14 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/view-range.test.ts:58:40\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.j"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 167,
+        "before": "*",
+        "after": "/",
+        "expression": "24 * hourHeight",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 288,
+        "failed": 4,
+        "pending": 0,
+        "id": 20,
+        "failureExamples": [
+          {
+            "name": "day-end boundary regression grid selection at 23:56 は 23:45 から始まり翌日 00:00 で終わる",
+            "message": "AssertionError: expected 15 to be 16 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:379:50\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/d"
+          },
+          {
+            "name": "Grid selection (mouse) GRID_POINTER_DOWN → selecting with initial minimum-duration range",
+            "message": "AssertionError: expected +0 to be 9 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-NqTL0U/apps/product/src/features/calendar/domain/interaction/machine-selection.test.ts:27:51\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dis"
+          }
+        ]
+      }
+    ]
+  },
+  "after_missing_endpoints": {
+    "seed": 20260929,
+    "head": "5b93a735d5f97d1ec090b29907d5572b1156bcf6",
+    "candidateCount": 323,
+    "baseline": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 326,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    "restoration": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 326,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    "restored": true,
+    "killed": 19,
+    "results": [
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 106,
+        "before": "<",
+        "after": "<=",
+        "expression": "previousDates.length < offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 308,
+        "failed": 18,
+        "pending": 0,
+        "id": 1,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 週末非表示では表示する営業日を飛ばさず query 範囲へ含める",
+            "message": "AssertionError: expected [ 14, 15, 16, 19 ] to deeply equal [ 15, 16, 19 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/view-range.test.ts:73:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          },
+          {
+            "name": "calculateViewDateRange multi-day view 7dayかつ週末非表示では中央日を基準に7営業日を返す",
+            "message": "AssertionError: expected [ 2026-01-09T12:00:00.000Z, …(7) ] to have a length of 7 but got 8\n    at Proxy.<anonymous> (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/s"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/plan-template-anchor.ts",
+        "line": 78,
+        "before": "-",
+        "after": "+",
+        "expression": "wallAsUtcMs - MS_PER_DAY",
+        "sha256": "b725b6fe26a8365a1ef410c72ba8bda3cfd6a1647202287df3a1fa9c99a3fa2e",
+        "status": "survived",
+        "exitCode": 0,
+        "passed": 326,
+        "failed": 0,
+        "pending": 0,
+        "id": 2,
+        "failureExamples": []
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/activity-visibility.ts",
+        "line": 7,
+        "before": "||",
+        "after": "&&",
+        "expression": "!initialized || activityId === null",
+        "sha256": "402290a4babb9667f769397dd1b9c19fa0ff14775526dec35d0ec722b86c9ed7",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 2,
+        "pending": 0,
+        "id": 3,
+        "failureExamples": [
+          {
+            "name": "initial activity visibility shows a known activity before filter initialization, so SSR can render the card",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/activity-visibility.test.ts:6:61\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chu"
+          },
+          {
+            "name": "initial activity visibility always shows records without an activity",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/activity-visibility.test.ts:16:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/ch"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 49,
+        "before": "*",
+        "after": "/",
+        "expression": "start.hour * 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 319,
+        "failed": 7,
+        "pending": 0,
+        "id": 4,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: +0, …(3) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+r"
+          },
+          {
+            "name": "calculateSelection 下方向のみ: current が start より手前でも最低 1 snap 分の長さを保証する",
+            "message": "AssertionError: expected { startHour: +0, …(3) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:16:81\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "line": 45,
+        "before": "/",
+        "after": "*",
+        "expression": "prevMinutes / HAPTIC_BOUNDARY_MINUTES",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 325,
+        "failed": 1,
+        "pending": 0,
+        "id": 5,
+        "failureExamples": [
+          {
+            "name": "crossedHapticBoundary 同一 5 分区画内の移動では発火しない（601 → 604）",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/precision.test.ts:39:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "line": 45,
+        "before": "!==",
+        "after": "===",
+        "expression": "Math.floor(prevMinutes / HAPTIC_BOUNDARY_MINUTES) !==\n    Math.floor(nextMinutes / HAPTIC_BOUNDARY_MINUTES)",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 322,
+        "failed": 4,
+        "pending": 0,
+        "id": 6,
+        "failureExamples": [
+          {
+            "name": "crossedHapticBoundary 同一 5 分区画内の移動では発火しない（601 → 604）",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/precision.test.ts:39:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          },
+          {
+            "name": "crossedHapticBoundary 5 分境界を跨ぐと発火する（604 → 605）",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/precision.test.ts:43:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 173,
+        "before": "*",
+        "after": "/",
+        "expression": "(snappedTop / hourHeight) * 60",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 322,
+        "failed": 4,
+        "pending": 0,
+        "id": 7,
+        "failureExamples": [
+          {
+            "name": "day-end boundary regression grid selection at 23:56 は 23:45 から始まり翌日 00:00 で終わる",
+            "message": "AssertionError: expected 15 to be 16 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:379:50\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/d"
+          },
+          {
+            "name": "Grid selection (mouse) GRID_POINTER_DOWN → selecting with initial minimum-duration range",
+            "message": "AssertionError: expected +0 to be 9 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-selection.test.ts:27:51\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dis"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 26,
+        "before": "===",
+        "after": "!==",
+        "expression": "anchor.getDay() === 0",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 308,
+        "failed": 18,
+        "pending": 0,
+        "id": 8,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 週末非表示では表示する営業日を飛ばさず query 範囲へ含める",
+            "message": "AssertionError: expected [ 16, 18, 19 ] to deeply equal [ 15, 16, 19 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/view-range.test.ts:73:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chun"
+          },
+          {
+            "name": "calculateViewDateRange multi-day view 7dayかつ週末非表示では中央日を基準に7営業日を返す",
+            "message": "AssertionError: expected [ 3, 4, 5, +0, 1, 2, 3 ] to deeply equal [ 1, 2, 3, 4, 5, 1, 2 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/view-range.test.ts:83:53\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vite"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 154,
+        "before": "-",
+        "after": "+",
+        "expression": "endMinutes - startMinutes",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 320,
+        "failed": 6,
+        "pending": 0,
+        "id": 9,
+        "failureExamples": [
+          {
+            "name": "precision regression: 移動 / リサイズは相対 snap で元の分を保持する resize 10:07-11:07 timeblock を +15px → 10:07-11:22（開始は動かさず終端だけ 15 分伸ばす）",
+            "message": "AssertionError: expected 1289 to be 75 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:303:35\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner"
+          },
+          {
+            "name": "POINTER_MOVE while resizing updates height snapped to grid",
+            "message": "AssertionError: expected 1170 to be 90 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-resize.test.ts:112:35\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/di"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
+        "line": 24,
+        "before": "===",
+        "after": "!==",
+        "expression": "resolveTimeblockDestination(endAt, now) === 'record'",
+        "sha256": "2cfd5244f1c6756dbd13608af75f299c74b4886f8891783023860eb75ff92fc9",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 323,
+        "failed": 3,
+        "pending": 0,
+        "id": 10,
+        "failureExamples": [
+          {
+            "name": "resolveTimeblockKindChoice 未来スロットは要求に関わらず Plan で、記録は選べない",
+            "message": "AssertionError: expected { kind: 'record', canRecord: true } to deeply equal { kind: 'plan', canRecord: false }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/timeblock/domain/timeblock-destination.test.ts:21:64\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          },
+          {
+            "name": "resolveTimeblockKindChoice 過去スロットの既定は Record で、Plan へ切り替えられる",
+            "message": "AssertionError: expected { kind: 'plan', canRecord: false } to deeply equal { kind: 'record', canRecord: true }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/timeblock/domain/timeblock-destination.test.ts:34:62\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 50,
+        "before": "+",
+        "after": "-",
+        "expression": "current.hour * 60 + current.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 2,
+        "pending": 0,
+        "id": 11,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: 9, startMinute: +0, …(2) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules"
+          },
+          {
+            "name": "calculateSelection 1 snap 分を超える current はそのまま end になる",
+            "message": "AssertionError: expected { Object (startHour, startMinute, ...) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:52:83\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modu"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 55,
+        "before": "/",
+        "after": "*",
+        "expression": "startMin / 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 319,
+        "failed": 7,
+        "pending": 0,
+        "id": 12,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: 32400, …(3) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          },
+          {
+            "name": "calculateSelection 下方向のみ: current が start より手前でも最低 1 snap 分の長さを保証する",
+            "message": "AssertionError: expected { startHour: 36000, …(3) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:16:81\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vit"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/time-math.ts",
+        "line": 90,
+        "before": "/",
+        "after": "*",
+        "expression": "Math.max(0, yPx) / hourHeight",
+        "sha256": "6b867ee22413f70f18b07c82fb977e96289a8858c457f86f3c3b3c8be636f8d4",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 301,
+        "failed": 25,
+        "pending": 0,
+        "id": 13,
+        "failureExamples": [
+          {
+            "name": "LONGPRESS_FIRED transitions to dragging with haptic and drag store effects",
+            "message": "AssertionError: expected 1380 to be 540 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts:101:32\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest"
+          },
+          {
+            "name": "LONGPRESS_FIRED computes overlap for the snapped long-press preview before any pointer move",
+            "message": "AssertionError: expected +0 to be 7 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts:131:52\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/run"
+          }
+        ]
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "line": 46,
+        "before": "===",
+        "after": "!==",
+        "expression": "state === 'subscribed'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 321,
+        "failed": 5,
+        "pending": 0,
+        "id": 14,
+        "failureExamples": [
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1792497599999",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          },
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1796385600000",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/activity-estimation-factor.ts",
+        "line": 40,
+        "before": "*",
+        "after": "/",
+        "expression": "Math.round(projected / PROJECTION_STEP_MINUTES) * PROJECTION_STEP_MINUTES",
+        "sha256": "a389878b1a751843882d596b86a9353b1b245fff24bed8cd0c32b972fc6bfdc7",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 2,
+        "pending": 0,
+        "id": 15,
+        "failureExamples": [
+          {
+            "name": "projectActualMinutes 係数を draft の予定時間に掛けて 5 分刻みに丸める",
+            "message": "AssertionError: expected 5 to be 45 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts:38:43\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          },
+          {
+            "name": "projectActualMinutes 端数は最も近い 5 分へ寄せる",
+            "message": "AssertionError: expected 5 to be 35 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts:45:43\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/lib/time/time-conflict.ts",
+        "line": 38,
+        "before": "||",
+        "after": "&&",
+        "expression": "firstStartMs == null || firstEndMs == null",
+        "sha256": "2abce227e9b7c85ef3765f152e955c6a59578670e62efd36440cb057be6045a3",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 322,
+        "failed": 4,
+        "pending": 0,
+        "id": 16,
+        "failureExamples": [
+          {
+            "name": "overlap input boundaries rejects each missing or invalid endpoint independently: null",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/lib/time/time-conflict.test.ts:13:55\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:2"
+          },
+          {
+            "name": "overlap input boundaries rejects each missing or invalid endpoint independently: undefined",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/lib/time/time-conflict.test.ts:13:55\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:2"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 74,
+        "before": "+",
+        "after": "-",
+        "expression": "time.hour * 60 + time.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 325,
+        "failed": 1,
+        "pending": 0,
+        "id": 17,
+        "failureExamples": [
+          {
+            "name": "createInstantSelection minute 跨ぎ（35 + 30 = 65）で hour を繰り上げる",
+            "message": "AssertionError: expected { Object (date, startHour, ...) } to deeply equal { Object (date, startHour, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:105:72\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vi"
+          }
+        ]
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "line": 46,
+        "before": "||",
+        "after": "&&",
+        "expression": "!enforced || state === 'trial'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 323,
+        "failed": 3,
+        "pending": 0,
+        "id": 18,
+        "failureExamples": [
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1792497600000",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          },
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1796385599999",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 126,
+        "before": "-",
+        "after": "+",
+        "expression": "index - offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 325,
+        "failed": 1,
+        "pending": 0,
+        "id": 19,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 3day: currentDateを中心に3日分を返す",
+            "message": "AssertionError: expected 16 to be 14 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/view-range.test.ts:58:40\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.j"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 167,
+        "before": "*",
+        "after": "/",
+        "expression": "24 * hourHeight",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 322,
+        "failed": 4,
+        "pending": 0,
+        "id": 20,
+        "failureExamples": [
+          {
+            "name": "day-end boundary regression grid selection at 23:56 は 23:45 から始まり翌日 00:00 で終わる",
+            "message": "AssertionError: expected 15 to be 16 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:379:50\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/d"
+          },
+          {
+            "name": "Grid selection (mouse) GRID_POINTER_DOWN → selecting with initial minimum-duration range",
+            "message": "AssertionError: expected +0 to be 9 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-d5ORBm/apps/product/src/features/calendar/domain/interaction/machine-selection.test.ts:27:51\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dis"
+          }
+        ]
+      }
+    ]
+  },
+  "final": {
+    "seed": 20260929,
+    "head": "5b93a735d5f97d1ec090b29907d5572b1156bcf6",
+    "candidateCount": 323,
+    "baseline": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 328,
+      "failed": 0,
+      "pending": 0,
+      "runtimeErrors": 0,
+      "failures": []
+    },
+    "restoration": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 328,
+      "failed": 0,
+      "pending": 0,
+      "runtimeErrors": 0,
+      "failures": []
+    },
+    "restored": true,
+    "killed": 20,
+    "results": [
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 106,
+        "before": "<",
+        "after": "<=",
+        "expression": "previousDates.length < offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 310,
+        "failed": 18,
+        "pending": 0,
+        "id": 1,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 週末非表示では表示する営業日を飛ばさず query 範囲へ含める",
+            "message": "AssertionError: expected [ 14, 15, 16, 19 ] to deeply equal [ 15, 16, 19 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/view-range.test.ts:73:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          },
+          {
+            "name": "calculateViewDateRange multi-day view 7dayかつ週末非表示では中央日を基準に7営業日を返す",
+            "message": "AssertionError: expected [ 2026-01-09T12:00:00.000Z, …(7) ] to have a length of 7 but got 8\n    at Proxy.<anonymous> (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/s"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/plan-template-anchor.ts",
+        "line": 78,
+        "before": "-",
+        "after": "+",
+        "expression": "wallAsUtcMs - MS_PER_DAY",
+        "sha256": "b725b6fe26a8365a1ef410c72ba8bda3cfd6a1647202287df3a1fa9c99a3fa2e",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "id": 2,
+        "failureExamples": [
+          {
+            "name": "anchorMinuteToInstant 前日の offset が必要な Africa/Casablanca の fold でも早い instant を選ぶ",
+            "message": "AssertionError: expected '2025-02-23T02:30:00.000Z' to be '2025-02-23T01:30:00.000Z' // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/timeblock/domain/plan-template-anchor.test.ts:33:78\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runn"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/activity-visibility.ts",
+        "line": 7,
+        "before": "||",
+        "after": "&&",
+        "expression": "!initialized || activityId === null",
+        "sha256": "402290a4babb9667f769397dd1b9c19fa0ff14775526dec35d0ec722b86c9ed7",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 326,
+        "failed": 2,
+        "pending": 0,
+        "id": 3,
+        "failureExamples": [
+          {
+            "name": "initial activity visibility shows a known activity before filter initialization, so SSR can render the card",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/activity-visibility.test.ts:6:61\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chu"
+          },
+          {
+            "name": "initial activity visibility always shows records without an activity",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/activity-visibility.test.ts:16:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/ch"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 49,
+        "before": "*",
+        "after": "/",
+        "expression": "start.hour * 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 321,
+        "failed": 7,
+        "pending": 0,
+        "id": 4,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: +0, …(3) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+r"
+          },
+          {
+            "name": "calculateSelection 下方向のみ: current が start より手前でも最低 1 snap 分の長さを保証する",
+            "message": "AssertionError: expected { startHour: +0, …(3) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:16:81\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "line": 45,
+        "before": "/",
+        "after": "*",
+        "expression": "prevMinutes / HAPTIC_BOUNDARY_MINUTES",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "id": 5,
+        "failureExamples": [
+          {
+            "name": "crossedHapticBoundary 同一 5 分区画内の移動では発火しない（601 → 604）",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/precision.test.ts:39:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "line": 45,
+        "before": "!==",
+        "after": "===",
+        "expression": "Math.floor(prevMinutes / HAPTIC_BOUNDARY_MINUTES) !==\n    Math.floor(nextMinutes / HAPTIC_BOUNDARY_MINUTES)",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "id": 6,
+        "failureExamples": [
+          {
+            "name": "crossedHapticBoundary 同一 5 分区画内の移動では発火しない（601 → 604）",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/precision.test.ts:39:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          },
+          {
+            "name": "crossedHapticBoundary 5 分境界を跨ぐと発火する（604 → 605）",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/precision.test.ts:43:45\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifa"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 173,
+        "before": "*",
+        "after": "/",
+        "expression": "(snappedTop / hourHeight) * 60",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "id": 7,
+        "failureExamples": [
+          {
+            "name": "day-end boundary regression grid selection at 23:56 は 23:45 から始まり翌日 00:00 で終わる",
+            "message": "AssertionError: expected 15 to be 16 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:379:50\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/d"
+          },
+          {
+            "name": "Grid selection (mouse) GRID_POINTER_DOWN → selecting with initial minimum-duration range",
+            "message": "AssertionError: expected +0 to be 9 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-selection.test.ts:27:51\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dis"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 26,
+        "before": "===",
+        "after": "!==",
+        "expression": "anchor.getDay() === 0",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 310,
+        "failed": 18,
+        "pending": 0,
+        "id": 8,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 週末非表示では表示する営業日を飛ばさず query 範囲へ含める",
+            "message": "AssertionError: expected [ 16, 18, 19 ] to deeply equal [ 15, 16, 19 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/view-range.test.ts:73:54\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chun"
+          },
+          {
+            "name": "calculateViewDateRange multi-day view 7dayかつ週末非表示では中央日を基準に7営業日を返す",
+            "message": "AssertionError: expected [ 3, 4, 5, +0, 1, 2, 3 ] to deeply equal [ 1, 2, 3, 4, 5, 1, 2 ]\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/view-range.test.ts:83:53\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vite"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 154,
+        "before": "-",
+        "after": "+",
+        "expression": "endMinutes - startMinutes",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 322,
+        "failed": 6,
+        "pending": 0,
+        "id": 9,
+        "failureExamples": [
+          {
+            "name": "precision regression: 移動 / リサイズは相対 snap で元の分を保持する resize 10:07-11:07 timeblock を +15px → 10:07-11:22（開始は動かさず終端だけ 15 分伸ばす）",
+            "message": "AssertionError: expected 1289 to be 75 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:303:35\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner"
+          },
+          {
+            "name": "POINTER_MOVE while resizing updates height snapped to grid",
+            "message": "AssertionError: expected 1170 to be 90 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-resize.test.ts:112:35\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/di"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
+        "line": 24,
+        "before": "===",
+        "after": "!==",
+        "expression": "resolveTimeblockDestination(endAt, now) === 'record'",
+        "sha256": "2cfd5244f1c6756dbd13608af75f299c74b4886f8891783023860eb75ff92fc9",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 325,
+        "failed": 3,
+        "pending": 0,
+        "id": 10,
+        "failureExamples": [
+          {
+            "name": "resolveTimeblockKindChoice 未来スロットは要求に関わらず Plan で、記録は選べない",
+            "message": "AssertionError: expected { kind: 'record', canRecord: true } to deeply equal { kind: 'plan', canRecord: false }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/timeblock/domain/timeblock-destination.test.ts:21:64\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          },
+          {
+            "name": "resolveTimeblockKindChoice 過去スロットの既定は Record で、Plan へ切り替えられる",
+            "message": "AssertionError: expected { kind: 'plan', canRecord: false } to deeply equal { kind: 'record', canRecord: true }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/timeblock/domain/timeblock-destination.test.ts:34:62\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 50,
+        "before": "+",
+        "after": "-",
+        "expression": "current.hour * 60 + current.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 326,
+        "failed": 2,
+        "pending": 0,
+        "id": 11,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: 9, startMinute: +0, …(2) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules"
+          },
+          {
+            "name": "calculateSelection 1 snap 分を超える current はそのまま end になる",
+            "message": "AssertionError: expected { Object (startHour, startMinute, ...) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:52:83\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modu"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 55,
+        "before": "/",
+        "after": "*",
+        "expression": "startMin / 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 321,
+        "failed": 7,
+        "pending": 0,
+        "id": 12,
+        "failureExamples": [
+          {
+            "name": "calculateSelection current が start より下なら current を end として返す",
+            "message": "AssertionError: expected { startHour: 32400, …(3) } to deeply equal { startHour: 9, startMinute: +0, …(2) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:7:82\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vites"
+          },
+          {
+            "name": "calculateSelection 下方向のみ: current が start より手前でも最低 1 snap 分の長さを保証する",
+            "message": "AssertionError: expected { startHour: 36000, …(3) } to deeply equal { Object (startHour, startMinute, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:16:81\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vit"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/time-math.ts",
+        "line": 90,
+        "before": "/",
+        "after": "*",
+        "expression": "Math.max(0, yPx) / hourHeight",
+        "sha256": "6b867ee22413f70f18b07c82fb977e96289a8858c457f86f3c3b3c8be636f8d4",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 303,
+        "failed": 25,
+        "pending": 0,
+        "id": 13,
+        "failureExamples": [
+          {
+            "name": "LONGPRESS_FIRED transitions to dragging with haptic and drag store effects",
+            "message": "AssertionError: expected 1380 to be 540 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts:101:32\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest"
+          },
+          {
+            "name": "LONGPRESS_FIRED computes overlap for the snapped long-press preview before any pointer move",
+            "message": "AssertionError: expected +0 to be 7 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-drag-initiation.test.ts:131:52\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/run"
+          }
+        ]
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "line": 46,
+        "before": "===",
+        "after": "!==",
+        "expression": "state === 'subscribed'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 323,
+        "failed": 5,
+        "pending": 0,
+        "id": 14,
+        "failureExamples": [
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1792497599999",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          },
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1796385600000",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/activity-estimation-factor.ts",
+        "line": 40,
+        "before": "*",
+        "after": "/",
+        "expression": "Math.round(projected / PROJECTION_STEP_MINUTES) * PROJECTION_STEP_MINUTES",
+        "sha256": "a389878b1a751843882d596b86a9353b1b245fff24bed8cd0c32b972fc6bfdc7",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 326,
+        "failed": 2,
+        "pending": 0,
+        "id": 15,
+        "failureExamples": [
+          {
+            "name": "projectActualMinutes 係数を draft の予定時間に掛けて 5 分刻みに丸める",
+            "message": "AssertionError: expected 5 to be 45 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts:38:43\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          },
+          {
+            "name": "projectActualMinutes 端数は最も近い 5 分へ寄せる",
+            "message": "AssertionError: expected 5 to be 35 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/timeblock/domain/activity-estimation-factor.test.ts:45:43\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/lib/time/time-conflict.ts",
+        "line": 38,
+        "before": "||",
+        "after": "&&",
+        "expression": "firstStartMs == null || firstEndMs == null",
+        "sha256": "2abce227e9b7c85ef3765f152e955c6a59578670e62efd36440cb057be6045a3",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "id": 16,
+        "failureExamples": [
+          {
+            "name": "overlap input boundaries rejects each missing or invalid endpoint independently: null",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/lib/time/time-conflict.test.ts:13:55\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:2"
+          },
+          {
+            "name": "overlap input boundaries rejects each missing or invalid endpoint independently: undefined",
+            "message": "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/lib/time/time-conflict.test.ts:13:55\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:2"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "line": 74,
+        "before": "+",
+        "after": "-",
+        "expression": "time.hour * 60 + time.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "id": 17,
+        "failureExamples": [
+          {
+            "name": "createInstantSelection minute 跨ぎ（35 + 30 = 65）で hour を繰り上げる",
+            "message": "AssertionError: expected { Object (date, startHour, ...) } to deeply equal { Object (date, startHour, ...) }\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/selection-rules.test.ts:105:72\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vi"
+          }
+        ]
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "line": 46,
+        "before": "||",
+        "after": "&&",
+        "expression": "!enforced || state === 'trial'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 325,
+        "failed": 3,
+        "pending": 0,
+        "id": 18,
+        "failureExamples": [
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1792497600000",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          },
+          {
+            "name": "single-plan access enforces the half-open elapsed-time window at 1796385599999",
+            "message": "AssertionError: expected false to be true // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/packages/billing/src/access.test.ts:21:68\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2025:60\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at fil"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "line": 126,
+        "before": "-",
+        "after": "+",
+        "expression": "index - offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "id": 19,
+        "failureExamples": [
+          {
+            "name": "calculateViewDateRange multi-day view 3day: currentDateを中心に3日分を返す",
+            "message": "AssertionError: expected 16 to be 14 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/view-range.test.ts:58:40\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.j"
+          }
+        ]
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "line": 167,
+        "before": "*",
+        "after": "/",
+        "expression": "24 * hourHeight",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "status": "killed",
+        "exitCode": 1,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "id": 20,
+        "failureExamples": [
+          {
+            "name": "day-end boundary regression grid selection at 23:56 は 23:45 から始まり翌日 00:00 で終わる",
+            "message": "AssertionError: expected 15 to be 16 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-precision.test.ts:379:50\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/d"
+          },
+          {
+            "name": "Grid selection (mouse) GRID_POINTER_DOWN → selecting with initial minimum-duration range",
+            "message": "AssertionError: expected +0 to be 9 // Object.is equality\n    at /private/var/folders/_7/nbzk_h4j6gb0br7f_qmfsw4w0000gn/T/dayopt-mutations-RPVZpD/apps/product/src/features/calendar/domain/interaction/machine-selection.test.ts:27:51\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/tanakatomoya/Desktop/dayopt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dis"
+          }
+        ]
+      }
+    ]
+  },
+  "sourceHashesMatchCurrent": true,
+  "newTestFiles": [
+    {
+      "file": "apps/product/src/features/timeblock/domain/plan-template-anchor.test.ts",
+      "sha256": "0c7d7fa915a4377dac7a4a61a2e73bd9f430fea81485516818a93065cf1e5fc0"
+    },
+    {
+      "file": "apps/product/src/lib/time/time-conflict.test.ts",
+      "sha256": "dd45ac33f53e99d360424fec627ed50ba5335148fdb2b3f37cfc37b52555a493"
+    },
+    {
+      "file": "apps/product/src/lib/time/time-range.test.ts",
+      "sha256": "aa96cd61d30b17e7b5398344029baf53f009f136fc0dc03994b8c90299f3df0d"
+    },
+    {
+      "file": "packages/billing/src/access.test.ts",
+      "sha256": "3ff95b0830b334dbd94f3c914c395ed9a9d16833c20b93f8fbd710c1c8916afa"
+    },
+    {
+      "file": "packages/billing/src/subscription.test.ts",
+      "sha256": "4cdb5f1557e4f6bbacfd9afaa56b1bfd1e2587950fd65aad1811d97f303f48e2"
+    },
+    {
+      "file": "packages/billing/src/entitlement.test.ts",
+      "sha256": "38285c496fc6f433d97c52c92b30c1af28c7fc4357013e7f8b0cbaf42aad6539"
+    },
+    {
+      "file": "packages/billing/src/pricing.test.ts",
+      "sha256": "d55811e3ed312d89035a2621821065c94fc5d6f4f2c578d2aca9e264637ae755"
+    },
+    {
+      "file": "packages/billing/src/plans.test.ts",
+      "sha256": "07618bdc8523ad97151eba242aebb230bf1f88ce464869c753a104385edcb9e7"
+    }
+  ],
+  "verifiedRunner": {
+    "head": "7d12d8bb70e2acf30a8c98a0719d5755186461eb",
+    "seed": 20260929,
+    "candidateCount": 323,
+    "baseline": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 328,
+      "failed": 0,
+      "pending": 0,
+      "reportComplete": true,
+      "failures": []
+    },
+    "restoration": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 328,
+      "failed": 0,
+      "pending": 0,
+      "reportComplete": true,
+      "failures": []
+    },
+    "restored": true,
+    "allTestIdentitiesMatched": true,
+    "killed": 20,
+    "results": [
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "start": 2910,
+        "end": 2911,
+        "line": 106,
+        "before": "<",
+        "after": "<=",
+        "expression": "previousDates.length < offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 310,
+        "failed": 18,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/plan-template-anchor.ts",
+        "start": 2632,
+        "end": 2633,
+        "line": 78,
+        "before": "-",
+        "after": "+",
+        "expression": "wallAsUtcMs - MS_PER_DAY",
+        "sha256": "b725b6fe26a8365a1ef410c72ba8bda3cfd6a1647202287df3a1fa9c99a3fa2e",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/activity-visibility.ts",
+        "start": 222,
+        "end": 224,
+        "line": 7,
+        "before": "||",
+        "after": "&&",
+        "expression": "!initialized || activityId === null",
+        "sha256": "402290a4babb9667f769397dd1b9c19fa0ff14775526dec35d0ec722b86c9ed7",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 326,
+        "failed": 2,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "start": 1361,
+        "end": 1362,
+        "line": 49,
+        "before": "*",
+        "after": "/",
+        "expression": "start.hour * 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 321,
+        "failed": 7,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "start": 1407,
+        "end": 1408,
+        "line": 45,
+        "before": "/",
+        "after": "*",
+        "expression": "prevMinutes / HAPTIC_BOUNDARY_MINUTES",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/precision.ts",
+        "start": 1434,
+        "end": 1437,
+        "line": 45,
+        "before": "!==",
+        "after": "===",
+        "expression": "Math.floor(prevMinutes / HAPTIC_BOUNDARY_MINUTES) !==\n    Math.floor(nextMinutes / HAPTIC_BOUNDARY_MINUTES)",
+        "sha256": "3656414ae2b599d9cc685ecb80a1c73a41d8ad34d539c76d3f086bd24f99b2a6",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "start": 5902,
+        "end": 5903,
+        "line": 173,
+        "before": "*",
+        "after": "/",
+        "expression": "(snappedTop / hourHeight) * 60",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "start": 580,
+        "end": 583,
+        "line": 26,
+        "before": "===",
+        "after": "!==",
+        "expression": "anchor.getDay() === 0",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 310,
+        "failed": 18,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "start": 5185,
+        "end": 5186,
+        "line": 154,
+        "before": "-",
+        "after": "+",
+        "expression": "endMinutes - startMinutes",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 322,
+        "failed": 6,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/timeblock-destination.ts",
+        "start": 833,
+        "end": 836,
+        "line": 24,
+        "before": "===",
+        "after": "!==",
+        "expression": "resolveTimeblockDestination(endAt, now) === 'record'",
+        "sha256": "2cfd5244f1c6756dbd13608af75f299c74b4886f8891783023860eb75ff92fc9",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 325,
+        "failed": 3,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "start": 1421,
+        "end": 1422,
+        "line": 50,
+        "before": "+",
+        "after": "-",
+        "expression": "current.hour * 60 + current.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 326,
+        "failed": 2,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "start": 1639,
+        "end": 1640,
+        "line": 55,
+        "before": "/",
+        "after": "*",
+        "expression": "startMin / 60",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 321,
+        "failed": 7,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/time-math.ts",
+        "start": 2897,
+        "end": 2898,
+        "line": 90,
+        "before": "/",
+        "after": "*",
+        "expression": "Math.max(0, yPx) / hourHeight",
+        "sha256": "6b867ee22413f70f18b07c82fb977e96289a8858c457f86f3c3b3c8be636f8d4",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 303,
+        "failed": 25,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "start": 1516,
+        "end": 1519,
+        "line": 46,
+        "before": "===",
+        "after": "!==",
+        "expression": "state === 'subscribed'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 323,
+        "failed": 5,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/timeblock/domain/activity-estimation-factor.ts",
+        "start": 1366,
+        "end": 1367,
+        "line": 40,
+        "before": "*",
+        "after": "/",
+        "expression": "Math.round(projected / PROJECTION_STEP_MINUTES) * PROJECTION_STEP_MINUTES",
+        "sha256": "a389878b1a751843882d596b86a9353b1b245fff24bed8cd0c32b972fc6bfdc7",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 326,
+        "failed": 2,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/lib/time/time-conflict.ts",
+        "start": 1035,
+        "end": 1037,
+        "line": 38,
+        "before": "||",
+        "after": "&&",
+        "expression": "firstStartMs == null || firstEndMs == null",
+        "sha256": "2abce227e9b7c85ef3765f152e955c6a59578670e62efd36440cb057be6045a3",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/selection-rules.ts",
+        "start": 2167,
+        "end": 2168,
+        "line": 74,
+        "before": "+",
+        "after": "-",
+        "expression": "time.hour * 60 + time.minute",
+        "sha256": "16482bd1d264280158bb63d9de35734d222623005e6f705b950d750e43aa987c",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "packages/billing/src/access.ts",
+        "start": 1486,
+        "end": 1488,
+        "line": 46,
+        "before": "||",
+        "after": "&&",
+        "expression": "!enforced || state === 'trial'",
+        "sha256": "5d5a61ae76d68874ef47dc3398b493c0e91adc04813ffda4d9f1ff8584e52c09",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 325,
+        "failed": 3,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/view-range.ts",
+        "start": 3514,
+        "end": 3515,
+        "line": 126,
+        "before": "-",
+        "after": "+",
+        "expression": "index - offset",
+        "sha256": "2040ee7af7e3e1fc74c4ba30fc2753f7a7d74b357fde52d9e953f5c7f2253ed1",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 327,
+        "failed": 1,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      },
+      {
+        "file": "apps/product/src/features/calendar/domain/interaction/grid-geometry.ts",
+        "start": 5622,
+        "end": 5623,
+        "line": 167,
+        "before": "*",
+        "after": "/",
+        "expression": "24 * hourHeight",
+        "sha256": "6e4819352d52b2d5b0be372cbdc8ad9c464aa4f9dd3a29020dcc814b4a7a8efa",
+        "exitCode": 1,
+        "signal": null,
+        "passed": 324,
+        "failed": 4,
+        "pending": 0,
+        "reportComplete": true,
+        "status": "killed"
+      }
+    ]
+  }
+}

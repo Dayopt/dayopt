@@ -16,7 +16,7 @@ PlanとRecordを時間gridに描画するcomponent群。Storybookではviewご�
 | Interaction | selection、drag preview、context menu、inline create |
 
 - Planはoutline / 淡色、Recordは塗りを基本にする
-- Review / Diff panelのcomponentとStoryはReview featureが所有する
+- アクティビティ詳細は活動のメニューから明示的に開き、閉じた状態ではカレンダーの幅を使う
 - Calendar Storyはpanel内部やDB data flowを説明しない
 
 | ビュー        | 説明                   | コンポーネント |
@@ -26,51 +26,27 @@ PlanとRecordを時間gridに描画するcomponent群。Storybookではviewご�
 | **Multi-Day** | 2〜7日間のカスタム表示 | `MultiDayView` |
 
 ビュー切替は `ViewSwitcherList` コンポーネントで行い、`CalendarNavigationContext` で状態管理。
-Review / Diff は view ではなく Calendar の単一 panel slot に表示する。Storybook 上の panel 表示は `Product/Features/Review` が所有し、Calendar は時間軸表示だけを扱う。
+アクティビティ詳細は直近30日の記録時間・1件あたりの中央値・記録一覧を表示する。実装は [ActivitySummaryPanel](../../activities/components/activity-summary/ActivitySummaryPanel.tsx) を参照する。Calendar の Story は時間軸表示と操作状態を扱う。
 
 ---
 
 ## コンポーネント構成
 
-```
-CalendarController              メインエントリポイント
-├── layout/
-│   ├── CalendarLayout          レイアウトラッパー
-│   └── Header/
-│       ├── ViewSwitcher        ビュー切替（PC・ドロップダウン）
-│       ├── ViewSwitcherList    ビュー切替（モバイル・リスト）
-│       └── DateRangeDisplay    日付範囲表示
-├── views/
-│   ├── DayView/                1日ビュー
-│   ├── WeekView/               週ビュー
-│   ├── MultiDayView/           N日ビュー
-│   └── shared/
-│       ├── grid/               TimeGrid, TimeColumn, GridLines, CurrentTimeLine
-│       ├── CalendarDragSelection/  ドラッグ選択レイヤー
-│       └── EventContextMenu    右クリックメニュー
-├── activity-filter/            アクティビティ / カテゴリーのサイドバー UI
-├── animations/                 ビュー遷移アニメーション
-└── controller/                 ビュー描画ディスパッチ
-```
+Calendar は controller、layout / Header、views / grid、activity filter、animation に責務を分ける。個々の実在ファイルは [components source](.)、ビューの描画分岐は [CalendarViewRenderer](controller/components/CalendarViewRenderer.tsx) から確認する。ここには file tree の写しを置かない。
 
 ---
 
 ## 状態管理
 
-### Zustand Stores
+### 状態の責務
 
-| Store                    | 用途                                 | persist |
-| ------------------------ | ------------------------------------ | ------- |
-| `useCalendarFilterStore` | アクティビティのフィルター           | Yes     |
-| `useCalendarDragStore`   | ドラッグ元・ゴースト・プレビュー時間 | No      |
-| `useCalendarScrollStore` | スクロール位置同期                   | No      |
+| 状態                           | 所有する責務                        | 正本                                                                           |
+| ------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------ |
+| フィルター                     | アクティビティごとの表示設定        | [FilterStore](../stores/useCalendarFilterStore.ts)                             |
+| drag / scroll / 表示状態       | Calendar 内の一時 UI 状態と表示設定 | [stores source](../stores)                                                     |
+| 日付 / ビュー / ナビゲーション | URL と Calendar の表示範囲          | [CalendarNavigationContext](../hooks/navigation/CalendarNavigationContext.tsx) |
 
-### Context
-
-| Context                     | 用途                                    |
-| --------------------------- | --------------------------------------- |
-| `CalendarNavigationContext` | 日付・ビュー・panel・ナビゲーション操作 |
-| `CalendarGridProvider`      | グリッド計算の共有                      |
+実在する store / Context の一覧と型は source から確認する。アクティビティ詳細の開閉状態は共通 store が持ち、カレンダーの表示日・viewから独立している。
 
 ---
 
@@ -89,21 +65,18 @@ CalendarController              メインエントリポイント
 
 ## フィルター
 
-| フィルター         | 説明                                       |
-| ------------------ | ------------------------------------------ |
-| アクティビティ別   | アクティビティごとの表示切替               |
-| アクティビティなし | アクティビティ未設定のブロックの表示トグル |
+アクティビティごとの表示を切り替える。アクティビティ未設定のブロックは常に表示し、「アクティビティなし」の表示トグルは持たない。カテゴリー未所属のアクティビティとは区別する。
 
-`useCalendarFilterStore` で管理、localStorage に永続化。
+状態・保存方式・表示判定の正本は [FilterStore](../stores/useCalendarFilterStore.ts)。
 
 ---
 
 ## コンテキストメニュー
 
-| メニュー               | トリガー                       | アクション                       |
-| ---------------------- | ------------------------------ | -------------------------------- |
-| `EventContextMenu`     | タイムブロックカード右クリック | 振り返り、コピー、削除、状態操作 |
-| `EmptyAreaContextMenu` | 空エリア右クリック             | プラン作成、レコード作成         |
+| メニュー               | トリガー                       | アクション                                 |
+| ---------------------- | ------------------------------ | ------------------------------------------ |
+| `EventContextMenu`     | タイムブロックカード右クリック | アクティビティ詳細、コピー、削除、状態操作 |
+| `EmptyAreaContextMenu` | 空エリア右クリック             | プラン作成、レコード作成                   |
 
 ---
 

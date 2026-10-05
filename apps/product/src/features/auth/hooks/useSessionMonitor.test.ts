@@ -20,7 +20,7 @@ vi.mock('@/lib/supabase/client', () => ({
 const mockSignOut = vi.fn().mockResolvedValue(undefined);
 let mockSession: { user: { id: string } } | null = { user: { id: 'user-1' } };
 
-vi.mock('./stores/useAuthStore', () => ({
+vi.mock('../stores/useAuthStore', () => ({
   useAuthStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ session: mockSession, signOut: mockSignOut }),
 }));
@@ -51,8 +51,10 @@ describe('useSessionMonitor', () => {
   });
 
   describe('初期状態', () => {
-    it('セッションがある場合、有効な状態で初期化される', () => {
+    it('セッションがある場合、初回チェック後も有効な状態を維持する', async () => {
+      // 初期値trueだけで通さず、storeを参照するmicrotaskの判定まで確認する。
       const { result } = renderHook(() => useSessionMonitor());
+      await act(async () => {});
 
       expect(result.current.isSessionValid).toBe(true);
       expect(result.current.showTimeoutWarning).toBe(false);
@@ -121,17 +123,21 @@ describe('useSessionMonitor', () => {
 
   describe('logout', () => {
     it('logoutを呼ぶとリダイレクトされる', async () => {
+      // 遷移だけでなく意図したstore actionが実際に呼ばれたことを確認する。
       const { result } = renderHook(() => useSessionMonitor());
 
       await act(async () => {
         await result.current.logout();
       });
 
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith('/auth/login');
     });
 
     it('signOutエラーでもリダイレクトする', async () => {
+      // 別の例外で通らないよう、注入したrejectとcatchの対応も確認する。
       mockSignOut.mockRejectedValueOnce(new Error('fail'));
+      const { logger } = await import('@/lib/logger');
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const { result } = renderHook(() => useSessionMonitor());
@@ -140,6 +146,11 @@ describe('useSessionMonitor', () => {
         await result.current.logout();
       });
 
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
+        '[SessionMonitor] Logout error:',
+        expect.objectContaining({ message: 'fail' }),
+      );
       expect(mockPush).toHaveBeenCalledWith('/auth/login');
       spy.mockRestore();
     });

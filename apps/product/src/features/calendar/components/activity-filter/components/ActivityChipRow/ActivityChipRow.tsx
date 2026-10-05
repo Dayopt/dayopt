@@ -2,15 +2,18 @@
 
 import { useMemo } from 'react';
 
-import { Plus } from 'lucide-react';
+import { MoreHorizontal, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { ActivityIcon, useActivities, useActivitiesMap } from '@/features/activities';
+import { useTimeblockInspectorStore } from '@/features/timeblock';
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 
 import { useActivityModalNavigation } from '../../../../hooks/useActivityModalNavigation';
 import { useActivityQuickCreate } from '../../hooks/useActivityQuickCreate';
+import { ActivityDetailsMenuItem } from '../ActivityDetailsMenuItem';
 
-import { cn } from '@dayopt/components';
+import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@dayopt/components';
 
 interface ActivityChipRowProps {
   className?: string;
@@ -57,6 +60,11 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
     quickCreate({ activityId, activityName });
   };
 
+  const handleViewActivityDetails = (activityId: string, activityName: string) => {
+    useActivityDetailStore.getState().open({ activityId, name: activityName });
+    useTimeblockInspectorStore.getState().closeInspector();
+  };
+
   return (
     <div
       className={cn(
@@ -79,20 +87,37 @@ export function ActivityChipRow({ className }: ActivityChipRowProps) {
       aria-label={t('calendar.filter.quickCreate')}
     >
       {chips.map((chip) => (
-        <button
-          key={chip.id}
-          type="button"
-          onClick={() => handleActivityTap(chip.id, chip.name)}
-          className="hover:bg-state-hover flex h-12 min-w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 transition-colors duration-150"
-        >
-          <ActivityIcon
-            icon={chip.icon}
-            color={chip.color}
-            size="md"
-            neutral={chip.color === null}
-          />
-          <span className="text-muted-foreground max-w-24 truncate text-xs">{chip.name}</span>
-        </button>
+        <div key={chip.id} className="flex h-12 shrink-0 items-center">
+          <button
+            type="button"
+            onClick={() => handleActivityTap(chip.id, chip.name)}
+            className="hover:bg-state-hover flex h-12 min-w-16 flex-col items-center justify-center gap-1 rounded-l-lg px-2 transition-colors duration-150"
+          >
+            <ActivityIcon
+              icon={chip.icon}
+              color={chip.color}
+              size="md"
+              neutral={chip.color === null}
+            />
+            <span className="text-muted-foreground max-w-24 truncate text-xs">{chip.name}</span>
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${t('calendar.filter.activityMenu')}: ${chip.name}`}
+                className="hover:bg-state-hover text-muted-foreground flex h-12 w-9 items-center justify-center rounded-r-lg transition-colors duration-150"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top">
+              <ActivityDetailsMenuItem
+                onViewActivityDetails={() => handleViewActivityDetails(chip.id, chip.name)}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ))}
 
       <button

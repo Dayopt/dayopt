@@ -150,7 +150,7 @@ describeWithEnv('Timeblock conflict', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(email);
     await page.locator('input[type="password"]').first().fill(password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
   /** UI が版を握った後に、別 writer として同じ Plan を service_role で更新する。 */
@@ -173,7 +173,7 @@ describeWithEnv('Timeblock conflict', () => {
   test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す', async ({
     page,
   }) => {
-    await page.goto(`/ja/calendar?view=day&date=${PAST_DATE}`);
+    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
     await page.waitForLoadState('networkidle');
 
     const card = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
@@ -188,8 +188,6 @@ describeWithEnv('Timeblock conflict', () => {
     await updateAsOtherWriter();
 
     // 古い版を前提にしたメモ編集を送る（debounce 600ms、blur で flush）。
-    const noteTrigger = page.getByRole('button', { name: 'メモ' });
-    await noteTrigger.click();
     const noteInput = page.getByRole('textbox', { name: 'メモ' });
     await noteInput.fill(STALE_UI_NOTE);
     await noteInput.blur();
@@ -201,7 +199,7 @@ describeWithEnv('Timeblock conflict', () => {
 
     // 2. 再取得した server 値でフォームを描き直す（UI の古い入力は残さない）
     await expect(startTime).toHaveValue('09:30', { timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'メモ' })).toContainText(OTHER_WRITER_NOTE, {
+    await expect(page.getByRole('textbox', { name: 'メモ' })).toHaveValue(OTHER_WRITER_NOTE, {
       timeout: 10_000,
     });
 

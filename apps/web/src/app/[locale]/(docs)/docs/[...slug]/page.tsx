@@ -94,6 +94,7 @@ export async function generateMetadata({ params }: DocPageProps): Promise<Metada
       url: `/${locale}/docs/${slug}`,
       locale,
       type: 'article',
+      category: 'docs',
       publishedTime: frontMatter.publishedAt,
       modifiedTime: frontMatter.updatedAt || frontMatter.publishedAt,
       authors: frontMatter.author ? [frontMatter.author] : undefined,

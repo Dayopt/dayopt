@@ -12,11 +12,13 @@ interface UseTrialEndedDialogResult {
 }
 
 /**
- * Trial終了ダイアログの表示判定 + フラグ管理
+ * 旧Free/Pro方式のTrial終了ダイアログの表示判定 + フラグ管理
+ * 単一有料プランでは利用状態に基づくinline bannerを使う。
+ * Stripe Customerの存在は45日体験の終了を意味しない。
  *
  * 表示条件（すべて満たす場合のみ）:
- * 1. 課金制御が有効
- * 2. BillingAccessProvider が期限終了と判定している
+ * 1. subscriptionStatus === 'free'
+ * 2. stripeCustomerId が存在する（= Trial を経験した）
  * 3. dismissedTrialEndedDialog フラグが false
  *
  * close() は UI を即座に閉じる（local state で optimistic dismiss）、
@@ -24,7 +26,10 @@ interface UseTrialEndedDialogResult {
  * 失敗時も local dismiss は保持し、ユーザーがダイアログに閉じ込められないようにする。
  */
 export function useTrialEndedDialog(): UseTrialEndedDialogResult {
-  const access = useBillingAccess();
+  const { enforced } = useBillingAccess();
+  const billingQuery = api.billing.getOverview.useQuery(undefined, {
+    retry: false,
+  });
   const settingsQuery = api.userSettings.get.useQuery();
   const updateSettings = useUpdateUserSettings();
 
@@ -36,18 +41,19 @@ export function useTrialEndedDialog(): UseTrialEndedDialogResult {
   }, [updateSettings]);
 
   const open = useMemo(() => {
-    if (locallyDismissed) return false;
+    if (enforced || locallyDismissed) return false;
 
+    const billing = billingQuery.data?.billingInfo;
     const settings = settingsQuery.data;
 
-    if (settings === undefined) return false;
+    if (!billing || settings === undefined) return false;
 
     return (
-      access.enforced &&
-      access.state === 'expired' &&
+      billing.subscriptionStatus === 'free' &&
+      billing.stripeCustomerId !== null &&
       !settings?.personalization.dismissedTrialEndedDialog
     );
-  }, [access.enforced, access.state, settingsQuery.data, locallyDismissed]);
+  }, [billingQuery.data, settingsQuery.data, locallyDismissed, enforced]);
 
   return { open, close };
 }

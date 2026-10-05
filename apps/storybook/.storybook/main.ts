@@ -54,7 +54,7 @@ const config: StorybookConfig = {
   features: {
     experimentalRSC: true,
   },
-  staticDirs: ['../../product/public'],
+  staticDirs: ['../../product/public', { from: '../../../packages/assets/fonts', to: '/og-fonts' }],
   typescript: {
     reactDocgen: 'react-docgen-typescript',
   },

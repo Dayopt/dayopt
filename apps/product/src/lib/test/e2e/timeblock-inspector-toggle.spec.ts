@@ -128,13 +128,13 @@ describeWithEnv('Inspector toggle repro', () => {
       throw new Error(`magic link 発行に失敗: ${error?.message ?? 'no hashed_token'}`);
     }
     await page.goto(
-      `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/ja/calendar')}`,
+      `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/ja/')}`,
     );
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   });
 
   async function openDay(page: Page) {
-    await page.goto(`/ja/calendar?view=day&date=${PAST_DATE}`);
+    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
     await page.waitForLoadState('networkidle');
     const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
     await expect(grid).toBeVisible({ timeout: 10_000 });

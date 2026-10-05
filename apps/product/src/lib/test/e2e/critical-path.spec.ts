@@ -11,25 +11,23 @@ import {
   clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
-  expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
-  openDay as openDayFromFixture,
+  openDay,
   revealHour,
   seedCriticalPathUser,
   TIMEZONE,
 } from './critical-path-fixture';
-import { REPORT_ALLOCATION, REPORT_EXECUTION } from './report-selectors';
 import { test } from './trpc-budget-fixture';
 
 test.use({ trpcProcedureBudget: 26 });
 
 /**
- * クリティカルパス E2E（desktop）— 計画 → 実績 → 振り返りの中核ループを実 UI 操作で通す
+ * クリティカルパス E2E（desktop）— 計画 → 実績 → アクティビティ詳細の中核ループを実 UI 操作で通す
  *
  * 「作成導線が存在する」ではなく、ドラッグ選択 → アクティビティ選択で実際に Plan / Record を作り、
- * リロード後も残る（= DB へ永続化された）ことと、Report の配分へ反映されることを検証する。
- * mobile の同じループは mobile-critical-path.spec.ts（長押し → Drawer → ヘッダーのレポートリンク）。
+ * リロード後も残る（= DB へ永続化された）ことと、アクティビティ詳細へ反映されることを検証する。
+ * mobile の同じループは mobile-critical-path.spec.ts（長押し → Drawer → アクティビティ詳細）。
  *
  * 過去帯ドラッグでパレットが開かない症状は、ドラッグ x 座標が Plan lane 側
  * （`box.width * 0.15`）だったことが原因だった。過去スロットの新規作成は宛先が
@@ -46,7 +44,10 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // CI（E2E_REQUIRE_SERVICE_ROLE_SUITES=1）では skip を許さない。env が壊れて suite が
 // 丸ごと消えても「0 failed」で緑になるのを防ぐ。
-assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Critical Path: 計画 → 実績 → 振り返り');
+assertServiceRoleSuiteRunnable(
+  SERVICE_ROLE_TARGET,
+  'Critical Path: 計画 → 実績 → アクティビティ詳細',
+);
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
 const IDENTITY = createCriticalPathIdentity('critical-path');
@@ -74,12 +75,21 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
   await page.mouse.up();
 }
 
-async function openDay(page: Page, dateParam: string) {
-  await openDayFromFixture(page, dateParam);
-  await page.waitForLoadState('networkidle');
+async function openActivityDetails(page: Page, activityName: string) {
+  const activityRow = page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('button', { name: activityName, exact: true }) })
+    .last();
+  await activityRow.hover();
+  await activityRow.getByRole('button', { name: 'アクティビティメニュー', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'アクティビティの詳細', exact: true }).click();
+
+  const panel = page.locator('[data-activity-summary-panel="true"]');
+  await expect(panel).toBeVisible();
+  return panel;
 }
 
-describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
+describeWithEnv('Critical Path: 計画 → 実績 → アクティビティ詳細', () => {
   test.describe.configure({ mode: 'serial' });
   test.use({ timezoneId: TIMEZONE });
 
@@ -201,17 +211,20 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     );
   });
 
-  test('記録した実績が /report の 1 章（配分）に反映される', async ({ page }) => {
-    // レポートは週 / 月 / 年の 3 粒度（#2575）。前日の記録は今週の中に入る。
-    await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
+  test('直近30日の記録合計・中央値・一覧が実際の Record に一致する', async ({ page }) => {
+    const panel = await openActivityDetails(page, IDENTITY.activityName);
 
-    await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
+    await expect(panel.getByText('記録合計', { exact: true }).locator('..')).toContainText('1時間');
+    await expect(panel.getByText('1件あたりの中央値', { exact: true }).locator('..')).toContainText(
+      '1時間',
+    );
+    await expect(panel.getByRole('heading', { name: '記録（1件）', exact: true })).toBeVisible();
+    const recordRows = panel.locator('section ul > li > button');
+    await expect(recordRows).toHaveCount(1);
+    await expect(recordRows.first()).toContainText('1時間');
   });
 
-  test('Report の明細・差分・振り返りと表示フィルタが同じ記録を示し、保存行を変更しない', async ({
-    page,
-  }) => {
-    // This serial case consumes the preceding UI-created two Plans and one Record.
+  test('アクティビティ詳細から Record を開き、保存行を変更しない', async ({ page }) => {
     const readRecords = () =>
       adminSupabase
         .from('records')
@@ -231,45 +244,20 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     expect(beforePlans.data).toHaveLength(2);
     const recordId = beforeRecords.data![0]!.id;
 
-    await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
-    await expectReportAllocationShowsOneHour(page, ACTIVITY_NAME);
-    const usageRow = page.locator(REPORT_ALLOCATION.usageRows).filter({ hasText: ACTIVITY_NAME });
-    await usageRow.getByRole('button').click();
-    const detail = page.locator('[data-report-panel="detail"]');
-    await expect(detail).toBeVisible();
-    const stats = detail.locator('[data-report-stats="detail"] > li');
-    await expect(stats.filter({ hasText: '記録合計' })).toContainText('1:00');
-    await expect(stats.filter({ hasText: '予定との差' })).toContainText('予定比 100%');
-    await expect(detail.locator(`[data-record-id="${recordId}"]`)).toContainText('09:00–10:00');
-
-    await page.getByRole('tab', { name: '差分', exact: true }).click();
-    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('diff');
-    const executionRow = page.locator(REPORT_EXECUTION.rows).filter({ hasText: ACTIVITY_NAME });
-    await expect(executionRow).toContainText('予定比 100%');
-    await expect(detail.locator(`[data-record-id="${recordId}"]`)).toBeVisible();
-
-    await page.getByRole('tab', { name: '振り返り', exact: true }).click();
-    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('reflect');
-    await expect(page.locator('[data-report-chapter="quality"]')).toContainText(
-      '記録の詳細で充実度を選ぶと',
-    );
-    await expect(detail.locator(`[data-record-id="${recordId}"]`)).toBeVisible();
-    await detail.getByRole('button', { name: '閉じる', exact: true }).click();
-    await expect(detail).toHaveCount(0);
-
-    await page.getByRole('tab', { name: '差分', exact: true }).click();
-    const filter = page
-      .locator('[data-report-filter-row="activity"]')
-      .getByRole('button', { name: ACTIVITY_NAME, exact: true });
-    await expect(filter).toHaveAttribute('aria-pressed', 'true');
-    await filter.click();
-    await expect(filter).toHaveAttribute('aria-pressed', 'false');
-    await expect(executionRow).toHaveCount(0);
-    await filter.click();
-    await expect(filter).toHaveAttribute('aria-pressed', 'true');
-    await expect(executionRow).toContainText('予定比 100%');
-    await page.getByRole('tab', { name: '時間の使い方', exact: true }).click();
-    await expectReportAllocationShowsOneHour(page, ACTIVITY_NAME);
+    const panel = await openActivityDetails(page, ACTIVITY_NAME);
+    const recordRow = panel.locator('section ul > li > button');
+    await expect(recordRow).toHaveCount(1);
+    await recordRow.click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+      .toBe(`record:${recordId}`);
+    const note = page.getByRole('textbox', { name: 'メモ', exact: true });
+    await expect(note).toBeVisible();
+    await page.reload();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+      .toBe(`record:${recordId}`);
+    await expect(note).toBeVisible();
 
     const afterRecords = await readRecords();
     const afterPlans = await readPlans();
@@ -287,9 +275,9 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await dialog.getByRole('button', { name: '確認', exact: true }).click();
     await expect(dialog).toBeHidden();
     await page.reload();
-    // Desktop settings live in a shell modal. Reloading /calendar closes it, so reopen the
+    // Desktop settings live in a shell modal. Reloading the workspace closes it, so reopen the
     // category before checking the persisted value in the UI.
-    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/ja\/?(?:\?.*)?$/);
     await page.goto('/ja/settings/account');
     await expect(page.getByRole('button', { name: /表示名/ })).toContainText(displayName);
     const profile = await adminSupabase
@@ -316,7 +304,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('12h');
     await page.reload();
-    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/ja\/?(?:\?.*)?$/);
     await page.goto('/ja/settings/display');
     await expect(timeFormat).toContainText('12時間表記');
   });
@@ -498,7 +486,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       .toBe('dark');
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/ja\/?(?:\?.*)?$/);
     await page.goto('/ja/settings/display');
     await expect(page.getByRole('combobox', { name: 'テーマ', exact: true })).toContainText(
       'ダーク',
@@ -522,7 +510,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('Australia/Sydney');
     await page.reload();
-    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/ja\/?(?:\?.*)?$/);
     await page.goto('/ja/settings/display');
     await expect(timezone).toContainText('シドニー');
     await timezone.click();
@@ -544,14 +532,14 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     const englishLanguage = page.getByRole('combobox', { name: 'Language', exact: true });
     await test.step('初期の表示設定を開く', async () => {
       await page.goto('/ja/settings/display');
-      // Desktop settings routes open a modal, then replace the URL with /calendar.
-      await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+      // Desktop settings routes open a modal, then replace the URL with the workspace home.
+      await expect(page).toHaveURL(/\/ja\/?(?:\?.*)?$/);
       await expect(japaneseLanguage).toBeVisible();
     });
     await test.step('英語へ変更して保存を確認する', async () => {
       await japaneseLanguage.click();
       await page.getByRole('option', { name: 'English', exact: true }).click();
-      await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
+      await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/$/);
       await expect
         .poll(async () => {
           const result = await adminSupabase
@@ -566,15 +554,15 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     });
     await test.step('再読込して英語の表示設定を開く', async () => {
       await page.reload();
-      await expect.poll(() => new URL(page.url()).pathname).toBe('/calendar');
+      await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/$/);
       await page.goto('/settings/display');
-      await expect(page).toHaveURL(/\/calendar(?:\?.*)?$/);
+      await expect(page).toHaveURL(/\/(?:\?.*)?$/);
       await expect(englishLanguage).toContainText('English');
     });
     await test.step('日本語へ戻して保存を確認する', async () => {
       await englishLanguage.click();
       await page.getByRole('option', { name: '日本語', exact: true }).click();
-      await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
+      await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/ja\/?$/);
       await expect
         .poll(async () => {
           const result = await adminSupabase
@@ -588,9 +576,9 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     });
     await test.step('再読込後の日本語設定を確認する', async () => {
       await page.reload();
-      await expect.poll(() => new URL(page.url()).pathname).toBe('/ja/calendar');
+      await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/ja\/?$/);
       await page.goto('/ja/settings/display');
-      await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+      await expect(page).toHaveURL(/\/ja\/?(?:\?.*)?$/);
       await expect(japaneseLanguage).toContainText('日本語');
     });
   });
@@ -862,7 +850,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect.poll(async () => (await ownedTomorrowPlan()).note).toBe(note);
     await page.reload();
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
-    await page.getByRole('button', { name: 'ブロックを検索', exact: true }).first().click();
+    await page.getByRole('button', { name: 'タイムブロックを検索', exact: true }).first().click();
     const search = page.getByRole('combobox', { name: '予定と記録を検索', exact: true });
     await search.fill(note);
     await page.getByText(note, { exact: true }).click();
@@ -1079,21 +1067,30 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     });
   });
 
-  test('月・年の Report 配分と空期間が実際の記録に一致する', async ({ page }) => {
+  test('記録のないアクティビティ詳細は空状態を表示する', async ({ page }) => {
+    const emptyActivityName = `Empty ${IDENTITY.userId.slice(0, 8)}`;
     const activity = await adminSupabase
       .from('activities')
-      .select('name')
-      .eq('user_id', IDENTITY.userId)
+      .insert({ user_id: IDENTITY.userId, name: emptyActivityName, category_id: null })
+      .select('id')
       .single();
     expect(activity.error === null).toBe(true);
-    for (const range of ['month', 'year']) {
-      await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=${range}`);
-      await expectReportAllocationShowsOneHour(page, activity.data!.name);
-    }
-    await page.goto(`/ja/report?date=${offsetDateParam(-40)}&range=week`);
-    await expect(page.locator('[data-report-summary="recorded"]')).toHaveText('0分');
-    await expect(
-      page.locator('[data-report-table="usage"] li').filter({ hasText: activity.data!.name }),
-    ).toHaveCount(0);
+    const records = await adminSupabase
+      .from('records')
+      .select('id')
+      .eq('user_id', IDENTITY.userId)
+      .eq('activity_id', activity.data!.id);
+    expect(records.error === null).toBe(true);
+    expect(records.data).toHaveLength(0);
+
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
+    const panel = await openActivityDetails(page, emptyActivityName);
+    await expect(panel.getByText('記録合計', { exact: true }).locator('..')).toContainText('0分');
+    await expect(panel.getByText('1件あたりの中央値', { exact: true }).locator('..')).toContainText(
+      '—',
+    );
+    await expect(panel.getByRole('heading', { name: '記録（0件）', exact: true })).toBeVisible();
+    await expect(panel.getByText('過去30日の記録はありません', { exact: true })).toBeVisible();
   });
 });

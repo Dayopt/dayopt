@@ -68,8 +68,7 @@ interface CalendarCompositionResult {
 
   // === Context menu actions ===
   onDeleteTimeblockConfirm: ReturnType<typeof useCalendarCrudHandlers>['onDeleteTimeblockConfirm'];
-  onViewStats: ReturnType<typeof useCalendarCrudHandlers>['onViewStats'];
-  onCopy: ReturnType<typeof useCalendarCrudHandlers>['onCopy'];
+  onViewActivityDetails: ReturnType<typeof useCalendarCrudHandlers>['onViewActivityDetails'];
 
   // === Navigation handlers ===
   onNavigate: ReturnType<typeof useCalendarNavHandlers>['onNavigate'];
@@ -142,7 +141,6 @@ export function useCalendarComposition({
   const crudHandlers = useCalendarCrudHandlers({
     selectedTimeblockId,
     filteredEvents: dataLayer.filteredEvents,
-    currentDate,
   });
 
   // =========================================================================

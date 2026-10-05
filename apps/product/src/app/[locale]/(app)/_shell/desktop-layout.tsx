@@ -6,22 +6,25 @@ import { useCallback } from 'react';
 import { AnimatedWidthPanel } from '@/components/shell/AnimatedWidthPanel';
 import { AppHeader } from '@/components/shell/AppHeader';
 import { Sidebar } from '@/components/shell/sidebar';
+import {
+  ACTIVITY_DETAIL_PANEL_DEFAULT_WIDTH,
+  ACTIVITY_DETAIL_SLOT_KEY,
+} from '@/features/activities';
 import { useAuthStore } from '@/features/auth';
-import { isCalendarViewPath, resolveWorkspaceTab } from '@/features/calendar';
-import { REPORT_DETAIL_SLOT_KEY, useReportDetailStore } from '@/features/review';
+import { isCalendarViewPath } from '@/features/calendar';
 import { TIMEBLOCK_INSPECTOR_SLOT_KEY, useTimeblockInspectorStore } from '@/features/timeblock';
 import { setDomSlot } from '@/lib/dom-slots/useDomSlot';
 import { getAvatarUrl, getDisplayName } from '@/lib/user';
 import { Button, InlineBanner } from '@dayopt/components';
 import { usePathname } from '@dayopt/i18n/navigation';
 
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 import { useShellStore } from '@/lib/stores/useShellStore';
 
 import { MainContentWrapper } from './main-content-wrapper';
 import { SidebarContent } from './SidebarContent';
 import { SidebarPinnedContent } from './SidebarPinnedContent';
 import { useAppInlineBanner } from './useAppInlineBanner';
-import { WorkspaceTabs, WorkspaceTitle } from './WorkspaceTabs';
 
 interface DesktopLayoutProps {
   children: React.ReactNode;
@@ -37,12 +40,10 @@ const INSPECTOR_PANEL_WIDTH = 400;
  * - Sidebar（256px、開閉可能）← 全ページ共通 Sidebar
  * - PageHeader + MainContent
  * - Inspector（400px、Timeblock 選択時のみ開く。@/features/timeblock が portal で描画）
- * - Report detail（既定 360px・250〜560px で可変。`/report` で行・点を選んだ時のみ開く。
- *   @/features/review が portal で描画し、幅は review の store が持つ）
+ * - Activity detail（既定幅 360px。カレンダーから明示的に開いた時のみ表示）
  *
- * **右のパネルは 2 枚とも DOM 上に常に存在する**（`AnimatedWidthPanel` が幅 0 で畳む）が、
- * inspector はカレンダー、report detail はレポートに属するので同時には開かない。slot を
- * 共有せず 2 枚並べているのは、調停ロジックを shell に置かないため（#2581）。
+ * **右のパネルは 2 枚とも DOM 上に常に存在する**（`AnimatedWidthPanel` が幅 0 で畳む）。
+ * Inspector とアクティビティ詳細は GlobalOverlays で相互排他にする。
  */
 export function DesktopLayout({ children }: DesktopLayoutProps) {
   const pathname = usePathname();
@@ -56,11 +57,9 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
   const setInspectorSlot = useCallback((element: HTMLDivElement | null) => {
     setDomSlot(TIMEBLOCK_INSPECTOR_SLOT_KEY, element);
   }, []);
-  const isReportDetailOpen = useReportDetailStore((s) => s.isOpen);
-  const reportDetailWidth = useReportDetailStore((s) => s.width);
-  const isReportDetailResizing = useReportDetailStore((s) => s.isResizing);
-  const setReportDetailSlot = useCallback((element: HTMLDivElement | null) => {
-    setDomSlot(REPORT_DETAIL_SLOT_KEY, element);
+  const isActivityDetailOpen = useActivityDetailStore((s) => s.isOpen);
+  const setActivityDetailSlot = useCallback((element: HTMLDivElement | null) => {
+    setDomSlot(ACTIVITY_DETAIL_SLOT_KEY, element);
   }, []);
   const sidebarUser = {
     name: getDisplayName(authUser, 'User'),
@@ -68,10 +67,8 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
     avatar: getAvatarUrl(authUser),
   };
 
-  // ページ判定: 独自ヘッダーを持つページかどうか（AppHeader表示制御用）。
-  // `/report` も自前で AppHeader を組む（期間ラベル・`‹ ›`・粒度切替を持つため、#2575）。
-  // サイドバートグルは ReportViewClient が leftSlot へ渡し直す。
-  const hasOwnHeader = isCalendarViewPath(pathname) || resolveWorkspaceTab(pathname) === 'report';
+  // カレンダーは独自ヘッダーを持つ。その他の app pages は AppHeader を使う。
+  const hasOwnHeader = isCalendarViewPath(pathname);
   const sidebarVisible = sidebar.open && !sidebarSuppressed;
 
   // サイドバーが閉じているときに表示するトグルボタン
@@ -100,8 +97,11 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
         >
           <Sidebar
             user={sidebarUser}
-            headerTitle={<WorkspaceTitle />}
-            headerTabs={<WorkspaceTabs />}
+            headerTitle={
+              <span className="text-foreground truncate text-base font-medium tracking-tight">
+                Dayopt
+              </span>
+            }
             pinnedContent={<SidebarPinnedContent />}
           >
             <SidebarContent />
@@ -140,18 +140,16 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
           <div ref={setInspectorSlot} className="h-full" />
         </AnimatedWidthPanel>
 
-        {/* Report detail（可変幅、`/report` で行・点を選んだ時のみ開く） */}
+        {/* Activity detail（カレンダーから明示的に開いた時のみ表示） */}
         <AnimatedWidthPanel
-          data-panel="report-detail"
-          open={isReportDetailOpen}
-          width={reportDetailWidth}
-          // ドラッグ中は補間を切る。200ms の追従だと指の位置とパネルの端がずれる
-          disableTransition={isReportDetailResizing}
+          data-panel="activity-detail"
+          open={isActivityDetailOpen}
+          width={ACTIVITY_DETAIL_PANEL_DEFAULT_WIDTH}
           side="right"
           className="border-border h-full border-l"
           innerClassName="h-full"
         >
-          <div ref={setReportDetailSlot} className="h-full" />
+          <div ref={setActivityDetailSlot} className="h-full" />
         </AnimatedWidthPanel>
       </div>
     </div>

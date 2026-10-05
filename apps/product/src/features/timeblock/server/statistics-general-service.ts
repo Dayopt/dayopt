@@ -65,9 +65,8 @@ export class StatisticsGeneralService {
       .filter((plan): plan is typeof plan & { activity_id: string } => plan.activity_id != null)
       .map((plan) => ({ groupKey: plan.activity_id }));
 
-    // 期間の切り出しはここで行う（`fetchRecords` に range を渡すと窓の境界に跨る
-    // record が clip され、そのアクティビティの「実際の長さ」ではなくなる。
-    // テンプレート適用側は期間内の埋まり方を見るので clip したままでよい）
+    // Both creation and templates measure complete Record durations across the window boundary.
+    // This caller already needs all history for counts, so filter the median window here.
     const windowStart = now.getTime() - MEDIAN_DURATION_WINDOW_DAYS * MS_PER_DAY;
     const recentRecords = records.filter((record) => Date.parse(record.end_at) > windowStart);
 

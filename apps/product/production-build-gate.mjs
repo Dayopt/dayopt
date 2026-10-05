@@ -107,6 +107,45 @@ function assertServerSupabaseKey(env) {
   }
 }
 
+/** Classify the exact value bundled by Next.js; never normalize a public credential. */
+function assertPublicSupabaseKey(env) {
+  const value = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (typeof value === 'string') {
+    if (/^sb_publishable_[A-Za-z0-9_-]+$/u.test(value) && value === value.trim()) return;
+
+    // Legacy anon keys are HS256 JWTs. This checks format and role, not signature
+    // authenticity or project binding, which remain the Supabase gateway's job.
+    const parts = value.split('.');
+    if (
+      parts.length === 3 &&
+      parts.every(
+        (part) =>
+          /^[A-Za-z0-9_-]+$/u.test(part) &&
+          Buffer.from(part, 'base64url').toString('base64url') === part,
+      )
+    ) {
+      try {
+        const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        if (
+          header?.alg === 'HS256' &&
+          header?.typ === 'JWT' &&
+          payload?.role === 'anon' &&
+          Buffer.from(parts[2], 'base64url').length === 32
+        ) {
+          return;
+        }
+      } catch {
+        // Malformed JWTs fail with the same value-free error as privileged keys.
+      }
+    }
+  }
+  throw new Error(
+    'Product deployment requires a public NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ' +
+      '(publishable key or legacy anon JWT)',
+  );
+}
+
 export const PRODUCT_PRODUCTION_ORIGIN = 'https://app.dayopt.app';
 export const MCP_PRODUCTION_ORIGIN = 'https://mcp.dayopt.app';
 export const PRODUCT_INTEGRATION_ORIGIN = 'https://product-git-integration-dayopt.vercel.app';
@@ -260,26 +299,25 @@ export function assertProductIntegrationBuildEnv(env) {
   assertOptionalEnvironmentGroup(env, 'Product Integration Stripe configuration', [
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_ACCOUNT_ID',
   ]);
-
-  const contactRecipient =
-    typeof env.CONTACT_INTEGRATION_RECIPIENT === 'string'
-      ? env.CONTACT_INTEGRATION_RECIPIENT.trim().toLowerCase()
-      : '';
-  if (
-    hasNonEmptyValue(env, 'RESEND_API_KEY') &&
-    (!isValidEmailAddress(contactRecipient) || contactRecipient === 'support@dayopt.app')
-  ) {
-    throw new Error(
-      'Product Integration with Resend requires a dedicated CONTACT_INTEGRATION_RECIPIENT',
-    );
+  if (stripeKey && !/^acct_[A-Za-z0-9_]+$/.test(env.STRIPE_ACCOUNT_ID)) {
+    throw new Error('Product Integration requires a valid STRIPE_ACCOUNT_ID');
   }
-  assertOptionalEnvironmentGroup(env, 'Product Integration Resend configuration', [
+
+  // The contact runtime is Production-only. Do not claim a configured sink is
+  // usable until an independently reviewed Integration delivery path exists.
+  const mailNames = [
     'RESEND_API_KEY',
     'RESEND_FROM_EMAIL',
     'RESEND_WEBHOOK_SECRET',
     'CONTACT_INTEGRATION_RECIPIENT',
-  ]);
+  ];
+  if (mailNames.some((name) => hasNonEmptyValue(env, name))) {
+    throw new Error(
+      'Product Integration Resend delivery is not supported; leave mail settings unset',
+    );
+  }
   assertOptionalEnvironmentGroup(env, 'Product Integration Calendar configuration', [
     'GOOGLE_CALENDAR_CLIENT_ID',
     'GOOGLE_CALENDAR_PROJECT_NUMBER',
@@ -287,6 +325,15 @@ export function assertProductIntegrationBuildEnv(env) {
     'CALENDAR_TOKEN_ENCRYPTION_KEY',
     'GOOGLE_CALENDAR_REDIRECT_URIS',
   ]);
+
+  if (hasNonEmptyValue(env, 'GOOGLE_CALENDAR_CLIENT_ID')) {
+    if (!/^[1-9][0-9]{5,29}$/.test(env.GOOGLE_CALENDAR_PROJECT_NUMBER)) {
+      throw new Error('Product Integration requires a valid GOOGLE_CALENDAR_PROJECT_NUMBER');
+    }
+    if (Buffer.from(env.CALENDAR_TOKEN_ENCRYPTION_KEY.trim(), 'base64').length !== 32) {
+      throw new Error('Product Integration requires a 32-byte CALENDAR_TOKEN_ENCRYPTION_KEY');
+    }
+  }
 
   if (
     hasNonEmptyValue(env, 'GOOGLE_CALENDAR_CLIENT_ID') &&
@@ -304,12 +351,6 @@ function assertOptionalEnvironmentGroup(env, label, names) {
   if (configured > 0 && configured !== names.length) {
     throw new Error(`${label} requires all or none of: ${names.join(', ')}`);
   }
-}
-
-function isValidEmailAddress(value) {
-  return (
-    value.length <= 254 && !/[\r\n,]/u.test(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value)
-  );
 }
 
 function hasNonEmptyValue(env, name) {
@@ -397,6 +438,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'SUPABASE_SECRET_KEY',
+    'RECOVERY_CODE_PEPPER',
   ].filter((name) => !hasNonEmptyValue(env, name));
   if (missingNames.length > 0) {
     throw new Error(`Product ${vercelEnvironment} build requires: ${missingNames.join(', ')}`);
@@ -406,6 +448,7 @@ export function assertProductDeploymentEnvironmentBuildEnv(env) {
   if (!projectRef) {
     throw new Error('Product deployment requires a canonical HTTPS Supabase project URL');
   }
+  assertPublicSupabaseKey(env);
   assertServerSupabaseKey(env, vercelEnvironment);
 
   const appMarker = env.DAYOPT_ENVIRONMENT || env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT;

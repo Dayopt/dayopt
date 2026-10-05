@@ -178,6 +178,38 @@ describe('release workflow contract', () => {
     expect(gate.length).toBeGreaterThan(0);
   });
 
+  it('checks an enabled candidate before release work and again immediately before promote', () => {
+    const impactJob = code(
+      release.slice(release.indexOf('\n  impact:'), release.indexOf('\n  e2e:')),
+    );
+    const earlyGate = impactJob.indexOf('Verify tested candidate before release work');
+    const impactResolution = impactJob.indexOf('Resolve release impact');
+    expect(earlyGate).toBeGreaterThan(-1);
+    expect(impactResolution).toBeGreaterThan(earlyGate);
+    const earlyGateStep = impactJob.slice(earlyGate, impactResolution);
+    expect(earlyGateStep).toContain("if: vars.RELEASE_CANDIDATE_ENABLED == 'true'");
+    expect(earlyGateStep).toContain('RELEASE_CANDIDATE_MAX_AGE_SECONDS');
+    expect(earlyGateStep).toContain('node scripts/ci/release-candidate-gate.mjs production');
+
+    const migrationReadiness = release.indexOf(
+      'Verify candidate migrations are applied in Production',
+    );
+    const finalGate = release.indexOf('Verify tested candidate immediately before promotion');
+    const promote = release.indexOf('Wait, smoke, and promote Production');
+    expect(migrationReadiness).toBeGreaterThan(-1);
+    expect(finalGate).toBeGreaterThan(migrationReadiness);
+    expect(promote).toBeGreaterThan(finalGate);
+
+    const readinessStep = release.slice(migrationReadiness, finalGate);
+    expect(readinessStep).toContain(
+      'MIGRATION_READINESS_REQUIRED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}',
+    );
+    const finalGateStep = release.slice(finalGate, promote);
+    expect(finalGateStep).toContain("if: vars.RELEASE_CANDIDATE_ENABLED == 'true'");
+    expect(finalGateStep).toContain('RELEASE_CANDIDATE_MAX_AGE_SECONDS');
+    expect(finalGateStep).toContain('node scripts/ci/release-candidate-gate.mjs production');
+  });
+
   it('pins the release gate expression exactly', () => {
     // **部分文字列の検査では守れない。** 必要な conjunct の存在だけを見る形だと、
     // 既存 literal を残したまま外側に選言を 1 本足すだけで gate 全体を無効化できる
@@ -191,11 +223,10 @@ describe('release workflow contract', () => {
 
     expect(normalized).toBe(
       'if: >- ${{ !cancelled() ' +
-        "&& ( github.event.inputs.force == 'true' " +
-        "|| ( needs.impact.result == 'success' " +
+        "&& needs.impact.result == 'success' " +
         "&& (needs.impact.outputs.product_affected == 'false' || needs.e2e.result == 'success') " +
         "&& (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success') " +
-        "&& (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') ) ) }}",
+        "&& (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') }}",
     );
   });
 
@@ -280,12 +311,17 @@ describe('release workflow contract', () => {
     expect(code(release)).not.toMatch(/needs\.[A-Za-z0-9_]*-/);
   });
 
-  it('lets force skip layer 3 only through workflow_dispatch', () => {
-    // push イベントに inputs は無いので `github.event.inputs.force` は空になり、
-    // 自動経路から force へ入る道は存在しない。
-    expect(release).toContain("github.event.inputs.force == 'true'");
+  it('has no force input, bypass condition, or RELEASE_FORCE wiring', () => {
+    const executable = code(release);
+    expect(code(onBlock)).not.toMatch(/^\s*force:/m);
+    expect(code(onBlock)).not.toMatch(/^\s*reason:/m);
+    expect(executable).not.toMatch(/(?:github\.event\.)?inputs\.force/);
+    expect(executable).not.toMatch(/RELEASE_FORCE/);
+    expect(executable).not.toMatch(/force\s*(?:==|!=)|(?:==|!=)\s*'true'[^\n]*force/i);
+
     expect(release).toMatch(/if:.*needs\.impact\.outputs\.product_affected == 'true'/);
-    expect(release).toContain("github.event.inputs.force != 'true'");
+    expect(release).toMatch(/if:.*needs\.impact\.outputs\.web_affected == 'true'/);
+    expect(release).toMatch(/if:.*needs\.impact\.outputs\.storybook_affected == 'true'/);
   });
 
   it('serializes promote at the job level, never the workflow level', () => {
@@ -471,6 +507,19 @@ describe('release workflow contract', () => {
 describe('Storybook promote contract', () => {
   const source = workflow('promote.yml');
   const job = source.slice(source.indexOf('\n  storybook:'), source.indexOf('\n  web:'));
+  it('同じ affected gate 内で静的ビルドをブラウザテスト前に検証する', () => {
+    expect(job).toMatch(/^    needs: impact$/m);
+    expect(job).toMatch(
+      /^    if: \$\{\{ needs\.impact\.outputs\.storybook_affected == 'true' \}\}$/m,
+    );
+    const buildStep = job.match(
+      /^      - name: Build Storybook\n        run: pnpm build-storybook$/m,
+    );
+    expect(buildStep).not.toBeNull();
+    expect(buildStep!.index).toBeLessThan(job.indexOf('- name: Test Storybook light and dark'));
+    // build は検証 job 内の通常 step。独立した deploy や追加の免除条件にしない。
+    expect(job).not.toMatch(/vercel|deploy|secrets\./i);
+  });
   it('collect と両テーマを実行し、失敗を握り潰さない', () => {
     expect(job).toContain("needs.impact.outputs.storybook_affected == 'true'");
     expect(job).toContain('check-story-coverage.ts --collected');

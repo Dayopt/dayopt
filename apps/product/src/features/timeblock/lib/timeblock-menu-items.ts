@@ -9,11 +9,11 @@
  */
 
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, Copy, CopyPlus, Trash2 } from 'lucide-react';
+import { BarChart3, CopyPlus, Trash2 } from 'lucide-react';
 
 import type { MessageKey } from '@/lib/i18n';
 
-export type TimeblockMenuItemKey = 'viewStats' | 'copy' | 'duplicate' | 'delete';
+export type TimeblockMenuItemKey = 'viewActivityDetails' | 'duplicate' | 'delete';
 
 export interface TimeblockMenuItem {
   key: TimeblockMenuItemKey;
@@ -26,36 +26,25 @@ export interface TimeblockMenuItem {
 
 interface TimeblockMenuItemsArgs {
   activityId?: string | null | undefined;
-  onViewStats?: (() => void) | undefined;
-  onCopy?: (() => void) | undefined;
+  onViewActivityDetails?: (() => void) | undefined;
   onDuplicate?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
 }
 
 export function getTimeblockMenuItems({
   activityId,
-  onViewStats,
-  onCopy,
+  onViewActivityDetails,
   onDuplicate,
   onDelete,
 }: TimeblockMenuItemsArgs): TimeblockMenuItem[] {
   const items: (TimeblockMenuItem | null)[] = [
-    onViewStats && activityId
+    onViewActivityDetails && activityId
       ? {
-          key: 'viewStats',
-          labelKey: 'calendar.filter.viewStats',
+          key: 'viewActivityDetails',
+          labelKey: 'calendar.filter.viewActivityDetails',
           icon: BarChart3,
           dangerous: false,
-          onSelect: onViewStats,
-        }
-      : null,
-    onCopy
-      ? {
-          key: 'copy',
-          labelKey: 'common.actions.copy',
-          icon: Copy,
-          dangerous: false,
-          onSelect: onCopy,
+          onSelect: onViewActivityDetails,
         }
       : null,
     onDuplicate

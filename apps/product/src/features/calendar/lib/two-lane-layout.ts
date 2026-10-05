@@ -13,12 +13,9 @@
  * 固定幅分割、無ければその timeblock はフル幅（0-100%）で描画する。`DEFAULT_PLAN_LANE_WIDTH_PERCENT`
  * は「split 時の Plan レーン幅」であり、「常時のレーン幅」ではない点に注意する。
  *
- * この動的幅判定は表示だけでなく、ドラッグ中の pointer→lane 判定
- * （`resolveTwoLaneFromPointer`）・ドラッグゴースト（`CalendarGridContent.renderGhost`）・
- * 選択後ハイライト（`DragSelectionHighlight`）・選択中プレビュー（`DragSelectionPreview`）の
- * 4 経路でも同じ `hasLaneCounterpart` を用いて揃える。表示上フル幅（境界不可視）なのに
- * pointer 判定だけ旧固定境界のままだと、境界の見えないカラムで意図せず
- * Plan→Record 変換 mutation が発火する（#2250 plan-review で検出、P1 級）。
+ * この動的幅判定は表示だけでなく、ドラッグゴースト（`CalendarGridContent.renderGhost`）・
+ * 選択後ハイライト（`DragSelectionHighlight`）・選択中プレビュー（`DragSelectionPreview`）でも
+ * 同じ `hasLaneCounterpart` を用いて揃える。
  *
  * 呼び出し側は対象日の plans/records だけを渡す想定（日をまたぐ絞り込みは
  * 呼び出し側の責務）。この日次スコープの前提により、
@@ -74,29 +71,6 @@ export function hasLaneCounterpart(
     if (counterpartEndMs <= counterpartStartMs) return false;
     return targetStartMs < counterpartEndMs && counterpartStartMs < targetEndMs;
   });
-}
-
-/**
- * カラム内の pointer X から Plan / Record の drop 先レーンを決める。
- *
- * `laneAvailability` を渡すと、その時刻に相手レーンの timeblock が存在しない
- * （= 画面上フル幅で境界が見えていない）場合は pointer の x 座標に関わらず
- * `sourceLane` をそのまま返す。境界の無いカラムで意図しない
- * Plan→Record 変換が起きるのを防ぐための安全弁（#2250）。省略時は従来どおり
- * 常に x 座標だけで判定する（既存 test / 呼び出し元との互換を保つ）。
- */
-export function resolveTwoLaneFromPointer(
-  clientX: number,
-  columnLeft: number,
-  columnWidth: number,
-  planLaneWidthPercent: number = DEFAULT_PLAN_LANE_WIDTH_PERCENT,
-  laneAvailability?: { sourceLane: 'plan' | 'record'; hasCounterpart: boolean },
-): 'plan' | 'record' {
-  if (laneAvailability && !laneAvailability.hasCounterpart) {
-    return laneAvailability.sourceLane;
-  }
-  const boundary = columnLeft + columnWidth * (planLaneWidthPercent / 100);
-  return clientX < boundary ? 'plan' : 'record';
 }
 
 function minutesSinceMidnight(date: Date): number {

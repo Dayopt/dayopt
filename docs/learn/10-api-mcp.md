@@ -100,8 +100,8 @@ last_verified: 2026-09-21
   },
   {
     "path": "apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts",
-    "find": "Create one future Plan as canonical Dayopt data.",
-    "why": "tool の説明（外部契約）。過去の Plan も作れるのに future と書いてある"
+    "find": "Create one Plan in the past or future as canonical Dayopt data.",
+    "why": "tool の説明（外部契約）。Plan は過去・未来とも作成できる"
   },
   {
     "path": "apps/product/src/app/api/mcp/_tools/list-tools.test.ts",

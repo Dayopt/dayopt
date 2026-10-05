@@ -44,6 +44,10 @@
         "saveFailed": "Failed to save"
       },
       "noTitle": "(No title)",
+      "kind": {
+        "plan": "Plan",
+        "record": "Record"
+      },
       "notFound": "Timeblock not found",
       "noData": "No data found",
       "menu": {
@@ -106,7 +110,6 @@
       "date": "Date",
       "time": "Time",
       "note": "Note",
-      "notePlaceholder": "Add a note...",
       "timeLocked": "Records cannot be moved into the future",
       "duplicate": {
         "create": "Create duplicate",

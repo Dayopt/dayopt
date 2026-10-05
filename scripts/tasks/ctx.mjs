@@ -35,7 +35,7 @@ function isCodexBotLogin(login) {
  * Jev assistはdispatch時の `--post` か明示的な `--l1-shadow` previewでだけ実行する。
  * 出力は 150 行以内の markdown、判断そのものはしない（判断材料の収集で止める）。
  *
- * 呼び出し予算: issue は最大 6 回、PR は最大 9 回の gh 呼び出しに収める
+ * 呼び出し予算: issue は最大 7 回、PR は最大 9 回の gh 呼び出しに収める
  * （search prs / graphql の 1 回 + 関連先の pr view を必要な分だけ）。
  *
  * deferred（次回以降）: `--comments` の bot 判定を login 完全一致以外（app slug）
@@ -899,7 +899,7 @@ function extractBriefRequiredSections(body) {
 }
 
 /**
- * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch §status:ready）。
+ * issue body の「受け入れ条件 / 検証コマンド」を判定する（routing skill / dispatch issue contract）。
  *
  * - acceptance: body に `受け入れ条件` または `完了条件` の語がある、または
  *   `## やること` セクションにチェックリスト/箇条書き行が1つ以上ある
@@ -953,7 +953,7 @@ export function buildJudgmentHint(records) {
   if (!records.brief) missing.push('brief');
   if ('acceptance' in records && !records.acceptance) missing.push('受け入れ条件');
   if ('verification' in records && !records.verification) {
-    missing.push('検証コマンド（dispatch §status:ready の機械判定）');
+    missing.push('検証コマンド（dispatch issue contract の機械判定）');
   }
   if (missing.length === 0) return null;
   return `判断の記録が欠けている: ${missing.join('・')}（routing skill 手順 1 / dispatch 手順 7）`;
@@ -1461,6 +1461,7 @@ function buildMarkdownLines(
     lines.push(
       `実装・判断: ${pack.routing.level} | 入力充足: ${pack.routing.ready ? 'あり' : '不足'} | 事前整理: ${pack.routing.preparation}`,
     );
+    if (pack.routing.workGuidance) lines.push(`type の進め方: ${pack.routing.workGuidance}`);
     lines.push(`理由: ${pack.routing.reasons.join(' / ')}`);
     lines.push(`不足: ${pack.routing.missing.join(' / ') || 'なし（内容の正しさは担当が確認）'}`);
     lines.push(`事前整理の成果: ${pack.routing.preparationGoal}`, '');

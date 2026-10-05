@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
 import { acceptNecessaryOnly, getCookieConsent, setCookieConsent } from '@/lib/cookie-consent';
+import { getDateKey } from '@/lib/date/core';
+import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { toast } from '@/lib/toast';
 import { dayoptUrls } from '@dayopt/config';
@@ -56,6 +58,7 @@ export function DataSettings() {
 
 function ExportSection() {
   const t = useTranslations('settings.dataControls.export');
+  const timezone = useUserPreferences((preferences) => preferences.timezone);
   const [format, setFormat] = useState<ExportFormat>('json');
   const [range, setRange] = useState<ExportRange>('all');
   const [startDate, setStartDate] = useState('');
@@ -67,24 +70,23 @@ function ExportSection() {
 
   const handleExport = useCallback(async () => {
     try {
+      if (range === 'custom' && (!startDate || !endDate || startDate > endDate)) {
+        throw new Error('Invalid export range');
+      }
       const result = await exportDataQuery.refetch();
-      if (!result.data) throw new Error('Export failed');
+      if (result.isError || !result.data) throw new Error('Export failed');
 
-      const exportData = result.data;
+      const exportData = { ...result.data, data: { ...result.data.data } };
 
       // 日付範囲フィルタリング
       if (range === 'custom' && startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-
         exportData.data.plans = exportData.data.plans.filter((plan) => {
-          const planDate = new Date(plan.start_at);
-          return planDate >= start && planDate <= end;
+          const date = getDateKey(new Date(plan.start_at), timezone);
+          return date >= startDate && date <= endDate;
         });
         exportData.data.records = exportData.data.records.filter((record) => {
-          const recordDate = new Date(record.start_at);
-          return recordDate >= start && recordDate <= end;
+          const date = getDateKey(new Date(record.start_at), timezone);
+          return date >= startDate && date <= endDate;
         });
       }
 
@@ -118,7 +120,7 @@ function ExportSection() {
     } catch {
       toast.error(t('exportFailed'));
     }
-  }, [exportDataQuery, format, range, startDate, endDate, t]);
+  }, [exportDataQuery, format, range, startDate, endDate, timezone, t]);
 
   const isExporting = exportDataQuery.isLoading || exportDataQuery.isFetching;
 
@@ -343,6 +345,7 @@ function AccountAnalyticsConsentSection() {
 
 function McpApiSection() {
   const t = useTranslations('settings.dataControls.mcp');
+  const tToast = useTranslations('common.toast');
   const [copied, setCopied] = useState<'url' | null>(null);
 
   const { canUseProduct } = useBillingAccess();
@@ -360,13 +363,18 @@ function McpApiSection() {
       ? mcpResourceUri
       : `${mcpResourceUri}/mcp`;
   const handleCopy = useCallback(
-    (text: string, type: 'url') => {
-      navigator.clipboard.writeText(text);
-      setCopied(type);
-      toast.success(t('copied'));
-      setTimeout(() => setCopied(null), 2000);
+    async (text: string, type: 'url') => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(type);
+        toast.success(t('copied'));
+        setTimeout(() => setCopied(null), 2000);
+      } catch {
+        setCopied(null);
+        toast.error(tToast('copyFailed'));
+      }
     },
-    [t],
+    [t, tToast],
   );
 
   // MCP 資格のない deploy では接続導線を出さない（Production へ誤接続させない）。
@@ -462,10 +470,14 @@ function DeletionSection() {
 
   const handleConfirm = useCallback(async () => {
     if (!isConfirmed) return;
-    if (target === 'blocks') {
-      await deleteBlocksMutation.mutateAsync({ confirmText: 'DELETE' });
-    } else if (target === 'all') {
-      await deleteAllDataMutation.mutateAsync({ confirmText: 'DELETE' });
+    try {
+      if (target === 'blocks') {
+        await deleteBlocksMutation.mutateAsync({ confirmText: 'DELETE' });
+      } else if (target === 'all') {
+        await deleteAllDataMutation.mutateAsync({ confirmText: 'DELETE' });
+      }
+    } catch {
+      // 通知はmutationのonErrorが行う。入力を保ち、確認画面で再試行できるようにする。
     }
   }, [target, isConfirmed, deleteBlocksMutation, deleteAllDataMutation]);
 

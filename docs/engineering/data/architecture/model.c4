@@ -47,7 +47,7 @@ model {
     link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-category '関連候補（main）'
   }
   concept c_segment 'Segment' {
-    description '旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去し、/report のアクティビティ単位フィルタへ置き換えた。DB テーブルだけが残る'
+    description '旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去。関連する DB テーブルだけが残る'
     metadata { glossary 'segment' layer 'ui' }
     link ../../../../scripts/lib/glossary/terms.ts
     link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-segment '関連候補（main）'
@@ -58,11 +58,11 @@ model {
     link ../../../../scripts/lib/glossary/terms.ts
     link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-plan-template '関連候補（main）'
   }
-  concept c_review 'Review' {
-    description 'ページ名・機能名。route は /report、i18n namespace も report'
-    metadata { glossary 'review' layer 'ui' }
+  concept c_activity-details 'Activity details' {
+    description 'カレンダーから明示的に開く、直近30日の記録時間・中央値・記録一覧'
+    metadata { glossary 'activity-details' layer 'ui' }
     link ../../../../scripts/lib/glossary/terms.ts
-    link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-review '関連候補（main）'
+    link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-activity-details '関連候補（main）'
   }
   concept c_inspector 'Inspector' {
     description 'タイムブロックをクリックした時に開く詳細パネル'
@@ -99,6 +99,12 @@ model {
     metadata { glossary 'external-event' layer 'ui' }
     link ../../../../scripts/lib/glossary/terms.ts
     link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-external-event '関連候補（main）'
+  }
+  concept c_mcp-review 'MCP review.get' {
+    description '公開済みの read-only MCP 契約。product のアクティビティ詳細とは独立して維持する'
+    metadata { glossary 'mcp-review' layer 'code' }
+    link ../../../../scripts/lib/glossary/terms.ts
+    link https://github.com/Dayopt/dayopt/blob/main/docs/engineering/data/architecture-inventory.md#concept-mcp-review '関連候補（main）'
   }
   concept c_plan-source 'Source' {
     description '作成時に確定する不変の provenance。plans は manual / external_calendar / api、records はそれに from_plan / auto_migrated を加えた 5 値'
@@ -162,10 +168,6 @@ model {
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/external-calendar
   }
-  feature f_review 'review' {
-    metadata { inventoryKind 'feature' }
-    link ../../../../apps/product/src/features/review
-  }
   feature f_settings 'settings' {
     metadata { inventoryKind 'feature' }
     link ../../../../apps/product/src/features/settings
@@ -175,7 +177,7 @@ model {
     link ../../../../apps/product/src/features/timeblock
   }
   table t_activities 'activities' {
-    metadata { inventoryKind 'table' detail 'used by activities, auth, lib, review, timeblock' }
+    metadata { inventoryKind 'table' detail 'used by activities, auth, lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_calendar_connection_calendars 'calendar_connection_calendars' {
@@ -187,11 +189,11 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_categories 'categories' {
-    metadata { inventoryKind 'table' detail 'used by activities, auth, lib, review' }
+    metadata { inventoryKind 'table' detail 'used by activities, auth, lib' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_cron_heartbeats 'cron_heartbeats' {
-    metadata { inventoryKind 'table' detail 'used by lib' }
+    metadata { inventoryKind 'table' detail 'used by app, lib' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_email_suppressions 'email_suppressions' {
@@ -243,7 +245,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plans 'plans' {
-    metadata { inventoryKind 'table' detail 'used by app, auth, lib, review, timeblock' }
+    metadata { inventoryKind 'table' detail 'used by app, auth, lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_product_events 'product_events' {
@@ -255,7 +257,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_records 'records' {
-    metadata { inventoryKind 'table' detail 'used by auth, lib, review, timeblock' }
+    metadata { inventoryKind 'table' detail 'used by activities, auth, lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_reports 'reports' {
@@ -371,7 +373,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_begin_calendar_oauth_attempt_v1 'begin_calendar_oauth_attempt_v1' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
+    metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_begin_calendar_sync_run_v1 'begin_calendar_sync_run_v1' {
@@ -387,10 +389,6 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_cancel_calendar_account_deletion_v1 'cancel_calendar_account_deletion_v1' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_check_supabase_rate_limit_poc 'check_supabase_rate_limit_poc' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
@@ -415,7 +413,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_claim_calendar_oauth_attempt_v1 'claim_calendar_oauth_attempt_v1' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
+    metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_claim_calendar_revoke_direct_attempt_v1 'claim_calendar_revoke_direct_attempt_v1' {
@@ -440,10 +438,6 @@ model {
   }
   dbfunction fn_claim_stripe_webhook_event 'claim_stripe_webhook_event' {
     metadata { inventoryKind 'db-function' detail 'used by app' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_claim_supabase_webhook_event_poc 'claim_supabase_webhook_event_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_classify_billing_customer_event_v1 'classify_billing_customer_event_v1' {
@@ -512,10 +506,6 @@ model {
   }
   dbfunction fn_complete_calendar_revoke_outbox_v1 'complete_calendar_revoke_outbox_v1' {
     metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
-  dbfunction fn_complete_supabase_webhook_event_poc 'complete_supabase_webhook_event_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_confirm_day_plans_command_v1 'confirm_day_plans_command_v1' {
@@ -710,10 +700,6 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
-  dbfunction fn_prune_supabase_rate_limit_poc 'prune_supabase_rate_limit_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
-    link ../../../../apps/product/src/lib/database/generated/database.types.ts
-  }
   dbfunction fn_reconcile_billing_mutation_v2 'reconcile_billing_mutation_v2' {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -726,6 +712,10 @@ model {
     metadata { inventoryKind 'db-function' detail 'used by settings' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
+  dbfunction fn_reconnect_calendar_connection_command_v1 'reconnect_calendar_connection_command_v1' {
+    metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
+    link ../../../../apps/product/src/lib/database/generated/database.types.ts
+  }
   dbfunction fn_record_plan_command_v1 'record_plan_command_v1' {
     metadata { inventoryKind 'db-function' detail 'used by timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
@@ -734,8 +724,8 @@ model {
     metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
-  dbfunction fn_release_supabase_webhook_event_poc 'release_supabase_webhook_event_poc' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
+  dbfunction fn_repair_calendar_connection_authority_fence_v1 'repair_calendar_connection_authority_fence_v1' {
+    metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_replace_mfa_recovery_codes_v1 'replace_mfa_recovery_codes_v1' {
@@ -787,7 +777,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_save_calendar_connection_command_v2 'save_calendar_connection_command_v2' {
-    metadata { inventoryKind 'db-function' detail 'app からの .rpc 呼び出しなし' }
+    metadata { inventoryKind 'db-function' detail 'used by external-calendar' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   dbfunction fn_seal_account_deletion_v1 'seal_account_deletion_v1' {
@@ -910,10 +900,6 @@ model {
     metadata { inventoryKind 'trpc-router' feature 'timeblock' detail 'recordsRouter' }
     link ../../../../apps/product/src/features/timeblock/server/records-router.ts
   }
-  router r_review 'review' {
-    metadata { inventoryKind 'trpc-router' feature 'review' detail 'reviewRouter' }
-    link ../../../../apps/product/src/features/review/server/router.ts
-  }
   router r_statistics 'statistics' {
     metadata { inventoryKind 'trpc-router' feature 'timeblock' detail 'statisticsRouter' }
     link ../../../../apps/product/src/features/timeblock/server/router-index.ts
@@ -1006,6 +992,11 @@ model {
     metadata { inventoryKind 'mcp-tool' detail 'read:stats' }
     link ../../../../apps/product/src/app/api/mcp/_tools/registry.ts
   }
+  store s_useActivityDetailStore 'useActivityDetailStore' {
+    #unmapped
+    metadata { inventoryKind 'store' }
+    link ../../../../apps/product/src/lib/stores/useActivityDetailStore.ts
+  }
   store s_useActivitySortStore 'useActivitySortStore' {
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useActivitySortStore.ts
@@ -1038,14 +1029,6 @@ model {
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useInlineCreateStore.ts
   }
-  store s_useReportDetailStore 'useReportDetailStore' {
-    metadata { inventoryKind 'store' feature 'review' }
-    link ../../../../apps/product/src/features/review/stores/useReportDetailStore.ts
-  }
-  store s_useReportViewStore 'useReportViewStore' {
-    metadata { inventoryKind 'store' feature 'review' }
-    link ../../../../apps/product/src/features/review/stores/useReportViewStore.ts
-  }
   store s_useShellStore 'useShellStore' {
     #unmapped
     metadata { inventoryKind 'store' }
@@ -1054,10 +1037,6 @@ model {
   store s_useTemplateSaveStore 'useTemplateSaveStore' {
     metadata { inventoryKind 'store' feature 'calendar' }
     link ../../../../apps/product/src/features/calendar/stores/useTemplateSaveStore.ts
-  }
-  store s_useTimeblockClipboardStore 'useTimeblockClipboardStore' {
-    metadata { inventoryKind 'store' feature 'calendar' }
-    link ../../../../apps/product/src/features/calendar/stores/useTimeblockClipboardStore.ts
   }
   store s_useTimeblockInspectorStore 'useTimeblockInspectorStore' {
     metadata { inventoryKind 'store' feature 'timeblock' }
@@ -1102,6 +1081,10 @@ model {
   httproute h_product_api_health '/api/health' {
     metadata { app 'product' methods 'GET' }
     link ../../../../apps/product/src/app/api/health/route.ts
+  }
+  httproute h_product_api_health_cron '/api/health/cron' {
+    metadata { app 'product' methods 'GET' }
+    link ../../../../apps/product/src/app/api/health/cron/route.ts
   }
   httproute h_product_api_health_version '/api/health/version' {
     metadata { app 'product' methods 'GET' }
@@ -1223,10 +1206,6 @@ model {
     metadata { source 'github-actions' schedule '0 21 * * *' authoritative 'true' }
     link ../../../../.github/workflows/production-config-audit.yml
   }
-  schedule cron_github-actions_production-config-audit_yml____15_________ 'production-config-audit.yml (*/15 * * * *)' {
-    metadata { source 'github-actions' schedule '*/15 * * * *' authoritative 'true' }
-    link ../../../../.github/workflows/production-config-audit.yml
-  }
   schedule cron_pg_cron_cleanup-notifications 'cleanup-notifications' {
     metadata { source 'pg_cron' schedule '20 3 * * *' authoritative 'false' }
     link ../../../../supabase/migrations/00000000000000_baseline.sql
@@ -1286,14 +1265,12 @@ model {
   c_activity -> mcp_activities_list 'direct'
   c_category -> t_categories 'direct'
   c_category -> mcp_categories_list 'direct'
-  c_segment -> f_review 'direct'
   c_segment -> t_segment_activities 'direct'
   c_segment -> t_segments 'direct'
   c_plan-template -> f_timeblock 'direct'
   c_plan-template -> t_plan_template_blocks 'direct'
   c_plan-template -> t_plan_templates 'direct'
-  c_review -> f_review 'direct'
-  c_review -> mcp_review_get 'direct'
+  c_activity-details -> f_activities 'direct'
   c_inspector -> f_timeblock 'direct'
   c_archive -> t_activities 'direct'
   c_archive -> t_categories 'direct'
@@ -1303,6 +1280,7 @@ model {
   c_fulfillment -> t_records 'direct'
   c_external-event -> f_external-calendar 'direct'
   c_external-event -> t_external_calendar_events 'direct'
+  c_mcp-review -> mcp_review_get 'direct'
   c_plan-source -> t_plans 'direct'
   c_plan-source -> t_records 'direct'
   c_note-vs-description -> t_external_calendar_events 'direct'
@@ -1316,7 +1294,6 @@ model {
   f_calendar -> f_activities 'imports'
   f_calendar -> f_external-calendar 'imports'
   f_calendar -> f_timeblock 'imports'
-  f_review -> f_activities 'imports'
   f_settings -> f_auth 'imports'
   f_settings -> f_calendar 'imports'
   f_settings -> f_external-calendar 'imports'
@@ -1332,9 +1309,11 @@ model {
   f_timeblock -> fn_apply_mcp_record_restore_v1 'calls'
   f_timeblock -> fn_apply_mcp_record_update_v1 'calls'
   f_external-calendar -> fn_begin_calendar_account_deletion_v1 'calls'
+  f_external-calendar -> fn_begin_calendar_oauth_attempt_v1 'calls'
   f_external-calendar -> fn_begin_calendar_sync_run_v1 'calls'
   f_settings -> fn_claim_billing_customer_provisioning_v2 'calls'
   f_settings -> fn_claim_billing_mutation_v3 'calls'
+  f_external-calendar -> fn_claim_calendar_oauth_attempt_v1 'calls'
   f_external-calendar -> fn_claim_calendar_revoke_outbox_v1 'calls'
   f_settings -> fn_claim_posthog_signup_v1 'calls'
   f_settings -> fn_classify_billing_customer_event_v1 'calls'
@@ -1366,7 +1345,9 @@ model {
   f_external-calendar -> fn_prepare_calendar_token_rotation_recovery_command_v1 'calls'
   f_external-calendar -> fn_prepare_user_data_purge_v1 'calls'
   f_settings -> fn_reconcile_billing_mutation_v4 'calls'
+  f_external-calendar -> fn_reconnect_calendar_connection_command_v1 'calls'
   f_timeblock -> fn_record_plan_command_v1 'calls'
+  f_external-calendar -> fn_repair_calendar_connection_authority_fence_v1 'calls'
   f_settings -> fn_replace_mfa_recovery_codes_v1 'calls'
   f_external-calendar -> fn_replace_selected_calendars_command_v1 'calls'
   f_timeblock -> fn_restore_plan_command_v1 'calls'
@@ -1374,6 +1355,7 @@ model {
   f_external-calendar -> fn_retry_calendar_revoke_outbox_v1 'calls'
   f_settings -> fn_revoke_oauth_connection 'calls'
   f_external-calendar -> fn_rotate_or_enqueue_calendar_refresh_token_command_v2 'calls'
+  f_external-calendar -> fn_save_calendar_connection_command_v2 'calls'
   f_external-calendar -> fn_seal_calendar_account_deletion_v1 'calls'
   f_settings -> fn_start_billing_customer_provisioning_v2 'calls'
   f_settings -> fn_start_billing_mutation_v2 'calls'
@@ -1393,7 +1375,6 @@ model {
   f_timeblock -> r_planTemplates 'owns'
   f_timeblock -> r_recordCommands 'owns'
   f_timeblock -> r_records 'owns'
-  f_review -> r_review 'owns'
   f_timeblock -> r_statistics 'owns'
   f_timeblock -> r_timeblockContext 'owns'
   f_auth -> r_user 'owns'
@@ -1406,32 +1387,26 @@ model {
   f_calendar -> s_useCalendarFilterStore 'owns'
   f_calendar -> s_useCalendarNavigationStore 'owns'
   f_calendar -> s_useInlineCreateStore 'owns'
-  f_review -> s_useReportDetailStore 'owns'
-  f_review -> s_useReportViewStore 'owns'
   f_calendar -> s_useTemplateSaveStore 'owns'
-  f_calendar -> s_useTimeblockClipboardStore 'owns'
   f_timeblock -> s_useTimeblockInspectorStore 'owns'
   f_activities -> t_activities 'reads'
   f_auth -> t_activities 'reads'
-  f_review -> t_activities 'reads'
   f_timeblock -> t_activities 'reads'
   f_external-calendar -> t_calendar_connection_calendars 'reads'
   f_external-calendar -> t_calendar_connections 'reads'
   f_activities -> t_categories 'reads'
   f_auth -> t_categories 'reads'
-  f_review -> t_categories 'reads'
   f_external-calendar -> t_external_calendar_events 'reads'
   f_auth -> t_mfa_recovery_codes 'reads'
   f_settings -> t_oauth_connections 'reads'
   f_timeblock -> t_plan_template_blocks 'reads'
   f_timeblock -> t_plan_templates 'reads'
   f_auth -> t_plans 'reads'
-  f_review -> t_plans 'reads'
   f_timeblock -> t_plans 'reads'
   f_auth -> t_profiles 'reads'
   f_settings -> t_profiles 'reads'
+  f_activities -> t_records 'reads'
   f_auth -> t_records 'reads'
-  f_review -> t_records 'reads'
   f_timeblock -> t_records 'reads'
   f_settings -> t_stripe_webhook_events 'reads'
   f_auth -> t_user_settings 'reads'
@@ -1458,6 +1433,7 @@ model {
   mcp_records_list -> r_records 'calls'
   r_activities -> t_activities 'reads'
   r_activities -> t_categories 'reads'
+  r_activities -> t_records 'reads'
   r_billing -> t_product_events 'reads'
   r_billing -> t_profiles 'reads'
   r_externalCalendar -> t_calendar_connection_calendars 'reads'
@@ -1486,11 +1462,6 @@ model {
   r_recordCommands -> t_records 'reads'
   r_records -> t_activities 'reads'
   r_records -> t_records 'reads'
-  r_review -> t_activities 'reads'
-  r_review -> t_categories 'reads'
-  r_review -> t_plans 'reads'
-  r_review -> t_product_events 'reads'
-  r_review -> t_records 'reads'
   r_statistics -> t_plans 'reads'
   r_statistics -> t_records 'reads'
   r_user -> t_activities 'reads'
@@ -1520,6 +1491,7 @@ model {
   r_externalCalendar -> fn_mark_calendar_connection_reauth_command_v2 'calls'
   r_externalCalendar -> fn_persist_calendar_sync_result_command_v1 'calls'
   r_externalCalendar -> fn_prepare_calendar_token_rotation_recovery_command_v1 'calls'
+  r_externalCalendar -> fn_repair_calendar_connection_authority_fence_v1 'calls'
   r_externalCalendar -> fn_replace_selected_calendars_command_v1 'calls'
   r_externalCalendar -> fn_rotate_or_enqueue_calendar_refresh_token_command_v2 'calls'
   r_mcpConnections -> fn_revoke_oauth_connection 'calls'

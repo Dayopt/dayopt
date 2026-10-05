@@ -15,6 +15,9 @@
       "deleteFailed": "Failed to delete account",
       "profile": "Profile",
       "profileDesc": "Basic information and profile image settings",
+      "sections": {
+        "security": "Security"
+      },
       "displayName": "Display name",
       "displayNameDesc": "Name shown to other users",
       "displayNamePlaceholder": "Enter display name",
@@ -590,6 +593,13 @@
       }
     },
     "accountPage": {
+      "sections": {
+        "settings": "Settings",
+        "data": "Data",
+        "plan": "Plan",
+        "support": "Support",
+        "other": "Other"
+      },
       "helpAndSupport": "Help & support",
       "releaseNotes": "Release notes",
       "documentation": "Documentation",
@@ -640,7 +650,7 @@
       "cancelDescription": "Your subscription will remain active until the end of the current billing period.",
       "cancelButton": "Cancel subscription",
       "cancelConfirmTitle": "Cancel your subscription?",
-      "cancelConfirmDescription": "You can use all features until the end of your billing period. After that, saved calendars and reports remain readable.",
+      "cancelConfirmDescription": "You can use all features until the end of your billing period. After that, saved plans and records remain readable.",
       "cancelConfirmAction": "Yes, cancel subscription",
       "cancelConfirmCancel": "Keep subscription",
       "billingHistory": "Billing history",
@@ -658,25 +668,6 @@
       "canceledTitle": "Subscription canceled",
       "canceledDescription": "Your saved data is available to view. Subscribe to resume creating, editing and syncing.",
       "resubscribe": "Subscribe again",
-      "plans": {
-        "free": {
-          "name": "Free",
-          "features": {
-            "timeboxing": "Timeboxing & time tracking",
-            "weeklyReview": "Weekly review",
-            "unlimitedActivities": "Unlimited activities",
-            "dataExport": "Data export (CSV / JSON)"
-          }
-        },
-        "pro": {
-          "name": "Pro",
-          "features": {
-            "longRange": "Monthly and yearly overviews with past-self comparison",
-            "googleCalendar": "Google Calendar sync",
-            "api": "MCP / API access"
-          }
-        }
-      },
       "trialEndsAt": "Your trial runs through {date}",
       "syncingPlan": "Confirming your payment… access will resume shortly",
       "singlePlan": {

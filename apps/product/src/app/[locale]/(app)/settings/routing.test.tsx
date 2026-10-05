@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let mockHasMounted = false;
 let mockIsMobile = false;
-let mockCategory = 'profile';
+let mockCategory = 'account';
 let mockSearchParams = new URLSearchParams();
 
 const mockReplace = vi.fn();
@@ -48,19 +48,38 @@ vi.mock('@dayopt/i18n/navigation', async () => {
 // SETTINGS_CATEGORIES はここで mock し、barrel 側は re-export を通じて同じ値を受け取る。
 vi.mock('@/features/settings/constants', () => ({
   SETTINGS_CATEGORIES: [
-    { id: 'profile', labelKey: 'settings.category.profile', icon: () => <span>icon</span> },
+    {
+      id: 'account',
+      labelKey: 'settings.dialog.categories.account',
+      icon: () => <span aria-hidden="true" />,
+    },
+    {
+      id: 'display',
+      labelKey: 'settings.dialog.categories.display',
+      icon: () => <span aria-hidden="true" />,
+    },
+    {
+      id: 'data',
+      labelKey: 'settings.dialog.categories.data',
+      icon: () => <span aria-hidden="true" />,
+    },
     {
       id: 'integrations',
-      labelKey: 'settings.category.integrations',
-      icon: () => <span>icon</span>,
+      labelKey: 'settings.dialog.categories.integrations',
+      icon: () => <span aria-hidden="true" />,
     },
-    { id: 'billing', labelKey: 'settings.category.billing', icon: () => <span>icon</span> },
+    {
+      id: 'billing',
+      labelKey: 'settings.dialog.categories.billing',
+      icon: () => <span aria-hidden="true" />,
+    },
   ],
 }));
 
 vi.mock('@/features/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/settings')>()),
-  isValidCategory: (category: string) => ['profile', 'integrations', 'billing'].includes(category),
+  isValidCategory: (category: string) =>
+    ['account', 'display', 'data', 'integrations', 'billing'].includes(category),
   SettingsContent: ({ category }: { category: string }) => <div>{category}</div>,
 }));
 
@@ -153,7 +172,7 @@ describe('settings route hydration guards', () => {
     vi.clearAllMocks();
     mockHasMounted = false;
     mockIsMobile = false;
-    mockCategory = 'profile';
+    mockCategory = 'account';
     mockSearchParams = new URLSearchParams();
   });
 
@@ -170,26 +189,41 @@ describe('settings route hydration guards', () => {
     render(<SettingsPage />);
 
     expect(mockOpenSettings).toHaveBeenCalledWith('account');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('renders mobile settings content without redirect', () => {
     mockHasMounted = true;
     mockIsMobile = true;
-    mockSearchParams = new URLSearchParams('returnTo=%2Fweek%3Fdate%3D2026-06-22%26panel%3Dreview');
+    mockSearchParams = new URLSearchParams('returnTo=%2F%3Fview%3Dweek%26date%3D2026-06-22');
 
     render(<SettingsPage />);
 
     expect(mockOpenSettings).not.toHaveBeenCalled();
     expect(screen.getByText('Tester')).toBeInTheDocument();
+    expect(screen.getByText('Tester').closest('a')).toBeNull();
     expect(screen.getByRole('link', { name: 'common.back' })).toHaveAttribute(
       'href',
-      '/week?date=2026-06-22&panel=review',
+      '/?view=week&date=2026-06-22',
     );
-    expect(screen.getByRole('link', { name: /settings\.category\.profile/ })).toHaveAttribute(
-      'href',
-      '/settings/profile?returnTo=%2Fweek%3Fdate%3D2026-06-22%26panel%3Dreview',
-    );
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.settings' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.data' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.plan' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.support' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'settings.accountPage.sections.other' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'settings.dialog.categories.account' }),
+    ).toHaveAttribute('href', '/settings/account?returnTo=%2F%3Fview%3Dweek%26date%3D2026-06-22');
     expect(
       screen.getByRole('link', { name: 'settings.accountPage.documentation' }),
     ).toHaveAttribute('href', 'https://dayopt.app/docs');
@@ -209,7 +243,7 @@ describe('settings route hydration guards', () => {
     render(<SettingsCategoryPage />);
 
     expect(mockOpenSettings).toHaveBeenCalledWith('billing');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('handles a desktop calendar callback before opening Integrations', () => {
@@ -224,7 +258,7 @@ describe('settings route hydration guards', () => {
     );
     expect(mockInvalidateConnections).toHaveBeenCalled();
     expect(mockOpenSettings).toHaveBeenCalledWith('integrations');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('handles a desktop checkout return before reopening Billing', () => {
@@ -238,19 +272,19 @@ describe('settings route hydration guards', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('settings.subscription.checkoutSuccess');
     expect(mockInvalidateBillingOverview).toHaveBeenCalled();
     expect(mockOpenSettings).toHaveBeenCalledWith('billing');
-    expect(mockReplace).toHaveBeenCalledWith('/calendar');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('cleans only checkout callback params on mobile', () => {
     mockHasMounted = true;
     mockIsMobile = true;
     mockCategory = 'billing';
-    mockSearchParams = new URLSearchParams('canceled=true&panel=review');
+    mockSearchParams = new URLSearchParams('canceled=true&view=week');
 
     render(<SettingsCategoryPage />);
 
     expect(mockToastSuccess).toHaveBeenCalledWith('settings.subscription.checkoutCanceled');
-    expect(mockReplace).toHaveBeenCalledWith('/settings/billing?panel=review');
+    expect(mockReplace).toHaveBeenCalledWith('/settings/billing?view=week');
   });
 
   it('invalidates the billing overview when returning from the customer portal', () => {
@@ -270,13 +304,13 @@ describe('settings route hydration guards', () => {
   it('ignores checkout params outside the billing category', () => {
     mockHasMounted = true;
     mockIsMobile = false;
-    mockCategory = 'profile';
+    mockCategory = 'account';
     mockSearchParams = new URLSearchParams('success=true');
 
     render(<SettingsCategoryPage />);
 
     expect(mockToastSuccess).not.toHaveBeenCalled();
-    expect(mockOpenSettings).toHaveBeenCalledWith('profile');
+    expect(mockOpenSettings).toHaveBeenCalledWith('account');
   });
 
   it('cleans only calendar callback params on mobile', () => {
@@ -284,7 +318,7 @@ describe('settings route hydration guards', () => {
     mockIsMobile = true;
     mockCategory = 'integrations';
     mockSearchParams = new URLSearchParams(
-      'returnTo=%2Fweek%3Fdate%3D2026-08-01&calendar=error&reason=account_mismatch&panel=review',
+      'returnTo=%2F%3Fview%3Dweek%26date%3D2026-08-01&calendar=error&reason=account_mismatch&view=week',
     );
 
     render(<SettingsCategoryPage />);
@@ -293,7 +327,7 @@ describe('settings route hydration guards', () => {
       'settings.integrations.googleCalendar.callback.accountMismatch',
     );
     expect(mockReplace).toHaveBeenCalledWith(
-      '/settings/integrations?returnTo=%2Fweek%3Fdate%3D2026-08-01&panel=review',
+      '/settings/integrations?returnTo=%2F%3Fview%3Dweek%26date%3D2026-08-01&view=week',
     );
   });
 

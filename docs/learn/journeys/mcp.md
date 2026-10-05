@@ -166,7 +166,7 @@ AI は必要なら先に activities.list でアクティビティの ID を調�
 
 - **なぜ必要か**: 画面からの保存には楽観的更新があり、サーバーの返事を待たずに一時 Plan を出す。MCP にはそれが無く、AI は返事（受領証）を待つ。代わりに operationId があるので、通信が切れても安全に送り直せる（画面の保存には冪等キーが無く、利用者が作り直すと二重になりうる）。読み取り tool（activities.list など）は tRPC を service role + oauthExecution 'mcp_internal' で内部呼び出しするので RLS が効かず、テナント分離は各 service の user filter だけが持つ。
 - **入力 → 出力**: 利用者の自然文の依頼 → POST /api/mcp（tools/call plans.create、Authorization: Bearer）
-- **ここを変えると**: tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。
+- **ここを変えると**: tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。
 - **コード**:
   - [`apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts`](../../../apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts) で `export const MCP_PLAN_CREATE_INPUT_SCHEMA = z` を探す
   - [`apps/product/src/app/api/mcp/_tools/registry.ts`](../../../apps/product/src/app/api/mcp/_tools/registry.ts) で `name: 'plans.create',` を探す
@@ -345,13 +345,15 @@ McpMutationClient が、apply RPC 8 本だけに絞った service role client �
 
 認可が通ると、apply RPC は画面からの保存と同じ create_plan_command_v1 を source 'api' で呼ぶ。時刻の規則（DT003: end_at > start_at）と重なりの排他制約（23P01）はここで同じように効く。成功すると同じトランザクションで受領証（mcp_mutation_receipts）を書く。deadlock（40P01）は adapter が 1 回だけ送り直す。
 
-- **なぜ必要か**: 入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。画面の保存と違うのは source（画面は manual、MCP は api）と、利用記録 plan_created を送らない点（Service 層を通らないため。意図かは未確認）。
+- **なぜ必要か**: 入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。保存時の source は画面が manual、MCP が api。利用記録 plan_created は、受領証を検証した後に McpMutationClient から source: mcp で送信を予約する。実送信には POSTHOG_SERVER_ENABLED と送信時点の analytics_consent が必要で、失敗しても Plan の保存は失敗にしない。同じ Plan の再送には同じイベント UUID を使う。
 - **入力 → 出力**: user_id（段 8 で決定）・title・start_at・end_at・activity_id → plans の行 + 受領証（resourceId・version・replayed: false）
 - **ここを変えると**: create_plan_command_v1 の規則を変えると、画面と MCP の両方が同時に変わる。MCP のエラーコード対応表（EXPECTED_ERROR_CODES）は画面側の表とは別にあるので、新しい SQLSTATE を足したら両方に足さないと MCP だけ MUTATION_FAILED になる。
 - **コード**:
   - [`supabase/migrations/20260914000000_version_mcp_create_digest.sql`](../../../supabase/migrations/20260914000000_version_mcp_create_digest.sql) で `FROM public.create_plan_command_v1(` を探す
   - [`supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql`](../../../supabase/migrations/20260904080216_simplify_timeblock_temporal_rules.sql) で `DT003` を探す
   - [`apps/product/src/features/timeblock/server/mcp-mutation-client.ts`](../../../apps/product/src/features/timeblock/server/mcp-mutation-client.ts) で `const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {` を探す
+  - [`apps/product/src/features/timeblock/server/mcp-mutation-client.ts`](../../../apps/product/src/features/timeblock/server/mcp-mutation-client.ts) で `await this.trackMutationEvent('plan_created', receipt.resourceId);` を探す
+  - [`apps/product/src/lib/analytics/posthog-server.ts`](../../../apps/product/src/lib/analytics/posthog-server.ts) で `export async function trackPostHogServerEvent(input: PostHogServerEvent): Promise<void> {` を探す
 
 <details>
 <summary>⚡ 時刻の規則に反する（DT003） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
@@ -761,7 +763,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
         "in": "利用者の自然文の依頼",
         "out": "POST /api/mcp（tools/call plans.create、Authorization: Bearer）"
       },
-      "change": "tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。tool の説明文は「Create one future Plan」のままで、過去にも Plan を置ける現行の規則と食い違っている。",
+      "change": "tool 名（plans.create）・入力 schema・必要 scope（write:plans）は外部契約。改名・削除・必須項目の追加は、既存クライアントと、それを前提に書かれた利用者の指示を壊す。Plan は過去・未来とも作成できる。説明文も現行の時間規則と一致させる。",
       "refs": [
         {
           "path": "apps/product/src/app/api/mcp/_tools/timeblock-mutations.ts",
@@ -1200,7 +1202,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
       "short": "画面と同じ関数で書く",
       "title": "画面と同じ create_plan_command_v1 で書き込む",
       "what": "認可が通ると、apply RPC は画面からの保存と同じ create_plan_command_v1 を source 'api' で呼ぶ。時刻の規則（DT003: end_at > start_at）と重なりの排他制約（23P01）はここで同じように効く。成功すると同じトランザクションで受領証（mcp_mutation_receipts）を書く。deadlock（40P01）は adapter が 1 回だけ送り直す。",
-      "why": "入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。画面の保存と違うのは source（画面は manual、MCP は api）と、利用記録 plan_created を送らない点（Service 層を通らないため。意図かは未確認）。",
+      "why": "入口が違っても規則の正本は DB に 1 つだけ、というのがこの経路の要点。保存時の source は画面が manual、MCP が api。利用記録 plan_created は、受領証を検証した後に McpMutationClient から source: mcp で送信を予約する。実送信には POSTHOG_SERVER_ENABLED と送信時点の analytics_consent が必要で、失敗しても Plan の保存は失敗にしない。同じ Plan の再送には同じイベント UUID を使う。",
       "io": {
         "in": "user_id（段 8 で決定）・title・start_at・end_at・activity_id",
         "out": "plans の行 + 受領証（resourceId・version・replayed: false）"
@@ -1218,6 +1220,14 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
         {
           "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.ts",
           "find": "const EXPECTED_ERROR_CODES: Readonly<Record<string, McpMutationErrorCode>> = {"
+        },
+        {
+          "path": "apps/product/src/features/timeblock/server/mcp-mutation-client.ts",
+          "find": "await this.trackMutationEvent('plan_created', receipt.resourceId);"
+        },
+        {
+          "path": "apps/product/src/lib/analytics/posthog-server.ts",
+          "find": "export async function trackPostHogServerEvent(input: PostHogServerEvent): Promise<void> {"
         }
       ],
       "fails": [
@@ -1384,7 +1394,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
       "fails": [],
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",

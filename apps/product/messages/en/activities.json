@@ -36,6 +36,19 @@
       "categoryDescription": "This can't be undone. The {count} activities in it aren't deleted — they become uncategorized.",
       "categoryDescriptionEmpty": "This can't be undone. No activities are in it."
     },
+    "activitySummary": {
+      "ariaLabel": "Activity details",
+      "close": "Close",
+      "error": "Could not load the details",
+      "period": "Last 30 days · {start} – {end}",
+      "periodLoading": "Last 30 days",
+      "recorded": "Recorded",
+      "median": "Median per record",
+      "noMedian": "—",
+      "records": "{count, plural, one {# record} other {# records}}",
+      "empty": "No records in the last 30 days",
+      "truncated": "Older records not shown: {count}"
+    },
     "undo": "Undo"
   }
 }

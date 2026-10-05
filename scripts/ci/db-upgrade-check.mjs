@@ -20,6 +20,7 @@
  * 接続先はローカル Docker の Supabase だけ（production / linked には触れない）。
  */
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   mkdtempSync,
@@ -33,6 +34,22 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import {
+  assertPocRetirementContract,
+  POC_ARCHIVE_PATH,
+  POC_ORIGINAL_MIGRATION_PATH,
+  POC_ORIGINAL_SHA256,
+  POC_RETIREMENT_MANIFEST,
+  POC_TOMBSTONE_SQL,
+} from '../lib/poc-retirement-contract.mjs';
+
+import {
+  POC_FRESH_ABSENCE_SQL,
+  POC_ROWS_FINGERPRINT_SQL,
+  POC_SECURITY_CATALOG_SQL,
+  rehearsePocRetirement,
+} from '../lib/poc-retirement-rehearsal.mjs';
+import { renderPocRetirementRecovery } from '../runbook/poc-retirement-recovery.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const TYPES_PATH = 'apps/product/src/lib/database/generated/database.types.ts';
@@ -41,6 +58,37 @@ export const MIGRATIONS_DIR = 'supabase/migrations';
 export const SEED_PATH = 'supabase/seed.sql';
 const MIGRATION_FILE = /^(\d{14})_.+\.sql$/;
 export const DB_UPGRADE_JOB = '🧱 DB Upgrade (shadow)';
+export const POC_STATE_SQL = POC_ROWS_FINGERPRINT_SQL;
+export const POC_FIXTURE_SQL = `insert into rate_limit_poc.supabase_rate_limit_state_poc values ('retirement_fixture', repeat('a',64), 10, 60, '2026-01-01T00:00:00Z', 2, 3, '2026-01-02T00:00:00Z', '2026-01-01T00:00:01Z'); insert into rate_limit_poc.supabase_webhook_claims_poc values (repeat('b',64), 'processing', '00000000-0000-4000-8000-000000000001', '2026-01-02T00:00:00Z', null, '2026-01-02T00:00:00Z', '2026-01-01T00:00:01Z'), (repeat('c',64), 'processed', null, null, '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z', '2026-01-01T00:00:01Z')`;
+const RETIRED_POC_FUNCTIONS = new Set([
+  'check_supabase_rate_limit_poc',
+  'claim_supabase_webhook_event_poc',
+  'complete_supabase_webhook_event_poc',
+  'release_supabase_webhook_event_poc',
+  'prune_supabase_rate_limit_poc',
+]);
+
+export function onlyRetiredPocFunctionsWereRemoved(comparison, retirementValidated) {
+  if (!retirementValidated || !comparison.narrowing) return false;
+  const otherNarrowing = Object.entries(comparison.removed).filter(
+    ([kind, list]) => kind !== 'functions' && list.length,
+  );
+  const removedFunctions = comparison.removed.functions;
+  return (
+    otherNarrowing.length === 0 &&
+    comparison.removed.functionSignatures.length === 0 &&
+    removedFunctions.length === RETIRED_POC_FUNCTIONS.size &&
+    removedFunctions.every((name) => RETIRED_POC_FUNCTIONS.has(name))
+  );
+}
+
+export function isHistoricalPocBaseline(baseMigrations, originalMigrationSql) {
+  const originalName = POC_ORIGINAL_MIGRATION_PATH.split('/').at(-1);
+  return (
+    baseMigrations.includes(originalName) &&
+    createHash('sha256').update(originalMigrationSql, 'utf8').digest('hex') === POC_ORIGINAL_SHA256
+  );
+}
 
 /** 既存データ・catalog を見る schema。app が所有する private（trigger 経由の control rows）も含める。 */
 export const DATA_SCHEMAS = ['public', 'auth', 'private'];
@@ -383,11 +431,36 @@ export function compareSchemaContracts(base, candidate) {
   return { narrowing, removed };
 }
 
+/** Compare the stored consumer contract and a real baseline generated with the same CLI. */
+export function compareUpgradeConsumerContracts(stored, baseline, upgraded) {
+  const tracked = compareSchemaContracts(stored, upgraded);
+  const baselineDrift = compareSchemaContracts(stored, baseline);
+  const actual = compareSchemaContracts(baseline, upgraded);
+  // Only column/write representations already present in the real baseline can be discounted.
+  // Object removals, RPC signatures, enum values and every actual before/after change stay blocking.
+  for (const kind of Object.keys(tracked.removed)) {
+    const preexisting = ['columnTypes', 'writeContracts'].includes(kind)
+      ? baselineDrift.removed[kind]
+      : [];
+    tracked.removed[kind] = [
+      ...new Set([
+        ...tracked.removed[kind].filter((entry) => !preexisting.includes(entry)),
+        ...actual.removed[kind],
+      ]),
+    ];
+  }
+  return {
+    narrowing: Object.values(tracked.removed).some((entries) => entries.length > 0),
+    removed: tracked.removed,
+    baselineDrift: baselineDrift.removed,
+  };
+}
+
 /**
  * base と candidate の migration ファイル集合から upgrade 計画を作る。
- * @param {{ base: string[], candidate: string[], changed: { status: string, path: string }[] }} input
+ * @param {{ base: string[], candidate: string[], changed: { status: string, path: string }[], pocRetirementValidated?: boolean }} input
  */
-export function planDbUpgrade({ base, candidate, changed }) {
+export function planDbUpgrade({ base, candidate, changed, pocRetirementValidated = false }) {
   const versionOf = (name) => name.match(MIGRATION_FILE)?.[1] ?? null;
   const baseVersions = base.map(versionOf).filter(Boolean).sort();
   const candidateSet = new Set(candidate);
@@ -396,6 +469,12 @@ export function planDbUpgrade({ base, candidate, changed }) {
   for (const entry of changed) {
     const name = entry.path.replace(`${MIGRATIONS_DIR}/`, '');
     if (!MIGRATION_FILE.test(name) || entry.path.includes('/_archive/')) continue;
+    if (
+      pocRetirementValidated &&
+      entry.path === POC_ORIGINAL_MIGRATION_PATH &&
+      entry.status === 'M'
+    )
+      continue;
     if (entry.status === 'M')
       problems.push(`applied migration edited: ${name} (production will not re-run it)`);
     if (entry.status === 'D' || (entry.status === 'R' && !candidateSet.has(name)))
@@ -470,31 +549,44 @@ const PSQL = [
  *   PR は、そのままだと「旧データに当てる」経路を通らない
  * 戻した後の `migration up` と fresh reset は candidate の入力で走る。
  */
-function withBaseInputs({ added, baseSeed }, { moveFile, makeTempDir, readFile, writeFile }, fn) {
+/**
+ * @param {{added: string[], baseSeed: string, pocArchiveSql?: string | null}} inputs
+ * @param {{moveFile: (from: string, to: string) => void, makeTempDir: () => string, readFile: (path: string) => string, writeFile: (path: string, text: string) => void}} io
+ * @param {() => unknown} fn
+ */
+export function withBaseInputs(
+  { added, baseSeed, pocArchiveSql = null },
+  { moveFile, makeTempDir, readFile, writeFile },
+  fn,
+) {
   const stash = makeTempDir();
   const moved = [];
   const candidateSeed = readFile(SEED_PATH);
+  const candidateTombstone = pocArchiveSql === null ? null : readFile(POC_ORIGINAL_MIGRATION_PATH);
   try {
     for (const name of added) {
       moveFile(resolve(ROOT, MIGRATIONS_DIR, name), resolve(stash, name));
       moved.push(name);
     }
+    if (pocArchiveSql !== null) writeFile(POC_ORIGINAL_MIGRATION_PATH, pocArchiveSql);
     writeFile(SEED_PATH, baseSeed);
     return fn();
   } finally {
     writeFile(SEED_PATH, candidateSeed);
+    if (candidateTombstone !== null) writeFile(POC_ORIGINAL_MIGRATION_PATH, candidateTombstone);
     for (const name of moved) moveFile(resolve(stash, name), resolve(ROOT, MIGRATIONS_DIR, name));
   }
 }
 
 /**
- * @param {{ exec?: typeof defaultExec, readFile?: (path: string) => string, listMigrations?: () => string[],
+ * @param {{ env?: Record<string, string | undefined>, exec?: typeof defaultExec, readFile?: (path: string) => string, listMigrations?: () => string[],
  *   writeFile?: (path: string, text: string) => void,
  *   moveFile?: (from: string, to: string) => void, makeTempDir?: () => string,
  *   log?: (text: string) => void, summaryPath?: string | null, resultPath?: string | null }} deps
  */
 export function runDbUpgradeCheck({
   exec = defaultExec,
+  env = process.env,
   readFile = (path) => readFileSync(resolve(ROOT, path), 'utf8'),
   writeFile = (path, text) => writeFileSync(resolve(ROOT, path), text),
   listMigrations = () =>
@@ -530,9 +622,16 @@ export function runDbUpgradeCheck({
     if (resultPath) writeFileSync(resolve(resultPath), `${JSON.stringify(result, null, 2)}\n`);
     return result;
   };
-  // base = pull_request checkout（merge commit）の第 1 親。無ければ origin/main。
+  // GitHub の PR merge ref だけ第 1 親が比較元。通常 branch の main-sync merge
+  // は第 1 親が古い candidate なので、手動実行では origin/main を使う。
   let baseSha;
   try {
+    if (
+      env.GITHUB_EVENT_NAME !== 'pull_request' ||
+      !/^refs\/pull\/\d+\/merge$/.test(env.GITHUB_REF ?? '')
+    ) {
+      throw new Error('not a GitHub PR merge ref');
+    }
     baseSha = exec('git', ['rev-parse', '--verify', 'HEAD^1^{commit}']).trim();
     exec('git', ['rev-parse', '--verify', 'HEAD^2^{commit}']);
   } catch {
@@ -563,7 +662,86 @@ export function runDbUpgradeCheck({
       const [status, path] = line.split('\t');
       return { status: status.charAt(0), path };
     });
-  const plan = planDbUpgrade({ base: baseList, candidate: listMigrations(), changed });
+  let retirement = null;
+  const retirementTouched = changed.some(({ path }) =>
+    [
+      POC_ORIGINAL_MIGRATION_PATH,
+      POC_ARCHIVE_PATH,
+      POC_RETIREMENT_MANIFEST.forwardRetirementMigrationPath,
+    ].includes(path),
+  );
+  const candidateMigrationNames = listMigrations();
+  let phaseBPresent = false;
+  try {
+    phaseBPresent =
+      readFile(POC_ARCHIVE_PATH) !== undefined &&
+      readFile(POC_ORIGINAL_MIGRATION_PATH) === POC_TOMBSTONE_SQL &&
+      candidateMigrationNames.includes(
+        POC_RETIREMENT_MANIFEST.forwardRetirementMigrationPath.split('/').at(-1),
+      );
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
+  }
+  if (retirementTouched || phaseBPresent) {
+    try {
+      const runtimePattern = /^(?:apps\/[^/]+\/|packages\/[^/]+\/|supabase\/functions\/)/;
+      const codePattern = /\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/i;
+      const treePaths = (revision) =>
+        exec('git', ['ls-tree', '-r', '--name-only', revision]).split('\n').filter(Boolean);
+      const basePaths = treePaths(baseSha).filter(
+        (path) => runtimePattern.test(path) && codePattern.test(path),
+      );
+      const candidatePaths = exec('git', ['ls-files'])
+        .split('\n')
+        .filter((path) => runtimePattern.test(path) && codePattern.test(path));
+      const baseFiles = new Map(
+        basePaths.map((path) => [path, exec('git', ['show', `${baseSha}:${path}`])]),
+      );
+      const candidateFiles = new Map();
+      for (const path of candidatePaths) {
+        try {
+          candidateFiles.set(path, readFile(path));
+        } catch (error) {
+          if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT')
+            throw error;
+        }
+      }
+      for (const name of baseList) {
+        const path = `${MIGRATIONS_DIR}/${name}`;
+        baseFiles.set(path, exec('git', ['show', `${baseSha}:${path}`]));
+      }
+      for (const name of listMigrations()) {
+        const path = `${MIGRATIONS_DIR}/${name}`;
+        candidateFiles.set(path, readFile(path));
+      }
+      candidateFiles.set(POC_ARCHIVE_PATH, readFile(POC_ARCHIVE_PATH));
+      const manifest = { ...POC_RETIREMENT_MANIFEST };
+      retirement = assertPocRetirementContract({ baseFiles, candidateFiles, manifest });
+      if (retirement.archiveSha256 !== POC_ORIGINAL_SHA256)
+        throw new Error('POC archive digest did not match the pinned historical digest');
+    } catch (error) {
+      result.problems.push(
+        error instanceof Error ? error.message : 'POC retirement contract failed',
+      );
+      return finish();
+    }
+  }
+  const basePocPath = `${MIGRATIONS_DIR}/${POC_ORIGINAL_MIGRATION_PATH.split('/').at(-1)}`;
+  let historicalPocBaseline = false;
+  if (baseList.includes(basePocPath.split('/').at(-1))) {
+    try {
+      const basePocSql = exec('git', ['show', `${baseSha}:${basePocPath}`]);
+      historicalPocBaseline = isHistoricalPocBaseline(baseList, basePocSql);
+    } catch {
+      // The contract below reports a missing or unexpected base migration when Phase B is present.
+    }
+  }
+  const plan = planDbUpgrade({
+    base: baseList,
+    candidate: listMigrations(),
+    changed,
+    pocRetirementValidated: retirement !== null,
+  });
   result.baseVersion = plan.baseVersion;
   result.added = plan.added;
   result.problems.push(...plan.problems);
@@ -577,8 +755,9 @@ export function runDbUpgradeCheck({
     // 1. base の migration 集合 + base の seed まで戻す（reset は config の seed を適用する）。
     //    追加分は timestamp に関わらず退避し、production と同じ「既存データに当てる」経路だけを通す
     const baseSeed = exec('git', ['show', `${baseSha}:${SEED_PATH}`]);
+    const archivedPocSql = retirement && historicalPocBaseline ? readFile(POC_ARCHIVE_PATH) : null;
     withBaseInputs(
-      { added: plan.added, baseSeed },
+      { added: plan.added, baseSeed, pocArchiveSql: archivedPocSql },
       { moveFile, makeTempDir, readFile, writeFile },
       () => exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] }),
     );
@@ -586,6 +765,22 @@ export function runDbUpgradeCheck({
     const primaryKeys = parsePrimaryKeys(exec('psql', [...PSQL, '-At', '-F,', '-c', PK_SQL]));
     const identitySql = rowIdentitySql(primaryKeys);
     const beforeRows = exec('psql', [...PSQL, '-At', '-c', identitySql]);
+    if (retirement && historicalPocBaseline)
+      exec('psql', [...PSQL, '-v', 'ON_ERROR_STOP=1', '-c', POC_FIXTURE_SQL]);
+    const beforePocState =
+      retirement && historicalPocBaseline
+        ? exec('psql', [...PSQL, '-At', '-c', POC_STATE_SQL])
+        : null;
+    const beforePocSecurity =
+      retirement && historicalPocBaseline
+        ? exec('psql', [...PSQL, '-At', '-c', POC_SECURITY_CATALOG_SQL])
+        : null;
+    // Generate the actual pre-upgrade schema with the exact same CLI as the upgraded schema.
+    const baselineTypes = exec('pnpm', ['exec', 'prettier', '--stdin-filepath', TYPES_PATH], {
+      input: exec('supabase', ['gen', 'types', 'typescript', '--local'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    });
     // 2. candidate の migration だけを当てる（version 順に依存せず未適用を全部）
     exec('supabase', ['migration', 'up', '--local', '--include-all'], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -594,10 +789,34 @@ export function runDbUpgradeCheck({
     // 3. 既存データの保持
     const after = parseCounts(exec('psql', [...PSQL, '-At', '-F,', '-c', COUNT_SQL]));
     const afterRows = exec('psql', [...PSQL, '-At', '-c', identitySql]);
+    const afterPocState =
+      retirement && historicalPocBaseline
+        ? exec('psql', [...PSQL, '-At', '-c', POC_STATE_SQL])
+        : null;
     const lost = [...compareCounts(before, after), ...compareRowIdentity(beforeRows, afterRows)];
     if (lost.length) result.problems.push(...lost.map((entry) => `seeded rows lost: ${entry}`));
     else
       result.checks.dataPreserved = `${before.size} table(s) kept their seeded rows (count and primary-key identity across ${primaryKeys.size} keyed table(s))`;
+    if (beforePocState !== null && afterPocState !== null) {
+      if (beforePocState !== afterPocState)
+        result.problems.push(
+          'retired POC table row state changed during forward migration (MD5 fingerprint mismatch)',
+        );
+      else
+        result.checks.pocRowsPreserved =
+          'both retired POC tables kept identical synthetic row-state fingerprints';
+    }
+    if (archivedPocSql !== null && beforePocState !== null && beforePocSecurity !== null) {
+      const recovery = rehearsePocRetirement({
+        execPsql: (sql) => exec('psql', [...PSQL, '-At'], { input: sql }),
+        renderRecovery: renderPocRetirementRecovery,
+        archivedSql: archivedPocSql,
+        forwardSql: readFile(POC_RETIREMENT_MANIFEST.forwardRetirementMigrationPath),
+        expectedTableRows: beforePocState,
+        expectedSecurityCatalog: beforePocSecurity,
+      });
+      result.checks.pocRecoveryRehearsal = JSON.stringify(recovery);
+    }
     // 4. RLS / GRANT snapshot は upgraded DB でも一致する
     exec('pnpm', ['rls:snapshot:check']);
     result.checks.rlsSnapshot = 'matches on the upgraded database';
@@ -615,26 +834,43 @@ export function runDbUpgradeCheck({
     else result.checks.freshEquivalence = 'generated types identical to the fresh database';
     // 6. old consumer: base 世代の型が参照するオブジェクトが残っている
     const baseTypes = exec('git', ['show', `${baseSha}:${TYPES_PATH}`]);
-    const comparison = compareSchemaContracts(
+    const comparison = compareUpgradeConsumerContracts(
       extractSchemaContract(baseTypes),
+      extractSchemaContract(baselineTypes),
       extractSchemaContract(upgradedTypes),
     );
+    result.checks.baselineTypeDrift = JSON.stringify(comparison.baselineDrift);
     if (comparison.narrowing) {
-      const detail = Object.entries(comparison.removed)
-        .filter(([, list]) => list.length)
-        .map(([kind, list]) => `${kind}: ${list.join(', ')}`)
-        .join('; ');
-      result.problems.push(
-        `old consumer contract narrowed (${detail}); the live build still targets the base schema. Requires expand → migrate → contract sequencing and explicit approval`,
+      const onlyRetiredPocFunctions = onlyRetiredPocFunctionsWereRemoved(
+        comparison,
+        retirement !== null,
       );
+      if (onlyRetiredPocFunctions) {
+        result.checks.oldConsumer =
+          'only the five retired POC RPCs are removed; Phase A base runtime contract proves no consumers';
+      } else {
+        const detail = Object.entries(comparison.removed)
+          .filter(([, list]) => list.length)
+          .map(([kind, list]) => `${kind}: ${list.join(', ')}`)
+          .join('; ');
+        result.problems.push(
+          `old consumer contract narrowed (${detail}); the live build still targets the base schema. Requires expand → migrate → contract sequencing and explicit approval`,
+        );
+      }
     } else
       result.checks.oldConsumer =
-        'every table / column (type, nullability, writability) / relationship / view column / function signature / enum value used by the base types still exists';
+        'stored consumer objects and actual baseline types remain compatible; unchanged baseline column/write representation drift is reported separately';
     // 7. 生成型に現れない schema（index / constraint / trigger）も fresh と一致する。既存行の有無で
     //    分岐する migration は fresh と upgraded で違う catalog を作り得るので、ここで fresh を
     //    作り直して catalog を比較する（追加分は戻してあるので reset = candidate 全部）
     const upgradedCatalog = exec('psql', [...PSQL, '-At', '-c', CATALOG_SQL]);
     exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    if (retirement) {
+      const freshPocState = exec('psql', [...PSQL, '-At', '-c', POC_FRESH_ABSENCE_SQL]).trim();
+      if (freshPocState !== 'true|0')
+        throw new Error('Fresh retirement schema must not create POC state or RPCs');
+      result.checks.freshPocAbsent = 'rate_limit_poc schema and all named POC RPCs absent';
+    }
     const freshCatalog = exec('psql', [...PSQL, '-At', '-c', CATALOG_SQL]);
     if (upgradedCatalog !== freshCatalog) {
       const upgradedSet = new Set(upgradedCatalog.split('\n'));

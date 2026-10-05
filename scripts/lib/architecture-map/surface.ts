@@ -396,7 +396,7 @@ export function parseRateLimits(
 ): Array<{ id: string; limit: number; window: string }> {
   const limits: Array<{ id: string; limit: number; window: string }> = [];
   for (const match of text.matchAll(
-    /export const (\w+) = createRateLimiter\(\s*Ratelimit\.\w+\(\s*([\d_]+),\s*'([^']+)'/g,
+    /export const (\w+) = createRateLimiter\(\s*(?:Ratelimit\.\w+\(\s*)?([\d_]+),\s*'([^']+)'/g,
   )) {
     limits.push({
       id: match[1],

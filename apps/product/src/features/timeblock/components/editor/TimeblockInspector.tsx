@@ -11,13 +11,15 @@
  * 旧 TimeblockInspector（entries 用）の置き換え。旧実装は Step 9 で削除する。
  */
 
-import { Suspense, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useTranslations } from 'next-intl';
 
 import { ErrorState } from '@/components/ui/feedback/ErrorState';
 import { useActivitiesMap } from '@/features/activities';
 import { MEDIA_QUERIES } from '@/lib/breakpoints';
+import type { PublicPlanRow, PublicRecordRow } from '@/lib/database';
 import { useDomSlot } from '@/lib/dom-slots/useDomSlot';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { overlappingRecords, type DerivedBlock } from '@/lib/time';
@@ -27,7 +29,6 @@ import { Drawer, DrawerContent, DrawerTitle, Spinner } from '@dayopt/components'
 import type { TimeblockDestination } from '../../domain/timeblock-destination';
 import { useInspectorURLSync } from '../../hooks/useInspectorURLSync';
 import { TIMEBLOCK_INSPECTOR_SLOT_KEY } from '../../lib/inspector-slot';
-import type { ClipboardTimeblock } from '../../lib/timeblock-clipboard';
 import { useTimeblockInspectorStore } from '../../stores/useTimeblockInspectorStore';
 import { DockedInspectorPanel } from '../inspector/DockedInspectorPanel';
 import { useInspectorKeyboard } from '../inspector/hooks';
@@ -40,10 +41,10 @@ function InspectorURLSyncHandler() {
 }
 
 interface TimeModelInspectorProps {
+  /** 予定 / 記録の内容末尾に表示する操作。PC / モバイルで共通。 */
+  actionsSlot?: React.ReactNode;
   /** 振り返り panel を開くコールバック（Composition Layer から注入） */
-  onViewStats?: ((tagId: string) => void) | undefined;
-  /** Timeblockを独立複製用のクリップボードへ保存する。 */
-  onCopy?: ((timeblock: ClipboardTimeblock) => void) | undefined;
+  onViewActivityDetails?: ((tagId: string, activityName: string) => void) | undefined;
   /**
    * ドラッグ作成モード（store.createMode）で描く内容。calendar 側が組み立てて
    * Composition Layer から注入する（timeblock は calendar を import できないため）。
@@ -53,6 +54,29 @@ interface TimeModelInspectorProps {
 
 const INSPECTOR_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function findCachedTimeblockListRow<Row extends { id: string }>(
+  queryClient: QueryClient,
+  lane: 'plans' | 'records',
+  id: string | null,
+): Row | undefined {
+  if (!id) return undefined;
+
+  const cachedLists = queryClient.getQueriesData<Row[]>({
+    predicate: ({ queryKey }) =>
+      Array.isArray(queryKey) &&
+      Array.isArray(queryKey[0]) &&
+      queryKey[0][0] === lane &&
+      queryKey[0][1] === 'list',
+  });
+
+  for (const [, rows] of cachedLists) {
+    const match = rows?.find((row) => row.id === id);
+    if (match) return match;
+  }
+
+  return undefined;
+}
 
 function toInspectorDerivedBlock(
   row: {
@@ -85,12 +109,13 @@ function toInspectorDerivedBlock(
 
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
 export function TimeblockInspector({
-  onViewStats,
-  onCopy,
+  actionsSlot,
+  onViewActivityDetails,
   createContent,
 }: TimeModelInspectorProps) {
   const t = useTranslations();
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
+  const queryClient = useQueryClient();
   const { getActivityById } = useActivitiesMap();
 
   const isOpen = useTimeblockInspectorStore((state) => state.isOpen);
@@ -105,14 +130,28 @@ export function TimeblockInspector({
   const closeInspector = useTimeblockInspectorStore((state) => state.closeInspector);
   const contentRef = useRef<HTMLDivElement>(null);
   const shouldFocusRelationshipRef = useRef(false);
+  const cachedPlan = useMemo(
+    () => findCachedTimeblockListRow<PublicPlanRow>(queryClient, 'plans', timeblockId),
+    [queryClient, timeblockId],
+  );
+  const cachedRecord = useMemo(
+    () => findCachedTimeblockListRow<PublicRecordRow>(queryClient, 'records', timeblockId),
+    [queryClient, timeblockId],
+  );
 
   const planQuery = api.plans.getById.useQuery(
     { id: timeblockId ?? '' },
-    { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'plan' },
+    {
+      enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'plan',
+      ...(isMobile && cachedPlan ? { placeholderData: cachedPlan } : {}),
+    },
   );
   const recordQuery = api.records.getById.useQuery(
     { id: timeblockId ?? '' },
-    { enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'record' },
+    {
+      enabled: isOpen && !duplicateDraft && !!timeblockId && timeblockKind === 'record',
+      ...(isMobile && cachedRecord ? { placeholderData: cachedRecord } : {}),
+    },
   );
   const relatedRecordsQuery = api.records.list.useQuery(
     {
@@ -240,14 +279,14 @@ export function TimeblockInspector({
   } else {
     content = (
       <TimeblockInspectorForm
-        key={`${timeblockKind}:${target.id}`}
+        key={`${timeblockKind}:${target.id}:${activeQuery.isPlaceholderData ? 'placeholder' : 'loaded'}`}
         kind={timeblockKind}
+        actionsSlot={actionsSlot}
         plan={plan}
         record={record}
         relationships={relationships}
         onOpenRelationship={handleOpenRelationship}
-        onViewStats={onViewStats}
-        onCopy={onCopy}
+        onViewActivityDetails={onViewActivityDetails}
         onStartDuplicate={openDuplicate}
         onCloseInspector={handleClose}
         onDeleted={handleClose}
@@ -256,7 +295,12 @@ export function TimeblockInspector({
   }
 
   const contentElement = (
-    <div ref={contentRef} tabIndex={-1} className="focus:outline-none">
+    <div
+      ref={contentRef}
+      tabIndex={-1}
+      inert={activeQuery.isPlaceholderData}
+      className="focus:outline-none"
+    >
       {content}
     </div>
   );

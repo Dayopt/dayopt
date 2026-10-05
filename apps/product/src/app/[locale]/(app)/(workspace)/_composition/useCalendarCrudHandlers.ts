@@ -10,19 +10,14 @@
 import { useCallback, useMemo } from 'react';
 
 import { addHours, startOfHour } from 'date-fns';
-import { useTranslations } from 'next-intl';
 
 import type { CalendarDisplayEvent } from '@/features/calendar';
 import {
   useCalendarEventKeyboard,
   useCalendarHandlers,
-  useTimeblockClipboardStore,
   useTimeblockContextActions,
   useTimeblockOperations,
 } from '@/features/calendar';
-import { toast } from '@/lib/toast';
-
-import { createCalendarEventClipboardTimeblock } from './createCalendarEventClipboardTimeblock';
 
 // =============================================================================
 // Types
@@ -33,8 +28,6 @@ interface CalendarCrudHandlersInput {
   selectedTimeblockId: string | null;
   /** フィルタ済みイベント一覧（キーボード操作でタイトル取得に使用） */
   filteredEvents: CalendarDisplayEvent[];
-  /** 現在の表示日付（キーボード操作で過去日判定に使用） */
-  currentDate: Date;
 }
 
 interface CalendarCrudHandlersResult {
@@ -58,8 +51,7 @@ interface CalendarCrudHandlersResult {
   ) => void | Promise<void> | Promise<{ skipToast: true } | void>;
   onDeleteTimeblock: (timeblockId: string) => Promise<boolean>;
   onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
-  onViewStats: (timeblock: CalendarDisplayEvent) => void;
-  onCopy: (timeblock: CalendarDisplayEvent) => void;
+  onViewActivityDetails: (timeblock: CalendarDisplayEvent) => void;
 }
 
 // =============================================================================
@@ -69,10 +61,7 @@ interface CalendarCrudHandlersResult {
 export function useCalendarCrudHandlers({
   selectedTimeblockId,
   filteredEvents,
-  currentDate,
 }: CalendarCrudHandlersInput): CalendarCrudHandlersResult {
-  const t = useTranslations();
-  const copyTimeblock = useTimeblockClipboardStore((state) => state.copyTimeblock);
   // =========================================================================
   // Calendar Handlers（click, create, drag-select）
   // =========================================================================
@@ -88,7 +77,7 @@ export function useCalendarCrudHandlers({
   // =========================================================================
   // Context Actions（右クリックメニュー）
   // =========================================================================
-  const { handleDeleteTimeblock: handleDeleteTimeblockConfirm, handleViewStats } =
+  const { handleDeleteTimeblock: handleDeleteTimeblockConfirm, handleViewActivityDetails } =
     useTimeblockContextActions();
 
   // =========================================================================
@@ -110,24 +99,6 @@ export function useCalendarCrudHandlers({
     return timeblock?.title ?? null;
   }, [selectedTimeblockId, filteredEvents]);
 
-  const getSelectedTimeblockForCopy = useCallback(() => {
-    if (!selectedTimeblockId) return null;
-    const timeblock = filteredEvents.find((p) => p.id === selectedTimeblockId);
-    return timeblock ? createCalendarEventClipboardTimeblock(timeblock) : null;
-  }, [selectedTimeblockId, filteredEvents]);
-
-  const handleCopy = useCallback(
-    (timeblock: CalendarDisplayEvent) => {
-      copyTimeblock(createCalendarEventClipboardTimeblock(timeblock));
-      toast.success(t('common.toast.copied'));
-    },
-    [copyTimeblock, t],
-  );
-
-  const getPasteDateForKeyboard = useCallback(() => {
-    return currentDate;
-  }, [currentDate]);
-
   const deleteTimeblockAsync = useCallback(
     (timeblockId: string) => deleteTimeblock(timeblockId),
     [deleteTimeblock],
@@ -138,8 +109,6 @@ export function useCalendarCrudHandlers({
     onDeleteTimeblock: deleteTimeblockAsync,
     getSelectedTimeblockTitle,
     getInitialTimeblockData,
-    getSelectedTimeblockForCopy,
-    getPasteDateForKeyboard,
   });
 
   // =========================================================================
@@ -153,8 +122,7 @@ export function useCalendarCrudHandlers({
       onTimeblockUpdate: handleTimeblockUpdate,
       onDeleteTimeblock: deleteTimeblock,
       onDeleteTimeblockConfirm: handleDeleteTimeblockConfirm,
-      onViewStats: handleViewStats,
-      onCopy: handleCopy,
+      onViewActivityDetails: handleViewActivityDetails,
     }),
     [
       disabledTimeblockId,
@@ -163,8 +131,7 @@ export function useCalendarCrudHandlers({
       handleTimeblockUpdate,
       deleteTimeblock,
       handleDeleteTimeblockConfirm,
-      handleViewStats,
-      handleCopy,
+      handleViewActivityDetails,
     ],
   );
 }

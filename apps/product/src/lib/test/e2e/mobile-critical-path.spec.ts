@@ -10,7 +10,6 @@ import {
   clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
-  expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
   openDay,
@@ -24,7 +23,7 @@ import { test } from './trpc-budget-fixture';
 test.use({ trpcProcedureBudget: 26 });
 
 /**
- * クリティカルパス E2E（mobile）— 計画 → 実績 → 振り返りを **mobile の実導線** で通す（#2743）
+ * クリティカルパス E2E（mobile）— 計画 → 実績 → アクティビティ詳細を **mobile の実導線** で通す（#2743）
  *
  * desktop の critical-path.spec.ts をエミュレータで流すだけでは mobile の UX を守れない。
  * mobile は操作境界が 3 つ違うので、それぞれを実 UI で通す:
@@ -32,7 +31,7 @@ test.use({ trpcProcedureBudget: 26 });
  * - 作成は **長押し**（タップは無視、`DRAG_CONSTANTS.LONG_PRESS_DURATION`）。動かさずに
  *   離すと `resolveInstantSelection` が default_duration（seed で 60 分）の選択を確定する
  * - 作成 UI は右パネルではなく **Drawer**（`TimeblockInspector` の mobile 分岐）
- * - Report へは **ヘッダーのレポートリンク**（`MobileCalendarHeader`、BottomTabBar は #2300 で廃止）
+ * - アクティビティ詳細は **ActivityChipRow のメニュー**から開き、記録を選ぶと Inspector へ移る
  *
  * `Mobile Chrome` project は `@mobile` tag の test だけを持つ（playwright.config.ts の grep）。
  * CI では promote.yml の層 3 で chromium と同じ invocation に入る。
@@ -41,7 +40,10 @@ test.use({ trpcProcedureBudget: 26 });
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Mobile Critical Path: 計画 → 実績 → 振り返り');
+assertServiceRoleSuiteRunnable(
+  SERVICE_ROLE_TARGET,
+  'Mobile Critical Path: 計画 → 実績 → アクティビティ詳細',
+);
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
 const IDENTITY = createCriticalPathIdentity('mobile-critical-path');
@@ -95,7 +97,7 @@ async function pickActivityInDrawer(page: Page, kind: 'plan' | 'record') {
   );
 }
 
-describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () => {
+describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビティ詳細', () => {
   test.describe.configure({ mode: 'serial' });
   test.use({ timezoneId: TIMEZONE });
 
@@ -147,14 +149,38 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
   });
 
   test(
-    'ヘッダーのレポートリンクから開いた Report に記録が反映される',
+    'ActivityChipRow から詳細を開き、記録を選んで Inspector へ移る',
     MOBILE_TAG,
     async ({ page }) => {
       await openDay(page, offsetDateParam(-1));
-      await page.getByRole('link', { name: 'レポートを開く' }).click();
-      await expect(page).toHaveURL(/\/ja\/report\?/, { timeout: 10_000 });
+      await page
+        .getByRole('button', {
+          name: `アクティビティメニュー: ${IDENTITY.activityName}`,
+          exact: true,
+        })
+        .click();
+      await page.getByRole('menuitem', { name: 'アクティビティの詳細', exact: true }).click();
 
-      await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
+      const sheet = page.locator('[data-activity-summary-sheet="true"]');
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByText('記録合計', { exact: true }).locator('..')).toContainText(
+        '1時間',
+      );
+      const record = await adminSupabase
+        .from('records')
+        .select('id')
+        .eq('user_id', IDENTITY.userId)
+        .single();
+      expect(record.error === null).toBe(true);
+      const recordRows = sheet.locator('section ul > li > button');
+      await expect(recordRows).toHaveCount(1);
+      await recordRows.first().click();
+
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+        .toBe(`record:${record.data!.id}`);
+      await expect(sheet).toBeHidden();
+      await expect(page.getByRole('textbox', { name: 'メモ', exact: true })).toBeVisible();
     },
   );
 
@@ -162,7 +188,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
     'mobile の設定一覧から表示設定を変更し、戻る導線と永続化を確認する',
     MOBILE_TAG,
     async ({ page }) => {
-      await page.goto('/ja/settings?returnTo=%2Fcalendar');
+      await page.goto('/ja/settings?returnTo=%2F%3Fview%3Dday');
       await page.getByRole('link', { name: '表示', exact: true }).click();
       await expect(page).toHaveURL(/\/ja\/settings\/display\?/);
       const format = page.getByRole('combobox', { name: '時間表示形式', exact: true });
@@ -184,7 +210,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
       await page.getByRole('link', { name: '戻る', exact: true }).click();
       await expect(page).toHaveURL(/\/ja\/settings\?/);
       await page.getByRole('link', { name: '戻る', exact: true }).click();
-      await expect(page).toHaveURL(/\/ja\/calendar/);
+      await expect(page).toHaveURL(/\/ja\/?\?view=day(?:&.*)?$/);
       await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
     },
   );

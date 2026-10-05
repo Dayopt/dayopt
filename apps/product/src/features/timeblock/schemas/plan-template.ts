@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isValidTemplateDateKey } from '../domain/plan-template-anchor';
+
 /** テンプレート名。DB の `plan_templates_name_length`（btrim > 0、<= 100）と同じ境界。 */
 const templateNameSchema = z
   .string()
@@ -8,7 +10,7 @@ const templateNameSchema = z
   .max(100, 'validation.title.maxLength');
 
 /** yyyy-MM-dd（ユーザー timezone の暦日）。 */
-const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.invalidDate');
+const dateKeySchema = z.string().refine(isValidTemplateDateKey, 'validation.invalidDate');
 
 /**
  * 保存するブロック。組成（activity / title）と錨位置だけで、寸法は持たない（v1.0 §5.4）。

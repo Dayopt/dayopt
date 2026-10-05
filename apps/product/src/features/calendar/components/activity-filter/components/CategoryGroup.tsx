@@ -1,15 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
-
-import { useLocale } from 'next-intl';
+import { useMemo } from 'react';
 
 import type { Activity, Category } from '@/features/activities';
 import { cn } from '@dayopt/components';
 
 import { useActivityModalNavigation } from '../../../hooks/useActivityModalNavigation';
-import { buildReportPath } from '../../../lib/panel-url';
 import { useActivityDropTarget } from '../useActivityDragHandlers';
 
 import { ActivityRow } from './ActivityRow';
@@ -61,8 +57,6 @@ export function CategoryGroup({
   onArchiveActivity,
   onDeleteActivity,
 }: CategoryGroupProps) {
-  const locale = useLocale();
-  const router = useRouter();
   const { openActivityCreateModal, openCategoryRenameModal } = useActivityModalNavigation();
   const { displayColor, handleColorChange, handleIconChange } = useCategoryAppearanceEdit({
     categoryId: category.id,
@@ -72,12 +66,6 @@ export function CategoryGroup({
   const activityIds = useMemo(() => activities.map((activity) => activity.id), [activities]);
   const visibility = getCategoryVisibility(activityIds);
   const { isActiveTarget, dropProps } = useActivityDropTarget(category.id);
-
-  const handleViewStats = useCallback(() => {
-    // カレンダー内パネル（CalendarReviewRail）は廃止済み（#2181 Step 4）。
-    // アクティビティによるセグメント絞り込みは Step 5（セグメント配線）で復元する。
-    router.push(buildReportPath(locale, new Date()));
-  }, [router, locale]);
 
   return (
     // カテゴリー間の余白は自分の開閉状態で決める（自分の下に margin-bottom）。
@@ -112,7 +100,6 @@ export function CategoryGroup({
         onIconChange={handleIconChange}
         onAddActivityToCategory={() => openActivityCreateModal({ initialCategoryId: category.id })}
         onRenameCategory={() => openCategoryRenameModal({ id: category.id, name: category.name })}
-        onViewStats={handleViewStats}
         onArchiveCategory={() => onArchiveCategory(category.id)}
         onDeleteCategory={() => onDeleteCategory(category.id, category.name)}
       />
@@ -128,6 +115,7 @@ export function CategoryGroup({
               allActivities={allActivities}
               checked={visibleActivityIds.has(activity.id)}
               categoryId={category.id}
+              categoryName={category.name}
               categoryOptions={categoryOptions.filter((option) => option.id !== category.id)}
               isMobile={isMobile}
               onToggle={() => onToggleActivity(activity.id)}
