@@ -219,17 +219,22 @@ function validateRequest({ sha, deploymentId, branchName, prNumber, githubToken,
 
 function validatePullRequest(
   pullRequest,
-  { sha, branchName, prNumber, requireRunnablePullRequest },
+  { sha, branchName, prNumber, pullRequestPolicy, mergeCommitSha },
 ) {
   const repositoryId = pullRequest?.base?.repo?.id;
+  const stateIsAllowed =
+    pullRequestPolicy === 'open'
+      ? pullRequest.state === 'open' && pullRequest.draft === false
+      : pullRequestPolicy === 'merged'
+        ? pullRequest.state === 'closed' && pullRequest.merged === true
+        : ['open', 'closed'].includes(pullRequest.state) && typeof pullRequest.draft === 'boolean';
   requireCondition(
-    pullRequest?.number === prNumber &&
-      (requireRunnablePullRequest
-        ? pullRequest.state === 'open' && pullRequest.draft === false
-        : ['open', 'closed'].includes(pullRequest.state) && typeof pullRequest.draft === 'boolean'),
-    requireRunnablePullRequest
+    pullRequest?.number === prNumber && stateIsAllowed,
+    pullRequestPolicy === 'open'
       ? 'candidate PR is not open and ready'
-      : 'candidate PR identity is unavailable',
+      : pullRequestPolicy === 'merged'
+        ? 'candidate PR is not merged'
+        : 'candidate PR identity is unavailable',
   );
   requireCondition(
     pullRequest.head?.repo?.full_name === GITHUB_REPOSITORY &&
@@ -244,14 +249,53 @@ function validatePullRequest(
     pullRequest.head.ref === branchName &&
       typeof pullRequest.head.sha === 'string' &&
       SHA.test(pullRequest.head.sha) &&
-      (!requireRunnablePullRequest || pullRequest.head.sha.toLowerCase() === sha),
-    requireRunnablePullRequest
+      (pullRequestPolicy !== 'open' || pullRequest.head.sha.toLowerCase() === sha) &&
+      (pullRequestPolicy !== 'merged' ||
+        (pullRequest.base.ref === 'integration' &&
+          pullRequest.merge_commit_sha === mergeCommitSha)),
+    pullRequestPolicy === 'open'
       ? 'candidate PR head differs'
-      : 'candidate PR branch identity differs',
+      : pullRequestPolicy === 'merged'
+        ? 'candidate PR merge binding differs'
+        : 'candidate PR branch identity differs',
   );
   requireCondition(
     ['main', 'integration'].includes(pullRequest.base.ref),
     'candidate PR base is not allowed',
+  );
+}
+
+async function verifyMergedCommitHistory({ sha, mergeCommitSha, workflowSha, token, fetchImpl }) {
+  requireCondition(
+    SHA.test(mergeCommitSha ?? '') && SHA.test(workflowSha ?? ''),
+    'merged Integration history binding is invalid',
+  );
+  const mergeSha = mergeCommitSha.toLowerCase();
+  const { body: mergeCommit } = await readGitHubJson({
+    url: apiUrl(`/repos/${GITHUB_REPOSITORY}/git/commits/${mergeSha}`),
+    token,
+    fetchImpl,
+  });
+  requireCondition(
+    mergeCommit?.sha?.toLowerCase() === mergeSha &&
+      Array.isArray(mergeCommit.parents) &&
+      mergeCommit.parents.length === 2 &&
+      SHA.test(mergeCommit.parents[0]?.sha ?? '') &&
+      mergeCommit.parents[1]?.sha?.toLowerCase() === sha.toLowerCase(),
+    'merged Integration commit does not contain the candidate as its second parent',
+  );
+  const { body: comparison } = await readGitHubJson({
+    url: apiUrl(`/repos/${GITHUB_REPOSITORY}/compare/${mergeSha}...${workflowSha}`),
+    token,
+    fetchImpl,
+  });
+  requireCondition(
+    ['ahead', 'identical'].includes(comparison?.status) &&
+      comparison.merge_base_commit?.sha?.toLowerCase() === mergeSha &&
+      Number.isSafeInteger(comparison.ahead_by) &&
+      Number.isSafeInteger(comparison.behind_by) &&
+      comparison.behind_by === 0,
+    'merged Integration commit is not in the trusted workflow history',
   );
 }
 
@@ -364,13 +408,10 @@ function validateDeploymentStatus(status, deploymentId) {
 }
 
 /**
- * Observe the trusted Vercel Product Preview deployment attached to an open
- * internal PR. This authenticates GitHub's provider records; callers must still
- * verify the live app health and selected nonproduction database separately.
- * `requireRunnablePullRequest:false` is reserved for local cleanup of an
- * already-pinned run after its PR has closed or advanced; it does not relax the
- * exact deployment, provider-status, or immutable-origin checks.
- * @param {{ sha:string, deploymentId:string, branchName:string, prNumber:number, githubToken:string, requireRunnablePullRequest?:boolean, fetchImpl?:typeof fetch, now?:()=>Date }} options
+ * Observe the trusted Vercel Product Preview deployment attached to an internal
+ * PR. Merged validation binds the original candidate SHA to an Integration
+ * merge; cleanup policy is reserved for an already-pinned run.
+ * @param {{ sha:string, deploymentId:string, branchName:string, prNumber:number, githubToken:string, pullRequestPolicy?:'open'|'merged'|'cleanup', mergeCommitSha?:string, workflowSha?:string, fetchImpl?:typeof fetch, now?:()=>Date }} options
  * @returns {Promise<{ origin:string, providerEvidence:Record<string, string|number> }>}
  */
 export async function observeProductPreviewDeployment({
@@ -379,12 +420,20 @@ export async function observeProductPreviewDeployment({
   branchName,
   prNumber,
   githubToken,
-  requireRunnablePullRequest = true,
+  pullRequestPolicy = 'open',
+  mergeCommitSha = undefined,
+  workflowSha = undefined,
   fetchImpl = fetch,
   now = () => new Date(),
 }) {
   requireCondition(
-    typeof requireRunnablePullRequest === 'boolean',
+    ['open', 'merged', 'cleanup'].includes(pullRequestPolicy) &&
+      (pullRequestPolicy === 'merged'
+        ? typeof mergeCommitSha === 'string' &&
+          SHA.test(mergeCommitSha) &&
+          typeof workflowSha === 'string' &&
+          SHA.test(workflowSha)
+        : mergeCommitSha === undefined),
     'candidate PR policy is invalid',
   );
   const { sha, nowMs } = validateRequest({
@@ -402,7 +451,22 @@ export async function observeProductPreviewDeployment({
     token,
     fetchImpl,
   });
-  validatePullRequest(pullRequest, { sha, branchName, prNumber, requireRunnablePullRequest });
+  validatePullRequest(pullRequest, {
+    sha,
+    branchName,
+    prNumber,
+    pullRequestPolicy,
+    mergeCommitSha,
+  });
+  if (pullRequestPolicy === 'merged') {
+    await verifyMergedCommitHistory({
+      sha,
+      mergeCommitSha,
+      workflowSha,
+      token,
+      fetchImpl,
+    });
+  }
 
   const commitStatuses = await readPaginatedArray({
     path: `/repos/${GITHUB_REPOSITORY}/commits/${sha}/statuses`,

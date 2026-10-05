@@ -7,6 +7,8 @@ const sha = 'a'.repeat(40);
 const branchName = 'codex/preview-provenance-2910';
 const prNumber = 2910;
 const deploymentId = 'dpl_abc123XYZ';
+const mergeCommitSha = 'c'.repeat(40);
+const workflowSha = 'd'.repeat(40);
 const githubDeploymentId = 801;
 const repositoryUrl = 'https://api.github.com/repos/Dayopt/dayopt';
 const vercelCreator = { id: 35613825, login: 'vercel[bot]', type: 'Bot' };
@@ -70,17 +72,28 @@ function fixture(overrides: Record<string, unknown> = {}) {
       creator: { ...vercelCreator },
     },
   ];
+  const mergeParents = [{ sha: 'b'.repeat(40) }, { sha }];
+  const comparison = {
+    status: 'ahead',
+    ahead_by: 1,
+    behind_by: 0,
+    merge_base_commit: { sha: mergeCommitSha },
+  };
   const state = {
     pullRequest,
     commitStatuses,
     deployments,
     deploymentStatuses,
+    mergeParents,
+    comparison,
     ...overrides,
   } as {
     pullRequest: Record<string, any>;
     commitStatuses: Record<string, any>[];
     deployments: Record<string, any>[];
     deploymentStatuses: Record<string, any>[];
+    mergeParents: Array<{ sha: string }>;
+    comparison: Record<string, any>;
     fetchOverride?: (url: URL, init: RequestInit) => Response | Promise<Response>;
   };
 
@@ -101,6 +114,12 @@ function fixture(overrides: Record<string, unknown> = {}) {
     if (state.fetchOverride) return state.fetchOverride(url, init!);
     if (url.pathname === `/repos/Dayopt/dayopt/pulls/${prNumber}`) {
       return Response.json(state.pullRequest);
+    }
+    if (url.pathname === `/repos/Dayopt/dayopt/git/commits/${mergeCommitSha}`) {
+      return Response.json({ sha: mergeCommitSha, parents: state.mergeParents });
+    }
+    if (url.pathname === `/repos/Dayopt/dayopt/compare/${mergeCommitSha}...${workflowSha}`) {
+      return Response.json(state.comparison);
     }
     if (url.pathname === `/repos/Dayopt/dayopt/commits/${sha}/statuses`) {
       return Response.json(state.commitStatuses);
@@ -185,6 +204,72 @@ describe('Product Preview deployment provenance', () => {
     expect(world.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('requires a closed merged Integration PR with the expected merge commit for merged validation', async () => {
+    const world = fixture();
+    world.state.pullRequest.state = 'closed';
+    world.state.pullRequest.merged = true;
+    world.state.pullRequest.merge_commit_sha = mergeCommitSha;
+    world.state.pullRequest.base.ref = 'integration';
+    const evidence = await observeProductPreviewDeployment({
+      ...options(world.fetchImpl),
+      pullRequestPolicy: 'merged',
+      mergeCommitSha,
+      workflowSha,
+    });
+    expect(evidence.origin).toBe('https://product-abc123-dayopt.vercel.app');
+    expect(world.fetchImpl).toHaveBeenCalledTimes(6);
+  });
+
+  it.each([
+    ['the wrong second merge parent', (state: any) => (state.mergeParents[1].sha = 'e'.repeat(40))],
+    [
+      'an Integration SHA that is not descended from the merge',
+      (state: any) => (state.comparison.status = 'diverged'),
+    ],
+  ])('rejects merged deployment provenance when %s', async (_label, change) => {
+    const world = fixture();
+    world.state.pullRequest.state = 'closed';
+    world.state.pullRequest.merged = true;
+    world.state.pullRequest.merge_commit_sha = mergeCommitSha;
+    world.state.pullRequest.base.ref = 'integration';
+    change(world.state);
+    await expect(
+      observeProductPreviewDeployment({
+        ...options(world.fetchImpl),
+        pullRequestPolicy: 'merged',
+        mergeCommitSha,
+        workflowSha,
+      }),
+    ).rejects.toThrow();
+    const calledPaths = world.fetchImpl.mock.calls.map(
+      ([input]) => new URL(String(input)).pathname,
+    );
+    expect(calledPaths).not.toContain(`/repos/Dayopt/dayopt/commits/${sha}/statuses`);
+  });
+
+  it.each([
+    ['an open PR', (pr: any) => (pr.state = 'open')],
+    ['an unmerged PR', (pr: any) => (pr.merged = false)],
+    ['a PR targeting main', (pr: any) => (pr.base.ref = 'main')],
+    ['a different merge commit', (pr: any) => (pr.merge_commit_sha = 'd'.repeat(40))],
+  ])('rejects merged validation for %s before checking deployment state', async (_name, change) => {
+    const world = fixture();
+    world.state.pullRequest.state = 'closed';
+    world.state.pullRequest.merged = true;
+    world.state.pullRequest.merge_commit_sha = mergeCommitSha;
+    world.state.pullRequest.base.ref = 'integration';
+    change(world.state.pullRequest);
+    await expect(
+      observeProductPreviewDeployment({
+        ...options(world.fetchImpl),
+        pullRequestPolicy: 'merged',
+        mergeCommitSha,
+        workflowSha,
+      }),
+    ).rejects.toThrow();
+    expect(world.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('allows cleanup provenance to survive a closed PR and advanced head only with the recovery flag', async () => {
     const world = fixture();
     world.state.pullRequest.state = 'closed';
@@ -198,7 +283,7 @@ describe('Product Preview deployment provenance', () => {
     await expect(
       observeProductPreviewDeployment({
         ...options(recoveryWorld.fetchImpl),
-        requireRunnablePullRequest: false,
+        pullRequestPolicy: 'cleanup',
       }),
     ).resolves.toMatchObject({
       origin: 'https://product-abc123-dayopt.vercel.app',
@@ -214,7 +299,7 @@ describe('Product Preview deployment provenance', () => {
     await expect(
       observeProductPreviewDeployment({
         ...options(world.fetchImpl),
-        requireRunnablePullRequest: false,
+        pullRequestPolicy: 'cleanup',
       }),
     ).rejects.toThrow('candidate PR branch identity differs');
     expect(world.fetchImpl).toHaveBeenCalledTimes(1);

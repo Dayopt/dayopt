@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import {
   assertServiceRoleSuiteRunnable,
@@ -9,6 +9,7 @@ import {
   deleteScopedTestUser,
   type ScopedTestUser,
 } from '../create-scoped-test-user';
+import { test } from '../preview-access-fixture';
 import { suppressConsentBanner } from '../suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -63,27 +64,32 @@ async function isControlledByServiceWorker(page: Page): Promise<boolean> {
 }
 
 test.describe('PWA installability', () => {
-  test('exposes a valid web app manifest', async ({ page }) => {
-    await page.goto('/');
+  test(
+    'exposes a valid web app manifest',
+    { tag: '@preview-e2e/product-pwa-manifest' },
+    async ({ page }) => {
+      await page.goto('/');
 
-    const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
-    expect(manifestHref).toBeTruthy();
+      const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
+      expect(manifestHref).toBeTruthy();
 
-    const manifestUrl = new URL(manifestHref!, page.url());
-    const response = await page.request.get(manifestUrl.toString());
-    expect(response.status()).toBe(200);
+      const manifestUrl = new URL(manifestHref!, page.url());
+      expect(manifestUrl.origin).toBe(new URL(page.url()).origin);
+      const response = await page.goto(manifestUrl.href);
+      expect(response?.status()).toBe(200);
 
-    const manifest = (await response.json()) as Record<string, unknown>;
-    expect(manifest).toHaveProperty('name');
-    expect(manifest).toHaveProperty('start_url');
-    expect(manifest).toHaveProperty('display');
-    expect(manifest).toHaveProperty('icons');
+      const manifest = (await response!.json()) as Record<string, unknown>;
+      expect(manifest).toHaveProperty('name');
+      expect(manifest).toHaveProperty('start_url');
+      expect(manifest).toHaveProperty('display');
+      expect(manifest).toHaveProperty('icons');
 
-    const icons = manifest['icons'] as Array<Record<string, unknown>>;
-    const sizes = icons.map((icon) => icon['sizes'] as string);
-    expect(sizes.some((size) => size.includes('192'))).toBe(true);
-    expect(sizes.some((size) => size.includes('512'))).toBe(true);
-  });
+      const icons = manifest['icons'] as Array<Record<string, unknown>>;
+      const sizes = icons.map((icon) => icon['sizes'] as string);
+      expect(sizes.some((size) => size.includes('192'))).toBe(true);
+      expect(sizes.some((size) => size.includes('512'))).toBe(true);
+    },
+  );
 });
 
 /**

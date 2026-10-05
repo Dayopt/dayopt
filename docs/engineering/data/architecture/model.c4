@@ -237,11 +237,11 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plan_template_blocks 'plan_template_blocks' {
-    metadata { inventoryKind 'table' detail 'used by timeblock' }
+    metadata { inventoryKind 'table' detail 'used by lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plan_templates 'plan_templates' {
-    metadata { inventoryKind 'table' detail 'used by timeblock' }
+    metadata { inventoryKind 'table' detail 'used by lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plans 'plans' {

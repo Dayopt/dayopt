@@ -1790,7 +1790,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（40）</summary>
+<summary>test の候補（41）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1820,6 +1820,7 @@ graph LR
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
@@ -2386,7 +2387,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（65）</summary>
+<summary>test の候補（67）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2439,9 +2440,11 @@ graph LR
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-critical-path.spec.ts>) | 画面: /[locale]/settings |
 | [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] / 画面: /[locale]/settings |
 | [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |

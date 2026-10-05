@@ -34,6 +34,12 @@ vi.mock('./LandingInteractions', () => ({
 import { LandingPage } from './LandingPage';
 
 describe('LandingPage signup calls to action', () => {
+  it('links calendar and activity explanations to their published routes', async () => {
+    const { container } = render(await LandingPage({ locale: 'en' }));
+    expect(container.querySelector('a[href="/docs/calendar"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/docs/activities"]')).not.toBeNull();
+  });
+
   it('keeps each CTA on its matching Product preview and tracks its placement', async () => {
     const page = await LandingPage({ locale: 'en' });
     const { container } = render(page);
