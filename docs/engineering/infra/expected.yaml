@@ -1176,12 +1176,7 @@ ui_only:
       'service': 'github',
       'category': 'collector_unavailable',
       'items':
-        [
-          'installed Apps permissions',
-          'repository selection',
-          'Slack workspace / channel binding',
-          'organization hooks',
-        ],
+        ['installed Apps permissions', 'repository selection', 'Slack workspace / channel binding'],
       'reason': '現readerはrepository hooksのみでApp installation権限を収集しない。API未提供とは判定しない',
       'next_step': '既存認証済みGitHub SettingsでDayoptのApp権限・repo対象だけ確認。installや権限拡張はしない',
       'check_ids': ['github.installed_apps'],
@@ -1192,8 +1187,8 @@ ui_only:
       'service': 'github',
       'category': 'current_permission',
       'items': ['environment secret names', 'repository hooks'],
-      'reason': 'agent PATのGETは403。API未提供ではない',
-      'next_step': '認証済みGitHub Settingsで名前 / 件数を読む。9/30のUI証拠は履歴として扱う',
+      'reason': 'agent PATのGETは403。environment secret名とrepo/org webhookは認証済みUIで補完したが、自動DoctorのAPI判定はblockedのまま',
+      'next_step': 'UI補完は2026-10-05棚卸しに記録済み。既存read-only credentialのscope確認以外の権限変更・credential作成はしない',
       'check_ids':
         [
           'github.production-release.secret_names',
@@ -1340,9 +1335,9 @@ ui_only:
       'id': 'sentry.source_map.application',
       'service': 'sentry',
       'category': 'behavior_not_metadata',
-      'items': ['privacy settings', 'served release artifact mapping'],
-      'reason': 'release metadata / legacy file数はPII設定やsource map適用成功を証明しない',
-      'next_step': '既存Sentry project settings / artifact metadataを読む。個別顧客eventは取得しない',
+      'items': ['privacy settings', 'applied artifact bundle mapping'],
+      'reason': 'release metadataとlegacy release file数はPII設定やartifact bundle/source mapの適用成功を証明しない',
+      'next_step': '2026-10-05時点のSentry UIはloginへ転送され、Sentry MCPも利用不可。既存認証済みUIまたは対応済みread-only APIで設定metadataだけ確認し、個別顧客eventは取得しない',
       'check_ids': ['sentry.applied_source_maps'],
       'documentation_urls': [],
     }
