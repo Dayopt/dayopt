@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { ensureIntegrationMergebackPr } from '../lib/release-candidate-mergeback.mjs';
 import { runCandidateGate } from './release-candidate-gate.mjs';
-import { ensureIntegrationMergebackPr } from './release-candidate-mergeback.mjs';
 import { isTrustedCandidateWorkflowPath, verifyCandidateEvidence } from './release-candidate.mjs';
 
 export function assertCandidateBranchRules(rules) {

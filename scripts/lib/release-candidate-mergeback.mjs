@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { isDirectExecution } from './is-direct-execution.mjs';
 
 const shaPattern = /^[0-9a-f]{40}$/;
 
