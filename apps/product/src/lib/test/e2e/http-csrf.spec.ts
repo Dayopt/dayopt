@@ -243,8 +243,11 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     expect(recovery.count).toBe(0);
 
     await page.goto(attackerOrigin);
-    const rejectedAction = page.waitForResponse(
-      (response) => response.url() === actionUrl && response.request().method() === 'POST',
+    const actionBrowserRequestPromise = page.waitForRequest(
+      (browserRequest) =>
+        new URL(browserRequest.url()).origin === new URL(actionUrl).origin &&
+        new URL(browserRequest.url()).pathname === new URL(actionUrl).pathname &&
+        browserRequest.method() === 'POST',
     );
     await page.evaluate(
       ({ actionId, actionUrl }) => {
@@ -260,8 +263,33 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
       },
       { actionId: actionId!, actionUrl },
     );
-    const actionResponse = await rejectedAction;
+    const actionBrowserRequest = await actionBrowserRequestPromise;
+    const actionBrowserHeaders = await actionBrowserRequest.allHeaders();
+    const actionBody = actionBrowserRequest.postDataBuffer();
+    expect(actionBrowserHeaders.origin).toBe(attackerOrigin);
+    expect(
+      authCookieNames.some((name) => actionBrowserHeaders.cookie?.includes(`${name}=`)),
+      'Server Actionを呼ぶ攻撃元フォームにもログイン済みのSupabase Cookieが送られること',
+    ).toBe(true);
+    expect(actionBody).not.toBeNull();
+
+    // Capture the browser's actual Server Action submission, then replay its exact body
+    // with the same session and forged Origin through APIRequestContext to observe the
+    // deterministic Next.js rejection status.
+    const actionResponse = await request.post(actionUrl, {
+      headers: {
+        origin: attackerOrigin,
+        cookie: actionBrowserHeaders.cookie ?? '',
+        'content-type': actionBrowserHeaders['content-type'] ?? '',
+      },
+      data: actionBody!,
+    });
     expect(actionResponse.status()).toBe(500);
-    expect((await actionResponse.request().allHeaders()).origin).toBe(attackerOrigin);
+    const recoveryAfterAttack = await admin
+      .from('mfa_recovery_codes')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.userId);
+    expect(recoveryAfterAttack.error).toBeNull();
+    expect(recoveryAfterAttack.count).toBe(0);
   });
 });
