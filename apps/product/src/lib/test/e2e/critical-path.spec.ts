@@ -405,11 +405,21 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     expect(afterRecords.data).toEqual(beforeRecords.data);
   });
 
-  test('テーマ・タイムゾーン・言語の変更がリロード後も保持される', async ({ page }) => {
+  test('テーマの変更が保存され、リロード後も保持される', async ({ page }) => {
     await page.goto('/ja/settings/display');
     await page.getByRole('combobox', { name: 'テーマ', exact: true }).click();
     await page.getByRole('option', { name: 'ダーク', exact: true }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('theme')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        return result.error === null ? result.data?.theme : null;
+      })
+      .toBe('dark');
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
@@ -417,6 +427,10 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect(page.getByRole('combobox', { name: 'テーマ', exact: true })).toContainText(
       'ダーク',
     );
+  });
+
+  test('タイムゾーンの変更がリロード後も保持される', async ({ page }) => {
+    await page.goto('/ja/settings/display');
     const timezone = page.getByRole('combobox', { name: 'タイムゾーン', exact: true });
     await timezone.click();
     await page.getByRole('option', { name: 'シドニー (GMT+10)', exact: true }).click();
@@ -447,6 +461,10 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
         return result.error === null ? result.data?.timezone : null;
       })
       .toBe(TIMEZONE);
+  });
+
+  test('言語の変更がリロード後も保持される', async ({ page }) => {
+    await page.goto('/ja/settings/display');
     await page.getByRole('combobox', { name: '言語', exact: true }).click();
     await page.getByRole('option', { name: 'English', exact: true }).click();
     await expect(page).toHaveURL(/\/en\/calendar$/);

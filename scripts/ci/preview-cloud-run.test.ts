@@ -191,7 +191,7 @@ describe('Cloud Preview evidence and cleanup', () => {
     (kind) => {
       const options = fixture();
       const tests = [
-        ...Array.from({ length: 14 }, (_, index) => ({
+        ...Array.from({ length: 16 }, (_, index) => ({
           file: 'critical-path.spec.ts',
           project: 'chromium',
           line: index + 1,

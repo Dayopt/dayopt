@@ -66,7 +66,7 @@ const env = {
 
 function reviewedReport() {
   const tests = [
-    ...Array.from({ length: 14 }, (_, index) => ({
+    ...Array.from({ length: 16 }, (_, index) => ({
       file: 'critical-path.spec.ts',
       project: 'chromium',
       line: index + 1,
@@ -77,11 +77,11 @@ function reviewedReport() {
       line: index + 1,
     })),
   ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-  return { status: 'passed', expected: 18, tests };
+  return { status: 'passed', expected: 20, tests };
 }
 
 describe('Reviewed Preview declaration matrix', () => {
-  it('accepts exactly the reviewed fourteen desktop and four mobile declarations', () => {
+  it('accepts exactly the reviewed sixteen desktop and four mobile declarations', () => {
     expect(isPassingPreviewReport(reviewedReport())).toBe(true);
   });
   it('rejects the previous nine desktop and three mobile contract', () => {
