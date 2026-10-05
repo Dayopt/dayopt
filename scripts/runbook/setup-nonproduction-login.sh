@@ -17,6 +17,10 @@ for arg in "$@"; do
   esac
 done
 
+if [[ ! -f "$OP_STARTUP_CHECK" ]]; then
+  echo '1Password startup check is missing; set OP_STARTUP_CHECK to the approved checker; no changes made.' >&2
+  exit 1
+fi
 if ! python3 "$OP_STARTUP_CHECK" >/dev/null 2>&1; then
   echo '1Password startup check failed; no changes made.' >&2
   exit 1
@@ -36,6 +40,11 @@ if [[ -z "${NONPROD_LOGIN_VAULT_ID:-}" ]]; then
   echo 'NONPROD_LOGIN_VAULT_ID is required to resolve the owner-managed login item; no changes made.' >&2
   exit 1
 fi
+provision_vault="${NONPROD_LOGIN_PROVISION_VAULT_ID:-ci}"
+if [[ ! "$provision_vault" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo 'NONPROD_LOGIN_PROVISION_VAULT_ID must be a vault ID; no changes made.' >&2
+  exit 1
+fi
 
 read_item_field() {
   local item="$1" field="$2" result
@@ -49,7 +58,7 @@ read_item_field() {
 # Resolve and validate all source values before the first GitHub mutation.
 login_email="$(read_item_field "$LOGIN_ITEM_ID" username)" || exit 1
 login_password="$(read_item_field "$LOGIN_ITEM_ID" password)" || exit 1
-provision_token="$(op read 'op://ci/supabase-preview-provision/credential' 2>/dev/null)" || {
+provision_token="$(op read "op://$provision_vault/supabase-preview-provision/credential" 2>/dev/null)" || {
   echo '1Password read failed for the scoped Supabase Management PAT; no GitHub writes made.' >&2
   exit 1
 }
@@ -101,5 +110,5 @@ set_secret() {
 set_secret NONPROD_LOGIN_EMAIL login_email || exit 1
 set_secret NONPROD_LOGIN_PASSWORD login_password || exit 1
 set_secret SUPABASE_PREVIEW_PROVISION_TOKEN provision_token || exit 1
-unset login_email login_password provision_token
+unset login_email login_password provision_token provision_vault
 echo 'Nonproduction login secrets synchronized; values were not displayed or written to files.'

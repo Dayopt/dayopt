@@ -466,10 +466,9 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     githubSecret,
     githubEnvironments: ['Preview – product'],
   })),
-  // PR-local Auth user bootstrap. The login item ID is user-supplied and its
-  // vault was not found among the accessible vaults. ci is the intended master
-  // classification, not a verified location; setup takes the owner-managed
-  // vault ID explicitly and these references remain pending until confirmed.
+  // PR-local Auth user bootstrap. The login fields were verified as nonempty
+  // through the owner-provided vault locator. The PAT item and GitHub replica
+  // are still pending; setup supports an owner-managed source vault.
   ...[
     ['NONPROD_LOGIN_EMAIL', 's3tems3afbzvvguakggydcgxni', 'username'],
     ['NONPROD_LOGIN_PASSWORD', 's3tems3afbzvvguakggydcgxni', 'password'],
@@ -481,7 +480,7 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
       'staging',
       ci,
       item,
-      'Nonproduction login source vault is unverified or GitHub Environment replica is not initialized',
+      'Scoped Management PAT item or GitHub Environment replica is not initialized',
       envName,
     ),
     field,
