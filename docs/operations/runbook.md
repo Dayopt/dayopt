@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-10-05
 ---
 
 # Runbook（障害対応・リリース手順）
@@ -136,7 +136,7 @@ op run --env-file=.op-env.human -- pnpm mcp:gate -- --expect-url='<approved-supa
 2. Vercel Production env `MCP_WRITE_ENABLED_CLIENTS` に `<id>` を追加する。
 3. env 設定後に作成された Production build を配信する。実際に配信中の deployment ID・SHA と env 設定時刻の前後を先に照合する。
    - **live より新しい main HEAD に Product の変更がある場合**: `gh workflow run promote.yml --ref main` で通常の検証を経て配信する。
-   - **live と main HEAD が同じ SHA の場合**: 通常 dispatch は `already serving` と判定し、redeploy で作った新しい deployment を選ばない。下記「同一 commit の再配備」で deployment ID を名指しして配信する。`force=true` はこの SHA 判定を変えず検証を省略するため、代替手順にしない。
+   - **live と main HEAD が同じ SHA の場合**: 通常 dispatch は `already serving` と判定し、redeploy で作った新しい deployment を選ばない。下記「同一 commit の再配備」で deployment ID を名指しして配信する。検証を省略する入力は用意しない。
 4. 承認済みの DB 操作を1回ずつ行う: `--enable-billing`（体験利用を許可する場合）→ `--enable-global` → `--enable-client=<id>`。毎回期待 URL・環境を指定する。
 5. 対象ユーザーが再 consent し、付与 scope と `write_enabled_at`、実際の tool 一覧を確認する。広告 scope だけを write 開放の証拠にしない。
 6. 過去に終了した Record を作成し、receipt と Calendar 反映を確認する。未来終了の Record は DT005 で拒否される。
@@ -395,28 +395,58 @@ Vercel の rollback はビルド成果物だけを戻す。**DB migration と変
 通常のProduction公開は `main` merge → `Production Release` workflow（自動起動）の promote だけを使う。
 `Instant Rollback` / `Promote to Production` は正常な既存deploymentへ戻す緊急操作で、新規buildの作成経路ではない。
 
-#### ケースD: Force Promote（break-glass）
+#### ケースD: 緊急の前進リリース
 
-release gate 自体が壊れていて、かつ Production を今すぐ前進させる必要がある時だけ使う。smoke と Production Config Audit をスキップするため、通常運用では使わない。
+緊急時も通常と同じ候補固定・全体検証・tree 一致・migration readiness・smoke・設定監査を通す。`force` と `reason` の入力は廃止し、古い呼出しの `force=true` は API 操作前に拒否する。
+
+候補経路を有効化した環境では、下記の candidate 手順を時刻に関係なく使う。gate が失敗した場合は候補全体を保留し、修正して再検証する。
+
+### integration staging からの候補リリース（#3009）
+
+`main` が Production、`integration` が日中の Staging。日中の PR は既存の軽量 checks と review を通し、DB/schema 変更は #2910 の隔離 Preview で merge 前に確認する。Preview 準備失敗を共有 DB への fallback で補わない。
+
+候補実装は `release-candidate.yml` に置く。schedule と activation は別途合意する。無効時の既存 Production Release は従来の affected 検証を通し、force による免除はできない。
+
+候補は run 開始時に `integration` の完全 SHA/tree、現在の main SHA/tree、run/attempt と capture 時刻を固定する。main が integration の祖先でなければ停止する。main の hotfix を捨てる reset や、候補から PR を取り除く操作は行わない。
+
+全体 unit/workspace、integration/RLS、base→candidate の DB upgrade、Product desktop/mobile E2E、Web E2E、Storybook light/dark を同じ SHA で実行する。現在の full suite は GitHub-hosted runner 内の使い捨て Supabase を対象とする。DB container identity と実適用 migration 集合、migration 内容 hash、schema hash を前後で照合し、共有 Persistent DB の hosted runtime を検証したと主張しない。#3011/#2910 が所有する hosted Preview の受入は別途必要。
+
+成功時だけ attempt ごとの `candidate-evidence-<attempt>` を保存する。gate は artifact の記述に加え、GitHub 上の repo、trusted main workflow、最新 attempt の完了/成功、commit/tree、PR の両親と proposed merge tree を照合する。欠測・期限超過・DB/schema の変化・main の前進・再実行中・結果不明は全体保留。
+
+成功候補の完了イベントは `candidate-promotion.yml` に渡る。main の trusted controller が draft PR を作って ready 化し、既存の required checks を最大60分待ち、全件が明示的に成功した場合だけ同じ候補を通常 merge する。赤・欠測・期限超過は全体保留。candidate code は merge credential を持つ worker で実行しない。
+
+有効化前に確認する条件:
+
+- integration の既存差分と POC migration を通常 PR で整理し、main を含む状態にする。freeze の解除は独立して承認する。
+- main の strict required checks に `Release Candidate Gate` を追加する。integration の intake enforcement も #3017 で確定する。ruleset を実装作業から無断更新しない。
+- 候補検証の UTC cron と最大開始遅延（`RELEASE_CANDIDATE_MAX_DELAY_SECONDS`）、証拠有効期間（`RELEASE_CANDIDATE_MAX_AGE_SECONDS`）を実測に基づいて合意する。日次 cron は minute/hour が固定された形式を使う。
+- `production-release` に read-only migration readiness credential を承認済み台帳・同期経路で供給する。candidate mode では未確認の migration 状態を失敗とする。
+- 自動 PR/merge 用の pending master `github-release-candidate/credential` と trust boundary を別途承認する。`GITHUB_TOKEN` で作る PR/push は通常の CI/Production Actions を起動しないため、bot token を使って通常イベントを抑制したまま自動 merge しない。
+- 以上を確認した後に `RELEASE_CANDIDATE_ENABLED=true` を設定する。設定・schedule の変更と実 release には、それぞれ必要な承認を満たす。
+
+手動でも同じ入口を使う:
 
 ```bash
-gh workflow run promote.yml --ref main -f force=true -f reason="<なぜ gate を飛ばすか>"
+gh workflow run release-candidate.yml --ref main
 ```
 
-対象は main HEAD（`sha` input は 2026-09-03 に廃止。`-f sha=` は 422 で拒否される）。`--ref main` 以外を指定しない —— 他の ref の script が Production 権限で動く（environment の deployment branch policy が拒否するが、二重防御として手順にも残す）。
+完了した run を候補 PR にするコントローラは `scripts/ci/release-candidate-publish.mjs`。trusted main の checkout と承認済みイベント起動用 credential で `open <run-id>` を実行すると固定ブランチから draft PR を作る。同じ run/attempt は既存 PR を再利用し、branch が変更されていれば停止する。自動経路では ready 化後に通常 checks と review を満たすまで待つ。手動でも同じ controller の `auto <run-id>` を使える。
 
-force は層 3・smoke・Production Config Audit をすべて skip する。**層 3 が赤いだけなら force ではなく、原因を直して merge する**（merge が自動で promote を再試行する）。
+```bash
+node scripts/ci/release-candidate-publish.mjs open <run-id>
+node scripts/ci/release-candidate-publish.mjs merge <pr-number>
+```
 
-- [ ] reason は必須。空だと workflow が停止する
-- [ ] 実行後、GitHub issue として使用理由と結果を起票する（2026-08-28、#2475 で domain log/ 廃止に伴い移行）
-- [ ] gate の障害そのものを issue 化して、break-glass を常用しない
+`merge` は直前に freshness と全候補 gate を再検査し、strict branch rules を確認した通常 merge API を head SHA 固定・`merge_method=merge` で呼ぶ。bypass は使わない。main merge の migration writer は Supabase GitHub integration のまま。Production promote 直前にも実 merge tree と候補証拠を再検査し、migration の適用確認後に公開する。Git revert は DB rollback ではなく、migration は旧 app が動く expand/contract を前提とする。
+
+失敗時は `Release candidate held (#3009)` Issue を冪等更新する。同じ run/attempt の通知は重複しない。既存 nightly の replica 監査 tick では候補の最新 run/attempt の欠測・未完了・red・stale も検査する。backup/config-sync/audit の既存 cron と実行条件は候補検証から独立して維持する。候補検証と監視の両 cron が停止した場合は、Actions 外部の監視も必要になる。
 
 ### 振り返り
 
 - [ ] pre-commitフック（typecheck/lint）がスキップされていなかったか
 - [ ] `scripts/tasks/env/schema.ts` に新しい環境変数が追加されているか
 - [ ] ビルドエラーの場合: ローカルで `npm run build` を実行してから push するフローに
-- [ ] Force Promote を使った場合: gate 側の欠陥が issue 化されているか
+- [ ] 候補 gate が止まった場合: 全体保留の理由と再検証結果が Issue に残っているか
 
 ## Playbook 3: Stripe Webhook停止（P1）
 

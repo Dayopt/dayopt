@@ -176,7 +176,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 
 ## 設定
 
-### env 変数（62）
+### env 変数（64）
 
 名前と所在だけを載せる（値は 1Password にあり、この生成物は触らない）。
 
@@ -218,6 +218,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY` | yes  | secret     | production          | Supabase-StorageS3-backupsource | —                          |
 | `RCLONE_CONFIG_SOURCE_TYPE`              | yes  | public     | production          | Supabase-StorageS3-backupsource | —                          |
 | `RECOVERY_CODE_PEPPER`                   | no   | secret     | staging, production | app                             | —                          |
+| `RELEASE_CANDIDATE_TOKEN`                | no   | secret     | production          | github-release-candidate        | —                          |
 | `RESEND_API_KEY`                         | no   | secret     | production          | resend-send                     | —                          |
 | `RESEND_FROM_EMAIL`                      | no   | public     | production          | resend-send                     | —                          |
 | `RESEND_WEBHOOK_SECRET`                  | no   | secret     | production          | resend, resend-web              | —                          |
@@ -233,6 +234,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `SUPABASE_ACCESS_TOKEN`                  | no   | secret     | production          | supabase-cli                    | —                          |
 | `SUPABASE_AUTH_AUDIT_TOKEN`              | yes  | secret     | production          | supabase-auth-audit             | —                          |
 | `SUPABASE_DB_PASSWORD`                   | yes  | secret     | production          | supabase                        | —                          |
+| `SUPABASE_MIGRATION_READINESS_TOKEN`     | no   | secret     | production          | supabase-migration-readiness    | —                          |
 | `SUPABASE_PREVIEW_READINESS_TOKEN`       | no   | secret     | staging             | preview-e2e                     | —                          |
 | `SUPABASE_SECRET_KEY`                    | yes  | secret     | production, staging | supabase, preview-e2e           | —                          |
 | `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`       | yes  | secret     | production          | supabase-storage-rls-audit      | —                          |

@@ -1,0 +1,191 @@
+name: Release Candidate
+
+# Schedule is intentionally unset until #3017 agrees timezone and delay budget.
+# Nightly and emergency use this same entry point. No Production credentials.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+      main_sha: ${{ steps.pin.outputs.main_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require approved candidate activation
+        env:
+          ENABLED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}
+        run: test "$ENABLED" = true && test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_MAX_DELAY_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_DELAY_SECONDS }}
+        run: node scripts/ci/release-candidate.mjs pin candidate-pin.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-pin-${{ github.run_attempt }}
+          path: candidate-pin.json
+          if-no-files-found: error
+
+  verify:
+    needs: pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout trusted control
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.main_sha }}
+          persist-credentials: false
+      - name: Checkout the fixed candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download this attempt snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "candidate-pin-$GITHUB_RUN_ATTEMPT"
+      - uses: ./.github/actions/setup
+      - name: Install candidate dependencies
+        working-directory: candidate
+        run: pnpm install --frozen-lockfile
+      - name: Install browsers
+        working-directory: candidate
+        run: pnpm exec playwright install --with-deps chromium chromium-headless-shell
+      - id: supabase_version
+        working-directory: candidate
+        run: |
+          version=$(node -p "require('./package.json').devDependencies.supabase")
+          test -n "$version" && test "$version" != undefined
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: ${{ steps.supabase_version.outputs.version }}
+      - name: Start disposable runner database
+        working-directory: candidate
+        run: supabase start
+      - name: Rehearse the pinned main to candidate migration upgrade
+        id: db_upgrade
+        working-directory: candidate
+        env:
+          DB_UPGRADE_RESULT_PATH: db-upgrade-result.json
+          CI: true
+        run: |
+          git update-ref refs/remotes/origin/main "${{ needs.pin.outputs.main_sha }}"
+          node scripts/ci/db-upgrade-check.mjs
+      - name: Record database identity and schema
+        run: node scripts/ci/release-candidate-db.mjs candidate db-before.json
+      - name: Export disposable database endpoints
+        working-directory: candidate
+        run: |
+          status=$(supabase status --output json)
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(echo "$status" | jq -er '.PUBLISHABLE_KEY // .ANON_KEY')"
+            echo "SUPABASE_SECRET_KEY=$(echo "$status" | jq -er '.SECRET_KEY // .SERVICE_ROLE_KEY')"
+            echo "DATABASE_URL=$(echo "$status" | jq -er '.DB_URL')"
+          } >> "$GITHUB_ENV"
+      - name: Full unit and workspace tests
+        id: unit
+        working-directory: candidate
+        run: pnpm test:run
+      - name: Full integration and RLS tests
+        id: integration
+        working-directory: candidate
+        env:
+          INTEGRATION_AFFECTED: 'true'
+          USE_LOCAL_DB: 'true'
+          NODE_ENV: test
+          CI: true
+        run: node scripts/ci/check.mjs integration
+      - name: Full Product E2E
+        id: e2e
+        working-directory: candidate
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_e2e_dummy
+          E2E_REQUIRE_SERVICE_ROLE_SUITES: '1'
+        run: pnpm --dir apps/product exec playwright test --project=chromium --project="Mobile Chrome"
+      - name: Web build and E2E
+        id: web
+        working-directory: candidate
+        run: pnpm build:web && pnpm --filter @dayopt/web test:e2e:smoke
+      - name: Storybook light and dark
+        id: storybook
+        working-directory: candidate
+        run: |
+          pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
+          pnpm build-storybook
+          pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark
+      - name: Recheck database identity and schema
+        run: node scripts/ci/release-candidate-db.mjs candidate db-after.json
+      - name: Seal evidence only when every suite passed
+        env:
+          CANDIDATE_RESULTS: '{"unit":"${{ steps.unit.outcome }}","integration":"${{ steps.integration.outcome }}","db_upgrade":"${{ steps.db_upgrade.outcome }}","e2e":"${{ steps.e2e.outcome }}","web":"${{ steps.web.outcome }}","storybook":"${{ steps.storybook.outcome }}"}'
+        run: node scripts/ci/release-candidate.mjs seal candidate-pin.json db-before.json db-after.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-evidence-${{ github.run_attempt }}
+          path: candidate-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop disposable database
+        if: always()
+        working-directory: candidate
+        run: supabase stop
+      - name: Save diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-diagnostics-${{ github.run_attempt }}
+          path: |
+            candidate/db-upgrade-result.json
+            candidate/apps/product/test-results/
+            candidate/apps/web/test-results/
+          retention-days: 7
+
+  notify_failure:
+    needs: [pin, verify]
+    if: ${{ always() && (needs.pin.result != 'success' || needs.verify.result != 'success') }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: candidate-failure-issue
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No checkout, dependencies or candidate code with the write token.
+      - name: Hold the whole candidate and update its failure Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: 'Release candidate held (#3009)'
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number,title --jq '.[] | select(.title == "Release candidate held (#3009)") | .number' | head -1)
+          body="Writer: Release Candidate workflow. Entire candidate held; no PR removal or partial release. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          if [ -n "$existing" ]; then
+            marker="actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)"
+            found=$({ gh api "repos/$GITHUB_REPOSITORY/issues/$existing" --jq \.body; gh api "repos/$GITHUB_REPOSITORY/issues/$existing/comments" --paginate --jq '.[].body'; } | { rg -F "$marker" || true; })
+            if [ -z "$found" ]; then gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"; fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --label type:bug,area:deployment --body "$body"
+          fi
