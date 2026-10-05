@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import PreviewE2EReporter, {
+  isPassingPreviewReport,
   safePreviewNetwork,
   safePreviewStep,
 } from '../lib/preview-e2e-reporter.mjs';
@@ -63,6 +64,63 @@ const env = {
   HOME: process.env.HOME,
 };
 
+function reviewedReport() {
+  const tests = [
+    ...Array.from({ length: 9 }, (_, index) => ({
+      file: 'critical-path.spec.ts',
+      project: 'chromium',
+      line: index + 1,
+    })),
+    ...Array.from({ length: 3 }, (_, index) => ({
+      file: 'mobile-critical-path.spec.ts',
+      project: 'Mobile Chrome',
+      line: index + 1,
+    })),
+  ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
+  return { status: 'passed', expected: 12, tests };
+}
+
+describe('Reviewed Preview declaration matrix', () => {
+  it('accepts exactly the reviewed nine desktop and three mobile declarations', () => {
+    expect(isPassingPreviewReport(reviewedReport())).toBe(true);
+  });
+  it('rejects the old seven declarations even if their dynamic expected count agrees', () => {
+    const report = reviewedReport();
+    report.tests.splice(4, 5);
+    report.expected = 7;
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it('rejects missing added coverage despite a matching dynamic count', () => {
+    const report = reviewedReport();
+    report.tests.splice(8, 1);
+    report.expected = 11;
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it('rejects duplicate declaration locations that replace a new case', () => {
+    const report = reviewedReport();
+    report.tests[8] = { ...report.tests[0]! };
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it('rejects the right counts under the wrong file/project pairing', () => {
+    const report = reviewedReport();
+    report.tests[0]!.file = 'mobile-critical-path.spec.ts';
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it('rejects twelve distinct declarations split as eight desktop and four mobile', () => {
+    const report = reviewedReport();
+    report.tests[8] = { ...report.tests[9]!, line: 4 };
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects unsafe declaration line %s',
+    (line) => {
+      const report = reviewedReport();
+      report.tests[0]!.line = line;
+      expect(isPassingPreviewReport(report)).toBe(false);
+    },
+  );
+});
+
 function scenario() {
   const root = mkdtempSync(join(tmpdir(), 'preview-runner-test-'));
   roots.push(root);
@@ -71,17 +129,7 @@ function scenario() {
     writeFileSync(join(workerEnv.E2E_PREVIEW_PRIVATE_DIR!, 'trace.zip'), 'private');
     writeFileSync(
       join(workerEnv.E2E_PREVIEW_EVIDENCE_DIR!, 'e2e.json'),
-      JSON.stringify({
-        status: 'passed',
-        expected: 2,
-        tests: ['chromium', 'Mobile Chrome'].map((project) => ({
-          file: 'critical-path.spec.ts',
-          project,
-          status: 'passed',
-          expectedPassed: true,
-          retry: 0,
-        })),
-      }),
+      JSON.stringify(reviewedReport()),
     );
     return 0;
   });
@@ -141,7 +189,7 @@ describe('Preview E2E runner', () => {
 const fs = require('node:fs');
 const path = require('node:path');
 fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
-fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify({status:'passed',expected:2,tests:['chromium','Mobile Chrome'].map(project=>({file:'critical-path.spec.ts',project,status:'passed',expectedPassed:true,retry:0}))}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify(${JSON.stringify(reviewedReport())}));
 `,
     );
     chmodSync(executable, 0o700);
@@ -226,17 +274,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       expect(started.runId).toBe(workerEnv.E2E_PREVIEW_RUN_ID);
       writeFileSync(
         join(workerEnv.E2E_PREVIEW_EVIDENCE_DIR!, 'e2e.json'),
-        JSON.stringify({
-          status: 'passed',
-          expected: 2,
-          tests: ['chromium', 'Mobile Chrome'].map((project) => ({
-            file: 'critical-path.spec.ts',
-            project,
-            status: 'passed',
-            expectedPassed: true,
-            retry: 0,
-          })),
-        }),
+        JSON.stringify(reviewedReport()),
       );
       return 0;
     });
@@ -318,13 +356,13 @@ describe('Preview reporter completeness', () => {
       const root = mkdtempSync(join(tmpdir(), 'preview-reporter-'));
       roots.push(root);
       const reporter = new PreviewE2EReporter({ directory: root });
-      reporter.onBegin({}, { allTests: () => [1, 2] });
-      for (const [index, project] of ['chromium', 'Mobile Chrome'].entries()) {
+      reporter.onBegin({}, { allTests: () => reviewedReport().tests });
+      for (const [index, declaration] of reviewedReport().tests.entries()) {
         const test = {
           id: String(index),
           expectedStatus: 'passed',
-          location: { file: '/repo/critical-path.spec.ts', line: 5 },
-          parent: { project: () => ({ name: project }) },
+          location: { file: `/repo/${declaration.file}`, line: declaration.line },
+          parent: { project: () => ({ name: declaration.project }) },
         };
         reporter.onStepEnd(
           test,
