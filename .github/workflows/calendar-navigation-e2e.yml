@@ -77,6 +77,9 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ steps.supabase.outputs.service_role_key }}
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_e2e_dummy
+          # next start runs in production mode and validates this key at request time.
+          # This disposable local-Supabase lane uses no production recovery codes.
+          RECOVERY_CODE_PEPPER: e2e-only-local-recovery-code-pepper
           CI: '1'
           POSTHOG_SERVER_ENABLED: 'false'
           NEXT_PUBLIC_POSTHOG_PROJECT_KEY: ''
