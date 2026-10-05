@@ -26,6 +26,6 @@ DB Upgrade shadow で実際の元 SQL を disposable baseline に復元し、既
 
 ## 復旧
 
-state は削除しないため RPC 定義だけを戻せる。`node scripts/tasks/poc-retirement-recovery.mjs > /tmp/poc-rpc-recovery.sql` は hash を検証した原本から 5 RPC・元の GRANT・セキュリティ assertion の復旧 SQL を生成する。DB に接続しない。旧 migration 全文を実行すると既存 schema/table と衝突するため実行しない。
+state は削除しないため RPC 定義だけを戻せる。`node scripts/runbook/poc-retirement-recovery.mjs > /tmp/poc-rpc-recovery.sql` は hash を検証した原本から 5 RPC・元の GRANT・セキュリティ assertion の復旧 SQL を生成する。DB に接続しない。旧 migration 全文を実行すると既存 schema/table と衝突するため実行しない。
 
 失敗した退役 transaction は rollback される。適用後の復旧が必要なら、明示承認と独立レビューの下で生成 SQL の新しい forward migration を作り、隔離環境で検証して既存 migration owner に渡す。ledger repair、履歴削除、共有 DB reset、CASCADE、テーブル削除は禁止。
