@@ -214,7 +214,7 @@ describeWithEnv('Isolated Record lifecycle', () => {
     const create = page.getByRole('button', { name: '複製を作成', exact: true });
     await expect(create).toBeEnabled();
     await create.click();
-    await expect(page.getByTestId('date-time-error')).toBeVisible();
+    await expect(page.getByText('この時間帯には既に記録があります', { exact: true })).toBeVisible();
     await expect(create).toBeDisabled();
     await setTime(page, '終了時刻', '12:00');
     await setTime(page, '開始時刻', '11:00');

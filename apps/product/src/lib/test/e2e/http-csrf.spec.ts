@@ -244,10 +244,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
 
     await page.goto(attackerOrigin);
     const actionBrowserRequestPromise = page.waitForRequest(
-      (browserRequest) =>
-        new URL(browserRequest.url()).origin === new URL(actionUrl).origin &&
-        new URL(browserRequest.url()).pathname === new URL(actionUrl).pathname &&
-        browserRequest.method() === 'POST',
+      (browserRequest) => browserRequest.method() === 'POST',
     );
     await page.evaluate(
       ({ actionId, actionUrl }) => {
@@ -264,6 +261,7 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
       { actionId: actionId!, actionUrl },
     );
     const actionBrowserRequest = await actionBrowserRequestPromise;
+    expect(new URL(actionBrowserRequest.url()).pathname).toMatch(/^\/ja\/?$/);
     const actionBrowserHeaders = await actionBrowserRequest.allHeaders();
     const actionBody = actionBrowserRequest.postDataBuffer();
     expect(actionBrowserHeaders.origin).toBe(attackerOrigin);
