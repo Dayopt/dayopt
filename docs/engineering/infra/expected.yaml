@@ -209,12 +209,17 @@ services:
     expected:
       send_default_pii: false
       pii_scrubbing: required
+      project_visibility: private
+      organization_requires_two_factor: true
       root_trace_sample_rate: 0.1
       source_maps_match_served_release: true
       auth_edge_reporting: optional
     coverage:
+      - project_settings
+      - organization_settings
+      - project_environments
+      - service_hooks
       - source_map_application
-      - privacy_dashboard_settings
   google:
     expected:
       auth_callback: https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback
@@ -1217,8 +1222,8 @@ ui_only:
       'service': 'vercel',
       'category': 'collector_unavailable',
       'items': ['project settings', 'env metadata / bindings', 'domains'],
-      'reason': '現agent op経路ではci資格情報を読めない。MCP get_projectはprojectId / idOrName不整合',
-      'next_step': '既存の認証済みDashboardを読む。credential追加 / fallbackは行わない',
+      'reason': 'Doctorの既存op readerはcredential_or_collector_failed。read-only MCPのenv metadata GETもdecrypt=falseで403 projectEnvVars permission denied',
+      'next_step': '既存の認証済みDashboardでenv metadataだけ確認する。credential追加・権限変更・secret値の取得はしない',
       'check_ids':
         [
           'vercel.product.settings',
@@ -1307,8 +1312,8 @@ ui_only:
       'service': 'resend',
       'category': 'current_permission',
       'items': ['send credential master', 'webhook replica values / Auth Edge sender'],
-      'reason': 'Doctorの既存op readerは4項目すべてcredential_or_collector_failed。MCPのdomain/webhook metadataだけではAPI key scopeとsecret replica一致を確認できない',
-      'next_step': '既存read-only経路でmetadataだけ照合する。Resend GET webhookが返すsigning_secretは出力・保存せず、credential発行や変更をしない',
+      'reason': 'Doctorの既存op readerは4項目すべてcredential_or_collector_failed。MCPはverified domain・enabled webhook・API key名を返すがendpoint URLをredactし、key scopeとsecret replica一致を返さない',
+      'next_step': '既存Dashboardでendpoint接続先とkey scopeのmetadataだけ確認する。signing secretは表示・保存せず、credential発行や変更をしない',
       'check_ids': ['resend.sender_and_signature_replicas'],
       'documentation_urls': ['https://resend.com/docs/api-reference/webhooks/get-webhook'],
     }
@@ -1340,19 +1345,29 @@ ui_only:
       'id': 'sentry.source_map.application',
       'service': 'sentry',
       'category': 'behavior_not_metadata',
-      'items': ['privacy settings', 'applied artifact bundle mapping'],
-      'reason': 'release metadataとlegacy release file数はPII設定やartifact bundle/source mapの適用成功を証明しない',
-      'next_step': '2026-10-05時点のSentry UIはloginへ転送され、Sentry MCPも利用不可。既存認証済みUIまたは対応済みread-only APIで設定metadataだけ確認し、個別顧客eventは取得しない',
+      'items': ['applied artifact bundle mapping'],
+      'reason': 'project / organization privacy metadataはAPIで確認できるが、release metadataとlegacy release file数は配信中releaseへのartifact bundle/source map適用を証明しない',
+      'next_step': '認証済みSentry UIでProduct / Webのartifact bundleとserved releaseの対応だけ確認する。個別顧客eventは取得しない',
       'check_ids': ['sentry.applied_source_maps'],
       'documentation_urls': [],
+    }
+  - {
+      'id': 'sentry.hooks.permissions',
+      'service': 'sentry',
+      'category': 'current_permission',
+      'items': ['Product / Web project service hook metadata'],
+      'reason': '2026-10-05にproject settings・organization・environment GETは成功したが、両projectのservice hook一覧GETは403。存在数は不明',
+      'next_step': '認証済みSentry UIでhookの件数・event名・接続先hostだけ確認する。secret値やevent payloadは開かない',
+      'check_ids': ['sentry.service_hooks.dayopt', 'sentry.service_hooks.dayopt-web'],
+      'documentation_urls': ['https://docs.sentry.io/api/projects/list-a-projects-service-hooks/'],
     }
   - {
       'id': 'posthog.project.permissions',
       'service': 'posthog',
       'category': 'current_permission',
-      'items': ['Doctor API reader permission; deployed privacy switches / deletion key replica'],
-      'reason': 'Doctor用op://agent/potshog-readonly/credentialのproject APIは403 insufficient_access。接続済みPostHog MCPでは同じproject metadataを読み取れたため、API未提供ではなくDoctor credential固有の権限不足',
-      'next_step': 'MCP観測を棚卸し記録へ反映する。Doctor自動化の権限回復は既存read-only credentialのscopeまたはreaderを別途確認し、今回の棚卸しではcredential発行・権限変更をしない',
+      'items': ['Doctor API reader scope; deployed privacy switches / deletion key replica'],
+      'reason': 'Doctor用op://agent/potshog-readonly/credentialのproject APIは403 insufficient_access。PostHog MCP project-getはmetadataを返すが、personal API credential scopeとdeployed secret replicaは証明しない',
+      'next_step': 'MCPで得たproject settingsを棚卸し記録へ反映する。Doctor自動化のscope・deletion replicaは既存read-only credentialとVercel metadataで確認し、credential発行・権限変更をしない',
       'check_ids': ['posthog.settings', 'posthog.deployed_privacy_and_deletion'],
       'documentation_urls': [],
     }
@@ -2014,6 +2029,80 @@ checks:
         slug: dayopt-web
     required: true
     next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.project_settings.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      id: '4509737836412928'
+      slug: dayopt
+      is_public: false
+      allowed_domains:
+        - https://app.dayopt.app
+      data_scrubber: true
+      data_scrubber_defaults: true
+    required: true
+    next_step: 正本と既存project metadataを比較してください。secret field名とeventは取得しません。
+  - id: sentry.project_settings.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      id: '4511741979394048'
+      slug: dayopt-web
+      is_public: false
+      allowed_domains:
+        - https://dayopt.app
+      data_scrubber: true
+      data_scrubber_defaults: true
+    required: true
+    next_step: 正本と既存project metadataを比較してください。secret field名とeventは取得しません。
+  - id: sentry.organization_settings
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      require_two_factor: true
+      allow_member_invite: false
+      allow_member_project_creation: false
+      open_membership: false
+      allow_join_requests: false
+      data_scrubber: true
+      data_scrubber_defaults: true
+      scrub_ip_addresses: true
+    required: true
+    next_step: 正本とorganization metadataを比較してください。member情報・eventは取得しません。
+  - id: sentry.environments.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: environment metadataのみを確認します。イベント流入や顧客データは読みません。
+  - id: sentry.environments.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: environment metadataのみを確認します。イベント流入や顧客データは読みません。
+  - id: sentry.service_hooks.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: hook metadataだけを確認します。403の場合は既存UIで件数・接続先hostを確認してください。
+  - id: sentry.service_hooks.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: hook metadataだけを確認します。403の場合は既存UIで件数・接続先hostを確認してください。
   - id: sentry.releases.dayopt
     service: sentry
     environments:

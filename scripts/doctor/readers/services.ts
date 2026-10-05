@@ -19,6 +19,30 @@ const scalar = (value: unknown): string | number | boolean | null =>
     : null;
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+const safeHost = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.hostname : null;
+  } catch {
+    return null;
+  }
+};
+const safeOrigins = (value: unknown): string[] => [
+  ...new Set(
+    strings(value).flatMap((entry) => {
+      try {
+        const url = new URL(entry);
+        return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password
+          ? [url.origin]
+          : [];
+      } catch {
+        return [];
+      }
+    }),
+  ),
+];
+const arrayLength = (value: unknown): number | null => (Array.isArray(value) ? value.length : null);
 const safeUrl = (value: unknown): { origin: string; path: string } | null => {
   if (typeof value !== 'string') return null;
   try {
@@ -452,7 +476,93 @@ async function sentry(ctx: ReaderContext, output: Observation[]): Promise<void> 
           status: scalar(row.status),
         })),
   );
+  await observe(
+    ctx,
+    output,
+    'sentry.organization_settings',
+    'production',
+    'sentry.getOrganization',
+    { organization: 'dayopt' },
+    (value) => {
+      const row = record(value);
+      return {
+        require_two_factor: scalar(row.require2FA),
+        allow_member_invite: scalar(row.allowMemberInvite),
+        allow_member_project_creation: scalar(row.allowMemberProjectCreation),
+        allow_superuser_access: scalar(row.allowSuperuserAccess),
+        open_membership: scalar(row.openMembership),
+        allow_join_requests: scalar(row.allowJoinRequests),
+        events_member_admin: scalar(row.eventsMemberAdmin),
+        alerts_member_write: scalar(row.alertsMemberWrite),
+        enhanced_privacy: scalar(row.enhancedPrivacy),
+        data_scrubber: scalar(row.dataScrubber),
+        data_scrubber_defaults: scalar(row.dataScrubberDefaults),
+        scrub_ip_addresses: scalar(row.scrubIPAddresses),
+        sensitive_field_count: arrayLength(row.sensitiveFields),
+        safe_field_count: arrayLength(row.safeFields),
+      };
+    },
+  );
   for (const project of ['dayopt', 'dayopt-web']) {
+    await observe(
+      ctx,
+      output,
+      `sentry.project_settings.${project}`,
+      'production',
+      'sentry.getProject',
+      { organization: 'dayopt', project },
+      (value) => {
+        const row = record(value);
+        return {
+          id: scalar(row.id),
+          slug: scalar(row.slug),
+          is_public: scalar(row.isPublic),
+          allowed_domains: safeOrigins(row.allowedDomains),
+          data_scrubber: scalar(row.dataScrubber),
+          data_scrubber_defaults: scalar(row.dataScrubberDefaults),
+          scrub_ip_addresses: scalar(row.scrubIPAddresses),
+          verify_ssl: scalar(row.verifySSL),
+          scrape_javascript: scalar(row.scrapeJavaScript),
+          is_dynamically_sampled: scalar(row.isDynamicallySampled),
+          target_sample_rate: scalar(row.targetSampleRate),
+          sensitive_field_count: arrayLength(row.sensitiveFields),
+        };
+      },
+    );
+    await observe(
+      ctx,
+      output,
+      `sentry.environments.${project}`,
+      'production',
+      'sentry.listProjectEnvironments',
+      { organization: 'dayopt', project, visibility: 'all' },
+      (value) =>
+        rows(value)
+          .map((row) => ({ name: scalar(row.name), visibility: scalar(row.visibility) }))
+          .filter((row) => typeof row.name === 'string'),
+    );
+    await observe(
+      ctx,
+      output,
+      `sentry.service_hooks.${project}`,
+      'production',
+      'sentry.listProjectHooks',
+      { organization: 'dayopt', project },
+      (value) => {
+        const hooks = rows(value);
+        return {
+          count: hooks.length,
+          events: [...new Set(hooks.flatMap((hook) => strings(hook.events)))].sort(),
+          destination_hosts: [
+            ...new Set(
+              hooks
+                .map((hook) => safeHost(hook.url))
+                .filter((host): host is string => host !== null),
+            ),
+          ].sort(),
+        };
+      },
+    );
     const releases = await observe(
       ctx,
       output,
@@ -489,7 +599,7 @@ async function sentry(ctx: ReaderContext, output: Observation[]): Promise<void> 
     'sentry.applied_source_maps',
     'production',
     'repository_contract',
-    'Release metadata and legacy file count do not prove source map application or deployed privacy/sampling settings.',
+    'Release metadata and legacy file count do not prove artifact bundle or source map application to the served release.',
   );
 }
 

@@ -108,6 +108,57 @@ const fixtures: Record<string, unknown> = {
   'sentry.listReleaseFiles': [
     { id: 'file_dayopt', name: fixtureSecret, headers: { Authorization: fixtureSecret } },
   ],
+  'sentry.getProject': (params: Record<string, unknown>) => {
+    const project = String(params.project);
+    return {
+      id: project === 'dayopt' ? '4509737836412928' : '4511741979394048',
+      slug: project,
+      isPublic: false,
+      allowedDomains: [
+        project === 'dayopt' ? 'https://app.dayopt.app' : 'https://dayopt.app',
+        `https://${project === 'dayopt' ? 'app.dayopt.app' : 'dayopt.app'}/?token=${fixtureSecret}`,
+      ],
+      dataScrubber: true,
+      dataScrubberDefaults: true,
+      scrubIPAddresses: false,
+      verifySSL: false,
+      scrapeJavaScript: true,
+      isDynamicallySampled: false,
+      targetSampleRate: null,
+      sensitiveFields: [fixtureSecret, 'email'],
+      piiConfig: { rules: [{ name: fixtureSecret }] },
+      secret: fixtureSecret,
+    };
+  },
+  'sentry.getOrganization': {
+    require2FA: true,
+    allowMemberInvite: false,
+    allowMemberProjectCreation: false,
+    allowSuperuserAccess: true,
+    openMembership: false,
+    allowJoinRequests: false,
+    eventsMemberAdmin: false,
+    alertsMemberWrite: false,
+    enhancedPrivacy: true,
+    dataScrubber: true,
+    dataScrubberDefaults: true,
+    scrubIPAddresses: true,
+    sensitiveFields: [fixtureSecret, 'email'],
+    safeFields: [],
+    secret: fixtureSecret,
+  },
+  'sentry.listProjectEnvironments': [
+    { name: 'production', visibility: 'visible', secret: fixtureSecret },
+    { name: 'vercel-production', visibility: 'visible', token: fixtureSecret },
+  ],
+  'sentry.listProjectHooks': [
+    {
+      id: 'hook_dayopt',
+      events: ['issue.created'],
+      url: `https://hooks.dayopt.app/opaque/${fixtureSecret}?token=${fixtureQuery}`,
+      secret: fixtureSecret,
+    },
+  ],
   'posthog.getProject': {
     id: 625917,
     name: 'Dayopt',
@@ -174,7 +225,15 @@ for (const [service, operations] of Object.entries({
     'cloudflare.listR2Buckets',
     'cloudflare.getR2Locks',
   ],
-  sentry: ['sentry.listProjects', 'sentry.listReleases', 'sentry.listReleaseFiles'],
+  sentry: [
+    'sentry.listProjects',
+    'sentry.listReleases',
+    'sentry.listReleaseFiles',
+    'sentry.getProject',
+    'sentry.getOrganization',
+    'sentry.listProjectEnvironments',
+    'sentry.listProjectHooks',
+  ],
   posthog: ['posthog.getProject', 'posthog.aggregate'],
   upstash: ['upstash.ping'],
   uptimerobot: ['uptimerobot.getMonitors'],
@@ -202,6 +261,68 @@ test('Stripe production scope never invokes test-mode operations', async () => {
   await readService('stripe', ctx);
   assert.ok(calls.length > 0);
   assert.ok(calls.every((call) => call.params.mode === 'live'));
+});
+
+test('Sentry projects, organization, environments, and hooks are safely projected', async () => {
+  const { ctx, calls } = context();
+  const output = await readService('sentry', ctx);
+  assert.ok(calls.some((call) => call.operation === 'sentry.getOrganization'));
+  assert.deepEqual(output.find((row) => row.key === 'sentry.project_settings.dayopt')?.value, {
+    id: '4509737836412928',
+    slug: 'dayopt',
+    is_public: false,
+    allowed_domains: ['https://app.dayopt.app'],
+    data_scrubber: true,
+    data_scrubber_defaults: true,
+    scrub_ip_addresses: false,
+    verify_ssl: false,
+    scrape_javascript: true,
+    is_dynamically_sampled: false,
+    target_sample_rate: null,
+    sensitive_field_count: 2,
+  });
+  assert.deepEqual(output.find((row) => row.key === 'sentry.organization_settings')?.value, {
+    require_two_factor: true,
+    allow_member_invite: false,
+    allow_member_project_creation: false,
+    allow_superuser_access: true,
+    open_membership: false,
+    allow_join_requests: false,
+    events_member_admin: false,
+    alerts_member_write: false,
+    enhanced_privacy: true,
+    data_scrubber: true,
+    data_scrubber_defaults: true,
+    scrub_ip_addresses: true,
+    sensitive_field_count: 2,
+    safe_field_count: 0,
+  });
+  assert.deepEqual(output.find((row) => row.key === 'sentry.environments.dayopt')?.value, [
+    { name: 'production', visibility: 'visible' },
+    { name: 'vercel-production', visibility: 'visible' },
+  ]);
+  assert.deepEqual(output.find((row) => row.key === 'sentry.service_hooks.dayopt')?.value, {
+    count: 1,
+    events: ['issue.created'],
+    destination_hosts: ['hooks.dayopt.app'],
+  });
+  const serialized = JSON.stringify(output);
+  assert.ok(!serialized.includes(fixtureSecret));
+  assert.ok(!serialized.includes(fixtureQuery));
+  assert.ok(!serialized.includes('/opaque/'));
+});
+
+test('Sentry hook permission failure is isolated and does not block project metadata', async () => {
+  const { ctx } = context({
+    'sentry.listProjectHooks': Object.assign(new Error(fixtureSecret), { status: 403 }),
+  });
+  const output = await readService('sentry', ctx);
+  const hook = output.find((row) => row.key === 'sentry.service_hooks.dayopt');
+  assert.equal(hook?.status, 'blocked');
+  assert.equal(hook?.reason, 'insufficient_access');
+  assert.equal(hook?.value, null);
+  assert.ok(output.some((row) => row.key === 'sentry.project_settings.dayopt' && !row.status));
+  assert.ok(!JSON.stringify(output).includes(fixtureSecret));
 });
 
 test('Cloudflare derives account ID only from the Dayopt zone', async () => {

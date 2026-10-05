@@ -126,6 +126,50 @@ describe('doctor read transport', () => {
     ).resolves.toEqual([{ slug: 'dayopt' }]);
     expect(mock).toHaveBeenCalledTimes(1);
   });
+  it('allows only scoped Sentry metadata GETs and never uses a write method', async () => {
+    const mock = vi
+      .fn()
+      .mockResolvedValueOnce(json({ slug: 'dayopt' }))
+      .mockResolvedValueOnce(json({ id: 'org_dayopt' }))
+      .mockResolvedValueOnce(json([{ name: 'production', visibility: 'visible' }]))
+      .mockResolvedValueOnce(json([]));
+    const request = createTransport({ ...ENV, SENTRY_AUTH_TOKEN: 'fake-sentry' }, mock);
+    await request('sentry.getProject', { project: 'dayopt' });
+    await request('sentry.getOrganization');
+    await request('sentry.listProjectEnvironments', { project: 'dayopt' });
+    await request('sentry.listProjectHooks', { project: 'dayopt' });
+    expect(mock).toHaveBeenCalledTimes(4);
+    expect(mock.mock.calls.map(([input, init]) => [new URL(input).pathname, init.method])).toEqual([
+      ['/api/0/projects/dayopt/dayopt/', 'GET'],
+      ['/api/0/organizations/dayopt/', 'GET'],
+      ['/api/0/projects/dayopt/dayopt/environments/', 'GET'],
+      ['/api/0/projects/dayopt/dayopt/hooks/', 'GET'],
+    ]);
+    expect(new URL(mock.mock.calls[2][0]).searchParams.get('visibility')).toBe('all');
+    await expect(request('sentry.getProject', { project: 'unrelated' })).rejects.toMatchObject({
+      code: 'POLICY_BLOCKED',
+    });
+    await expect(request('sentry.updateProject', { project: 'dayopt' })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_OPERATION',
+    });
+    expect(mock).toHaveBeenCalledTimes(4);
+  });
+  it('limits Sentry release metadata to the newest 20 and does not fetch later pages', async () => {
+    const mock = vi.fn().mockResolvedValue(
+      json([{ version: 'release-1' }], 200, {
+        link: '<https://sentry.io/api/0/projects/dayopt/dayopt/releases/?cursor=next>; rel="next"; results="true"',
+      }),
+    );
+    await expect(
+      createTransport({ ...ENV, SENTRY_AUTH_TOKEN: 'fake-sentry' }, mock)('sentry.listReleases', {
+        project: 'dayopt',
+        limit: 20,
+      }),
+    ).resolves.toEqual([{ version: 'release-1' }]);
+    expect(mock).toHaveBeenCalledTimes(1);
+    expect(new URL(mock.mock.calls[0][0]).searchParams.get('per_page')).toBe('20');
+    expect(mock.mock.calls[0][1].method).toBe('GET');
+  });
   it('refuses pagination links that escape the scoped endpoint', async () => {
     const mock = vi
       .fn()

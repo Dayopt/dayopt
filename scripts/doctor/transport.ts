@@ -57,6 +57,10 @@ export const OPERATIONS = new Set([
   'sentry.listProjects',
   'sentry.listReleases',
   'sentry.listReleaseFiles',
+  'sentry.getProject',
+  'sentry.getOrganization',
+  'sentry.listProjectEnvironments',
+  'sentry.listProjectHooks',
   'posthog.getProject',
   'posthog.aggregate',
   'upstash.ping',
@@ -567,18 +571,30 @@ export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch 
     if (operation.startsWith('sentry.')) {
       const token = credential('SENTRY_AUTH_TOKEN');
       const base = 'https://sentry.io';
-      let path = '/api/0/organizations/dayopt/projects/';
-      if (operation !== 'sentry.listProjects') {
-        if (!['dayopt', 'dayopt-web'].includes(String(params.project)))
-          throw new ReadFailure('POLICY_BLOCKED');
-        path = `/api/0/projects/dayopt/${params.project}/releases/`;
-        if (operation === 'sentry.listReleaseFiles') {
-          if (typeof params.release !== 'string') throw new ReadFailure('INVALID_RESPONSE');
-          path += `${encodeURIComponent(params.release)}/files/`;
-        } else if (operation !== 'sentry.listReleases')
-          throw new ReadFailure('UNSUPPORTED_OPERATION');
+      if (operation === 'sentry.listProjects')
+        return pages(url(base, '/api/0/organizations/dayopt/projects/'), token);
+      if (operation === 'sentry.getOrganization')
+        return (await http(url(base, '/api/0/organizations/dayopt/'), token)).data;
+      if (!['dayopt', 'dayopt-web'].includes(String(params.project)))
+        throw new ReadFailure('POLICY_BLOCKED');
+      const project = String(params.project);
+      const projectPath = `/api/0/projects/dayopt/${project}/`;
+      if (operation === 'sentry.getProject')
+        return (await http(url(base, projectPath), token)).data;
+      if (operation === 'sentry.listProjectEnvironments')
+        return pages(url(base, `${projectPath}environments/`, { visibility: 'all' }), token);
+      if (operation === 'sentry.listProjectHooks')
+        return pages(url(base, `${projectPath}hooks/`), token);
+      if (operation === 'sentry.listReleases')
+        return (await http(url(base, `${projectPath}releases/`, { per_page: 20 }), token)).data;
+      if (operation === 'sentry.listReleaseFiles') {
+        if (typeof params.release !== 'string') throw new ReadFailure('INVALID_RESPONSE');
+        return pages(
+          url(base, `${projectPath}releases/${encodeURIComponent(params.release)}/files/`),
+          token,
+        );
       }
-      return pages(url(base, path), token);
+      throw new ReadFailure('UNSUPPORTED_OPERATION');
     }
     if (operation === 'posthog.getProject')
       return (
