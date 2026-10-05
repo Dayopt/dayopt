@@ -39,7 +39,7 @@ last_verified: 2026-09-21
 ### Plan を保存
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
+  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `'ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
 - **1. Plan か Record か決める**:
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.test.ts`](../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts) で `it('終了が現在より未来なら Plan を返す'` を探す
   - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す
@@ -84,7 +84,7 @@ last_verified: 2026-09-21
 ### Record を作る・Plan を記録する
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (2) の過去の時間帯から明示的に作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
+  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `'過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (2) の過去の時間帯から明示的に作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
 - **1. 入口を選ぶ**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('時間帯の記録の有無で予定の記録操作を消さない'` を探す
   - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す

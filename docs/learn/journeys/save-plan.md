@@ -46,7 +46,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
+- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `'ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
 
 ### 1. Plan か Record かを決める（ブラウザ）
 
@@ -1227,7 +1227,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/critical-path.spec.ts",
-      "find": "test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'",
+      "find": "'ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'",
       "why": "E2E。保存して再読み込みしても残ることまで見る"
     }
   ]

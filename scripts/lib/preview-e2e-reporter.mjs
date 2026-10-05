@@ -5,10 +5,45 @@ const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts'])
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 // Reviewed browser acceptance scope. Changes require a reviewed trusted harness rollout.
 const COVERAGE = [
-  { file: 'critical-path.spec.ts', project: 'chromium', count: 17 },
-  { file: 'mobile-critical-path.spec.ts', project: 'Mobile Chrome', count: 4 },
+  {
+    file: 'critical-path.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'desktop-plan-create',
+      'desktop-record-create',
+      'desktop-past-plan-create',
+      'desktop-summary-known-records',
+      'desktop-summary-record-deep-link',
+      'desktop-summary-empty',
+      'desktop-settings-display',
+      'desktop-data-export',
+      'desktop-activity-lifecycle',
+      'desktop-theme',
+      'desktop-timezone',
+      'desktop-locale',
+      'desktop-category-lifecycle',
+      'desktop-inspector-search',
+      'desktop-plan-move',
+      'desktop-conflict-merge',
+      'desktop-template-lifecycle',
+    ],
+  },
+  {
+    file: 'mobile-critical-path.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: [
+      'mobile-plan-create',
+      'mobile-record-create',
+      'mobile-summary-to-inspector',
+      'mobile-settings-display',
+    ],
+  },
 ];
-const EXPECTED_COUNT = COVERAGE.reduce((sum, row) => sum + row.count, 0);
+const EXPECTED_FLOWS = new Map(
+  COVERAGE.flatMap((row) => row.flowIds.map((flowId) => [flowId, row])),
+);
+const EXPECTED_COUNT = EXPECTED_FLOWS.size;
+const PREVIEW_FLOW_TAG_PREFIX = 'preview-e2e/';
 
 const CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook']);
 const BUDGET_FIELDS = ['procedures', 'budget', 'rateLimitedResponses', 'mixedBatchResponses'];
@@ -90,25 +125,23 @@ export function isPassingPreviewReport(report) {
     return false;
   const declarations = new Set();
   for (const test of report.tests) {
+    const expected = EXPECTED_FLOWS.get(test?.flowId);
     if (
       !test ||
+      !expected ||
       test.status !== 'passed' ||
       test.expectedPassed !== true ||
       test.retry !== 0 ||
       !Number.isSafeInteger(test.line) ||
       test.line <= 0 ||
-      !COVERAGE.some((row) => row.file === test.file && row.project === test.project)
+      expected.file !== test.file ||
+      expected.project !== test.project
     )
       return false;
-    const identity = `${test.file}:${test.project}:${test.line}`;
-    if (declarations.has(identity)) return false;
-    declarations.add(identity);
+    if (declarations.has(test.flowId)) return false;
+    declarations.add(test.flowId);
   }
-  return COVERAGE.every(
-    (row) =>
-      report.tests.filter((test) => test.file === row.file && test.project === row.project)
-        .length === row.count,
-  );
+  return declarations.size === EXPECTED_COUNT;
 }
 
 export default class PreviewE2EReporter {
@@ -139,7 +172,19 @@ export default class PreviewE2EReporter {
   onTestEnd(test, result) {
     const file = basename(test.location.file);
     const project = test.parent.project()?.name;
+    const flowTags = Array.isArray(test.tags)
+      ? test.tags
+          .filter((tag) => typeof tag === 'string')
+          .map((tag) => tag.replace(/^@/, ''))
+          .filter((tag) => tag.startsWith(PREVIEW_FLOW_TAG_PREFIX))
+      : [];
+    const taggedFlowId =
+      flowTags.length === 1 ? flowTags[0].slice(PREVIEW_FLOW_TAG_PREFIX.length) : null;
+    const reviewedFlow = taggedFlowId ? EXPECTED_FLOWS.get(taggedFlowId) : null;
+    const flowId =
+      reviewedFlow?.file === file && reviewedFlow.project === project ? taggedFlowId : null;
     if (!FILES.has(file) || !PROJECTS.has(project)) this.infrastructureFailure = true;
+    if (!flowId) this.infrastructureFailure = true;
     const screenshots = [];
     let network = null;
     let procedureBudget = null;
@@ -177,6 +222,7 @@ export default class PreviewE2EReporter {
     this.tests.push({
       file: FILES.has(file) ? file : null,
       project: PROJECTS.has(project) ? project : null,
+      flowId,
       line: test.location.line,
       status: ['passed', 'failed', 'timedOut', 'skipped', 'interrupted'].includes(result.status)
         ? result.status

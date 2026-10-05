@@ -23,6 +23,33 @@ const request = {
 const runId = 'b617105b-9c87-44c0-b5f8-18071be8c0f9';
 const userId = 'd707d390-8ad2-4776-8e46-7364f6cd7145';
 const roots: string[] = [];
+const reviewedFlowIds = {
+  desktop: [
+    'desktop-plan-create',
+    'desktop-record-create',
+    'desktop-past-plan-create',
+    'desktop-summary-known-records',
+    'desktop-summary-record-deep-link',
+    'desktop-summary-empty',
+    'desktop-settings-display',
+    'desktop-data-export',
+    'desktop-activity-lifecycle',
+    'desktop-theme',
+    'desktop-timezone',
+    'desktop-locale',
+    'desktop-category-lifecycle',
+    'desktop-inspector-search',
+    'desktop-plan-move',
+    'desktop-conflict-merge',
+    'desktop-template-lifecycle',
+  ],
+  mobile: [
+    'mobile-plan-create',
+    'mobile-record-create',
+    'mobile-summary-to-inspector',
+    'mobile-settings-display',
+  ],
+};
 type PublicDiagnosticArtifact = {
   tests: Array<{
     procedureBudget?: {
@@ -118,6 +145,7 @@ describe('Cloud Preview evidence and cleanup', () => {
           {
             file: 'critical-path.spec.ts',
             project: 'chromium',
+            flowId: 'desktop-plan-create',
             line: 1,
             retry: 0,
             status: 'failed',
@@ -134,6 +162,7 @@ describe('Cloud Preview evidence and cleanup', () => {
     expect(result.users).toEqual([{ userId, runId, status: 'cleanup-failed' }]);
     const serialized = readFileSync(join(options.destination, 'preview.json'), 'utf8');
     expect(serialized).not.toContain('PRIVATE_');
+    expect(serialized).not.toContain('desktop-plan-create');
     expect(result.tests).toHaveLength(1);
   });
   it('publishes only sanitized failed Playwright step metadata for diagnosis', () => {
@@ -296,18 +325,21 @@ describe('Cloud Preview evidence and cleanup', () => {
     'old-seven',
     'duplicate',
     'wrong-pair',
+    'substituted',
     'missing',
   ])('publisher independently enforces reviewed coverage: %s', (kind) => {
     const options = fixture();
     const tests = [
-      ...Array.from({ length: 17 }, (_, index) => ({
+      ...reviewedFlowIds.desktop.map((flowId, index) => ({
         file: 'critical-path.spec.ts',
         project: 'chromium',
+        flowId,
         line: index + 1,
       })),
-      ...Array.from({ length: 4 }, (_, index) => ({
+      ...reviewedFlowIds.mobile.map((flowId, index) => ({
         file: 'mobile-critical-path.spec.ts',
         project: 'Mobile Chrome',
+        flowId,
         line: index + 1,
       })),
     ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
@@ -322,6 +354,7 @@ describe('Cloud Preview evidence and cleanup', () => {
     }
     if (kind === 'duplicate') tests[8] = { ...tests[0]! };
     if (kind === 'wrong-pair') tests[0]!.file = 'mobile-critical-path.spec.ts';
+    if (kind === 'substituted') tests[3]!.flowId = 'desktop-unreviewed-flow';
     if (kind === 'missing') tests.splice(8, 1);
     writeFileSync(
       join(options.directory, 'evidence', 'e2e.json'),

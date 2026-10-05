@@ -47,7 +47,10 @@ assertServiceRoleSuiteRunnable(
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
 const IDENTITY = createCriticalPathIdentity('mobile-critical-path');
-const MOBILE_TAG = { tag: '@mobile' };
+
+function mobilePreviewFlowTag(flowId: string) {
+  return { tag: ['@mobile', `@preview-e2e/${flowId}`] };
+}
 
 /**
  * 長押しの保持時間。UI 仕様（300ms）そのものを待つ固定 wait なので許容し、
@@ -119,38 +122,48 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
     await loginAs(page, IDENTITY);
   });
 
-  test('明日の枠を長押しして Plan を作成し、リロード後も残る', MOBILE_TAG, async ({ page }) => {
-    await openDay(page, offsetDateParam(1));
+  test(
+    '明日の枠を長押しして Plan を作成し、リロード後も残る',
+    mobilePreviewFlowTag('mobile-plan-create'),
+    async ({ page }) => {
+      await openDay(page, offsetDateParam(1));
 
-    await longPressHour(page, 9);
-    await pickActivityInDrawer(page, 'plan');
+      await longPressHour(page, 9);
+      await pickActivityInDrawer(page, 'plan');
 
-    const planCard = page.locator('[data-plan-lane-card]', { hasText: IDENTITY.activityName });
-    await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+      const planCard = page.locator('[data-plan-lane-card]', { hasText: IDENTITY.activityName });
+      await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
 
-    await page.reload();
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-    await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
-  });
+      await page.reload();
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+    },
+  );
 
-  test('昨日の枠を長押しして Record を記録し、リロード後も残る', MOBILE_TAG, async ({ page }) => {
-    await openDay(page, offsetDateParam(-1));
+  test(
+    '昨日の枠を長押しして Record を記録し、リロード後も残る',
+    mobilePreviewFlowTag('mobile-record-create'),
+    async ({ page }) => {
+      await openDay(page, offsetDateParam(-1));
 
-    // 過去スロットの既定は Record（resolveTimeblockDestination）。タブは触らない
-    await longPressHour(page, 9);
-    await pickActivityInDrawer(page, 'record');
+      // 過去スロットの既定は Record（resolveTimeblockDestination）。タブは触らない
+      await longPressHour(page, 9);
+      await pickActivityInDrawer(page, 'record');
 
-    const recordCard = page.locator('[data-record-lane-card]', { hasText: IDENTITY.activityName });
-    await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
+      const recordCard = page.locator('[data-record-lane-card]', {
+        hasText: IDENTITY.activityName,
+      });
+      await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
 
-    await page.reload();
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-    await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
-  });
+      await page.reload();
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
+    },
+  );
 
   test(
     'ActivityChipRow から詳細を開き、記録を選んで Inspector へ移る',
-    MOBILE_TAG,
+    mobilePreviewFlowTag('mobile-summary-to-inspector'),
     async ({ page }) => {
       await openDay(page, offsetDateParam(-1));
       await page
@@ -186,7 +199,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
 
   test(
     'mobile の設定一覧から表示設定を変更し、戻る導線と永続化を確認する',
-    MOBILE_TAG,
+    mobilePreviewFlowTag('mobile-settings-display'),
     async ({ page }) => {
       await page.goto('/ja/settings?returnTo=%2F%3Fview%3Dday');
       await page.getByRole('link', { name: '表示', exact: true }).click();

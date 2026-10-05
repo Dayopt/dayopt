@@ -67,15 +67,42 @@ const env = {
 };
 
 function reviewedReport() {
+  const desktopFlowIds = [
+    'desktop-plan-create',
+    'desktop-record-create',
+    'desktop-past-plan-create',
+    'desktop-summary-known-records',
+    'desktop-summary-record-deep-link',
+    'desktop-summary-empty',
+    'desktop-settings-display',
+    'desktop-data-export',
+    'desktop-activity-lifecycle',
+    'desktop-theme',
+    'desktop-timezone',
+    'desktop-locale',
+    'desktop-category-lifecycle',
+    'desktop-inspector-search',
+    'desktop-plan-move',
+    'desktop-conflict-merge',
+    'desktop-template-lifecycle',
+  ];
+  const mobileFlowIds = [
+    'mobile-plan-create',
+    'mobile-record-create',
+    'mobile-summary-to-inspector',
+    'mobile-settings-display',
+  ];
   const tests = [
-    ...Array.from({ length: 17 }, (_, index) => ({
+    ...desktopFlowIds.map((flowId, index) => ({
       file: 'critical-path.spec.ts',
       project: 'chromium',
+      flowId,
       line: index + 1,
     })),
-    ...Array.from({ length: 4 }, (_, index) => ({
+    ...mobileFlowIds.map((flowId, index) => ({
       file: 'mobile-critical-path.spec.ts',
       project: 'Mobile Chrome',
+      flowId,
       line: index + 1,
     })),
   ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
@@ -114,6 +141,11 @@ describe('Reviewed Preview declaration matrix', () => {
   it('rejects duplicate declaration locations that replace a new case', () => {
     const report = reviewedReport();
     report.tests[8] = { ...report.tests[0]! };
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it('rejects a different declaration that keeps the reviewed file and count', () => {
+    const report = reviewedReport();
+    report.tests[3]!.flowId = 'desktop-unreviewed-flow';
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects the right counts under the wrong file/project pairing', () => {
@@ -519,6 +551,7 @@ describe('Preview reporter completeness', () => {
       for (const [index, declaration] of reviewedReport().tests.entries()) {
         const test = {
           id: String(index),
+          tags: [`preview-e2e/${declaration.flowId}`],
           expectedStatus: 'passed',
           location: { file: `/repo/${declaration.file}`, line: declaration.line },
           parent: { project: () => ({ name: declaration.project }) },

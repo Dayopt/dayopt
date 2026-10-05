@@ -209,7 +209,7 @@ describeWithEnv('Block search', () => {
     // 後着して再オープンを打ち消さない。
     await page.keyboard.press('Escape');
     await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
-    await page.getByRole('button', { name: 'ブロックを検索' }).first().click();
+    await page.getByRole('button', { name: 'タイムブロックを検索' }).first().click();
     await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(RECORD_NOTE);
     await page.getByText(RECORD_NOTE).click();
     await expect
@@ -224,7 +224,7 @@ describeWithEnv('Block search', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'ブロックを検索' }).first().click();
+    await page.getByRole('button', { name: 'タイムブロックを検索' }).first().click();
     await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
     await expect(page.getByText(PLAN_NOTE)).toBeVisible();
     await expect(page.getByText(RECORD_NOTE)).toBeVisible();
@@ -251,7 +251,7 @@ describeWithEnv('Block search', () => {
       test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 
       await page.getByRole('button', { name: 'カレンダーを開く' }).click();
-      await page.getByRole('button', { name: 'ブロックを検索' }).click();
+      await page.getByRole('button', { name: 'タイムブロックを検索' }).click();
       await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
 
       await expect(page.getByText(PLAN_NOTE)).toBeVisible();
