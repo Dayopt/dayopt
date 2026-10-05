@@ -1,4 +1,5 @@
-import { writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -277,15 +278,32 @@ describe('release candidate publisher', () => {
     const calls: Array<{ path: string; method: string; body?: unknown }> = [];
     const gated = { ...candidate(), mainSha };
     const gate = vi.fn(() => gated);
+    const syntheticSha = '9'.repeat(40);
+    const mergeBack = {
+      status: 'pending',
+      mainSha: '9'.repeat(40),
+      integrationSha: '8'.repeat(40),
+      prNumber: 89,
+      prUrl: `https://github.com/${repository}/pull/89`,
+      draft: false,
+    };
+    const mergeback = vi.fn(() => mergeBack);
     const api = (path: string, method = 'GET', body?: unknown) => {
       calls.push({ path, method, body });
       if (path === `repos/${repository}/rules/branches/main`) return requiredRules();
       if (path === 'user') return { login: 't3-nico' };
       if (path === `repos/${repository}/pulls/88`)
-        return { number: 88, merge_commit_sha: '9'.repeat(40) };
-      if (path === `repos/${repository}/commits/${candidateSha}/check-runs?per_page=100`)
+        return {
+          number: 88,
+          head: { sha: candidateSha },
+          base: { ref: 'main', sha: mainSha },
+          merge_commit_sha: syntheticSha,
+          mergeable: true,
+          mergeable_state: 'clean',
+        };
+      if (path === `repos/${repository}/commits/${syntheticSha}/check-runs?per_page=100`)
         return { check_runs: [] };
-      if (path === `repos/${repository}/commits/${candidateSha}/status?per_page=100`)
+      if (path === `repos/${repository}/commits/${syntheticSha}/status?per_page=100`)
         return {
           statuses: [
             {
@@ -295,6 +313,11 @@ describe('release candidate publisher', () => {
             },
           ],
         };
+      if (
+        path === `repos/${repository}/commits/${candidateSha}/check-runs?per_page=100` ||
+        path === `repos/${repository}/commits/${candidateSha}/status?per_page=100`
+      )
+        return path.endsWith('/check-runs?per_page=100') ? { check_runs: [] } : { statuses: [] };
       if (path === `repos/${repository}/pulls/88/merge` && method === 'PUT')
         return { merged: true, sha: '9'.repeat(40) };
       if (path === `repos/${repository}/commits/${'9'.repeat(40)}`) {
@@ -313,11 +336,20 @@ describe('release candidate publisher', () => {
       maxAgeSeconds: 3600,
       api,
       gate,
+      mergeback,
+      graphql: () => ({
+        repository: {
+          pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [] } },
+        },
+      }),
     });
 
-    expect(result).toEqual({ merged: true, sha: '9'.repeat(40) });
+    expect(result).toEqual({ merged: true, sha: '9'.repeat(40), mergeBack });
+    expect(mergeback).toHaveBeenCalledWith(
+      expect.objectContaining({ repository, mergedMainSha: '9'.repeat(40), api }),
+    );
     expect(gate).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'pr', repository, sha: '9'.repeat(40), prNumber: '88' }),
+      expect.objectContaining({ mode: 'pr', repository, sha: syntheticSha, prNumber: '88' }),
     );
     expect(calls.find((call) => call.path.endsWith('/merge'))).toEqual({
       path: `repos/${repository}/pulls/88/merge`,
@@ -337,7 +369,11 @@ describe('release candidate publisher', () => {
       if (path === `repos/${repository}/rules/branches/main`) return requiredRules();
       if (path === 'user') return { login: 't3-nico' };
       if (path === `repos/${repository}/pulls/88`)
-        return { number: 88, merge_commit_sha: '9'.repeat(40) };
+        return {
+          number: 88,
+          head: { sha: candidateSha },
+          merge_commit_sha: '9'.repeat(40),
+        };
       writes.push(`${method} ${path}`);
       throw new Error(`Unexpected write: ${method} ${path}`);
     };
@@ -357,6 +393,83 @@ describe('release candidate publisher', () => {
     ).rejects.toThrow('Candidate held: gate rejected');
     expect(writes).toEqual([]);
     expect(gate).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains the verified main merge SHA and reports a phase-aware failure if merge-back fails', async () => {
+    vi.stubEnv('GITHUB_REF', 'refs/heads/main');
+    vi.stubEnv('RELEASE_CANDIDATE_ENABLED', 'true');
+    const outputDir = mkdtempSync(join(tmpdir(), 'candidate-publish-output-'));
+    const outputPath = join(outputDir, 'github-output');
+    writeFileSync(outputPath, '');
+    vi.stubEnv('GITHUB_OUTPUT', outputPath);
+    const syntheticSha = '9'.repeat(40);
+    const api = (path: string, method = 'GET') => {
+      if (path === `repos/${repository}/rules/branches/main`) return requiredRules();
+      if (path === 'user') return { login: 't3-nico' };
+      if (path === `repos/${repository}/pulls/88`)
+        return {
+          head: { sha: candidateSha },
+          base: { ref: 'main', sha: mainSha },
+          merge_commit_sha: syntheticSha,
+          mergeable: true,
+          mergeable_state: 'clean',
+        };
+      if (path === `repos/${repository}/commits/${syntheticSha}/check-runs?per_page=100`)
+        return { check_runs: [] };
+      if (path === `repos/${repository}/commits/${syntheticSha}/status?per_page=100`)
+        return {
+          statuses: [
+            {
+              context: 'Release Candidate Gate',
+              state: 'success',
+              created_at: now,
+            },
+          ],
+        };
+      if (
+        path === `repos/${repository}/commits/${candidateSha}/check-runs?per_page=100` ||
+        path === `repos/${repository}/commits/${candidateSha}/status?per_page=100`
+      )
+        return path.endsWith('/check-runs?per_page=100') ? { check_runs: [] } : { statuses: [] };
+      if (path === `repos/${repository}/pulls/88/merge` && method === 'PUT')
+        return { merged: true, sha: '7'.repeat(40) };
+      if (path === `repos/${repository}/commits/${'7'.repeat(40)}`)
+        return {
+          parents: [{ sha: mainSha }, { sha: candidateSha }],
+          commit: { tree: { sha: candidateTree } },
+        };
+      throw new Error(`Unexpected API call: ${method} ${path}`);
+    };
+    const mergeback = vi.fn(() => {
+      throw new Error('synthetic integration PR conflict');
+    });
+
+    try {
+      await expect(
+        publishCandidate({
+          mode: 'merge',
+          prNumber: '88',
+          repository,
+          maxAgeSeconds: 3600,
+          api,
+          gate: () => ({ ...candidate(), mainSha }),
+          graphql: () => ({
+            repository: {
+              pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [] } },
+            },
+          }),
+          mergeback,
+        }),
+      ).rejects.toThrow(
+        'post-merge merge-back failed after verified main merge 7777777777777777777777777777777777777777',
+      );
+      expect(readFileSync(outputPath, 'utf8')).toBe(`verified_main_merge_sha=${'7'.repeat(40)}\n`);
+      expect(mergeback).toHaveBeenCalledWith(
+        expect.objectContaining({ mergedMainSha: '7'.repeat(40) }),
+      );
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 
   it('rejects the Actions bot identity before merge so normal workflow events can run', async () => {

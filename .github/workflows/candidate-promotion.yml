@@ -24,6 +24,8 @@ concurrency:
 
 jobs:
   promote_candidate:
+    outputs:
+      verified_main_merge_sha: ${{ steps.publish_candidate.outputs.verified_main_merge_sha }}
     if: vars.RELEASE_CANDIDATE_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-latest
     timeout-minutes: 80
@@ -41,6 +43,7 @@ jobs:
         with:
           node-version: 24
       - name: Open, verify ordinary PR checks, and merge the exact candidate
+        id: publish_candidate
         env:
           GH_TOKEN: ${{ secrets.RELEASE_CANDIDATE_TOKEN }}
           RELEASE_CANDIDATE_ENABLED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}
@@ -64,9 +67,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: 'Release candidate held (#3009)'
+          VERIFIED_MAIN_MERGE_SHA: ${{ needs.promote_candidate.outputs.verified_main_merge_sha }}
         run: |
           existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number,title --jq '.[] | select(.title == "Release candidate held (#3009)") | .number' | head -1)
-          body="Writer: Release Candidate workflow. Entire candidate held; no PR removal or partial release. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          if [ -n "$VERIFIED_MAIN_MERGE_SHA" ]; then
+            body="Writer: Release Candidate workflow. Main promotion PR merge was verified at $VERIFIED_MAIN_MERGE_SHA, but the post-merge Integration merge-back step failed. This controller has not asserted Production deployment status. Inspect the merge-back and run before assuming environments are aligned. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          else
+            body="Writer: Release Candidate workflow. Candidate held before a verified main merge; no partial release was confirmed. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          fi
           if [ -n "$existing" ]; then
             marker="actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)"
             found=$({ gh api "repos/$GITHUB_REPOSITORY/issues/$existing" --jq \.body; gh api "repos/$GITHUB_REPOSITORY/issues/$existing/comments" --paginate --jq '.[].body'; } | { rg -F "$marker" || true; })

@@ -440,6 +440,8 @@ node scripts/ci/release-candidate-publish.mjs merge <pr-number>
 
 `merge` は直前に freshness と全候補 gate を再検査し、strict branch rules を確認した通常 merge API を head SHA 固定・`merge_method=merge` で呼ぶ。bypass は使わない。main merge の migration writer は Supabase GitHub integration のまま。Production promote 直前にも実 merge tree と候補証拠を再検査し、migration の適用確認後に公開する。Git revert は DB rollback ではなく、migration は旧 app が動く expand/contract を前提とする。
 
+main の Production merge 後、controller は現在の `main` から `integration` への通常 PR を作成または再利用し、branch SHA と PR の source/base を再確認してから ready 化する。PR は通常の Integration CI・review・保護 merge を通す。自動 merge や ruleset bypass は行わない。`integration` に現在の `main` が含まれるまで次の候補 pin は祖先 gate で保留される（`git merge-base --is-ancestor origin/main origin/integration`）。integration の保護・review・merge 運用が設定され実測されるまでは、夜間の無人反復運用は有効化しない。
+
 失敗時は `Release candidate held (#3009)` Issue を冪等更新する。同じ run/attempt の通知は重複しない。既存 nightly の replica 監査 tick では候補の最新 run/attempt の欠測・未完了・red・stale も検査する。backup/config-sync/audit の既存 cron と実行条件は候補検証から独立して維持する。候補検証と監視の両 cron が停止した場合は、Actions 外部の監視も必要になる。
 
 ### 振り返り

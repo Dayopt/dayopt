@@ -7,7 +7,12 @@ import { CANDIDATE_SUITES } from './release-candidate.mjs';
 
 const workflows = join(process.cwd(), '.github/workflows');
 const candidate = readFileSync(join(workflows, 'release-candidate.yml'), 'utf8');
+const promotion = readFileSync(join(workflows, 'candidate-promotion.yml'), 'utf8');
 const pinScript = readFileSync(join(process.cwd(), 'scripts/ci/release-candidate.mjs'), 'utf8');
+const promotionScript = readFileSync(
+  join(process.cwd(), 'scripts/ci/release-candidate-publish.mjs'),
+  'utf8',
+);
 const nightly = readFileSync(join(workflows, 'nightly.yml'), 'utf8');
 const configAudit = readFileSync(join(workflows, 'production-config-audit.yml'), 'utf8');
 
@@ -93,6 +98,31 @@ describe('release candidate workflow contract', () => {
     expect(failureJob).toContain('if [ -z "$found" ]; then gh issue comment');
     expect(failureJob).toContain('gh issue create');
     expect(failureJob).not.toContain('git revert');
+  });
+
+  it('preserves the verified main merge SHA when the post-merge integration step fails', () => {
+    const promoteJob = promotion.slice(
+      promotion.indexOf('\n  promote_candidate:'),
+      promotion.indexOf('\n  notify_failure:'),
+    );
+    const failureJob = promotion.slice(promotion.indexOf('\n  notify_failure:'));
+
+    expect(promoteJob).toContain(
+      'verified_main_merge_sha: ${{ steps.publish_candidate.outputs.verified_main_merge_sha }}',
+    );
+    expect(promoteJob).toContain('id: publish_candidate');
+    expect(failureJob).toContain('needs: [promote_candidate]');
+    expect(failureJob).toContain("always() && needs.promote_candidate.result == 'failure'");
+    expect(failureJob).toContain(
+      'VERIFIED_MAIN_MERGE_SHA: ${{ needs.promote_candidate.outputs.verified_main_merge_sha }}',
+    );
+    expect(failureJob).toContain('before a verified main merge');
+    expect(failureJob).toContain('post-merge Integration merge-back step failed');
+    expect(failureJob).toContain('has not asserted Production deployment status');
+    expect(promotionScript).toContain('`verified_main_merge_sha=${result.sha}\\n`');
+    expect(promotionScript).toContain(
+      'Candidate post-merge merge-back failed after verified main merge',
+    );
   });
 
   it('preserves the existing nightly backup and audit schedules', () => {
