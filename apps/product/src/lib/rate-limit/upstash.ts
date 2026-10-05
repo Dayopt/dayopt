@@ -11,10 +11,12 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
+import { isOrdinaryProductPreview, resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import { extractClientIp } from '@/lib/security/ip-validation';
 import { captureUnexpectedError } from '@/lib/sentry';
+
+import { createLocalRateLimiter } from './local';
 
 /**
  * `@/env` の `env.X` は初回アクセス時に schema 全体（Supabase 必須3変数を含む）を検証する
@@ -35,6 +37,8 @@ function readTrimmedEnv(name: string): string | undefined {
   const trimmed = process.env[name]?.replace(/\\n/g, '').trim();
   return trimmed === '' ? undefined : trimmed;
 }
+
+const USE_LOCAL_PREVIEW_LIMITS = isOrdinaryProductPreview(process.env);
 
 const UPSTASH_REDIS_REST_URL = readTrimmedEnv('UPSTASH_REDIS_REST_URL');
 const UPSTASH_REDIS_REST_TOKEN = readTrimmedEnv('UPSTASH_REDIS_REST_TOKEN');
@@ -66,8 +70,10 @@ function rateLimitPrefix(suffix: string): string {
   return `${RATE_LIMIT_PREFIX}:${suffix}`;
 }
 
-/** Upstash Redisが有効かどうか（環境変数が設定されている場合のみtrue） */
-export const isUpstashEnabled = Boolean(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN);
+/** Verified ordinary Preview uses local limits even when Redis credentials are inherited. */
+export const isUpstashEnabled = Boolean(
+  !USE_LOCAL_PREVIEW_LIMITS && UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN,
+);
 const isProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
 
 /**
@@ -80,7 +86,7 @@ if (isUpstashEnabled) {
     url: UPSTASH_REDIS_REST_URL!,
     token: UPSTASH_REDIS_REST_TOKEN!,
   });
-} else if (!isProductionBuild) {
+} else if (!isProductionBuild && !USE_LOCAL_PREVIEW_LIMITS) {
   // Production runtimeはenv validation、Production buildはapp-local build gateが不足を拒否する。
   logger.warn(
     '[RateLimit] Upstash is not configured. Falling back to in-memory rate limiting — single-instance only, breaks on multi-replica deployments.',
@@ -116,7 +122,7 @@ function bytesToHex(bytes: ArrayBuffer): string {
 export async function hashRateLimitIdentifier(identifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const value = encoder.encode(`dayopt-product:${identifier}`);
-  const secret = UPSTASH_REDIS_REST_TOKEN?.trim();
+  const secret = USE_LOCAL_PREVIEW_LIMITS ? undefined : UPSTASH_REDIS_REST_TOKEN?.trim();
 
   if (!secret) return bytesToHex(await crypto.subtle.digest('SHA-256', value));
 
@@ -131,14 +137,21 @@ export async function hashRateLimitIdentifier(identifier: string): Promise<strin
 }
 
 function createRateLimiter(
-  limiter: ReturnType<typeof Ratelimit.slidingWindow>,
+  requests: number,
+  window: `${number} m` | `${number} h`,
   prefix: string,
 ): ProductRateLimiter | null {
+  if (USE_LOCAL_PREVIEW_LIMITS) {
+    const [duration, unit] = window.split(' ');
+    const windowMs = Number(duration) * (unit === 'm' ? 60_000 : 3_600_000);
+    const local = createLocalRateLimiter(requests, windowMs);
+    return { limit: async (identifier) => local.limit(await hashRateLimitIdentifier(identifier)) };
+  }
   if (!redis) return null;
 
   const rateLimit = new Ratelimit({
     redis,
-    limiter,
+    limiter: Ratelimit.slidingWindow(requests, window),
     analytics: false,
     prefix,
     timeout: RATE_LIMIT_TIMEOUT_MS,
@@ -156,14 +169,12 @@ function createRateLimiter(
  * お問い合わせ用レート制限
  * 5リクエスト / 1時間（Sliding Window）
  */
-export const contactRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(5, '1 h'),
-  rateLimitPrefix('contact'),
-);
+export const contactRateLimit = createRateLimiter(5, '1 h', rateLimitPrefix('contact'));
 
 /** お問い合わせ配送全体の予算上限: 60リクエスト / 1時間。 */
 export const contactGlobalRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(60, '1 h'),
+  60,
+  '1 h',
   rateLimitPrefix('contact-global'),
 );
 
@@ -249,10 +260,7 @@ return 0`,
  * 300リクエスト / 1分 per user（in-memory fallback の `USER_RATE_LIMIT` と同値。
  * 100 は 1 画面 15〜20 手続きの実装で実ユーザーも届く値だった。#2669）
  */
-export const trpcUserRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(300, '1 m'),
-  rateLimitPrefix('trpc:user'),
-);
+export const trpcUserRateLimit = createRateLimiter(300, '1 m', rateLimitPrefix('trpc:user'));
 
 /**
  * パスワード再認証（captcha 免除の service-role signInWithPassword）用レート制限
@@ -264,26 +272,18 @@ export const trpcUserRateLimit = createRateLimiter(
  * 全ユーザー共有のため、ここで先に頭打ちにして共有バケットの枯渇を遅らせる
  * （`features/auth/server/password-reauthentication.ts` 参照）。
  */
-export const reauthRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(5, '10 m'),
-  rateLimitPrefix('reauth'),
-);
+export const reauthRateLimit = createRateLimiter(5, '10 m', rateLimitPrefix('reauth'));
 
 /** MCP token検証前のcoarse IP ceiling。認証後は別のuser limitで絞る。 */
-export const mcpPreAuthRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(1_200, '1 m'),
-  rateLimitPrefix('mcp:pre-auth'),
-);
+export const mcpPreAuthRateLimit = createRateLimiter(1_200, '1 m', rateLimitPrefix('mcp:pre-auth'));
 
 /** MCP protected resource用: tool discovery/read/writeをuser単位でまとめて制限する。 */
-export const mcpUserRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(120, '1 m'),
-  rateLimitPrefix('mcp:user'),
-);
+export const mcpUserRateLimit = createRateLimiter(120, '1 m', rateLimitPrefix('mcp:user'));
 
 /** OAuth token endpoint用: 未認証IP単位のDB負荷上限。 */
 export const oauthTokenIpRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(10, '1 m'),
+  10,
+  '1 m',
   rateLimitPrefix('oauth-token:ip'),
 );
 
@@ -294,7 +294,8 @@ export const oauthTokenIpRateLimit = createRateLimiter(
  * 無制限にしないための層。DBを引かない安価な処理だけがこの内側にある。
  */
 export const oauthTokenPreBodyIpRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(600, '1 m'),
+  600,
+  '1 m',
   rateLimitPrefix('oauth-token:pre-body-ip'),
 );
 
@@ -307,7 +308,8 @@ export const oauthTokenPreBodyIpRateLimit = createRateLimiter(
  * 巻き添えで 429 になる**（#2721 D-01）。token 単位なら他の接続に波及しない。
  */
 export const oauthTokenRefreshRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(30, '1 m'),
+  30,
+  '1 m',
   rateLimitPrefix('oauth-token:refresh'),
 );
 
@@ -320,13 +322,15 @@ export const oauthTokenRefreshRateLimit = createRateLimiter(
  * を締め出さないよう、`authorization_code` 用の10/分より緩くする。
  */
 export const oauthTokenRefreshIpRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(120, '1 m'),
+  120,
+  '1 m',
   rateLimitPrefix('oauth-token:refresh-ip'),
 );
 
 /** OAuth token endpoint の client ごとのDB負荷上限。client ID は静的allowlistで検証後に使う。 */
 export const oauthTokenClientRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(120, '1 m'),
+  120,
+  '1 m',
   rateLimitPrefix('oauth-token:client'),
 );
 
@@ -335,7 +339,8 @@ export const oauthTokenClientRateLimit = createRateLimiter(
  * 500リクエスト / 24時間 per user
  */
 export const timeblockCreateRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(500, '24 h'),
+  500,
+  '24 h',
   rateLimitPrefix('timeblock:create'),
 );
 
@@ -343,10 +348,7 @@ export const timeblockCreateRateLimit = createRateLimiter(
  * iCalフィード用レート制限
  * 10リクエスト / 1分 per token（外部カレンダーアプリからの購読用）
  */
-export const icalFeedRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(10, '1 m'),
-  rateLimitPrefix('ical-feed'),
-);
+export const icalFeedRateLimit = createRateLimiter(10, '1 m', rateLimitPrefix('ical-feed'));
 
 /**
  * iCalフィードの事前認証集約上限（IP単位）。per-token上限より前に評価する。
@@ -355,10 +357,7 @@ export const icalFeedRateLimit = createRateLimiter(
  * 30/minのような厳しい値にせず60/minに緩めている（暫定値。本番トラフィック未計測）。
  * 到達時はSentryへcaptureし運用中に観測・調整する前提。
  */
-export const icalFeedIpRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(60, '1 m'),
-  rateLimitPrefix('ical-feed-ip'),
-);
+export const icalFeedIpRateLimit = createRateLimiter(60, '1 m', rateLimitPrefix('ical-feed-ip'));
 
 /**
  * 認証前の tRPC 境界用: cookie 付きリクエストの IP 単位上限。
@@ -371,7 +370,8 @@ export const icalFeedIpRateLimit = createRateLimiter(
  * ユーザー単位の 300/分 より緩くして、NAT 越しの同居ユーザーを巻き込まない。
  */
 export const trpcPreAuthIpRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(600, '1 m'),
+  600,
+  '1 m',
   rateLimitPrefix('trpc:pre-auth-ip'),
 );
 
@@ -382,13 +382,22 @@ export const trpcPreAuthIpRateLimit = createRateLimiter(
  * 外形監視を止めないため、超過時は 503 ではなく直近の結果を返す。
  */
 export const healthCheckGlobalRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(120, '1 m'),
+  120,
+  '1 m',
   rateLimitPrefix('health:global'),
+);
+
+/** Anonymous cron-heartbeat monitor: cap public service-role SELECT traffic independently. */
+export const cronHeartbeatHealthRateLimit = createRateLimiter(
+  30,
+  '1 m',
+  rateLimitPrefix('cron-heartbeat-health:global'),
 );
 
 /** iCalフィード全体の集約上限（暫定値）。service-role DB lookupを保護する。 */
 export const icalFeedGlobalRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(600, '1 m'),
+  600,
+  '1 m',
   rateLimitPrefix('ical-feed-global'),
 );
 
@@ -405,7 +414,8 @@ export const icalFeedGlobalRateLimit = createRateLimiter(
  * 別ユーザーを巻き込まない。
  */
 export const calendarConnectRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(10, '1 h'),
+  10,
+  '1 h',
   rateLimitPrefix('calendar-connect'),
 );
 
@@ -416,18 +426,17 @@ export const calendarConnectRateLimit = createRateLimiter(
  * 手動同期は補助的な導線であり 1 時間 6 回で足りる。
  */
 export const calendarSyncNowRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(6, '1 h'),
+  6,
+  '1 h',
   rateLimitPrefix('calendar-sync-now'),
 );
 
 /** CSP reportは公開入力なのでIP単位と全体上限を別々に持つ。 */
-export const cspReportRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(20, '1 m'),
-  rateLimitPrefix('csp-report'),
-);
+export const cspReportRateLimit = createRateLimiter(20, '1 m', rateLimitPrefix('csp-report'));
 
 export const cspReportGlobalRateLimit = createRateLimiter(
-  Ratelimit.slidingWindow(120, '1 m'),
+  120,
+  '1 m',
   rateLimitPrefix('csp-report-global'),
 );
 

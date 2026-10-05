@@ -1,5 +1,7 @@
 'use client';
 
+import { cn } from '@dayopt/components';
+
 interface AppHeaderProps {
   /** 左スロット: 戻るボタン等 */
   leftSlot?: React.ReactNode;
@@ -7,6 +9,8 @@ interface AppHeaderProps {
   children: React.ReactNode;
   /** 右スロット: 設定ボタン、Todayボタン、デスクトップコントロール等 */
   rightSlot?: React.ReactNode;
+  /** 中央行の余白を呼び出し元で調整する。 */
+  contentClassName?: string | undefined;
 }
 
 /**
@@ -27,11 +31,16 @@ interface AppHeaderProps {
  *   内容が折り返す場合は高さを伸ばして本文との重なりを防ぐ
  * - 8pxグリッドシステム準拠
  */
-export function AppHeader({ leftSlot, children, rightSlot }: AppHeaderProps) {
+export function AppHeader({ leftSlot, children, rightSlot, contentClassName }: AppHeaderProps) {
   return (
     <header className="pt-safe flex min-h-14 shrink-0 items-center px-4">
-      {/* eslint-disable-next-line tailwindcss/no-arbitrary-value -- complex grid template */}
-      <div className="my-3 grid min-h-8 w-full grid-cols-[auto_1fr_auto] items-center">
+      <div
+        className={cn(
+          contentClassName ?? 'my-3',
+          // eslint-disable-next-line tailwindcss/no-arbitrary-value -- complex grid template
+          'grid min-h-8 w-full grid-cols-[auto_1fr_auto] items-center',
+        )}
+      >
         {/* 左側 */}
         <div className="flex items-center">{leftSlot}</div>
 

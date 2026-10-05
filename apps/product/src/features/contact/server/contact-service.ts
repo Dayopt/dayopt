@@ -11,7 +11,6 @@ import { dayoptContact, dayoptContactDeliverySources } from '@dayopt/config';
 import { z } from 'zod';
 
 import { env } from '@/env';
-import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 import { ServiceError } from '@/lib/trpc/errors';
 
@@ -19,19 +18,7 @@ import type { ContactCategory, ContactFormInput } from '../types';
 
 const RESEND_API_KEY = env.RESEND_API_KEY;
 const RESEND_FROM_EMAIL = env.RESEND_FROM_EMAIL;
-const CONTACT_INTEGRATION_RECIPIENT = env.CONTACT_INTEGRATION_RECIPIENT;
-const DAYOPT_ENVIRONMENT = resolveDayoptEnvironment({
-  dayoptEnvironment: env.DAYOPT_ENVIRONMENT,
-  publicDayoptEnvironment: env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
-  vercelEnvironment: env.VERCEL_ENV,
-  vercelTargetEnvironment: env.VERCEL_TARGET_ENV,
-  vercelGitCommitRef: env.VERCEL_GIT_COMMIT_REF,
-  vercelProjectId: env.VERCEL_PROJECT_ID,
-  vercelBranchUrl: env.VERCEL_BRANCH_URL,
-  vercelUrl: env.VERCEL_URL,
-  appUrl: env.NEXT_PUBLIC_APP_URL,
-  supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
-});
+const VERCEL_ENV = env.VERCEL_ENV;
 const CONTACT_EMAIL_TIMEOUT_MS = 10_000;
 const RESEND_EMAILS_ENDPOINT = 'https://api.resend.com/emails';
 
@@ -65,52 +52,30 @@ export type DeliverContactFeedbackResult = {
   delivered: true;
 };
 
-function getEmailConfiguration(): {
-  apiKey: string;
-  from: string;
-  to: string;
-  environment: 'production' | 'integration';
-} {
-  if (DAYOPT_ENVIRONMENT !== 'production' && DAYOPT_ENVIRONMENT !== 'integration') {
+function getEmailConfiguration(): { apiKey: string; from: string } {
+  if (VERCEL_ENV !== 'production') {
     throw new ServiceError(
       'CONTACT_DELIVERY_FAILED',
-      'Contact email delivery is not available in this environment',
+      'Contact email delivery is available only in Production',
     );
   }
 
   const apiKey = RESEND_API_KEY?.trim();
   const fromResult = senderEmailSchema.safeParse(RESEND_FROM_EMAIL);
-  const recipientResult =
-    DAYOPT_ENVIRONMENT === 'integration'
-      ? emailAddressSchema.safeParse(CONTACT_INTEGRATION_RECIPIENT)
-      : null;
-  const recipient =
-    DAYOPT_ENVIRONMENT === 'integration'
-      ? recipientResult?.success
-        ? recipientResult.data
-        : null
-      : dayoptContact.supportEmail;
 
-  if (
-    !apiKey ||
-    !fromResult.success ||
-    fromResult.data === 'onboarding@resend.dev' ||
-    !recipient ||
-    (DAYOPT_ENVIRONMENT === 'integration' &&
-      recipient.toLowerCase() === dayoptContact.supportEmail.toLowerCase())
-  ) {
+  if (!apiKey || !fromResult.success || fromResult.data === 'onboarding@resend.dev') {
     throw new ServiceError(
       'CONTACT_DELIVERY_FAILED',
       'Contact email configuration is missing or invalid',
     );
   }
 
-  return { apiKey, from: fromResult.data, to: recipient, environment: DAYOPT_ENVIRONMENT };
+  return { apiKey, from: fromResult.data };
 }
 
 /** Send one authenticated Product contact submission through Resend. */
 export async function sendContactEmail(params: ContactEmailParams): Promise<void> {
-  const { apiKey, from, to, environment: dayoptEnvironment } = getEmailConfiguration();
+  const { apiKey, from } = getEmailConfiguration();
   const replyToResult = emailAddressSchema.safeParse(params.userEmail);
   if (!replyToResult.success) {
     throw new ServiceError('CONTACT_DELIVERY_FAILED', 'Contact email reply address is invalid');
@@ -146,18 +111,17 @@ export async function sendContactEmail(params: ContactEmailParams): Promise<void
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'Idempotency-Key': `contact-product-${input.submissionId}${dayoptEnvironment === 'integration' ? '-integration' : ''}`,
+        'Idempotency-Key': `contact-product-${input.submissionId}`,
       },
       body: JSON.stringify({
         from: `Dayopt Contact <${from}>`,
-        to: [to],
+        to: [dayoptContact.supportEmail],
         reply_to: replyToResult.data,
-        subject: `[Dayopt Contact][Product]${dayoptEnvironment === 'integration' ? '[Integration]' : ''}[${categoryLabel}]`,
+        subject: `[Dayopt Contact][Product][${categoryLabel}]`,
         text,
         tags: [
           { name: 'source', value: dayoptContactDeliverySources.product },
           { name: 'category', value: input.category },
-          { name: 'environment', value: dayoptEnvironment },
         ],
       }),
       signal: abortController.signal,

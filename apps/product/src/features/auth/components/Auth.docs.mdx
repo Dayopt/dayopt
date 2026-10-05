@@ -68,7 +68,7 @@ SessionMonitorProvider          セッション監視プロバイダー
 | `resetPassword(email)`      | パスワードリセット |
 | `updatePassword(password)`  | パスワード更新     |
 
-devtools ミドルウェア付き、タイムアウト処理（5秒）。
+state / action、middleware、セッション初期化のタイムアウトとオンライン / オフラインの条件は [useAuthStore.ts](../stores/useAuthStore.ts) を正本とする。ここでは一律の秒数を複製しない。
 
 ---
 

@@ -12,7 +12,7 @@ code:
 
 ## Contract
 
-- event名はmigrationと`product-events.ts`に定義した6種だけ
+- event名はmigrationと`product-events.ts`の定義を使う。現在の名前は末尾の生成領域で確認する
 - `properties`は常に`{}`。email、氏名、token、title、note、request bodyを追加しない
 - application helperは1秒timeoutのbest-effort。分析障害をProduct操作の失敗にしないため、件数は厳密な監査logではない
 - `user_signed_up`は`auth.users`の`AFTER INSERT` triggerで記録し、内部insert失敗をsignupへ伝播させない
@@ -66,3 +66,11 @@ event追加時はTypeScript allowlistだけを広げない。database check cons
 
 - 旧 Project overview（`docs/projects/_archive/minimal-product-analytics/overview.md`、docs/projects 全廃に伴い #2473 で削除。git 履歴参照）
 - [Supabase運用](../engineering/infra.md)
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/operations/product-analytics.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

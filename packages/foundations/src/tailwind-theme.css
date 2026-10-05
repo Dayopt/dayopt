@@ -3,6 +3,7 @@
  * :root / .dark の CSS変数を Tailwind ユーティリティクラスに接続
  * ============================================ */
 @theme inline {
+  --color-brand-ink: var(--brand-ink);
   /* ============================================
    * Surface トークン（3段階 + muted）
    * container:   サイドバー、セクション（沈む）

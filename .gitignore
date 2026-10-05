@@ -21,8 +21,14 @@ apps/*/out/
 
 # misc
 .DS_Store
-# Dayopt Learning System の生成物（正本は docs/learn、pnpm learn で作る）
+# Dayopt Learning System の明示的な保存記録（通常の pnpm learn は保存しない）
 /.learn/
+
+# 正本から公開ビルドが作る配布説明・archive（生成本文を Git に保存しない）
+/apps/product/public/brand/README.md
+/apps/web/public/brand/README.md
+/apps/product/public/brand/dayopt-brand-F.zip
+/apps/web/public/brand/dayopt-brand-F.zip
 *.pem
 
 # debug

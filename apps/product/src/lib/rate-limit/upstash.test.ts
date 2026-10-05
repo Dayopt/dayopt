@@ -220,7 +220,8 @@ describe('Upstash Rate Limit', () => {
     const enabledModule = await import('./upstash');
     // #2024 で reauthRateLimit を追加（15 → 16）
     // #2721 で oauth-token の pre-body / refresh、tRPC の pre-auth 2 本、health を追加（16 → 21）
-    expect(constructorOptions).toHaveLength(21);
+    // cron heartbeat health route に global limiter を追加（21 → 22）
+    expect(constructorOptions).toHaveLength(22);
     for (const options of constructorOptions) {
       expect(options.analytics).toBe(false);
       expect(options.timeout).toBe(RATE_LIMIT_TIMEOUT_MS);
@@ -294,7 +295,15 @@ describe('Upstash Rate Limit', () => {
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'configured');
     for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
 
-    await import('./upstash');
+    const rateLimits = await import('./upstash');
+    if (environment.DAYOPT_ENVIRONMENT === 'preview') {
+      expect(constructorOptions).toEqual([]);
+      expect(await rateLimits.contactRateLimit!.limit('preview-user')).toMatchObject({
+        success: true,
+        limit: 5,
+      });
+      return;
+    }
 
     const prefixes = constructorOptions.map((options) => options.prefix);
     expect(prefixes).toContain(expectedPrefix);

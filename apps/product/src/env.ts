@@ -9,7 +9,7 @@ import 'server-only';
 
 import { z } from 'zod';
 
-import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
+import { isOrdinaryProductPreview, resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 import { logger } from '@/lib/logger';
 
 import { isValidOAuthRedirectUriList } from '@/lib/oauth-server/redirect-uris';
@@ -170,7 +170,6 @@ const serverSchema = z
     // 課金 enforcement。未設定（既定）= 無効＝全機能無料。
     // Phase B（成熟・ローンチ前）に production を 'true' にして Free/Pro 棲み分けを復活させる。
     BILLING_ENFORCED: z.enum(['true', 'false']).optional(),
-    // 固定 Integration でのみビルドゲートが許可する Stripe テスト検証の opt-in。
     INTEGRATION_BILLING_REHEARSAL: z.enum(['true', 'false']).optional(),
     VERCEL_URL: z.string().optional(),
     VERCEL_ENV: z.string().optional(),
@@ -277,20 +276,12 @@ const serverSchema = z
 
       const sender = data.RESEND_FROM_EMAIL?.trim().toLowerCase();
       if (data.DAYOPT_ENVIRONMENT === 'integration') {
-        const mailValues = [
+        return ![
           data.RESEND_API_KEY,
           data.RESEND_FROM_EMAIL,
           data.RESEND_WEBHOOK_SECRET,
           data.CONTACT_INTEGRATION_RECIPIENT,
-        ].map((value) => Boolean(value?.trim()));
-        if (!mailValues.every(Boolean) && mailValues.some(Boolean)) return false;
-        if (!mailValues.some(Boolean)) return true;
-        return Boolean(
-          sender &&
-          sender !== 'onboarding@resend.dev' &&
-          isDayoptEmailAddress(sender) &&
-          data.CONTACT_INTEGRATION_RECIPIENT?.trim().toLowerCase() !== 'support@dayopt.app',
-        );
+        ].some((value) => Boolean(value?.trim()));
       }
 
       return Boolean(
@@ -303,7 +294,7 @@ const serverSchema = z
     },
     {
       message:
-        'RESEND_API_KEY / apex dayopt.app RESEND_FROM_EMAIL / RESEND_WEBHOOK_SECRET はVercel Productionで必須です',
+        'RESEND_API_KEY / apex dayopt.app RESEND_FROM_EMAIL / RESEND_WEBHOOK_SECRET はVercel Productionで必須です。Integration Resend deliveryは未対応のため設定しないでください',
       path: ['RESEND_API_KEY'],
     },
   )
@@ -364,6 +355,11 @@ export const env = new Proxy({} as ServerEnv, {
       for (const [key, value] of Object.entries(process.env)) {
         const trimmed = value?.replace(/\\n/g, '').trim();
         cleaned[key] = trimmed === '' ? undefined : trimmed;
+      }
+      // Unused inherited Redis configuration must not break verified ordinary Preview.
+      if (isOrdinaryProductPreview(process.env)) {
+        delete cleaned.UPSTASH_REDIS_REST_URL;
+        delete cleaned.UPSTASH_REDIS_REST_TOKEN;
       }
       const result = serverSchema.safeParse(cleaned);
       if (!result.success) {

@@ -84,10 +84,10 @@ Inspector の削除は、メモの保存待ちを止めて最新の入力を保�
 
 ### 3. 先に画面から消す（楽観的更新）（ブラウザ）
 
-一覧と詳細のキャッシュを snapshot してから、該当行を一覧から取り除き、詳細のキャッシュを空にする。失敗したら snapshot へ戻し「削除できませんでした。もう一度お試しください」を出す。失敗の理由（競合・消えていた等）で文言は分けない。retry: false。
+操作ごとの書き込みを記録してから該当行を一覧から取り除く。失敗したらその削除だけを取り消し、並行する別操作の確定結果や後続編集を保つ。「削除できませんでした。もう一度お試しください」を出す。失敗の理由（競合・消えていた等）で文言は分けない。retry: false。
 
 - **なぜ必要か**: 押した瞬間に消えて見えるようにするため。失敗したら元の位置に戻す。
-- **入力 → 出力**: id + 版 → 行を取り除いたキャッシュと snapshot
+- **入力 → 出力**: id + 版 → 行を取り除いたキャッシュと操作ごとの変更記録
 - **ここを変えると**: 削除の失敗文言は 1 種類だけ。競合を区別したくなったら reportDeleteError で code を見る。
 - **コード**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const deletePlan = api.planCommands.delete.useMutation({` を探す
@@ -104,7 +104,7 @@ Inspector の削除は、メモの保存待ちを止めて最新の入力を保�
 - 痕跡: ブラウザから Sentry へ（source: trpc_client_transport、本番（VERCEL_ENV=production）で、かつ分析の同意がある時だけ）。
 - **最初に見る場所**: Sentry と、同じ時刻の Vercel の /api/trpc ログ。
 - 根拠:
-  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `onSettled: invalidate,` を探す
+  - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `onSettled: settleAndInvalidate,` を探す
 
 </details>
 
@@ -195,7 +195,7 @@ restore_plan_command_v1 / restore_record_command_v1 を呼ぶ。削除済みの�
 <details>
 <summary>⚡ 戻す位置に別の Plan / Record ができていた（23P01） — 画面: エラー表示 / データ: 変化なし / 再試行: しない / 痕跡: 残らない</summary>
 
-- 画面: 「この時間帯には既に記録があります」のトースト。
+- 画面: 「復元できませんでした。もう一度お試しください」のトースト。重なりが理由だとは出ない。
 - データ: 変化なし。削除済みのまま。
 - 再試行: しない。もう一度押しても同じ。
 - 痕跡: 想定内（TIME_OVERLAP）なので Sentry には出ない。
@@ -234,7 +234,7 @@ restore_plan_command_v1 / restore_record_command_v1 を呼ぶ。削除済みの�
 
 ### 8. 戻した行を画面へ入れ直す（ブラウザ）
 
-restore は先に描かない（snapshot を取るだけ）。返ってきた行を、条件の合う一覧と詳細へ入れ直す。成功・失敗どちらでも plans / records / statistics / review を取り直す。
+restore は先に描かない。返ってきた行を、条件の合う一覧と詳細へ入れ直す。成功・失敗どちらでも同じ認証cacheであれば plans / records / statistics / review を取り直す。失敗しても別操作のcacheを巻き戻さず、認証切り替えで消去したcacheには古いcallbackから書き込まない。
 
 - **なぜ必要か**: 戻す行の中身（最新の値）は DB が返すので、返事を待ってから描く。
 - **入力 → 出力**: deleted_at を外した行 → 元の位置に戻った画面
@@ -384,11 +384,11 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
       "id": "optimistic",
       "svc": "browser",
       "title": "先に画面から消す（楽観的更新）",
-      "what": "一覧と詳細のキャッシュを snapshot してから、該当行を一覧から取り除き、詳細のキャッシュを空にする。失敗したら snapshot へ戻し「削除できませんでした。もう一度お試しください」を出す。失敗の理由（競合・消えていた等）で文言は分けない。retry: false。",
+      "what": "操作ごとの書き込みを記録してから該当行を一覧から取り除く。失敗したらその削除だけを取り消し、並行する別操作の確定結果や後続編集を保つ。「削除できませんでした。もう一度お試しください」を出す。失敗の理由（競合・消えていた等）で文言は分けない。retry: false。",
       "why": "押した瞬間に消えて見えるようにするため。失敗したら元の位置に戻す。",
       "io": {
         "in": "id + 版",
-        "out": "行を取り除いたキャッシュと snapshot"
+        "out": "行を取り除いたキャッシュと操作ごとの変更記録"
       },
       "change": "削除の失敗文言は 1 種類だけ。競合を区別したくなったら reportDeleteError で code を見る。",
       "refs": [
@@ -419,7 +419,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
           "refs": [
             {
               "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-              "find": "onSettled: invalidate,"
+              "find": "onSettled: settleAndInvalidate,"
             }
           ],
           "tags": {
@@ -689,7 +689,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
         {
           "id": "restore-overlap",
           "label": "戻す位置に別の Plan / Record ができていた（23P01）",
-          "screen": "「この時間帯には既に記録があります」のトースト。",
+          "screen": "「復元できませんでした。もう一度お試しください」のトースト。重なりが理由だとは出ない。",
           "data": "変化なし。削除済みのまま。",
           "retry": "しない。もう一度押しても同じ。",
           "trace": "想定内（TIME_OVERLAP）なので Sentry には出ない。",
@@ -715,7 +715,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
                 "label": "新しい予定"
               }
             ],
-            "toast": "この時間帯には既に記録があります",
+            "toast": "復元できませんでした。もう一度お試しください",
             "toastTone": "bad"
           }
         },
@@ -797,7 +797,7 @@ restore は先に描かない（snapshot を取るだけ）。返ってきた行
       "id": "settle",
       "svc": "browser",
       "title": "戻した行を画面へ入れ直す",
-      "what": "restore は先に描かない（snapshot を取るだけ）。返ってきた行を、条件の合う一覧と詳細へ入れ直す。成功・失敗どちらでも plans / records / statistics / review を取り直す。",
+      "what": "restore は先に描かない。返ってきた行を、条件の合う一覧と詳細へ入れ直す。成功・失敗どちらでも同じ認証cacheであれば plans / records / statistics / review を取り直す。失敗しても別操作のcacheを巻き戻さず、認証切り替えで消去したcacheには古いcallbackから書き込まない。",
       "why": "戻す行の中身（最新の値）は DB が返すので、返事を待ってから描く。",
       "io": {
         "in": "deleted_at を外した行",

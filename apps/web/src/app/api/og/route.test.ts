@@ -41,16 +41,10 @@ function request(url = 'https://dayopt.com/api/og?title=Hello'): NextRequest {
   return new NextRequest(url);
 }
 
-/** ImageResponse に渡ったJSXツリーから、指定propの値をすべて集める(浅い探索で十分)。 */
-function collectTextContent(node: unknown): string[] {
-  if (node === null || node === undefined || typeof node === 'boolean') return [];
-  if (typeof node === 'string' || typeof node === 'number') return [String(node)];
-  if (Array.isArray(node)) return node.flatMap(collectTextContent);
-  if (typeof node === 'object' && 'props' in (node as Record<string, unknown>)) {
-    const props = (node as { props?: { children?: unknown } }).props;
-    return collectTextContent(props?.children);
-  }
-  return [];
+function getRenderedCardProps(): Record<string, unknown> | undefined {
+  const element = imageResponseCalls.at(-1)?.element;
+  if (!element || typeof element !== 'object' || !('props' in element)) return undefined;
+  return (element as { props: Record<string, unknown> }).props;
 }
 
 describe('OG image route', () => {
@@ -173,8 +167,7 @@ describe('OG image route', () => {
     const response = await GET(request(`https://dayopt.com/api/og?title=${longTitle}`));
 
     expect(response.status).toBe(200);
-    const texts = collectTextContent(imageResponseCalls.at(-1)?.element);
-    const renderedTitle = texts.find((text) => text.startsWith('xxx'));
+    const renderedTitle = getRenderedCardProps()?.title as string | undefined;
     expect(renderedTitle?.length).toBeLessThanOrEqual(120);
   });
 
@@ -182,8 +175,33 @@ describe('OG image route', () => {
     const response = await GET(request('https://dayopt.com/api/og?type=malicious'));
 
     expect(response.status).toBe(200);
-    const texts = collectTextContent(imageResponseCalls.at(-1)?.element);
-    expect(texts).not.toContain('malicious');
+    expect(getRenderedCardProps()).toMatchObject({ category: 'product', layout: 'left' });
+  });
+
+  it.each([
+    ['category=docs', { category: 'docs', layout: 'center', categoryLabel: 'Docs' }],
+    [
+      'category=docs&locale=ja',
+      { category: 'docs', layout: 'center', categoryLabel: 'ドキュメント' },
+    ],
+    ['category=docs&locale=en', { category: 'docs', layout: 'center', categoryLabel: 'Docs' }],
+    [
+      'category=docs&locale=unsupported',
+      { category: 'docs', layout: 'center', categoryLabel: 'Docs' },
+    ],
+    ['type=blog', { category: 'journal', layout: 'left' }],
+    ['type=release', { category: 'release', layout: 'left' }],
+    ['category=docs&layout=left', { category: 'docs', layout: 'left' }],
+    ['category=product&layout=screenshot', { category: 'product', layout: 'left' }],
+    [
+      'category=product&layout=screenshot&screenshot=https%3A%2F%2Fevil.example%2Fscreen.png',
+      { category: 'product', layout: 'left' },
+    ],
+  ])('category/layout を画像 renderer に渡す (%s)', async (query, expected) => {
+    const response = await GET(request(`https://dayopt.com/api/og?${query}`));
+
+    expect(response.status).toBe(200);
+    expect(getRenderedCardProps()).toMatchObject(expected);
   });
 
   it('public/og-fallback.pngとroute.tsxへ埋め込んだbase64は同じbyte列である(乖離すると再生成scriptの出力漏れに気づけない、#2052クロスレビュー指摘)', () => {

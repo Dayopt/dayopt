@@ -28,12 +28,15 @@ vi.mock('@/features/timeblock', async () => {
   const domain = await vi.importActual<
     typeof import('@/features/timeblock/domain/timeblock-destination')
   >('@/features/timeblock/domain/timeblock-destination');
+  const laneConflict = await vi.importActual<
+    typeof import('@/features/timeblock/lib/timeblock-lane-conflict')
+  >('@/features/timeblock/lib/timeblock-lane-conflict');
 
   return {
     resolveTimeblockDestination: domain.resolveTimeblockDestination,
     resolveTimeblockKindChoice: domain.resolveTimeblockKindChoice,
     collectTimeblockLaneItems: () => laneItems,
-    hasTimeblockLaneConflict: () => false,
+    hasTimeblockLaneConflict: laneConflict.hasTimeblockLaneConflict,
     useTimeblockWriteMutations: () => ({
       createPlan: { mutate: createPlanMutate },
       createRecord: { mutate: createRecordMutate },
@@ -255,6 +258,23 @@ describe('InlineCreatePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '開発' }));
 
     expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createPlanMutate).not.toHaveBeenCalled();
+  });
+
+  it('明示的なRecord作成は既存Recordと重なる時に作成しない', () => {
+    const day = pastDay();
+    const start = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), 9));
+    laneItems.push({
+      id: 'record-existing',
+      start_at: start.toISOString(),
+      end_at: new Date(start.getTime() + 60 * 60 * 1000).toISOString(),
+    });
+    setSelection(day);
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+
+    expect(createRecordMutate).not.toHaveBeenCalled();
     expect(createPlanMutate).not.toHaveBeenCalled();
   });
 

@@ -415,6 +415,34 @@ describe('ReportDetailPanel', () => {
     expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_DEFAULT_WIDTH + 60);
   });
 
+  it.each(['pointercancel', 'unmount'] as const)(
+    'リサイズが%sで中断されても選択禁止とドラッグを解除する',
+    (interruption) => {
+      const { unmount } = renderPanel();
+      document.body.style.cursor = 'crosshair';
+      document.body.style.userSelect = 'text';
+      try {
+        fireEvent.pointerDown(screen.getByRole('separator'), { button: 0, clientX: 500 });
+        fireEvent.pointerMove(window, { clientX: 440 });
+        expect(document.body.style.userSelect).toBe('none');
+
+        if (interruption === 'unmount') unmount();
+        else fireEvent.pointerCancel(window);
+
+        expect(document.body.style.cursor).toBe('crosshair');
+        expect(document.body.style.userSelect).toBe('text');
+        expect(useReportDetailStore.getState().isResizing).toBe(false);
+        fireEvent.pointerMove(window, { clientX: 400 });
+        expect(useReportDetailStore.getState().width).toBe(REPORT_DETAIL_PANEL_DEFAULT_WIDTH + 60);
+      } finally {
+        // red の段階でも他の test に listener/style を持ち越さない。
+        fireEvent.pointerUp(window);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    },
+  );
+
   /** 仕様 §6。パネル内で編集はしない。 */
   it('編集用の入力を持たない', () => {
     renderPanel();

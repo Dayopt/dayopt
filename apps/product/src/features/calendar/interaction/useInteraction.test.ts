@@ -16,11 +16,6 @@ const baseEvent: CalendarDisplayEvent = {
   version: '2026-01-15T08:00:00.000000Z',
 } as unknown as CalendarDisplayEvent;
 
-/**
- * #2250: pointer→lane 判定は相手レーンに timeblock が無い時刻ではフル幅（境界不可視）扱いになり
- * sourceLane を維持する。「Record レーンへ入る」挙動そのものを検証する test では、
- * 判定対象の時間帯に必ず重なる counterpart Record（終日）を明示的に用意する。
- */
 const counterpartRecordAllDay: CalendarDisplayEvent = {
   ...baseEvent,
   id: 'counterpart-record',
@@ -91,26 +86,7 @@ function completeDrag(hook: { result: { current: ReturnType<typeof useInteractio
   });
 }
 
-function createDayColumn(): HTMLElement {
-  const column = document.createElement('div');
-  column.dataset.calendarDayIndex = '0';
-  column.getBoundingClientRect = () =>
-    ({
-      bottom: 1440,
-      height: 1440,
-      left: 0,
-      right: 200,
-      top: 0,
-      width: 200,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    }) as DOMRect;
-  document.body.appendChild(column);
-  return column;
-}
-
-function dropIntoRecordLane(
+function dropAtRightLaneArea(
   hook: { result: { current: ReturnType<typeof useInteraction> } },
   moveY: number = 570,
 ): void {
@@ -126,42 +102,32 @@ function dropIntoRecordLane(
       type: 'POINTER_MOVE',
       point: { clientX: 180, clientY: moveY },
     });
-    useCalendarDragStore.getState().updateDrag({ targetLane: 'record' });
     hook.result.current.dispatch({ type: 'POINTER_UP' });
   });
 }
 
-describe('useInteraction Plan → Record drop', () => {
-  it('Recordレーンへのdropはplan更新ではなく記録mutationへ委譲する', () => {
+describe('useInteraction Plan drag', () => {
+  it('Recordと同じ領域へdropしてもPlanの時刻を更新する', () => {
     const onEventUpdate = vi.fn();
-    const onPlanRecord = vi.fn();
-    const hook = renderHook(() => useInteraction(makeProps({ onEventUpdate, onPlanRecord })));
+    const hook = renderHook(() =>
+      useInteraction(makeProps({ events: [baseEvent, counterpartRecordAllDay], onEventUpdate })),
+    );
 
-    completeDrag(hook);
-    act(() => {
-      useCalendarDragStore.getState().updateDrag({ targetLane: 'record' });
-      hook.result.current.dispatch({ type: 'POINTER_UP' });
-    });
+    dropAtRightLaneArea(hook);
 
-    expect(onPlanRecord).toHaveBeenCalledWith('timeblock-1', {
-      start: new Date('2026-01-15T09:30:00'),
-      end: new Date('2026-01-15T10:30:00'),
-    });
-    expect(onEventUpdate).not.toHaveBeenCalled();
+    expect(onEventUpdate).toHaveBeenCalledWith(
+      'timeblock-1',
+      expect.objectContaining({
+        startTime: new Date('2026-01-15T09:30:00'),
+        endTime: new Date('2026-01-15T10:30:00'),
+      }),
+    );
   });
 
-  // #2250 plan-review で検出した P1 故障モードそのものを固定する regression test。
-  // counterpart（Record）が全く存在しない日は Plan がフル幅（境界不可視）で表示される。
-  // 旧実装は pointer 判定が固定 38% 境界のままだったため、境界の見えないカラムの
-  // 右側へドロップしただけで不可視のまま Plan→Record 変換 mutation が発火していた。
-  it('counterpart Record が存在しない日では、旧境界の右側へドロップしても不可視のRecord変換mutationは発火しない', () => {
-    createDayColumn();
+  it('Recordと重なる場所へ移動してもRecord重複として拒否しない', () => {
     const onEventUpdate = vi.fn();
-    const onPlanRecord = vi.fn();
     const hook = renderHook(() =>
-      // events は baseEvent のみ（counterpart Record 無し）。rect.width=200 なので、
-      // 旧固定境界（38%）は x=76。x=180 は旧境界の右側 = 旧実装なら 'record' に誤判定される位置。
-      useInteraction(makeProps({ events: [baseEvent], onEventUpdate, onPlanRecord })),
+      useInteraction(makeProps({ events: [baseEvent, counterpartRecordAllDay], onEventUpdate })),
     );
 
     act(() => {
@@ -177,42 +143,7 @@ describe('useInteraction Plan → Record drop', () => {
       document.dispatchEvent(new MouseEvent('mousemove', { clientX: 180, clientY: 570 }));
     });
 
-    // 境界が見えない（counterpart が無い）ため、x 座標に関わらず sourceLane（'plan'）を維持する。
-    expect(useCalendarDragStore.getState().targetLane).toBe('plan');
-
-    act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
-
-    // 同一レーン（'plan' のまま）dropなので Record 変換は発火しない。
-    // 時間更新は過去 Plan でも通常どおり走る（「過去Planの同一レーンdropも時間更新する」と同型）。
-    expect(onPlanRecord).not.toHaveBeenCalled();
-    expect(onEventUpdate).toHaveBeenCalled();
-  });
-
-  it('最初のmousemoveでRecordレーンへ入った場合もtarget laneとpreview rangeを保持する', () => {
-    createDayColumn();
-    const onPlanRecord = vi.fn();
-    const hook = renderHook(() =>
-      useInteraction(makeProps({ events: [baseEvent, counterpartRecordAllDay], onPlanRecord })),
-    );
-
-    act(() => {
-      hook.result.current.dispatch({
-        type: 'POINTER_DOWN',
-        timeblockId: 'timeblock-1',
-        point: { clientX: 20, clientY: 540 },
-        originalPosition: rect,
-        dateIndex: 0,
-      });
-    });
-    act(() => {
-      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 180, clientY: 570 }));
-    });
-
-    // #2250: pointer 判定は counterpart（境界）が存在する時刻でのみ x 座標で record に
-    // 解決される。counterpartRecordAllDay（終日）が preview 区間に重なるため、targetLane は
-    // 'record' に解決される。
     expect(hook.result.current.state.mode).toBe('dragging');
-    expect(useCalendarDragStore.getState().targetLane).toBe('record');
     expect(hook.result.current.state).toMatchObject({
       previewTime: {
         start: new Date('2026-01-15T09:30:00'),
@@ -220,55 +151,18 @@ describe('useInteraction Plan → Record drop', () => {
       },
     });
 
-    // 同時刻に counterpart Record が既に存在するため、drop はスケジュール重複として
-    // 拒否される（checkOverlap 経由、境界可視性とは独立した既存 guard。
-    // 「タグフィルターで非表示のRecordとも重複を検出してdropを拒否する」と同型）。
     act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
-    expect(onPlanRecord).not.toHaveBeenCalled();
-  });
-
-  it('連続dragでは前回のRecord targetを引き継がず最初のmousemoveでPlan laneへ戻る', () => {
-    createDayColumn();
-    const hook = renderHook(() =>
-      useInteraction(makeProps({ events: [baseEvent, counterpartRecordAllDay] })),
+    expect(onEventUpdate).toHaveBeenCalledWith(
+      'timeblock-1',
+      expect.objectContaining({
+        startTime: new Date('2026-01-15T09:30:00'),
+        endTime: new Date('2026-01-15T10:30:00'),
+      }),
     );
-
-    act(() => {
-      hook.result.current.handlers.handlePointerDown(
-        'timeblock-1',
-        createMouseEvent(20, 540),
-        rect,
-      );
-    });
-    act(() => {
-      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 180, clientY: 570 }));
-    });
-
-    expect(useCalendarDragStore.getState().targetLane).toBe('record');
-
-    act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
-
-    // 新しい drag を開始したら、前回の 'record' が stale state として引き継がれず、
-    // 最初の mousemove で（x=40 は既定境界より左なので）'plan' に解決される。
-    act(() => {
-      hook.result.current.handlers.handlePointerDown(
-        'timeblock-1',
-        createMouseEvent(20, 540),
-        rect,
-      );
-    });
-    act(() => {
-      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 40, clientY: 600 }));
-    });
-
-    expect(useCalendarDragStore.getState().targetLane).toBe('plan');
-
-    act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
   });
 
-  it('タグフィルターで非表示のRecordとも重複を検出してdropを拒否する', () => {
-    createDayColumn();
-    const onPlanRecord = vi.fn();
+  it('タグフィルターで非表示のRecordと重なるPlan移動を許可する', () => {
+    const onEventUpdate = vi.fn();
     const record = {
       ...baseEvent,
       id: 'record-1',
@@ -281,7 +175,7 @@ describe('useInteraction Plan → Record drop', () => {
         makeProps({
           events: [baseEvent],
           allEventsForOverlapCheck: [baseEvent, record],
-          onPlanRecord,
+          onEventUpdate,
         }),
       ),
     );
@@ -299,18 +193,89 @@ describe('useInteraction Plan → Record drop', () => {
       document.dispatchEvent(new MouseEvent('mousemove', { clientX: 180, clientY: 570 }));
     });
 
-    expect(hook.result.current.state).toMatchObject({ mode: 'dragging', isOverlapping: true });
+    expect(hook.result.current.state).toMatchObject({ mode: 'dragging', isOverlapping: false });
 
     act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
 
-    expect(onPlanRecord).not.toHaveBeenCalled();
+    expect(onEventUpdate).toHaveBeenCalledWith(
+      'timeblock-1',
+      expect.objectContaining({
+        startTime: new Date('2026-01-15T09:30:00'),
+        endTime: new Date('2026-01-15T10:30:00'),
+      }),
+    );
+  });
+
+  it('別のPlanと重なる移動は拒否する', () => {
+    const onEventUpdate = vi.fn();
+    const overlappingPlan = {
+      ...baseEvent,
+      id: 'plan-2',
+      startDate: new Date('2026-01-15T09:15:00'),
+      endDate: new Date('2026-01-15T10:45:00'),
+    };
+    const hook = renderHook(() =>
+      useInteraction(makeProps({ events: [baseEvent, overlappingPlan], onEventUpdate })),
+    );
+
+    act(() => {
+      hook.result.current.dispatch({
+        type: 'POINTER_DOWN',
+        timeblockId: 'timeblock-1',
+        point: { clientX: 20, clientY: 540 },
+        originalPosition: rect,
+        dateIndex: 0,
+      });
+      hook.result.current.dispatch({
+        type: 'POINTER_MOVE',
+        point: { clientX: 180, clientY: 570 },
+      });
+    });
+
+    expect(hook.result.current.state).toMatchObject({ mode: 'dragging', isOverlapping: true });
+
+    act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
+    expect(onEventUpdate).not.toHaveBeenCalled();
+  });
+
+  it('別のRecordと重なる移動は拒否する', () => {
+    const onEventUpdate = vi.fn();
+    const record = { ...baseEvent, kind: 'record' as const };
+    const overlappingRecord = {
+      ...record,
+      id: 'record-2',
+      startDate: new Date('2026-01-15T09:15:00'),
+      endDate: new Date('2026-01-15T10:45:00'),
+    };
+    const hook = renderHook(() =>
+      useInteraction(makeProps({ events: [record, overlappingRecord], onEventUpdate })),
+    );
+
+    act(() => {
+      hook.result.current.dispatch({
+        type: 'POINTER_DOWN',
+        timeblockId: 'timeblock-1',
+        point: { clientX: 20, clientY: 540 },
+        originalPosition: rect,
+        dateIndex: 0,
+      });
+      hook.result.current.dispatch({
+        type: 'POINTER_MOVE',
+        point: { clientX: 180, clientY: 570 },
+      });
+    });
+
+    expect(hook.result.current.state).toMatchObject({ mode: 'dragging', isOverlapping: true });
+
+    act(() => hook.result.current.dispatch({ type: 'POINTER_UP' }));
+    expect(onEventUpdate).not.toHaveBeenCalled();
   });
 
   /**
    * 制約は drop 先の時間帯だけ（DT005）。Plan 自身が未来に終わるかは見ない。
    *
-   * 以前はここが「記録callbackを呼ばない」を assert しており、撤去済み DT013
-   * （#2598 で消した「未来 Plan」の特別扱い）を緑で固定していた（#2645）。
+   * Plan の時間編集に Record の未来終了制約を適用しないことを維持する。
+   * 「未来 Plan」の特別扱いは #2598 で撤去済み（#2645）。
    * DB は過去に終わる Record を未来 Plan へ紐付けられる
    * （timeblock-atomic-commands.integration.test.ts が real DB で固定）。
    */
@@ -322,6 +287,7 @@ describe('useInteraction Plan → Record drop', () => {
         startDate: new Date('2026-01-15T11:00:00'),
         endDate: new Date('2026-01-15T13:00:00'),
       },
+      '2026-01-15T11:30:00',
     ],
     [
       'future Plan',
@@ -330,29 +296,36 @@ describe('useInteraction Plan → Record drop', () => {
         startDate: new Date('2026-01-16T09:00:00'),
         endDate: new Date('2026-01-16T10:00:00'),
       },
+      '2026-01-15T10:30:00',
     ],
-  ])('%sでもdrop先が過去ならRecordレーンへのdropで記録callbackを呼ぶ', (_label, event) => {
+  ])('%sは他方のレーン側へdragしてもPlanの時刻を更新する', (_label, event, expectedEnd) => {
     const onEventUpdate = vi.fn();
-    const onPlanRecord = vi.fn();
-    const hook = renderHook(() =>
-      useInteraction(makeProps({ events: [event], onEventUpdate, onPlanRecord })),
+    const hook = renderHook(() => useInteraction(makeProps({ events: [event], onEventUpdate })));
+
+    dropAtRightLaneArea(hook);
+
+    expect(onEventUpdate).toHaveBeenCalledWith(
+      'timeblock-1',
+      expect.objectContaining({
+        startTime: new Date('2026-01-15T09:30:00'),
+        endTime: new Date(expectedEnd),
+      }),
     );
-
-    dropIntoRecordLane(hook);
-
-    expect(onPlanRecord).toHaveBeenCalledTimes(1);
-    expect(onEventUpdate).not.toHaveBeenCalled();
   });
 
-  it('drop previewの終了が未来なら過去Planでも記録callbackを呼ばない', () => {
+  it('drop previewの終了が未来でもPlanの時刻を更新する', () => {
     const onEventUpdate = vi.fn();
-    const onPlanRecord = vi.fn();
-    const hook = renderHook(() => useInteraction(makeProps({ onEventUpdate, onPlanRecord })));
+    const hook = renderHook(() => useInteraction(makeProps({ onEventUpdate })));
 
-    dropIntoRecordLane(hook, 720);
+    dropAtRightLaneArea(hook, 720);
 
-    expect(onPlanRecord).not.toHaveBeenCalled();
-    expect(onEventUpdate).not.toHaveBeenCalled();
+    expect(onEventUpdate).toHaveBeenCalledWith(
+      'timeblock-1',
+      expect.objectContaining({
+        startTime: new Date('2026-01-15T12:00:00'),
+        endTime: new Date('2026-01-15T13:00:00'),
+      }),
+    );
   });
 
   // Plan は時間軸のどこにでも置ける（AGENTS.md §時間 / docs/product/specs/plan-record.md）。

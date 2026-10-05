@@ -317,12 +317,17 @@ INSERT INTO private.calendar_oauth_attempts (
   // 通常の disconnect 経路で孤児化した subject fence（他の connection / revoke operation /
   // receipt から一切参照されない）を、本 cleanup がカバーすることを確認する。
   it('disconnect() 相当の操作（connection 削除のみ、fence 側は無変更）で孤児化した subject fence を回収する', () => {
-    const { projectFenceId } = provisionProject();
-    const subjectFenceId = createSubjectFence('retention-subject-disconnect-orphan');
+    provisionProject();
     const connectionId = crypto.randomUUID();
 
-    ownerSql(
-      `INSERT INTO public.calendar_connections (
+    // 毎時50分の本物のretention cronに、connection挿入前のfixtureや検証途中の
+    // 孤児fenceを回収させない。操作とassert用観測を同じtransaction内で行う。
+    const [beforeState, deletedCount, existsAfter] = serviceRoleSql(
+      `BEGIN;
+SELECT private.get_or_create_calendar_subject_fence_v1(
+  :'project_key', 'retention-subject-disconnect-orphan'
+) AS subject_fence_id \\gset
+INSERT INTO public.calendar_connections (
   id, user_id, provider, provider_account_id, granted_scopes, refresh_token_enc, status,
   data_generation, authority_fence_id, authority_epoch
 ) VALUES (
@@ -332,30 +337,19 @@ INSERT INTO private.calendar_oauth_attempts (
 );
 
 -- disconnect() が実際に行うのはこれだけ（fence 側には触れない）。
-DELETE FROM public.calendar_connections WHERE id = :'connection_id'::UUID;`,
-      {
-        connection_id: connectionId,
-        subject_fence_id: subjectFenceId,
-        user_id: userId,
-      },
-    );
+DELETE FROM public.calendar_connections WHERE id = :'connection_id'::UUID;
+SELECT state AS before_state FROM private.calendar_authority_fences
+WHERE id = :'subject_fence_id'::UUID \\gset
+SELECT private.cleanup_calendar_authority_retention_internal_v1(1000) AS deleted_count \\gset
+SELECT :'before_state' || '|' || :'deleted_count' || '|' ||
+  EXISTS(SELECT 1 FROM private.calendar_authority_fences WHERE id = :'subject_fence_id'::UUID);
+ROLLBACK;`,
+      { connection_id: connectionId, project_key: projectKey, user_id: userId },
+    ).split('|');
 
-    expect(
-      ownerSql(
-        `SELECT state FROM private.calendar_authority_fences WHERE id = :'subject_fence_id'::UUID;`,
-        { subject_fence_id: subjectFenceId },
-      ),
-    ).toBe('ready');
-
-    const deletedCount = runCleanup();
-    expect(deletedCount).toBeGreaterThanOrEqual(1);
-
-    expect(
-      ownerSql(
-        `SELECT EXISTS(SELECT 1 FROM private.calendar_authority_fences WHERE id = :'subject_fence_id'::UUID);`,
-        { subject_fence_id: subjectFenceId },
-      ),
-    ).toBe('f');
+    expect(beforeState).toBe('ready');
+    expect(Number(deletedCount)).toBeGreaterThanOrEqual(1);
+    expect(existsAfter).toBe('false');
   });
 
   // #2003 の元 test 設計は「#2002 の finalize 配線後に pending 詰まりが解消される」と

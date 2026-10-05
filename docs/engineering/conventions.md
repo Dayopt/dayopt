@@ -592,14 +592,16 @@ import { ConfirmDayButton } from '@/features/timeblock';
 
 ### 5. 禁止されたパターン
 
-| ❌ 禁止                        | ✅ 代替                          | 理由                        |
-| ------------------------------ | -------------------------------- | --------------------------- |
-| `any` / `unknown` / `Function` | 具体的な型、`as never`           | 型安全性                    |
-| `console.log`                  | `@/lib/logger`                   | 本番ログ制御                |
-| `useEffect` で fetch           | tRPC + TanStack Query            | キャッシュ・エラー処理      |
-| `style` 属性                   | Tailwind クラス                  | 一貫性                      |
-| `export default`               | named export                     | App Router 特殊ファイル除く |
-| `React.FC`                     | `export function Component() {}` | 簡潔さ                      |
+| ❌ 禁止              | ✅ 代替                          | 理由                        |
+| -------------------- | -------------------------------- | --------------------------- |
+| `any` / `Function`   | 具体的な型・関数シグネチャ       | 型安全性                    |
+| `console.log`        | `@/lib/logger`                   | 本番ログ制御                |
+| `useEffect` で fetch | tRPC + TanStack Query            | キャッシュ・エラー処理      |
+| `style` 属性         | Tailwind クラス                  | 一貫性                      |
+| `export default`     | named export                     | App Router 特殊ファイル除く |
+| `React.FC`           | `export function Component() {}` | 簡潔さ                      |
+
+未検証の外部入力や例外は `unknown` で受け、スキーマ検証や型ガードで絞り込んでから使う。`as never` を含む型アサーションは実行時の検証を行わないため、入力検証の代替にしない。
 
 ### 6. Storybook 関連
 

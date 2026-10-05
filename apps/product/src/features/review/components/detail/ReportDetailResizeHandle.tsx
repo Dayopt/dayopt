@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import {
   clampReportDetailPanelWidth,
@@ -28,11 +28,15 @@ export function ReportDetailResizeHandle() {
   const width = useReportDetailStore((state) => state.width);
   const setWidth = useReportDetailStore((state) => state.setWidth);
   const setResizing = useReportDetailStore((state) => state.setResizing);
+  const finishResizeRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => finishResizeRef.current?.(), []);
 
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
       event.preventDefault();
+      finishResizeRef.current?.();
 
       const startX = event.clientX;
       const startWidth = width;
@@ -53,10 +57,14 @@ export function ReportDetailResizeHandle() {
         document.body.style.userSelect = previousUserSelect;
         window.removeEventListener('pointermove', handlePointerMove);
         window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+        finishResizeRef.current = null;
       };
 
+      finishResizeRef.current = handlePointerUp;
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', handlePointerUp, { once: true });
+      window.addEventListener('pointercancel', handlePointerUp, { once: true });
     },
     [setResizing, setWidth, width],
   );

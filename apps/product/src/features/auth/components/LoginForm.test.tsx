@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -551,5 +551,38 @@ describe('LoginForm の再送先の紐付け', () => {
     });
     expect(button).toBeEnabled();
     expect(button).toHaveClass('min-h-11');
+  });
+
+  it.each([
+    ['completion', null],
+    ['captcha error', { message: 'captcha failed', code: 'captcha_failed' }],
+  ])('ignores an old resend %s after a new login attempt', async (_label, error) => {
+    let finish!: (value: { error: typeof error }) => void;
+    mockResendConfirmation.mockImplementationOnce(
+      () =>
+        new Promise<{ error: typeof error }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    mockSignIn.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await failLoginWith(user, 'first@example.com');
+    await user.click(
+      await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' }),
+    );
+    expect(mockResendConfirmation).toHaveBeenCalledWith('first@example.com');
+    await failLoginWith(user, 'second@example.com');
+    await screen.findByRole('button', { name: 'auth.loginForm.resendConfirmation' });
+    await act(async () => finish({ error }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('auth.errors.invalidCredentials');
+    expect(screen.queryByText('auth.loginForm.confirmationResent')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'auth.loginForm.resendConfirmation' }));
+    expect(mockResendConfirmation).toHaveBeenLastCalledWith('second@example.com');
   });
 });

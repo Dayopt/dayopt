@@ -203,3 +203,36 @@ function isDayoptEnvironment(value: string): value is Exclude<DayoptEnvironment,
     value === 'development'
   );
 }
+
+/** Server deployment identity only; ordinary Preview has no OAuth issuer authority. */
+export function isOrdinaryProductPreview(
+  environment: Readonly<Record<string, string | undefined>>,
+): boolean {
+  const read = (key: string) => environment[key]?.trim() || undefined;
+  if (
+    read('VERCEL_ENV') !== 'preview' ||
+    [
+      'MCP_OAUTH_ENVIRONMENT',
+      'MCP_OAUTH_PREVIEW_BRANCH',
+      'MCP_OAUTH_PREVIEW_UPSTASH_HOST',
+      'OAUTH_AUTHORIZATION_SERVER_URI',
+      'MCP_CANONICAL_RESOURCE_URI',
+    ].some((key) => read(key))
+  )
+    return false;
+
+  return (
+    resolveDayoptEnvironment({
+      dayoptEnvironment: read('DAYOPT_ENVIRONMENT'),
+      publicDayoptEnvironment: read('NEXT_PUBLIC_DAYOPT_ENVIRONMENT'),
+      vercelEnvironment: read('VERCEL_ENV'),
+      vercelTargetEnvironment: read('VERCEL_TARGET_ENV'),
+      vercelProjectId: read('VERCEL_PROJECT_ID'),
+      vercelGitCommitRef: read('VERCEL_GIT_COMMIT_REF'),
+      vercelUrl: read('VERCEL_URL'),
+      vercelBranchUrl: read('VERCEL_BRANCH_URL'),
+      appUrl: read('NEXT_PUBLIC_APP_URL'),
+      supabaseUrl: read('NEXT_PUBLIC_SUPABASE_URL'),
+    }) === 'preview'
+  );
+}

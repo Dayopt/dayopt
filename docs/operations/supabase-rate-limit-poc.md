@@ -31,9 +31,10 @@ This POC only evaluates the Calendar manual-sync limiter and webhook duplicate c
 
 ## Correctness checks
 
-Apply the migration only to a disposable POC database, then run:
+The POC SQL is retained at `supabase/poc/rate-limit-idempotency.sql`, outside `supabase/migrations`. Normal Staging-to-Production merges must not install this experiment automatically. Apply the fixture only to an explicitly selected nonproduction POC database, then run:
 
 ```sh
+psql "$POC_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/poc/rate-limit-idempotency.sql
 psql "$POC_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/supabase-rate-limit-idempotency-poc.sql
 ```
 

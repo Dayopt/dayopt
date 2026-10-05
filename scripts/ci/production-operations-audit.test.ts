@@ -21,6 +21,14 @@ const fresh = () =>
   }));
 
 describe('production cron heartbeat evidence', () => {
+  it('audits daily billing reconciliation with a 1560 minute completion budget', async () => {
+    expect(JOB_MAX_AGE_MINUTES['billing-reconciliation']).toBe(1560);
+    await expect(auditHeartbeats(async () => fresh(), now)).resolves.toBe(9);
+    const rows = fresh().filter((row) => row.job_name !== 'billing-reconciliation');
+    expect(evaluateHeartbeats(rows, now)).toEqual([
+      'billing-reconciliation: missing or duplicate heartbeat',
+    ]);
+  });
   it('requires every expected job and rejects missing completion', async () => {
     expect(evaluateHeartbeats(fresh(), now)).toEqual([]);
     await expect(auditHeartbeats(async () => fresh().slice(1), now)).rejects.toThrow('missing');
@@ -92,6 +100,7 @@ describe('production schema and query boundary', () => {
     const workflow = readFileSync('.github/workflows/production-config-audit.yml', 'utf8');
     for (const source of [
       'scripts/ci/production-cron-heartbeat-audit.mjs',
+      'apps/product/src/lib/ops/cron-heartbeat-policy.mjs',
       'scripts/ci/production-schema-drift-audit.mjs',
       'scripts/lib/production-db-readonly.mjs',
       'scripts/tasks/generate-rls-snapshot.ts',
@@ -113,6 +122,7 @@ describe('operational failure delivery', () => {
   it.each(['', '9999'])(
     'executes the real notification shell with existing issue %s',
     (existing) => {
+      // 守ること: 監査失敗を正しい Issue へ届け、廃止した Priority field に書かない。
       const workflow = readFileSync('.github/workflows/production-config-audit.yml', 'utf8');
       const notification = workflow.split('  notify-supabase-audit-failure:')[1]!;
       const script = notification
@@ -124,8 +134,13 @@ describe('operational failure delivery', () => {
       const calls = join(temp, 'calls');
       try {
         // Shadow gh inside the same shell: no network or real GitHub mutation is possible.
-        const fakeGh =
-          'gh() { printf "%s\\0" "$@" >> "$FIXTURE_CALLS"; if [ "$1 $2" = "issue list" ]; then printf "%s" "$FIXTURE_EXISTING"; fi; }\n';
+        const fakeGh = `gh() {
+          printf "%s\\0" "$@" >> "$FIXTURE_CALLS"
+          case "$1 $2" in
+            "issue list") printf "%s" "$FIXTURE_EXISTING" ;;
+            "issue create") printf "%s" "https://github.com/fixture/repo/issues/4242" ;;
+          esac
+        }\n`;
         const result = spawnSync('bash', ['-c', fakeGh + script], {
           encoding: 'utf8',
           env: {
@@ -146,6 +161,8 @@ describe('operational failure delivery', () => {
         const args = readFileSync(calls, 'utf8').split('\0');
         expect(args).toContain(existing ? 'comment' : 'create');
         if (existing) expect(args).toContain(existing);
+        expect(args.some((arg) => arg.includes('/issue-field-values'))).toBe(false);
+        expect(args).not.toContain('priority:p1');
         const body = args[args.indexOf('--body') + 1]!;
         expect(body).toContain('| Audit production cron heartbeats | `failure` |');
         expect(body).toContain('| Audit production schema and ACL | `failure` |');

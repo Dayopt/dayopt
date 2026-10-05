@@ -272,34 +272,21 @@ describe('Recovery Codes', () => {
   });
 
   describe('Security Properties', () => {
-    it('should use timing-safe comparison', () => {
-      // タイミング攻撃対策のテスト
-      // 正しいコードと間違ったコードの検証時間が大きく異ならないことを確認
+    // 平均時間差の比率を測ってもconstant-timeの保証にはならない。
+    // ここでは文字列比較の契約を検査し、constant-time比較はNodeのprimitiveへ委ねる。
+    it.each([0, 31, 63])('保存hashの位置%dだけが違う場合も拒否する', (position) => {
       const code = 'ABCD-EFGH';
       const hash = hashRecoveryCode(code);
-
-      const iterations = 1000;
-      const correctTimes: number[] = [];
-      const wrongTimes: number[] = [];
-
-      for (let i = 0; i < iterations; i++) {
-        const start1 = performance.now();
-        verifyRecoveryCode(code, hash);
-        correctTimes.push(performance.now() - start1);
-
-        const start2 = performance.now();
-        verifyRecoveryCode('ZZZZ-ZZZZ', hash);
-        wrongTimes.push(performance.now() - start2);
-      }
-
-      const avgCorrect = correctTimes.reduce((a, b) => a + b, 0) / iterations;
-      const avgWrong = wrongTimes.reduce((a, b) => a + b, 0) / iterations;
-
-      // 時間差が大きく異ならないことを確認（タイミング攻撃対策の検証）
-      // CI環境ではシステム負荷により変動が大きいため、閾値を緩めに設定
-      const timeDiff = Math.abs(avgCorrect - avgWrong) / Math.max(avgCorrect, avgWrong);
-      expect(timeDiff).toBeLessThan(2.0); // CI環境のばらつきを考慮した閾値
+      const different = `${hash.slice(0, position)}${hash[position] === '0' ? '1' : '0'}${hash.slice(position + 1)}`;
+      expect(verifyRecoveryCode(code, different)).toBe(false);
     });
+
+    it.each(['', 'short', 'a'.repeat(65), 'あ'.repeat(64)])(
+      '不正な保存hashを例外ではなく不一致として扱う: %s',
+      (storedHash) => {
+        expect(verifyRecoveryCode('ABCD-EFGH', storedHash)).toBe(false);
+      },
+    );
 
     it('should not store plain text codes', () => {
       const codes = generateRecoveryCodes();

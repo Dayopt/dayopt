@@ -8,7 +8,7 @@
  * 分類優先順位（最初に該当したもの、CLAUDE.md 由来ではなく issue #2476 本文
  * が定義する 6 分類）:
  *   1. root/apps/packages の package.json script エントリから呼ばれる -> tasks
- *   2. `.github/workflows/` から直接実行される -> ci
+ *   2. `.github/workflows/` / Vercel の build・install・ignore command から実行される -> ci
  *   3. `.husky/` または `.claude/settings.json` の hooks 設定から直接実行される -> hooks
  *      （#2479 で hooks 実体が `.claude/hooks/` から `scripts/hooks/` へ移動し、
  *      呼び出し元は settings.json の command path のみになった。`.claude/hooks/`
@@ -200,6 +200,7 @@ export interface ScanContext {
   allScriptFiles: string[];
   pkgEntries: PackageJsonEntry[];
   workflowFiles: string[];
+  vercelCommands: { file: string; field: string; command: string }[];
   huskyFiles: string[];
   claudeHookFiles: string[];
   claudeSettingsFiles: string[];
@@ -252,12 +253,33 @@ export function buildScanContext(repoRoot: string, scriptsDir = 'scripts'): Scan
     ...claudeHookFiles,
     ...settingsFiles,
   ]);
+  const vercelCommands: ScanContext['vercelCommands'] = [];
+  // Project の Root Directory に置かれる設定のみ。任意 JSON の path 一覧を実行と数えない。
+  const appsRoot = path.join(repoRoot, 'apps');
+  const vercelFiles = [
+    'vercel.json',
+    ...(fs.existsSync(appsRoot)
+      ? fs
+          .readdirSync(appsRoot, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => `apps/${entry.name}/vercel.json`)
+      : []),
+  ];
+  for (const file of vercelFiles) {
+    if (!fs.existsSync(path.join(repoRoot, file))) continue;
+    const config = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+    for (const field of ['buildCommand', 'installCommand', 'ignoreCommand']) {
+      if (typeof config[field] === 'string')
+        vercelCommands.push({ file, field, command: config[field] });
+    }
+  }
 
   return {
     repoRoot,
     allScriptFiles,
     pkgEntries: collectPackageJsonEntries(repoRoot),
     workflowFiles: walkFiles(repoRoot, '.github/workflows'),
+    vercelCommands,
     huskyFiles,
     claudeHookFiles,
     claudeSettingsFiles: settingsFiles,
@@ -269,7 +291,8 @@ export function buildScanContext(repoRoot: string, scriptsDir = 'scripts'): Scan
       repoRoot,
       fs.existsSync(path.join(repoRoot, '.agents/skills')) ? '.agents/skills' : '.claude/skills',
     ),
-    docsFiles: walkFiles(repoRoot, 'docs'),
+    // JSON 等の棚卸し・検証データに含まれる path は実行手順ではない。
+    docsFiles: walkFiles(repoRoot, 'docs', ['.md', '.mdx']),
   };
 }
 
@@ -280,7 +303,12 @@ export function collectReferenceHits(ctx: ScanContext, relPath: string): Referen
     pkg: ctx.pkgEntries
       .filter((e) => commandReferencesFile(e.command, relPath))
       .map((e) => `${e.pkgFile}#${e.name}`),
-    workflow: scanGroup(ctx.repoRoot, ctx.workflowFiles, relPath, base),
+    workflow: [
+      ...scanGroup(ctx.repoRoot, ctx.workflowFiles, relPath, base),
+      ...ctx.vercelCommands
+        .filter((entry) => commandReferencesFile(entry.command, relPath))
+        .map((entry) => `${entry.file}#${entry.field}`),
+    ],
     husky: scanGroup(ctx.repoRoot, ctx.huskyFiles, relPath, base),
     claudeHook: scanGroup(ctx.repoRoot, ctx.claudeHookFiles, relPath, base),
     claudeSettings: [

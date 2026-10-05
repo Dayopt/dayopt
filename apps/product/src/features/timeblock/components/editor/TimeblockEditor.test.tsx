@@ -273,7 +273,7 @@ describe('TimeblockEditor', () => {
     expect(screen.queryByText('plan')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('title')).not.toBeInTheDocument();
     expect(screen.getByText('0/1000')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'note' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'note' }).tagName).toBe('TEXTAREA');
     expect(screen.queryByRole('button', { name: 'save' })).not.toBeInTheDocument();
   });
 
@@ -289,7 +289,6 @@ describe('TimeblockEditor', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'note' }));
     const note = screen.getByRole('textbox', { name: 'note' });
     fireEvent.change(note, { target: { value: '調査メモ' } });
     fireEvent.blur(note);
@@ -326,9 +325,6 @@ describe('TimeblockEditor', () => {
     );
 
     expect(screen.getByTestId('date-time-section')).toHaveAttribute('data-disabled', 'false');
-    const note = screen.getByRole('button', { name: 'note' });
-    expect(note).toHaveAttribute('tabindex', '0');
-    fireEvent.click(note);
     expect(screen.getByRole('textbox', { name: 'note' })).not.toBeDisabled();
     expect(screen.queryByText('timeLocked')).not.toBeInTheDocument();
   });
@@ -348,9 +344,6 @@ describe('TimeblockEditor', () => {
     );
 
     expect(screen.getByTestId('date-time-section')).toHaveAttribute('data-disabled', 'false');
-    const note = screen.getByRole('button', { name: 'note' });
-    expect(note).toHaveAttribute('tabindex', '0');
-    fireEvent.click(note);
     expect(screen.getByRole('textbox', { name: 'note' })).not.toBeDisabled();
     expect(screen.queryByText('timeLocked')).not.toBeInTheDocument();
   });
@@ -361,9 +354,6 @@ describe('TimeblockEditor', () => {
     );
 
     expect(screen.getByTestId('date-time-section')).toHaveAttribute('data-disabled', 'true');
-    const note = screen.getByRole('button', { name: 'note' });
-    expect(note).toHaveAttribute('tabindex', '-1');
-    fireEvent.click(note);
-    expect(screen.queryByRole('textbox', { name: 'note' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'note' })).toBeDisabled();
   });
 });

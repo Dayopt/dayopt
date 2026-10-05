@@ -1,0 +1,30 @@
+{
+  "name": "@dayopt/assets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./brand": "./src/brand.ts",
+    "./logo-artwork": "./src/logo-artwork.tsx",
+    "./og": "./src/og.ts",
+    "./og-card-image": "./src/og-card-image.tsx",
+    "./og-fonts": "./src/og-fonts.ts",
+    "./og-screenshot": "./src/og-screenshot.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "react": "catalog:",
+    "typescript": "catalog:tooling"
+  }
+}

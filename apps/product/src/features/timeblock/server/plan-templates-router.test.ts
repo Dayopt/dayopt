@@ -98,6 +98,16 @@ describe('planTemplates router', () => {
     });
   });
 
+  it.each(['2026-02-30', '1900-02-29', '2026-13-01'])(
+    'rejects nonexistent date %s before calling the service',
+    async (date) => {
+      await expect(caller().applyToDay({ templateId: TEMPLATE_ID, date })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      expect(methods.apply).not.toHaveBeenCalled();
+    },
+  );
+
   it('rename / delete は templateId と userId を service へ渡す', async () => {
     await caller().rename({ templateId: TEMPLATE_ID, name: '新しい名前' });
     expect(methods.rename).toHaveBeenCalledWith({

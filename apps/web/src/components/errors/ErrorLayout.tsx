@@ -30,7 +30,7 @@ export function ErrorLayout({
       {/* Header */}
       <header className="mx-auto w-full max-w-7xl px-6 pt-6 sm:pt-12 lg:col-span-2 lg:col-start-1 lg:row-start-1 lg:px-8">
         <Link href="/" className="inline-block">
-          <Logo variant="wordmark" size="lg" className="text-foreground" />
+          <Logo variant="lockup" size="lg" />
         </Link>
       </header>
 

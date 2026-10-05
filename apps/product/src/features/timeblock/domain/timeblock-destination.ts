@@ -1,19 +1,11 @@
 export type TimeblockDestination = 'plan' | 'record';
 
-/** 保存先はユーザー選択ではなく終了時刻だけから決める。 */
+/** 新規作成の既定の保存先を終了時刻から決める。種別の選択可否は resolveTimeblockKindChoice が担う。 */
 export function resolveTimeblockDestination(
   endAt: Date | string,
   now: Date = new Date(),
 ): TimeblockDestination {
   return new Date(endAt).getTime() > now.getTime() ? 'plan' : 'record';
-}
-
-/** Plan を Record レーンへ落とす操作は記録化として扱う。 */
-export function isPlanRecordDrop(
-  sourceLane: TimeblockDestination,
-  targetLane: TimeblockDestination,
-): boolean {
-  return sourceLane === 'plan' && targetLane === 'record';
 }
 
 /**

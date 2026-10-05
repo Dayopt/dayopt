@@ -193,8 +193,8 @@ export function distributeToHours(
 /**
  * ブロックを壁時計の分範囲（`[startMinute, endMinute)`）のバケットへ按分する（分）。
  *
- * **0 時またぎは日境界で分割してから按分する。** 壁時計での位置が要るので、境界はユーザーの
- * timezone で解く。
+ * 実時間を単調に進め、壁時計の時間境界とUTC offsetの変更点で分割する。
+ * 夏時間で繰り返す時刻は両方を計上し、存在しない時刻には計上しない。
  */
 function distributeToDayMinuteRanges(
   blockStartAt: string,
@@ -207,39 +207,41 @@ function distributeToDayMinuteRanges(
   const endMs = Date.parse(blockEndAt);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return totals;
 
-  // 記録が跨ぐ壁時計日を 1 日ずつ辿る。年粒度でも 1 ブロックの長さは高々数日なので、
-  // 日数で回して問題ない（暴走を避けるため上限を置く）。
-  let dayKey = toZonedDateKey(new Date(startMs), timezone);
-  for (let index = 0; index < MAX_TIME_OF_DAY_DAYS; index += 1) {
-    const dayStartMs = zonedDayStart(dayKey, timezone).getTime();
-    const nextDayKey = formatDateKey(addDays(parseDateKey(dayKey), 1));
-    const dayEndMs = zonedDayStart(nextDayKey, timezone).getTime();
+  // 呼び出し元は表示期間（最大1年）にclip済み。壁時計は巻き戻るため、
+  // ループの進行・終了判定には常に実時間を使う。
+  const offsetAt = (instant: number) => formatInTimeZone(instant, timezone, 'xxxxx');
+  let cursor = startMs;
+  while (cursor < endMs) {
+    const [hour = 0, minute = 0, second = 0] = formatInTimeZone(cursor, timezone, 'HH:mm:ss.SSS')
+      .split(':')
+      .map(Number);
+    const fromMinute = hour * 60 + minute + second / 60;
+    let next = Math.min(endMs, cursor + Math.round((60 - (fromMinute % 60)) * 60_000));
 
-    const segmentStart = Math.max(startMs, dayStartMs);
-    const segmentEnd = Math.min(endMs, dayEndMs);
-
-    if (segmentEnd > segmentStart) {
-      // その日の 00:00 からの経過分で位置を測る（DST の日は 1 日が 23 / 25 時間になるが、
-      // 分布の見た目に効く差ではないので公称値で扱う）
-      const fromMinute = (segmentStart - dayStartMs) / 60_000;
-      const toMinute = (segmentEnd - dayStartMs) / 60_000;
-
-      buckets.forEach((bucket, bucketIndex) => {
-        const overlap =
-          Math.min(toMinute, bucket.endMinute) - Math.max(fromMinute, bucket.startMinute);
-        if (overlap > 0) totals[bucketIndex] = (totals[bucketIndex] ?? 0) + overlap;
-      });
+    // 1時間以内のoffset変更を挟む場合は、変更の瞬間までだけを同じ時計で按分する。
+    // 半開区間なので終端そのものの変更は次の反復で扱う。
+    const offset = offsetAt(cursor);
+    if (offsetAt(next - 1) !== offset) {
+      let low = cursor;
+      let high = next - 1;
+      while (high - low > 1) {
+        const middle = Math.floor((low + high) / 2);
+        if (offsetAt(middle) === offset) low = middle;
+        else high = middle;
+      }
+      next = high;
     }
-
-    if (dayEndMs >= endMs) break;
-    dayKey = nextDayKey;
+    const toMinute = fromMinute + (next - cursor) / 60_000;
+    buckets.forEach((bucket, bucketIndex) => {
+      const overlap =
+        Math.min(toMinute, bucket.endMinute) - Math.max(fromMinute, bucket.startMinute);
+      if (overlap > 0) totals[bucketIndex] = (totals[bucketIndex] ?? 0) + overlap;
+    });
+    cursor = next;
   }
 
   return totals;
 }
-
-/** `distributeToTimeOfDay` が辿る壁時計日の上限。1 ブロックがこれを超える長さになる想定は無い。 */
-const MAX_TIME_OF_DAY_DAYS = 400;
 
 /** 期間の終端日（壁時計、含まない）を粒度ごとに求める。 */
 function resolvePeriodEndDay(startDay: Date, granularity: ReportGranularity): Date {

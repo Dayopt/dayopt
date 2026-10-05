@@ -203,6 +203,28 @@ describe('GET /api/health', () => {
     expect(memoryUsage).not.toHaveBeenCalled();
   });
 
+  it('verified ordinary Preview skips inherited Redis construction and PING', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('VERCEL_TARGET_ENV', 'preview');
+    vi.stubEnv('VERCEL_PROJECT_ID', 'prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa');
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'codex/example');
+    vi.stubEnv('DAYOPT_ENVIRONMENT', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_DAYOPT_ENVIRONMENT', 'preview');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://tilwaprottpyhlfoggbb.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://product-example-dayopt.vercel.app');
+    vi.stubEnv('VERCEL_URL', 'product-example-dayopt.vercel.app');
+    vi.stubEnv('MCP_OAUTH_ENVIRONMENT', '');
+    vi.stubEnv('OAUTH_AUTHORIZATION_SERVER_URI', '');
+    vi.stubEnv('MCP_CANONICAL_RESOURCE_URI', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'malformed');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'safe-dummy-token');
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect((await response.json()).checks.redis).toBe('skipped');
+    expect(mocks.redisConstructorOptions).toEqual([]);
+    expect(mocks.redisPing).not.toHaveBeenCalled();
+  });
+
   it('productionではstatusだけをno-storeで返す', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');

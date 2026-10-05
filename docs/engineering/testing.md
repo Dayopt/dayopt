@@ -43,9 +43,13 @@ nightly の full が落ちたら、落ちた test を直すのに加えて、PR 
 
 ## Storybook の実行契約
 
-`promote.yml` の専用 `storybook` job が、collect 検査と light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
+`promote.yml` の専用 `storybook` job が、collect 検査、同じ Story の静的 build、light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。既存の force による緊急復旧は維持する。
 
-- collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- per-PR / local static: `pnpm storybook:collect-files-check`（`check:static` に含む）。Vitest の `list --filesOnly` で両テーマの include 集合を全 Story ファイルと比較する。ブラウザ不要で root / glob の収集漏れを検知するが、runtime tag・play・a11y は検査しない。MDX は比較対象外、`docs-only` / `wip` の Story ファイルは両辺に含む。
+- browser collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`
+- static build: `pnpm build-storybook`。Local / CI で同じ `.stories.*` と mock を使い、アプリ資格情報は不要。既存の affected Storybook job で build 失敗も通常の promote を遮断する。静的 build の成功は Preview 配信・URL 発行・実ブラウザ描画の成功を意味しない。
+- Vercel 配信: Dayopt の専用 `storybook` Project は同じ GitHub monorepo の `apps/storybook` を Root Directory とし、Node 24、root 外の workspace source 参照、`pnpm install --frozen-lockfile`、`pnpm build-storybook`、`storybook-static` を設定する。設定の正本は `apps/storybook/vercel.json`。資格情報・DB・custom domain は使わず、全 URL を Vercel Authentication で保護する。PR branch の generated Preview URL と main の固定 URL `https://storybook-sigma-gold.vercel.app` を使用する。固定 URL の初回配信はこの設定を main に merge した後であり、Preview の成功を main 配信済みとは扱わない。
+- 配信対象の判定: `scripts/ci/storybook-impact.mjs` を dependency install 前の Ignored Build Step で実行する。直前の成功 deployment SHA と今回 SHA の両方から workspace manifest・frontend source・静的 asset・参照先を調べるため、Story 自身の変更がなくても UI・CSS・theme・依存設定の変更を拾う。関係しない backend / docs は skip し、初回・履歴不足・入力判定失敗は build する。main にも同じ判定を適用し、product / web の release candidate 判定は変更しない。導入前の branch に判定 script が存在しない場合だけ Project 設定の bootstrap guard で skip し、既存 PR や未導入 main の配信を開始しない。
 - 両テーマ: `pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark`
 - JSON 結果は `storybook-results-<attempt>` artifact に7日保持する。workflow 全体の成功だけでなく、当該 job の実行と失敗件数を確認する。
 - 全件を per-PR に追加しない。E2E と専用 job を並列実行して所要を分離する。cold cache と GitHub runner の実測は PR / Issue の証跡に残す。
@@ -77,17 +81,36 @@ PR 本文には「どの層に赤を入れたか」を 1 行書く。
 
 ## Actions 予算（private repo 前提）
 
-repo を private に戻すと、Actions は分単位の課金になる。GitHub Team（$4/seat/月）で ruleset の merge gate を維持し、無料枠は 3,000 分/月。超過は $0.008/分。
+private repo の標準 GitHub-hosted runner は Team の月 3,000 分を消費する。Actions 予算は `$0` かつ上限到達時停止を維持するため、枠を使い切ると翌 billing cycle まで GitHub-hosted workflow が止まる。課金単価は runner OS ごとに異なり、現行の基準単価は Linux 2-core `$0.006/分`、Windows 2-core `$0.010/分`、macOS `$0.062/分`。一律 `$0.008/分` ではない。詳細は [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions) と [Team に含まれる利用量](https://docs.github.com/en/billing/reference/product-usage-included) を参照。
 
-実測（2026-09-14、job ごとに分を切り上げて集計）:
+**private 化の前提目標は月 2,400 分以下**（3,000 分の 80%）とする。Public runner の実行時間からの推計であり、private 標準 runner は Ubuntu が 4 CPU / 16 GB から 2 CPU / 8 GB になるため、private 化後の実時間は増える可能性がある。余裕を残せない推計なら public のままにする。
 
-| workflow                    | 直近 30 日 | 主な job（30 日）                                                           |
-| --------------------------- | ---------: | --------------------------------------------------------------------------- |
-| ci.yml                      |   3,399 分 | Unit 1,484 / Static 998 / Integration 643                                   |
-| promote.yml                 |     808 分 | E2E 569 / Web E2E 94                                                        |
-| production-config-audit.yml |     684 分 | 1 分未満の job 4 本 × 分の切り上げ                                          |
-| nightly.yml                 |     125 分 |                                                                             |
-| 合計                        |   5,017 分 | 直近 7 日の回数（PR push 100 / main push 57）で換算すると月 7,000〜8,000 分 |
+実測スナップショット（2026-09-21〜27 UTC、job ごとに分を切り上げ、GitHub REST API から取得）:
+
+| workflow                | 7 日の推計分 | runner job 数 | 取消済み分 |
+| ----------------------- | -----------: | ------------: | ---------: |
+| CI                      |          858 |           276 |         27 |
+| Production Config Audit |          100 |            97 |          0 |
+| Nightly                 |           59 |            26 |          0 |
+| Production Release      |          360 |           104 |          0 |
+| Validation shadow       |           74 |            74 |          0 |
+| Validation gate         |          923 |           749 |        352 |
+| **合計**                |    **2,374** |     **1,326** |    **379** |
+
+job 履歴からの単純な 30 日換算は **10,174 分**。これは最適化変更前の public runner 履歴であり、private の請求実績ではない。GitHub Billing Usage 画面は account-scoped な実請求単位を表示するため、private 化の最終判断では画面上の最新 billing cycle と Team の 3,000 分枠を照合する。短い job が多いだけでなく、Validation gate の取消済み実行にも週 352 分を使っていた。
+
+上位 job（同じ週）:
+
+| workflow           | job                    | job 数 | 推計分 |
+| ------------------ | ---------------------- | -----: | -----: |
+| Validation gate    | Validation (shadow)    |    749 |    923 |
+| CI                 | 📦 Unit Tests          |     67 |    273 |
+| CI                 | 🔍 Static Checks       |     74 |    256 |
+| CI                 | 🧪 Integration Tests   |     38 |    187 |
+| Production Release | 🎭 E2E Tests           |     17 |    134 |
+| Production Release | Storybook light / dark |     17 |    117 |
+
+GitHub は private repo の billable job duration を次の 1 分へ切り上げて表示し、その画面の分数には runner multiplier が含まれない。API からの public-run 推計と請求画面は照合方法が異なるため、集計結果は budget decision の根拠の一つとして扱う。
 
 消費を決めるのは 1 run の重さより回数。置き場所の規則:
 
@@ -98,15 +121,19 @@ repo を private に戻すと、Actions は分単位の課金になる。GitHub 
 
 ### 予算レバー台帳
 
-| レバー                                                | 状態                      | 効果の見込み                                   | 備考                                                                                                                                                         |
-| ----------------------------------------------------- | ------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PR の product unit を related に絞り、nightly で full | 実施（#2743）             | 月 300〜800 分減（nightly 150 分を差し引き前） | 結果(未): merge 後 2 週間の Unit job 所要で確かめる                                                                                                          |
-| promote の e2e job を self-hosted runner へ           | 切替手段のみ実施（#2743） | 月 600〜1,000 分減                             | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                                                              |
-| mobile 中核 E2E を promote に追加                     | 実施（#2743）             | 月 75〜110 分増                                | 増分                                                                                                                                                         |
-| promote 層 3 の cancel-in-progress                    | 実施済み（既存）          | —                                              |                                                                                                                                                              |
-| audit の Supabase 2 job を 1 job に統合               | 見送り                    | 月 100 分程度                                  | job 名を鍵にした security contract test 2 本の書き換えが要り、節約に見合わない。deploy-health は commit status 権限を持つので token 分離上そもそも統合しない |
-| Static と Unit の 1 job 化                            | 見送り                    | 月 200 分程度                                  | ruleset の required check 名が変わる                                                                                                                         |
-| org の Actions spending limit を $0 から上げる        | User 操作                 | —                                              | 上限 $0 のまま枠を使い切ると CI が起動しなくなり、merge gate ごと止まる                                                                                      |
+| レバー                                                     | 状態                                | 効果 / 次の確認                                                                                                         |
+| ---------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Web / package Unit を変更 workspace に絞る                 | 実装済み（#2930）、使用量は未計測   | Product の related/full 判定と fail-closed を維持する                                                                   |
+| Nightly full Unit は直近に実走した同一 SHA が成功なら省略  | 実装済み（#2930）、未計測・判定修正 | 新しい同一 SHA の全件テスト失敗時・手動実行・証拠取得失敗時は full suite を実行する                                     |
+| Validation shadow / gate の自動実行を停止                  | GitHub UI で停止済み（2026-09-28）  | 週 997 分の自動実行を停止。required checks ではない。#2811 の gate 展開は別件として維持し、required checks に追加しない |
+| 15 分 heartbeat Actions schedule を停止                    | 停止（push・日次監査は維持）        | 変更前は週 51 分。`/api/health/cron` の外形監視設定は未確認のため、push時・日次監査が残る                               |
+| Storybook browser suite を story / dependency 影響時に限定 | 未実施                              | 週 117 分。安全な依存判定がないため full suite を維持し、誤 skip のリスクを取らない                                     |
+| E2E を self-hosted runner へ切り替え                       | 選択肢のみ                          | runner 登録と変数設定は User 操作。[self-hosted-runner.md](../operations/self-hosted-runner.md)                         |
+| Actions の追加課金予算                                     | `$0` / 上限時停止のまま             | 変更しない。枠を超える場合も超過課金は起こさず workflow が停止する                                                      |
+
+**#2930 の CI 最適化は default branch に merge 済みだが、削減効果は未計測。Actions 使用量の再計測は保留する。** 後日計測する場合は、必須 checks を残した状態で 30 日換算 2,400 分以内を目標にし、`partial: true` の集計は判断に使わない。30 日分は API 上限と時間上限を守るため、週ごとに分割して集計する。
+
+読み取り専用 collector: `node scripts/runbook/actions-usage-collector.mjs [--since YYYY-MM-DD --until YYYY-MM-DD] [--out FILE]`。既定で直近 7 完了 UTC 日を収集し、job の経過時間を個別に分単位へ切り上げ、Windows / macOS runner の quota multiplier を適用する。`--out` は既存ファイルを上書きしない。GitHub の billable usage report ではなく、私有化前の比較用推計である。
 
 ## 実測で分かった罠（検証と報告）
 
@@ -177,14 +204,14 @@ Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head 
 
 このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` と `PREVIEW_E2E_SUPABASE_KEY` はEnvironmentへの直接保存をUIで確認済みで、1Password masterの初期化・同期を証明するものではない。Protection bypassの権限境界は未決のため、保存・実走完了とは扱わない。
 
-- `GITHUB_TOKEN`（`${{ github.token }}`）: trusted workerの短寿命token。`deployments: read` と `statuses: read` でGitHubにVercelが発行したProduct Previewのdeployment/statusを読む。長寿命Vercel PATはPreviewへ保存・注入しない。候補Playwrightの環境へGitHub tokenを渡さない。
+- `GITHUB_TOKEN`（`${{ github.token }}`）: trusted workerの短寿命token。`deployments: read` と `statuses: read` でGitHubにVercelが発行したProduct Previewのdeployment/statusを読む。長寿命Vercel PATはPreviewへ保存・注入しない。Playwrightの環境へGitHub tokenを渡さない。
 - `PREVIEW_E2E_SUPABASE_READINESS_TOKEN`（workerでは `SUPABASE_PREVIEW_READINESS_TOKEN`）: branch一覧と選択した非本番DBのmigration metadata確認用。fine-grained tokenは **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを付け、Database Data Readやwrite権限は付けない。migration確認は `GET /v1/projects/{ref}/database/migrations` を使い、SQLへfallbackしない。branch選択UIが子projectを提供しない場合は親projectを選ぶため、親のbranch/migration metadataへ到達できる権限であり非本番projectだけの権限とは呼ばない。選択した子projectへ同tokenでGETできることは初回実走で確認し、403では権限を広げず停止する。
 - `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。現在は方式・保存が未決。project単位bypassは同じProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは扱わない。対象Previewだけのshare方式との選択は所有者判断を待つ。アプリへの正規ログインは省略しない。
 - `PREVIEW_E2E_SUPABASE_KEY`（workerでは `SUPABASE_SECRET_KEY`）: 選択した非本番DBの合成user作成・所有runの回収用。隔離DBを選ぶ場合は対象DBのkeyが必要で、共有DBのkeyへfallbackしない。
 
 Vercel側のreadinessは数値project IDのAPI照合から、GitHubが認証した `vercel[bot]`（ID `35613825`）・Product path `/dayopt/product/`・`Preview – product` 環境・本番flag false・exact SHA・requested deployment ID・immutable originの契約へ置き換える。最新Product commit statusと最新deployment statusの成功を要求し、古い成功へのfallbackや曖昧な再デプロイ対応を拒否する。アプリの自己申告だけで合格にせず、同originのlive SHA/deployment ID/DB refとhealthを前後確認する。これは数値Vercel project IDの直接観測ではない。APIの観測失敗・発行者違い・別Product/環境・候補の変更はuser作成前に停止する。
 
-候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutと依存・Chromiumのinstallを終えてからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisorで既存desktop/mobile critical pathを実行する。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
+候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutはSHA・migration・fixture契約の読み取りだけに使い、候補の依存install・config・spec・importをworker上で実行しない。依存とChromiumは信頼済みIntegration checkoutから用意してからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisor・Playwright config・spec・推移的依存の全体で既存desktop/mobile critical pathを実行し、候補アプリは固定Preview URL越しに検証する。候補側だけに追加したspecはこの資格情報付きrunの検証対象にはならない。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
 
 通常E2Eの結果artifactは信頼済みコードで再構成した **preview.jsonだけ**。候補SHA/deployment/DB、run ID、testのファイル・行・成否、所有user ID/statusと確認フラグを含む。画像、private出力、生のJSON、error本文、title、入力値、header/cookie/bodyをuploadしない。Cloud実走・2run並列・中断回収・次のPRでの再利用は実測後に証拠を記録し、配線やunit testだけでは完了扱いにしない。
 

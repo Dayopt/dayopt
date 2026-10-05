@@ -1,38 +1,13 @@
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+import {
+  evaluateHeartbeats,
+  JOB_MAX_AGE_MINUTES,
+} from '../../apps/product/src/lib/ops/cron-heartbeat-policy.mjs';
 import { runReadOnlyQuery } from '../lib/production-db-readonly.mjs';
 
-export const JOB_MAX_AGE_MINUTES = {
-  'calendar-sync': 45,
-  'external-connection-maintenance': 45,
-  'calendar-account-deletion-settle': 180,
-  'expire-calendar-revoke-outbox': 3,
-  'cleanup-product-events': 4320,
-  'cleanup-calendar-authority-retention': 180,
-  'expire-calendar-revoke-authority': 180,
-  'finalize-calendar-revoke-guards': 180,
-};
-
-export function evaluateHeartbeats(rows, now = Date.now()) {
-  const failures = [];
-  for (const [name, maxAge] of Object.entries(JOB_MAX_AGE_MINUTES)) {
-    const matches = rows.filter((row) => row?.job_name === name);
-    if (matches.length !== 1) {
-      failures.push(`${name}: missing or duplicate heartbeat`);
-      continue;
-    }
-    const completed = Date.parse(matches[0].last_completed_at);
-    if (
-      !Number.isFinite(completed) ||
-      completed > now + 60_000 ||
-      now - completed > maxAge * 60_000
-    ) {
-      failures.push(`${name}: last completion exceeds ${maxAge} minutes or is invalid`);
-    }
-  }
-  return failures;
-}
+export { evaluateHeartbeats, JOB_MAX_AGE_MINUTES };
 
 export async function auditHeartbeats(query = runReadOnlyQuery, now = Date.now()) {
   const rows = await query(

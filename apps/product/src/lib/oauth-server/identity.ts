@@ -4,6 +4,7 @@ import {
   PRODUCT_INTEGRATION_APP_ORIGIN,
   PRODUCT_INTEGRATION_SUPABASE_REF,
   PRODUCT_VERCEL_PROJECT_ID,
+  resolveSupabaseProjectRef,
 } from '@/lib/dayopt-environment';
 
 import {
@@ -44,6 +45,27 @@ interface OAuthEnvironmentInput {
   publicDayoptEnvironment?: string | undefined;
   vercelProjectId?: string | undefined;
   supabaseProjectRef?: string | undefined;
+}
+
+/** Normalize deployment env at both proxy and handler boundaries before applying identity policy. */
+export function resolveOAuthEnvironmentFromEnv(
+  environment: Readonly<Record<string, string | undefined>>,
+): OAuthEnvironmentConfig {
+  const read = (key: string): string | undefined => environment[key]?.trim() || undefined;
+  return resolveOAuthEnvironmentConfig({
+    mcpOAuthEnvironment: read('MCP_OAUTH_ENVIRONMENT'),
+    authorizationServerUri: read('OAUTH_AUTHORIZATION_SERVER_URI'),
+    resourceUri: read('MCP_CANONICAL_RESOURCE_URI'),
+    vercelEnvironment: read('VERCEL_ENV'),
+    vercelTargetEnvironment: read('VERCEL_TARGET_ENV'),
+    vercelBranchUrl: read('VERCEL_BRANCH_URL'),
+    vercelGitCommitRef: read('VERCEL_GIT_COMMIT_REF'),
+    mcpOAuthPreviewBranch: read('MCP_OAUTH_PREVIEW_BRANCH'),
+    dayoptEnvironment: read('DAYOPT_ENVIRONMENT'),
+    publicDayoptEnvironment: read('NEXT_PUBLIC_DAYOPT_ENVIRONMENT'),
+    vercelProjectId: read('VERCEL_PROJECT_ID'),
+    supabaseProjectRef: resolveSupabaseProjectRef(read('NEXT_PUBLIC_SUPABASE_URL')),
+  });
 }
 
 const AUTHORIZATION_SERVER_PATHS = new Set([

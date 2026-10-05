@@ -34,7 +34,7 @@ const ALL_VISIBLE = {
   hiddenActivityIds: [],
 };
 
-/** 既定。すべてのカテゴリーと未分類・余白が分母に入っている。 */
+/** 既定。すべてのカテゴリーと未分類の記録が分母に入っている。余白は含めない。 */
 export const Default: Story = {
   parameters: { storeMocks: { useReportViewStore: ALL_VISIBLE } },
 };

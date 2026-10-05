@@ -137,6 +137,8 @@ function resolveCalendarProps(pathname: string, fallbackDate?: Date, initialSear
 interface CalendarNavigationContextValue {
   currentDate: Date;
   viewType: CalendarViewType;
+  /** SSR 後に保存済みビューを復元し、戻り先リンクを確定できたか */
+  isViewReady: boolean;
   /** ナビゲーション中（日付変更・ビュー切替）のトランジション状態 */
   isPending: boolean;
   navigateToDate: (date: Date, updateUrl?: boolean) => void;
@@ -182,6 +184,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
 
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [viewType, setViewType] = useState<CalendarViewType>(initialView);
+  const [isViewReady, setIsViewReady] = useState(initial.workspaceTab !== 'report');
 
   // モバイル判定（Day / Week以外の表示を制限するために使用）
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
@@ -202,7 +205,11 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   React.useEffect(() => {
     if (workspaceTab !== 'report') return;
     const savedView = readLastCalendarView();
-    if (savedView) startTransition(() => setViewType(savedView));
+    // SSR の week を戻り先として公開しない。ビューと準備完了は同じ commit で反映する。
+    startTransition(() => {
+      if (savedView) setViewType(savedView);
+      setIsViewReady(true);
+    });
   }, [workspaceTab]);
 
   // timezone cookie の無い初回認証 redirect は SSR が UTC に仮置きする。
@@ -418,12 +425,13 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     () => ({
       currentDate,
       viewType,
+      isViewReady,
       isPending,
       navigateToDate,
       changeView,
       navigateRelative,
     }),
-    [currentDate, viewType, isPending, navigateToDate, changeView, navigateRelative],
+    [currentDate, viewType, isViewReady, isPending, navigateToDate, changeView, navigateRelative],
   );
 
   return (

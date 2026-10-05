@@ -292,7 +292,7 @@ main へ merge しても Production domain は**直接**切り替わらない。
 
 さらに 2026-09-07（[#2643](https://github.com/Dayopt/dayopt/issues/2643)）から、promote.yml の
 `File promote failure` job が **`[auto] Production Release が失敗しました` という 1 本の issue**
-へ起票する（`area:deployment` / `priority:p1`）。同じ title prefix の open issue が既にあれば
+へ起票する（`type:bug`、`area:deployment`）。同じ title prefix の open issue が既にあれば
 新規作成せずコメントで追記するので、失敗が続く間も issue は 1 本のまま増えない。本文には
 どの job が落ちたか、対象 SHA、run URL が入る。**`superseded` は起票しない** —— burst merge で
 後発 run が先に promote した時、先発は superseded で exit 1 するが、その commit の内容は既に
@@ -1793,7 +1793,7 @@ agent が実際に踏んだ事例を、再発条件と最短の対処だけ残�
 
 ## worktree と branch:finish
 
-- **着手前は 3 点を見る**: `gh pr list`（open PR）、`git worktree list` の branch 名（commit 0 でも対象 issue 番号があれば着手済み）、`status:in-progress` label。`status:ready` は未着手を意味しない（2026-08-10、#1900 を二重実装して PR #1906 が丸ごと捨て仕事になった）。直列 merge 順の衝突は `git merge-tree --write-tree HEAD origin/<相手>` で待たずに測れる（exit 0 + tree OID なら衝突なし）
+- **着手前は 3 点を見る**: `gh pr list`（open PR）、`git worktree list` の branch 名（commit 0 でも対象 issue 番号があれば着手済み）、Issue state と `status:blocked` label。open Issue やラベルの有無は未着手・着手可を単独では意味しない（2026-08-10、#1900 を二重実装して PR #1906 が丸ごと捨て仕事になった）。直列 merge 順の衝突は `git merge-tree --write-tree HEAD origin/<相手>` で待たずに測れる（exit 0 + tree OID なら衝突なし）
 - **worktree で `next dev` を回した後の `pnpm branch:finish` は掃除だけ止まる**: Next が `apps/product/AGENTS.md` / `CLAUDE.md` を未追跡で生成するため。merge は済んでいるので 2 ファイルを削除して再実行する（commit しない。2026-09-07 PR #2634）
 - **main checkout 上で切った branch を `branch:finish` すると main working tree を削除しに行く**: git が拒否するので破壊はされないが途中停止する。本実行の前に `git checkout main` して `--dry-run` を見る（2026-09-18 PR #2839）
 - **`gh pr merge` は他ツールの worktree が main を checkout していると失敗する**（`'main' is already used by worktree`）。ローカル git に触れない `gh api repos/Dayopt/dayopt/pulls/<N>/merge -X PUT -f merge_method=merge` へ切り替える。worktree 削除後の `git branch -d` も同じ理由で `not fully merged` と誤検知するので、`git merge-base --is-ancestor <branch> origin/main` で確定してから消す

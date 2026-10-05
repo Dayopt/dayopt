@@ -8,7 +8,8 @@ import { useTimeblockRecordMutations } from './useTimeblockRecordMutations';
 type RecordRow = PublicRecordRow;
 
 interface MutationCallbacks<TData> {
-  onSuccess?: (data: TData) => void;
+  onMutate?: () => Promise<unknown>;
+  onSuccess?: (data: TData, input: unknown, context: unknown) => void;
   retry?: boolean;
 }
 
@@ -22,13 +23,16 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
+const queryKey = [['records', 'list'], { input: {}, type: 'query' }];
+const query = { queryKey, queryHash: JSON.stringify(queryKey) };
+vi.mock('@tanstack/react-query', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query')),
   useQueryClient: () => ({
+    getQueryCache: () => ({ getAll: () => [query], find: () => query }),
+    getMutationCache: () => ({ getAll: () => [] }),
+    cancelQueries: vi.fn().mockResolvedValue(undefined),
     invalidateQueries: vi.fn(),
-    getQueriesData: vi.fn(({ predicate }) => {
-      const queryKey = [['records', 'list'], { input: {}, type: 'query' }];
-      return predicate({ queryKey }) ? [[queryKey, []]] : [];
-    }),
+    getQueriesData: vi.fn(({ predicate }) => (predicate({ queryKey }) ? [[queryKey, []]] : [])),
     setQueryData: mocks.querySetData,
     setQueriesData: vi.fn(),
   }),
@@ -103,10 +107,11 @@ describe('useTimeblockRecordMutations', () => {
     mocks.confirmDayCallbacks = undefined;
   });
 
-  it('ワンタップ記録の返却行を一覧と詳細cacheへ同時に反映する', () => {
+  it('ワンタップ記録の返却行を一覧と詳細cacheへ同時に反映する', async () => {
     renderHook(() => useTimeblockRecordMutations());
 
-    act(() => mocks.recordCallbacks?.onSuccess?.(record));
+    const context = await mocks.recordCallbacks?.onMutate?.();
+    act(() => mocks.recordCallbacks?.onSuccess?.(record, {}, context));
 
     expect(mocks.getByIdSetData).toHaveBeenCalledWith({ id: record.id }, record);
     expect(mocks.querySetData).toHaveBeenCalledWith(
@@ -115,11 +120,12 @@ describe('useTimeblockRecordMutations', () => {
     );
   });
 
-  it('ワンタップ記録のトーストから作った Record を取り消せる', () => {
+  it('ワンタップ記録のトーストから作った Record を取り消せる', async () => {
     renderHook(() => useTimeblockRecordMutations());
 
+    const context = await mocks.recordCallbacks?.onMutate?.();
     act(() => {
-      mocks.recordCallbacks?.onSuccess?.(record);
+      mocks.recordCallbacks?.onSuccess?.(record, {}, context);
     });
 
     expect(mocks.toastSuccess).toHaveBeenCalledWith(
@@ -139,11 +145,12 @@ describe('useTimeblockRecordMutations', () => {
     });
   });
 
-  it('日次確定の返却行も詳細cacheへ反映する', () => {
+  it('日次確定の返却行も詳細cacheへ反映する', async () => {
     const secondRecord = { ...record, id: 'record-2' };
     renderHook(() => useTimeblockRecordMutations());
 
-    act(() => mocks.confirmDayCallbacks?.onSuccess?.([record, secondRecord]));
+    const context = await mocks.confirmDayCallbacks?.onMutate?.();
+    act(() => mocks.confirmDayCallbacks?.onSuccess?.([record, secondRecord], {}, context));
 
     expect(mocks.getByIdSetData).toHaveBeenNthCalledWith(1, { id: record.id }, record);
     expect(mocks.getByIdSetData).toHaveBeenNthCalledWith(2, { id: secondRecord.id }, secondRecord);

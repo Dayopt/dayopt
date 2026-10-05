@@ -14,7 +14,7 @@ import 'server-only';
  * @see OWASP - Account Recovery
  */
 
-import { createHmac, randomInt } from 'crypto';
+import { createHmac, randomInt, timingSafeEqual } from 'crypto';
 
 import { env } from '@/env';
 
@@ -83,30 +83,12 @@ export function hashRecoveryCode(code: string): string {
  * @returns 一致するかどうか
  */
 export function verifyRecoveryCode(inputCode: string, hashedCode: string): boolean {
-  const inputHash = hashRecoveryCode(inputCode);
-  // タイミング攻撃対策（定数時間比較）
-  return timingSafeEqual(inputHash, hashedCode);
-}
-
-/**
- * タイミングセーフな文字列比較
- *
- * タイミング攻撃（処理時間の差から秘密情報を推測する攻撃）を防ぐため、
- * 文字列の一致・不一致に関わらず常に同じ時間で比較を完了する。
- *
- * @see https://owasp.org/www-community/vulnerabilities/Timing_Attack
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-
-  return result === 0;
+  const inputHash = Buffer.from(hashRecoveryCode(inputCode), 'utf8');
+  const storedHash = Buffer.from(hashedCode, 'utf8');
+  // HMAC digestの比較はNodeのconstant-time primitiveに委ねる。
+  // 不正な保存値で異長の場合は、primitiveがthrowする前に不一致へ倒す。
+  // hexとしてdecodeしない（不正文字の切り捨て/大文字小文字の同一化を避ける）。
+  return inputHash.length === storedHash.length && timingSafeEqual(inputHash, storedHash);
 }
 
 /**

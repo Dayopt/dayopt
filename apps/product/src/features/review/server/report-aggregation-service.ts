@@ -29,8 +29,8 @@ import {
 /**
  * `/report` の各タブが読む期間集計。
  *
- * **返すのはアクティビティ別のスカラーだけ。** フィルタ（カテゴリー / アクティビティ /
- * 未分類 / 余白）・分母・見積もりの鏡・羅針盤の座標は、すべて client の純粋関数
+ * **返すのはアクティビティ別の集計だけ。** フィルタ（カテゴリー / アクティビティ）・
+ * 分母・見積もりの鏡・羅針盤の座標は、すべて client の純粋関数
  * （`domain/report/`）が導出する。トグルのたびにサーバーへ往復させないため。
  *
  * **箱の明細は載せない。** 各タブに要る箱の情報は件数（`plannedPastBoxes` / `recordBoxes`）・
@@ -163,7 +163,16 @@ class ReportAggregationService {
     const activityById = new Map(activities.map((row) => [row.id, row]));
     const categoryById = new Map(categories.map((row) => [row.id, row]));
 
-    const states = this.buildStates(records, plans, range, now, timezone);
+    // 前期間だけに記録がある活動も、現在のフィルタで比較対象を選べるように残す。
+    // 今期間の値は0。現在の行だけから可視IDを作ると、その活動の前期間まで0になる。
+    const states = this.buildStates(
+      records,
+      plans,
+      range,
+      now,
+      timezone,
+      previousRecords.map((record) => record.activity_id),
+    );
 
     return {
       period: {
@@ -191,6 +200,7 @@ class ReportAggregationService {
     range: ReturnType<typeof resolveReportRange>,
     now: Date,
     timezone: string,
+    comparisonActivityIds: readonly (string | null)[],
   ): Map<string | null, ActivityBucketState> {
     const blocks = [
       ...plans.map((row) => toDerivedBlock(row, 'plan')),
@@ -199,7 +209,10 @@ class ReportAggregationService {
     const eligibleMinutes = this.collectMedianEligibleMinutes(records, range);
     const hoursByActivity = this.collectHourTotals(records, range, timezone);
     const states = new Map<string | null, ActivityBucketState>();
-    for (const activityId of new Set(blocks.map((block) => block.activityId))) {
+    for (const activityId of new Set([
+      ...blocks.map((block) => block.activityId),
+      ...comparisonActivityIds,
+    ])) {
       const totals = aggregate({ ...range, timezone }, activityId, blocks, now);
       states.set(activityId, {
         recordedMinutes: totals.recordedMinutes,

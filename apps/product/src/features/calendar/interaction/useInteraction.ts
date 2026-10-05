@@ -15,9 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useHapticFeedback } from '../hooks/accessibility/useHapticFeedback';
 
-import { isPlanRecordDrop } from '@/features/timeblock';
 import { checkClientSideOverlapByKind } from '../lib/overlap';
-import { DEFAULT_PLAN_LANE_WIDTH_PERCENT } from '../lib/two-lane-layout';
 import { useCalendarDragStore } from '../stores/useCalendarDragStore';
 
 import { IDLE, interactionReducer } from '../domain/interaction/machine';
@@ -57,7 +55,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
     events: props.events,
     allEvents: props.allEventsForOverlapCheck ?? props.events,
     hourHeight: props.hourHeight,
-    planLaneWidthPercent: props.planLaneWidthPercent ?? DEFAULT_PLAN_LANE_WIDTH_PERCENT,
     date: props.date,
     displayDates: props.displayDates,
     viewMode: props.viewMode ?? 'day',
@@ -65,7 +62,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
     resizeDisabledPlanId: props.resizeDisabledPlanId,
     onEventClick: props.onEventClick,
     onEventUpdate: props.onEventUpdate,
-    onPlanRecord: props.onPlanRecord,
     onTimeRangeSelect: props.onTimeRangeSelect,
     haptic,
     startDragStore,
@@ -76,7 +72,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
     events: props.events,
     allEvents: props.allEventsForOverlapCheck ?? props.events,
     hourHeight: props.hourHeight,
-    planLaneWidthPercent: props.planLaneWidthPercent ?? DEFAULT_PLAN_LANE_WIDTH_PERCENT,
     date: props.date,
     displayDates: props.displayDates,
     viewMode: props.viewMode ?? 'day',
@@ -84,7 +79,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
     resizeDisabledPlanId: props.resizeDisabledPlanId,
     onEventClick: props.onEventClick,
     onEventUpdate: props.onEventUpdate,
-    onPlanRecord: props.onPlanRecord,
     onTimeRangeSelect: props.onTimeRangeSelect,
     haptic,
     startDragStore,
@@ -97,19 +91,12 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
 
   // Cached day-column NodeList — populated at drag-start, cleared on drag-end
   const dayColumnsRef = useRef<NodeListOf<HTMLElement> | null>(null);
-  // pending → dragging の初回mousemoveでも、pointer位置から解決したレーンを失わない。
-  // reducer effect の DRAG_STORE_START より前にレーンを解決するため、一時refで受け渡す。
-  const pendingTargetLaneRef = useRef<'plan' | 'record' | null>(null);
-  // machine は DRAG_STORE_END → DROP の順でeffectを出すため、drop判定用laneを別refに保持する。
-  const dragLaneRef = useRef<{ source: 'plan' | 'record'; target: 'plan' | 'record' } | null>(null);
   const interactionVersionRef = useRef<string | null>(null);
 
   const refs: InteractionRefs = {
     stateRef,
     timerRef,
     dayColumnsRef,
-    pendingTargetLaneRef,
-    dragLaneRef,
     interactionVersionRef,
   };
 
@@ -132,25 +119,13 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
       getResizeMinEndMinutes: () => null,
       // 自動記録モデルでは drag / resize とも「planned のみ移動・確定済み actual は固定」で
       // 重複判定が同一なため operation は使わない（machine の API 形状だけ維持する）
-      checkOverlap: (timeblockId: string, start: Date, end: Date, operation: 'drag' | 'resize') => {
-        const sourceKind = r.events.find((event) => event.id === timeblockId)?.kind;
-        const targetLane = pendingTargetLaneRef.current ?? dragLaneRef.current?.target;
-        // レーン間dropでkindが変わるのは Plan → Record だけ。
-        // RecordをPlan側へ寄せてもRecordの時間更新なので、Record同士の重複を判定する。
-        const targetKind =
-          operation === 'drag' &&
-          sourceKind &&
-          targetLane &&
-          isPlanRecordDrop(sourceKind, targetLane)
-            ? 'record'
-            : sourceKind;
-        return checkClientSideOverlapByKind(
-          r.allEvents,
-          timeblockId,
-          start,
-          end,
-          targetKind ? { targetKind } : undefined,
-        );
+      checkOverlap: (
+        timeblockId: string,
+        start: Date,
+        end: Date,
+        _operation: 'drag' | 'resize',
+      ) => {
+        return checkClientSideOverlapByKind(r.allEvents, timeblockId, start, end);
       },
     };
   }
@@ -177,8 +152,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
       stateRef,
       timerRef,
       dayColumnsRef,
-      pendingTargetLaneRef,
-      dragLaneRef,
       interactionVersionRef,
     });
   }, []);
@@ -201,8 +174,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
     (timeblockId: string, e: React.MouseEvent, position: TimeblockRect, dateIndex: number = 0) => {
       if (e.button !== 0) return;
       const r = latestRef.current;
-      pendingTargetLaneRef.current = null;
-      dragLaneRef.current = null;
       // 詳細を開いているブロックは drag させない。クリックはカード自身の onClick が
       // 届けるので、ここでは何もしない（touch 側と同じ扱い）。
       // かつてここで onEventClick を呼んでいたが、カードの onClick と合わせて 1 回の
@@ -224,8 +195,6 @@ export function useInteraction(props: UseInteractionProps): UseInteractionReturn
   const handleTouchStart = useCallback(
     (timeblockId: string, e: React.TouchEvent, position: TimeblockRect, dateIndex: number = 0) => {
       const r = latestRef.current;
-      pendingTargetLaneRef.current = null;
-      dragLaneRef.current = null;
       if (r.disabledPlanId && timeblockId === r.disabledPlanId) return;
       dispatch({
         type: 'TOUCH_START',

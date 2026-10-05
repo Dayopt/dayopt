@@ -1,11 +1,6 @@
+import { dayoptBrand } from '@dayopt/config';
 import { routing } from '@dayopt/i18n/routing';
-import {
-  HeroSection,
-  HowSection,
-  OpenByDesignSection,
-  PricingSection,
-  ProblemSection,
-} from '@web/features/marketing';
+import { LandingPage } from '@web/features/marketing';
 import { generateSEOMetadata } from '@web/platform/seo/metadata';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
@@ -26,8 +21,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const t = await getTranslations({ locale, namespace: 'marketing' });
 
   return generateSEOMetadata({
-    title: t('hero.title'),
-    description: t('hero.subtitle'),
+    title: t('landing.hero.title1') + (locale === 'ja' ? '' : ' ') + t('landing.hero.title2'),
+    documentTitle: dayoptBrand.name,
+    ogTitle: dayoptBrand.name,
+    description: t('landing.hero.body1') + (locale === 'ja' ? '' : ' ') + t('landing.hero.body2'),
     url: `/${locale}`,
     locale: locale,
     keywords:
@@ -42,24 +39,5 @@ export default async function Home({ params }: PageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return (
-    <div className="bg-background">
-      <div className="relative isolate">
-        {/* Hero Section */}
-        <HeroSection locale={locale} />
-
-        {/* Problem Section */}
-        <ProblemSection locale={locale} />
-
-        {/* How Section */}
-        <HowSection locale={locale} />
-
-        {/* Open by design */}
-        <OpenByDesignSection locale={locale} />
-
-        {/* Pricing Section */}
-        <PricingSection locale={locale} />
-      </div>
-    </div>
-  );
+  return <LandingPage locale={locale} />;
 }

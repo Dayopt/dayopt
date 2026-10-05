@@ -45,13 +45,6 @@ afterEach(() => {
 });
 
 describe('Integration server environment', () => {
-  it('allows the exact fixed Integration binding without optional mail or Calendar credentials', async () => {
-    const { env } = await loadIntegrationEnv();
-    expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe(
-      `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
-    );
-  });
-
   it.each(['true', 'false'])(
     'accepts the explicit rate-limit POC switch value %s',
     async (value) => {
@@ -78,6 +71,13 @@ describe('Integration server environment', () => {
       SUPABASE_WEBHOOK_CLAIM_POC_ENABLED: 'unsafe-value',
     });
     expect(() => env.NEXT_PUBLIC_SUPABASE_URL).toThrow('環境変数のバリデーション');
+  });
+
+  it('allows the exact fixed Integration binding without optional mail or Calendar credentials', async () => {
+    const { env } = await loadIntegrationEnv();
+    expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe(
+      `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+    );
   });
 
   it.each([
@@ -114,21 +114,17 @@ describe('Integration server environment', () => {
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain('sensitive-invalid-url');
   });
 
-  it('accepts a complete Integration-only Resend sink and rejects partial configuration', async () => {
+  it('rejects complete and partial Integration Resend settings until delivery is supported', async () => {
     const complete = await loadIntegrationEnv({
       RESEND_API_KEY: 'safe-dummy-test-key',
       RESEND_FROM_EMAIL: 'noreply@dayopt.app',
       RESEND_WEBHOOK_SECRET: 'safe-dummy-webhook-secret',
       CONTACT_INTEGRATION_RECIPIENT: 'qa+integration@example.com',
     });
-    expect(complete.env.NEXT_PUBLIC_SUPABASE_URL).toBe(
-      `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
-    );
+    expect(() => complete.env.NEXT_PUBLIC_SUPABASE_URL).toThrow('Integration Resend');
 
     const partial = await loadIntegrationEnv({ RESEND_API_KEY: 'safe-dummy-test-key' });
-    expect(() => partial.env.NEXT_PUBLIC_SUPABASE_URL).toThrow(
-      'RESEND_API_KEY / apex dayopt.app RESEND_FROM_EMAIL / RESEND_WEBHOOK_SECRET',
-    );
+    expect(() => partial.env.NEXT_PUBLIC_SUPABASE_URL).toThrow('Integration Resend');
   });
 
   it('rejects Stripe live-mode credentials', async () => {
@@ -150,4 +146,24 @@ describe('Integration server environment', () => {
       'IntegrationではStripe test keyとwebhook secretを一緒に設定してください',
     );
   });
+});
+
+describe('ordinary Preview Redis independence', () => {
+  it.each(['tilwaprottpyhlfoggbb', 'abcdefghijklmnopqrst'])(
+    'ignores unused malformed inherited Redis for %s at runtime',
+    async (ref) => {
+      const { env } = await loadIntegrationEnv({
+        DAYOPT_ENVIRONMENT: 'preview',
+        NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'preview',
+        VERCEL_GIT_COMMIT_REF: 'codex/example',
+        VERCEL_URL: 'product-example-dayopt.vercel.app',
+        VERCEL_BRANCH_URL: 'product-example-dayopt.vercel.app',
+        NEXT_PUBLIC_APP_URL: 'https://product-example-dayopt.vercel.app',
+        NEXT_PUBLIC_SUPABASE_URL: `https://${ref}.supabase.co`,
+        UPSTASH_REDIS_REST_URL: 'malformed',
+        UPSTASH_REDIS_REST_TOKEN: '',
+      });
+      expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe(`https://${ref}.supabase.co`);
+    },
+  );
 });

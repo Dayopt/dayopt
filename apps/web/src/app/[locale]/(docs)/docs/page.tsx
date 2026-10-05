@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: `/${locale}/docs`,
       locale: locale,
       type: 'article',
+      category: 'docs',
     });
   }
 
@@ -46,6 +47,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ? ['ドキュメント', 'API', 'ガイド', 'チュートリアル', 'SaaS', '開発']
         : ['documentation', 'API', 'guides', 'tutorials', 'SaaS', 'development'],
     type: 'website',
+    category: 'docs',
   });
 }
 

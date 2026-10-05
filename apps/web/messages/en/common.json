@@ -35,7 +35,13 @@
     },
     "metadata": {
       "siteName": "Dayopt",
-      "siteDescription": "A modern SaaS platform built with Next.js and Tailwind CSS"
+      "siteDescription": "A modern SaaS platform built with Next.js and Tailwind CSS",
+      "ogCategories": {
+        "product": "Product",
+        "docs": "Docs",
+        "journal": "Journal",
+        "release": "Release"
+      }
     },
     "actions": {
       "search": "Search",

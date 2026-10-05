@@ -21,7 +21,7 @@ flowchart TD
   end
   subgraph s_vercel["Vercel（Next.js）"]
     n3["3. /api/trpc と関門"]
-    n4["4. Service が 6 本読む"]
+    n4["4. Service が6種類を読む"]
   end
   subgraph s_supabase["Supabase"]
     n5["5. 行を読む"]
@@ -36,7 +36,7 @@ flowchart TD
   n8 --> n9
 ```
 
-通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 6 種。
+通るサービス: ブラウザ / Vercel（Next.js） / Supabase。段 9・失敗 4 種。
 
 #### この経路を守るテスト
 
@@ -60,22 +60,24 @@ exportData の query は enabled: false で作ってあり、ボタンを押し�
 
 - **なぜ必要か**: 設定を開いただけで全データを運ばないため。範囲を送らないので、サーバーは常に全件を返す。
 - **入力 → 出力**: ボタンの押下 → POST /api/trpc（user.exportData、入力なし）
-- **ここを変えると**: refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。
+- **ここを変えると**: refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - **コード**:
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const exportDataQuery = api.user.exportData.useQuery(undefined, {` を探す
   - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const result = await exportDataQuery.refetch();` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (!result.data) throw new Error('Export failed');` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (result.isError || !result.data) throw new Error('Export failed');` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('成功後の再取得失敗を古いdataで成功扱いしない'` を探す
 
 <details>
-<summary>⚡ 前回成功した後で、今回の取得が失敗する — 画面: 何も起きない / データ: 欠落する / 再試行: 自動で再試行 / 痕跡: Sentry</summary>
+<summary>⚡ 前回成功した後で、今回の取得が失敗する — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: Sentry</summary>
 
-- 画面: 「データをエクスポートしました」と出る。失敗は利用者に見えない。
-- データ: DB は変化なし。保存されるファイルは前回取得した時点の内容で、その後の変更が入っていない。
-- 再試行: query の既定で最大 3 回まで再試行したあと、前回の data のまま進む。
-- 痕跡: サーバー側の失敗なら Sentry（feature: account_export）に残るが、画面の成功表示とは結び付かない。
-- **最初に見る場所**: コードから読んだ挙動で、実機では未確認。同じ画面で 2 回目以降、またはブラウザに保存された前回の結果が復元された後に起きうる。handleExport の成否判定（result.data の有無）を見る。
+- 画面: エクスポート失敗のトーストを出し、ファイルを作らない。
+- データ: DBと前回取得したquery dataは変化なし。古いデータを今回の成功結果として保存しない。
+- 再試行: queryの既定の再試行後も失敗なら、利用者が押し直す。
+- 痕跡: サーバー側の失敗はaccount_exportの既存観測経路に残る。
+- **最初に見る場所**: 実QueryObserverの成功→失敗をcomponent testで再現。実機・本番の観測ではない。
 - 根拠:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (!result.data) throw new Error('Export failed');` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (result.isError || !result.data) throw new Error('Export failed');` を探す
   - [`apps/product/src/lib/trpc/query-client.ts`](../../../apps/product/src/lib/trpc/query-client.ts) で `return failureCount < 3;` を探す
   - [`apps/product/src/lib/tanstack-query/should-persist-query.ts`](../../../apps/product/src/lib/tanstack-query/should-persist-query.ts) で `query.state.status === 'success' &&` を探す
 
@@ -109,7 +111,7 @@ context がセッションの cookie から利用者を決め、protectedProcedu
 
 ### 4. UserService.exportData が 6 種類を並行で読む（Vercel（Next.js））
 
-profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6 本を並行で投げ、どれか 1 本でも失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。
+profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6種類を並行で読み、どれかの取得（後続ページを含む）が失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。
 
 - **なぜ必要か**: Plan / Record の RLS は削除済み（deleted_at あり）の行を利用者から隠す。service role で読むので、削除済みの行も deleted_at 付きで書き出される。これが意図かどうかはコード上に説明が無く、未確認。
 - **入力 → 出力**: ctx の userId → exportedAt・userId・data（profile / plans / records / categories / activities / userSettings）
@@ -125,29 +127,17 @@ profile・カテゴリ・アクティビティ・user_settings は利用者の�
 
 ### 5. Supabase から各表を読む（Supabase）
 
-各表を 1 回の select で読む。レポートの取得と違い、ページ分けして読み切る処理（collectQueryPages）を通していない。
+Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500件ずつid順に読み切る。profileとuser_settingsは単一行を読む。各ページは同じctxのuserIdで絞る。
 
-- **なぜ必要か**: 件数が少ない前提の書き方になっている（理由の記録は見当たらない）。
+- **なぜ必要か**: 全期間のエクスポートがData APIの1回取得上限で欠けないようにするため。
 - **入力 → 出力**: user_id で絞った select → 各表の行
-- **ここを変えると**: PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。
+- **ここを変えると**: ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 - **コード**:
-  - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `adminClient.from(databaseTables.records).select(publicRecordSelect).eq('user_id', userId),` を探す
+  - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `collectQueryPages((from, to) =>` を探す
   - [`supabase/config.toml`](../../../supabase/config.toml) で `max_rows = 1000` を探す
-  - [`apps/product/src/lib/database/collect-query-pages.ts`](../../../apps/product/src/lib/database/collect-query-pages.ts) で `Exhaust a stably ordered query rather than silently accepting the Data API row cap.` を探す（レポート側はこれで読み切っている）
-
-<details>
-<summary>⚡ Plan か Record が行数の上限を超える — 画面: 何も起きない / データ: 欠落する / 再試行: しない / 痕跡: 残らない</summary>
-
-- 画面: 成功のトーストが出る。欠けていることは画面に出ない。
-- データ: DB は変化なし。ファイルには上限までの行しか入らない（並び順を指定していないので、どの行が落ちるかも決まらない）。
-- 再試行: しない。何度押しても同じだけ欠ける。
-- 痕跡: 残らない（エラーではない）。
-- **最初に見る場所**: local は config.toml の max_rows = 1000。本番の値は未確認（Supabase の API 設定で見る）。書き出したファイルの行数と、DB の件数を比べる。
-- 根拠:
-  - [`supabase/config.toml`](../../../supabase/config.toml) で `max_rows = 1000` を探す
-  - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `adminClient.from('plans').select(publicPlanSelect).eq('user_id', userId),` を探す
-
-</details>
+  - [`apps/product/src/lib/database/collect-query-pages.ts`](../../../apps/product/src/lib/database/collect-query-pages.ts) で `Exhaust a stably ordered query rather than silently accepting the Data API row cap.` を探す（レポートとエクスポートで共有する既存のページ走査）
+- **この段を守るテスト**:
+  - [`apps/product/src/features/auth/server/user-service.test.ts`](../../../apps/product/src/features/auth/server/user-service.test.ts) で `it('Data API上限を越す1201件を4種類とも欠落なくexportする'` を探す（実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。）
 
 <details>
 <summary>⚡ どれかの表の読み取りが失敗する — 画面: エラー表示 / データ: 変化なし / 再試行: 自動で再試行 / 痕跡: Sentry</summary>
@@ -156,7 +146,7 @@ profile・カテゴリ・アクティビティ・user_settings は利用者の�
 - データ: 変化なし。ファイルは作られない。
 - 再試行: query の既定で最大 3 回まで自動で再試行する。それでも駄目なら利用者が押し直す。
 - 痕跡: サーバーが Sentry へ送る（feature: account_export、operation: fetch_records 等）。応答は INTERNAL_SERVER_ERROR。
-- **最初に見る場所**: Sentry で feature:account_export を探す。前回の成功がこの画面に残っていると、失敗でも成功表示になる（段 2 の失敗）。
+- **最初に見る場所**: Sentryでfeature:account_exportを探す。前回成功したdataが残っていても、画面はrefetch失敗として扱う。
 - 根拠:
   - [`apps/product/src/features/auth/server/user-service.ts`](../../../apps/product/src/features/auth/server/user-service.ts) で `feature: 'account_export',` を探す
   - [`apps/product/src/lib/trpc/error-code-map.ts`](../../../apps/product/src/lib/trpc/error-code-map.ts) で `EXPORT_FAILED: 'INTERNAL_SERVER_ERROR',` を探す
@@ -176,41 +166,31 @@ profile・カテゴリ・アクティビティ・user_settings は利用者の�
 
 ### 7. 期間指定ならブラウザで絞る（ブラウザ）
 
-範囲が「期間指定」で開始日と終了日の両方が入っている時だけ、Plan と Record を start_at で絞る。開始日は new Date('YYYY-MM-DD')、終了日はブラウザの timezone の 23:59:59.999。どちらかが空なら絞らず全期間になる。カテゴリ・アクティビティ・設定は絞らない。
+期間指定では開始日・終了日が両方あり開始日以下でない終了日を必要とする。不完全・逆転した入力は取得前に拒否する。PlanとRecordのstart_atを利用者の設定timezoneの暦日へ変換し、開始日から終了日までを含める。カテゴリ・アクティビティ・設定は絞らない。
 
 - **なぜ必要か**: サーバーは範囲を受け取らないので、絞り込みはここだけで行う。
-- **入力 → 出力**: キャッシュ上の全データと開始日・終了日 → 絞った Plan / Record（キャッシュの配列を置き換える）
-- **ここを変えると**: 日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。
+- **入力 → 出力**: キャッシュ上の全データと開始日・終了日 → エクスポート用コピーのPlan / Recordだけを絞る（query cacheは変更しない）
+- **ここを変えると**: timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。
 - **コード**:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const start = new Date(startDate);` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `end.setHours(23, 59, 59, 999);` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (range === 'custom' && startDate && endDate) {` を探す
-  - [`docs/engineering/timezone.md`](../../engineering/timezone.md) で `## 禁止パターン一覧` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const timezone = useUserPreferences((preferences) => preferences.timezone);` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const date = getDateKey(new Date(plan.start_at), timezone);` を探す
+  - [`apps/product/src/lib/date/core.ts`](../../../apps/product/src/lib/date/core.ts) で `export function getDateKey(` を探す
+  - [`docs/engineering/timezone.md`](../../engineering/timezone.md) で `## Layer 1: TZ Source of Truth` を探す
+- **この段を守るテスト**:
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('期間で絞ってもqueryの全件データを変更しない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'%sの%sの全日を設定TZで選び、隣接日を含めない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'不完全・逆転した期間 %s〜%s を全期間として出力しない'` を探す
 
 <details>
-<summary>⚡ UTC より東の timezone で期間指定する — 画面: 何も起きない / データ: 欠落する / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
+<summary>⚡ 期間指定の日付が不完全または逆転している — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
 
-- 画面: 成功のトーストが出る。
-- データ: DB は変化なし。JST なら開始日の 0:00〜8:59 に始まった Plan / Record がファイルから抜ける（開始日が UTC の 0 時 = JST 9 時として比べられるため）。
-- 再試行: しない。利用者が開始日を 1 日前にすれば入る。
+- 画面: 既存のエクスポート失敗トーストを表示する。
+- データ: 問い合わせず、ファイルも作らない。入力とquery cacheは維持する。
+- 再試行: 利用者が日付を直して押し直す。
 - 痕跡: 残らない。
-- **最初に見る場所**: handleExport の new Date(startDate)。この絞り込みを通すテストは無い。
+- **最初に見る場所**: handleExportの取得前のrange検証。
 - 根拠:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `const start = new Date(startDate);` を探す
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `return recordDate >= start && recordDate <= end;` を探す
-
-</details>
-
-<details>
-<summary>⚡ 期間指定で日付を片方しか入れない — 画面: 何も起きない / データ: 変化なし / 再試行: 不要 / 痕跡: 残らない</summary>
-
-- 画面: 成功のトーストが出る。
-- データ: DB は変化なし。絞り込みが掛からず、全期間が書き出される。
-- 再試行: 不要（多く出るだけ）。
-- 痕跡: 残らない。
-- **最初に見る場所**: 開始日と終了日の両方が入っている時だけ絞る条件。入力の検証は無い。
-- 根拠:
-  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `if (range === 'custom' && startDate && endDate) {` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.tsx`](../../../apps/product/src/features/settings/components/DataSettings.tsx) で `throw new Error('Invalid export range');` を探す
 
 </details>
 
@@ -317,7 +297,7 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         "in": "ボタンの押下",
         "out": "POST /api/trpc（user.exportData、入力なし）"
       },
-      "change": "refetch の結果は例外にならず、失敗しても前回成功した data を持ったまま返る。成否を data の有無だけで判定しているので、ここを触る時は result.isError も見る形にする。",
+      "change": "refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。",
       "refs": [
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
@@ -329,22 +309,22 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         },
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "if (!result.data) throw new Error('Export failed');"
+          "find": "if (result.isError || !result.data) throw new Error('Export failed');"
         }
       ],
       "fails": [
         {
           "id": "stale-success",
           "label": "前回成功した後で、今回の取得が失敗する",
-          "screen": "「データをエクスポートしました」と出る。失敗は利用者に見えない。",
-          "data": "DB は変化なし。保存されるファイルは前回取得した時点の内容で、その後の変更が入っていない。",
-          "retry": "query の既定で最大 3 回まで再試行したあと、前回の data のまま進む。",
-          "trace": "サーバー側の失敗なら Sentry（feature: account_export）に残るが、画面の成功表示とは結び付かない。",
-          "look": "コードから読んだ挙動で、実機では未確認。同じ画面で 2 回目以降、またはブラウザに保存された前回の結果が復元された後に起きうる。handleExport の成否判定（result.data の有無）を見る。",
+          "screen": "エクスポート失敗のトーストを出し、ファイルを作らない。",
+          "data": "DBと前回取得したquery dataは変化なし。古いデータを今回の成功結果として保存しない。",
+          "retry": "queryの既定の再試行後も失敗なら、利用者が押し直す。",
+          "trace": "サーバー側の失敗はaccount_exportの既存観測経路に残る。",
+          "look": "実QueryObserverの成功→失敗をcomponent testで再現。実機・本番の観測ではない。",
           "refs": [
             {
               "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "if (!result.data) throw new Error('Export failed');"
+              "find": "if (result.isError || !result.data) throw new Error('Export failed');"
             },
             {
               "path": "apps/product/src/lib/trpc/query-client.ts",
@@ -356,12 +336,11 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
             }
           ],
           "tags": {
-            "screen": "none",
-            "data": "lost",
-            "retry": "auto",
+            "screen": "toast",
+            "data": "unchanged",
+            "retry": "user",
             "trace": "sentry"
           },
-          "continues": true,
           "screenAfter": {
             "t": "settings",
             "url": "/ja/settings/data",
@@ -371,8 +350,9 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
               ["範囲", "全期間", "neutral"]
             ],
             "button": "エクスポート",
-            "toast": "データをエクスポートしました",
-            "note": "ブラウザが dayopt-export-<数字>.json を保存する"
+            "toast": "エクスポートできませんでした。もう一度お試しください。",
+            "note": "古いdataがあっても今回のファイルは作らない",
+            "toastTone": "bad"
           }
         }
       ],
@@ -386,7 +366,13 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         ],
         "button": "エクスポート中...",
         "note": "応答が返るまでボタンは押せない"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "it('成功後の再取得失敗を古いdataで成功扱いしない'"
+        }
+      ]
     },
     {
       "id": "gate",
@@ -456,9 +442,9 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
     {
       "id": "service",
       "svc": "vercel",
-      "short": "Service が 6 本読む",
+      "short": "Service が6種類を読む",
       "title": "UserService.exportData が 6 種類を並行で読む",
-      "what": "profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6 本を並行で投げ、どれか 1 本でも失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。",
+      "what": "profile・カテゴリ・アクティビティ・user_settings は利用者の権限の client（RLS が効く）で、Plan と Record は service role の client で読み、どれも ctx の userId で絞る。6種類を並行で読み、どれかの取得（後続ページを含む）が失敗すれば全体を失敗にする（profile と user_settings が未作成なのは失敗にしない）。",
       "why": "Plan / Record の RLS は削除済み（deleted_at あり）の行を利用者から隠す。service role で読むので、削除済みの行も deleted_at 付きで書き出される。これが意図かどうかはコード上に説明が無く、未確認。",
       "io": {
         "in": "ctx の userId",
@@ -502,17 +488,17 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
       "short": "行を読む",
       "title": "Supabase から各表を読む",
       "via": "PostgREST",
-      "what": "各表を 1 回の select で読む。レポートの取得と違い、ページ分けして読み切る処理（collectQueryPages）を通していない。",
-      "why": "件数が少ない前提の書き方になっている（理由の記録は見当たらない）。",
+      "what": "Plan・Record・カテゴリ・アクティビティはcollectQueryPagesで500件ずつid順に読み切る。profileとuser_settingsは単一行を読む。各ページは同じctxのuserIdで絞る。",
+      "why": "全期間のエクスポートがData APIの1回取得上限で欠けないようにするため。",
       "io": {
         "in": "user_id で絞った select",
         "out": "各表の行"
       },
-      "change": "PostgREST は 1 回の応答の行数に上限（max_rows）があり、超えた分は黙って切られる。local の設定は 1000。Plan / Record が多い利用者に効くので、直すなら collectQueryPages で読み切る。",
+      "change": "ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。",
       "refs": [
         {
           "path": "apps/product/src/features/auth/server/user-service.ts",
-          "find": "adminClient.from(databaseTables.records).select(publicRecordSelect).eq('user_id', userId),"
+          "find": "collectQueryPages((from, to) =>"
         },
         {
           "path": "supabase/config.toml",
@@ -521,50 +507,10 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
         {
           "path": "apps/product/src/lib/database/collect-query-pages.ts",
           "find": "Exhaust a stably ordered query rather than silently accepting the Data API row cap.",
-          "why": "レポート側はこれで読み切っている"
+          "why": "レポートとエクスポートで共有する既存のページ走査"
         }
       ],
       "fails": [
-        {
-          "id": "row-cap",
-          "label": "Plan か Record が行数の上限を超える",
-          "screen": "成功のトーストが出る。欠けていることは画面に出ない。",
-          "data": "DB は変化なし。ファイルには上限までの行しか入らない（並び順を指定していないので、どの行が落ちるかも決まらない）。",
-          "retry": "しない。何度押しても同じだけ欠ける。",
-          "trace": "残らない（エラーではない）。",
-          "look": "local は config.toml の max_rows = 1000。本番の値は未確認（Supabase の API 設定で見る）。書き出したファイルの行数と、DB の件数を比べる。",
-          "refs": [
-            {
-              "path": "supabase/config.toml",
-              "find": "max_rows = 1000"
-            },
-            {
-              "path": "apps/product/src/features/auth/server/user-service.ts",
-              "find": "adminClient.from('plans').select(publicPlanSelect).eq('user_id', userId),"
-            }
-          ],
-          "tags": {
-            "screen": "none",
-            "data": "lost",
-            "retry": "none",
-            "trace": "none"
-          },
-          "continues": true,
-          "to": "download",
-          "back": "欠けたまま保存",
-          "screenAfter": {
-            "t": "settings",
-            "url": "/ja/settings/data",
-            "title": "エクスポート",
-            "rows": [
-              ["形式", "JSON（バックアップ・復元用）", "neutral"],
-              ["範囲", "全期間", "neutral"]
-            ],
-            "button": "エクスポート",
-            "toast": "データをエクスポートしました",
-            "note": "ブラウザが dayopt-export-<数字>.json を保存する"
-          }
-        },
         {
           "id": "db-error",
           "label": "どれかの表の読み取りが失敗する",
@@ -572,7 +518,7 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
           "data": "変化なし。ファイルは作られない。",
           "retry": "query の既定で最大 3 回まで自動で再試行する。それでも駄目なら利用者が押し直す。",
           "trace": "サーバーが Sentry へ送る（feature: account_export、operation: fetch_records 等）。応答は INTERNAL_SERVER_ERROR。",
-          "look": "Sentry で feature:account_export を探す。前回の成功がこの画面に残っていると、失敗でも成功表示になる（段 2 の失敗）。",
+          "look": "Sentryでfeature:account_exportを探す。前回成功したdataが残っていても、画面はrefetch失敗として扱う。",
           "refs": [
             {
               "path": "apps/product/src/features/auth/server/user-service.ts",
@@ -603,6 +549,13 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
             "toast": "エクスポートできませんでした。もう一度お試しください。",
             "toastTone": "bad"
           }
+        }
+      ],
+      "tests": [
+        {
+          "path": "apps/product/src/features/auth/server/user-service.test.ts",
+          "find": "it('Data API上限を越す1201件を4種類とも欠落なくexportする'",
+          "why": "実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。"
         }
       ]
     },
@@ -636,91 +589,52 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
       "svc": "browser",
       "short": "期間で絞る",
       "title": "期間指定ならブラウザで絞る",
-      "what": "範囲が「期間指定」で開始日と終了日の両方が入っている時だけ、Plan と Record を start_at で絞る。開始日は new Date('YYYY-MM-DD')、終了日はブラウザの timezone の 23:59:59.999。どちらかが空なら絞らず全期間になる。カテゴリ・アクティビティ・設定は絞らない。",
+      "what": "期間指定では開始日・終了日が両方あり開始日以下でない終了日を必要とする。不完全・逆転した入力は取得前に拒否する。PlanとRecordのstart_atを利用者の設定timezoneの暦日へ変換し、開始日から終了日までを含める。カテゴリ・アクティビティ・設定は絞らない。",
       "why": "サーバーは範囲を受け取らないので、絞り込みはここだけで行う。",
       "io": {
         "in": "キャッシュ上の全データと開始日・終了日",
-        "out": "絞った Plan / Record（キャッシュの配列を置き換える）"
+        "out": "エクスポート用コピーのPlan / Recordだけを絞る（query cacheは変更しない）"
       },
-      "change": "日付の境界をブラウザで組んでいて、利用者の timezone 設定を使っていない（timezone.md の禁止パターンに近い書き方）。開始日は UTC の 0 時として読まれ、終了日はブラウザの timezone で閉じるので、両端の扱いが揃っていない。直すなら toTZStartISO / toTZEndISO を利用者の timezone で使う。絞り込みは開始時刻だけで、期間を跨ぐ Plan / Record は開始側の期間にしか入らない。",
+      "change": "timezoneは既存のuseUserPreferencesから取得し、getDateKeyで各開始時刻の暦日を比較する。日を固定24時間として扱わないため、夏時間の23/25時間の日も同じ条件で選べる。期間を跨ぐ行は従来どおり開始側の期間に入る。",
       "refs": [
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "const start = new Date(startDate);"
+          "find": "const timezone = useUserPreferences((preferences) => preferences.timezone);"
         },
         {
           "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "end.setHours(23, 59, 59, 999);"
+          "find": "const date = getDateKey(new Date(plan.start_at), timezone);"
         },
         {
-          "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-          "find": "if (range === 'custom' && startDate && endDate) {"
+          "path": "apps/product/src/lib/date/core.ts",
+          "find": "export function getDateKey("
         },
         {
           "path": "docs/engineering/timezone.md",
-          "find": "## 禁止パターン一覧"
+          "find": "## Layer 1: TZ Source of Truth"
         }
       ],
       "fails": [
         {
-          "id": "utc-start-day",
-          "label": "UTC より東の timezone で期間指定する",
-          "screen": "成功のトーストが出る。",
-          "data": "DB は変化なし。JST なら開始日の 0:00〜8:59 に始まった Plan / Record がファイルから抜ける（開始日が UTC の 0 時 = JST 9 時として比べられるため）。",
-          "retry": "しない。利用者が開始日を 1 日前にすれば入る。",
+          "id": "empty-date",
+          "label": "期間指定の日付が不完全または逆転している",
+          "screen": "既存のエクスポート失敗トーストを表示する。",
+          "data": "問い合わせず、ファイルも作らない。入力とquery cacheは維持する。",
+          "retry": "利用者が日付を直して押し直す。",
           "trace": "残らない。",
-          "look": "handleExport の new Date(startDate)。この絞り込みを通すテストは無い。",
+          "look": "handleExportの取得前のrange検証。",
           "refs": [
             {
               "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "const start = new Date(startDate);"
-            },
-            {
-              "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "return recordDate >= start && recordDate <= end;"
+              "find": "throw new Error('Invalid export range');"
             }
           ],
           "tags": {
-            "screen": "none",
-            "data": "lost",
+            "screen": "toast",
+            "data": "unchanged",
             "retry": "user",
             "trace": "none"
-          },
-          "continues": true,
-          "screenAfter": {
-            "t": "settings",
-            "url": "/ja/settings/data",
-            "title": "エクスポート",
-            "rows": [
-              ["形式", "JSON（バックアップ・復元用）", "neutral"],
-              ["範囲", "全期間", "neutral"]
-            ],
-            "button": "エクスポート",
-            "toast": "データをエクスポートしました",
-            "note": "ブラウザが dayopt-export-<数字>.json を保存する"
           }
-        },
-        {
-          "id": "empty-date",
-          "label": "期間指定で日付を片方しか入れない",
-          "screen": "成功のトーストが出る。",
-          "data": "DB は変化なし。絞り込みが掛からず、全期間が書き出される。",
-          "retry": "不要（多く出るだけ）。",
-          "trace": "残らない。",
-          "look": "開始日と終了日の両方が入っている時だけ絞る条件。入力の検証は無い。",
-          "refs": [
-            {
-              "path": "apps/product/src/features/settings/components/DataSettings.tsx",
-              "find": "if (range === 'custom' && startDate && endDate) {"
-            }
-          ],
-          "tags": {
-            "screen": "none",
-            "data": "unchanged",
-            "retry": "na",
-            "trace": "none"
-          },
-          "continues": true
         }
       ],
       "screen": {
@@ -734,7 +648,21 @@ Blob から一時 URL を作り、見えないリンクの download 属性に da
           ["終了日", "2026/09/20", "neutral"]
         ],
         "button": "エクスポート"
-      }
+      },
+      "tests": [
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "it('期間で絞ってもqueryの全件データを変更しない'"
+        },
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "'%sの%sの全日を設定TZで選び、隣接日を含めない'"
+        },
+        {
+          "path": "apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx",
+          "find": "'不完全・逆転した期間 %s〜%s を全期間として出力しない'"
+        }
+      ]
     },
     {
       "id": "format",
