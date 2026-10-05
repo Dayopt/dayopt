@@ -13,9 +13,12 @@ change or POC retirement PR is required. Existing migration history is intact.
 The reporter and publisher require all 18 declarations to pass on their first
 attempt, with unique positive safe source lines under these exact file/project
 pairs. Old seven- and twelve-case reports, omissions, duplicates and incorrect
-pairings fail. Titles, passwords, errors, headers, cookies and bodies remain
-excluded from public evidence. The intent's workflow SHA identifies the trusted
-source; the request binds the candidate SHA/deployment and nonproduction DB.
+pairings fail. For failed declarations, public evidence may include at most 40
+failed-step rows, each limited to category, allowlisted spec file, positive
+source line and capped duration. Titles, passwords, error messages, headers,
+cookies, screenshots and bodies remain excluded. The intent's workflow SHA
+identifies the trusted source; the request binds the candidate SHA/deployment
+and nonproduction DB.
 
 The suites retain exactly two synthetic identities. Fixture/identity contracts,
 durable ownership journal, cleanup/readback, network fence, private output,
@@ -43,7 +46,8 @@ in the current sidebar; this suite exercises save, rename, click apply and delet
 These boundaries do not claim all flows passed.
 
 Local unit checks, typechecking and Playwright collection prove contracts and
-collection only. Added browser cases remain unexecuted until a verified cloud
-run. Existing five-minute Playwright / seven-minute supervisor limits are
-unchanged because no expanded-run duration has been measured. A timeout is a
-failed run; collection evidence cannot replace it.
+collection only. A verified cloud run must pass all 18 cases on their first
+attempt, confirm cleanup and preserve post-readiness identity. Existing
+five-minute Playwright / seven-minute supervisor limits are unchanged because
+no expanded-run duration has been measured. A timeout is a failed run;
+collection evidence cannot replace it.

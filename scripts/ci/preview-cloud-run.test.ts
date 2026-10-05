@@ -117,6 +117,75 @@ describe('Cloud Preview evidence and cleanup', () => {
     expect(serialized).not.toContain('PRIVATE_');
     expect(result.tests).toHaveLength(1);
   });
+  it('publishes only sanitized failed Playwright step metadata for diagnosis', () => {
+    const options = fixture();
+    writeFileSync(
+      join(options.directory, 'evidence', 'e2e.json'),
+      JSON.stringify({
+        tests: [
+          {
+            file: 'critical-path.spec.ts',
+            project: 'chromium',
+            line: 205,
+            retry: 0,
+            status: 'failed',
+            expectedPassed: true,
+            title: 'PRIVATE_TITLE',
+            error: 'PRIVATE_ERROR',
+            headers: 'PRIVATE_TOKEN',
+            steps: [
+              {
+                category: 'pw:api',
+                file: 'critical-path.spec.ts',
+                line: 208,
+                duration: 43,
+                failed: false,
+                title: 'PRIVATE_TITLE',
+                error: 'PRIVATE_ERROR',
+              },
+              {
+                category: 'expect',
+                file: 'critical-path.spec.ts',
+                line: 212,
+                duration: 5000,
+                failed: true,
+                title: 'PRIVATE_TITLE',
+                error: 'PRIVATE_ERROR',
+                body: 'PRIVATE_BODY',
+              },
+              {
+                category: 'untrusted-category',
+                file: '/private/PRIVATE_FILE',
+                line: 0,
+                duration: -1,
+                failed: true,
+                title: 'PRIVATE_TITLE',
+                error: 'PRIVATE_ERROR',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const result = publishCloudEvidence(options);
+    expect(result.tests).toEqual([
+      {
+        file: 'critical-path.spec.ts',
+        project: 'chromium',
+        line: 205,
+        status: 'failed',
+        retry: 0,
+        expectedPassed: true,
+        failedSteps: [
+          { category: 'expect', file: 'critical-path.spec.ts', line: 212, duration: 5000 },
+          { category: 'other', file: null, line: null, duration: 0 },
+        ],
+      },
+    ]);
+    const serialized = readFileSync(join(options.destination, 'preview.json'), 'utf8');
+    expect(serialized).not.toContain('PRIVATE_');
+  });
   it.each(['reviewed', 'old-twelve', 'old-seven', 'duplicate', 'wrong-pair', 'missing'])(
     'publisher independently enforces reviewed coverage: %s',
     (kind) => {
