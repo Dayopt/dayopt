@@ -211,6 +211,10 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await dialog.getByRole('button', { name: '確認', exact: true }).click();
     await expect(dialog).toBeHidden();
     await page.reload();
+    // Desktop settings live in a shell modal. Reloading /calendar closes it, so reopen the
+    // category before checking the persisted value in the UI.
+    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await page.goto('/ja/settings/account');
     await expect(page.getByRole('button', { name: /表示名/ })).toContainText(displayName);
     const profile = await adminSupabase
       .from('profiles')
@@ -236,6 +240,8 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('12h');
     await page.reload();
+    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await page.goto('/ja/settings/display');
     await expect(timeFormat).toContainText('12時間表記');
   });
 
@@ -406,6 +412,8 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await page.goto('/ja/settings/display');
     await expect(page.getByRole('combobox', { name: 'テーマ', exact: true })).toContainText(
       'ダーク',
     );
@@ -424,6 +432,8 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('Australia/Sydney');
     await page.reload();
+    await expect(page).toHaveURL(/\/ja\/calendar(?:\?.*)?$/);
+    await page.goto('/ja/settings/display');
     await expect(timezone).toContainText('シドニー');
     await timezone.click();
     await page.getByRole('option', { name: '東京 (GMT+9)', exact: true }).click();
@@ -439,7 +449,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       .toBe(TIMEZONE);
     await page.getByRole('combobox', { name: '言語', exact: true }).click();
     await page.getByRole('option', { name: 'English', exact: true }).click();
-    await expect(page).toHaveURL(/\/en\/settings\/display$/);
+    await expect(page).toHaveURL(/\/en\/calendar$/);
     await expect
       .poll(async () => {
         const result = await adminSupabase
@@ -452,12 +462,14 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('en');
     await page.reload();
+    await expect(page).toHaveURL(/\/en\/calendar$/);
+    await page.goto('/en/settings/display');
     await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toContainText(
       'English',
     );
     await page.getByRole('combobox', { name: 'Language', exact: true }).click();
     await page.getByRole('option', { name: '日本語', exact: true }).click();
-    await expect(page).toHaveURL(/\/ja\/settings\/display$/);
+    await expect(page).toHaveURL(/\/ja\/calendar$/);
     await expect
       .poll(async () => {
         const result = await adminSupabase
