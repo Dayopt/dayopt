@@ -390,7 +390,7 @@ describe('runDbUpgradeCheck orchestration', () => {
     upgradedTypes = typesFixture(),
     freshTypes = typesFixture(),
     baseTypes = typesFixture(),
-    baselineTypes = baseTypes,
+    baselineTypes = '',
     changed = 'A\tsupabase/migrations/20260917000000_b.sql\n',
     migrationUpFails = false,
     resetFails = false,
@@ -445,11 +445,11 @@ describe('runDbUpgradeCheck orchestration', () => {
       if (joined.startsWith('supabase gen types'))
         return calls.some(([f, a]) => f === 'supabase' && a[0] === 'migration')
           ? upgradedTypes
-          : baselineTypes;
+          : baselineTypes || baseTypes;
       if (joined.startsWith('pnpm exec prettier'))
         return calls.some(([f, a]) => f === 'supabase' && a[0] === 'migration')
           ? upgradedTypes
-          : baselineTypes;
+          : baselineTypes || baseTypes;
       throw new Error(`unexpected exec: ${joined}`);
     };
     const result = runDbUpgradeCheck({
