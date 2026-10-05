@@ -4,12 +4,13 @@
 # 各設定値には「なぜそうしたか」を記載。
 # 公式リファレンス: https://supabase.com/docs/guides/local-development/cli/config
 #
-# 運用モデル: optional local / persistent nonproduction / isolated PR Preview / production
-#   - Local:          supabase start（この config.toml を使用。完全なアプリ開発が必要な時だけ）
-#   - Persistent:     通常のProduct Preview・固定Integration・必要時のlocal appが共有する非本番branch
-#   - PR Preview:     migrationなど共有backendの隔離が必要な変更だけに作成
+# 運用モデル: Codex Cloud-first / optional local / persistent nonproduction / isolated PR Preview / production
+#   - Codex Cloud:    Docker / supabase start を使わず、GitHub PR の Vercel Preview で確認
+#   - Local:          開発者所有の端末だけが任意で supabase start（この config.toml を使用）
+#   - Persistent:     通常のProduct Preview・固定Integrationが共有する非本番branch
+#   - PR Preview:     migration / 共通Auth設定 / 隔離が必要な変更だけに作成
 #   - Production:     dayopt main (ref: yvglwblxrnrenfifsnje)
-# Supabase Preview branchを全PRの必須経路にはせず、既存のpersistent nonproduction branchを再利用する。
+# Supabase Preview branchを全PRの必須経路にはせず、通常Previewはpersistent nonproduction branchを再利用する。
 # 詳細: .agents/skills/supabase/SKILL.md
 # ============================================================
 
@@ -140,8 +141,8 @@ site_url = "http://127.0.0.1:3000"
 # 旧 `app-*` パターンは project 改名前の残骸で、どの preview URL にも一致しなかった。
 additional_redirect_urls = [
   "https://127.0.0.1:3000",
-  "https://product-*-dayopt.vercel.app",
-  "https://product-git-*-dayopt.vercel.app"
+  "https://product-*-dayopt.vercel.app/**",
+  "https://product-git-*-dayopt.vercel.app/**"
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
