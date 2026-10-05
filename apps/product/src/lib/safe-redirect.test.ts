@@ -41,6 +41,11 @@ describe('getSafeLocalizedRedirectPath', () => {
   });
 
   it('localizes the safe fallback for an external redirect', () => {
-    expect(getSafeLocalizedRedirectPath('https://evil.example', 'ja')).toBe('/ja/');
+    expect(getSafeLocalizedRedirectPath('https://evil.example', 'ja')).toBe('/ja');
+  });
+
+  it('normalizes a localized home path without a trailing slash', () => {
+    expect(getSafeLocalizedRedirectPath('/', 'ja')).toBe('/ja');
+    expect(getSafeLocalizedRedirectPath('/ja/', 'ja')).toBe('/ja');
   });
 });

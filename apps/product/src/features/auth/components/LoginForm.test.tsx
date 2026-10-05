@@ -135,7 +135,7 @@ describe('LoginForm', () => {
 
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password123');
-        expect(mockPush).toHaveBeenCalledWith('/ja/');
+        expect(mockPush).toHaveBeenCalledWith('/ja');
       });
     });
 
@@ -338,7 +338,7 @@ describe('LoginForm', () => {
       await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/ja/');
+        expect(mockPush).toHaveBeenCalledWith('/ja');
       });
     });
   });

@@ -60,6 +60,10 @@ export function getSafeLocalizedRedirectPath(
   fallback = '/',
 ): string {
   const safePath = getSafeRedirectPath(next, fallback);
+  const canonicalizeLocaleRoot = (path: string) => {
+    const localeRoot = SUPPORTED_LOCALES.find((supportedLocale) => path === `/${supportedLocale}/`);
+    return localeRoot ? `/${localeRoot}` : path;
+  };
   const hasLocalePrefix = SUPPORTED_LOCALES.some(
     (supportedLocale) =>
       safePath === `/${supportedLocale}` ||
@@ -67,10 +71,10 @@ export function getSafeLocalizedRedirectPath(
       safePath.startsWith(`/${supportedLocale}?`) ||
       safePath.startsWith(`/${supportedLocale}#`),
   );
-  if (hasLocalePrefix) return safePath;
+  if (hasLocalePrefix) return canonicalizeLocaleRoot(safePath);
 
   const safeLocale: Locale = SUPPORTED_LOCALES.includes(locale as Locale)
     ? (locale as Locale)
     : DEFAULT_LOCALE;
-  return `/${safeLocale}${safePath}`;
+  return canonicalizeLocaleRoot(`/${safeLocale}${safePath}`);
 }

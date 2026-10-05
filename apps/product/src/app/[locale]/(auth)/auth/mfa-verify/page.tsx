@@ -26,7 +26,7 @@ export default function MFAVerifyPage() {
   const searchParams = useSearchParams();
   const params = useParams();
   const locale = (params?.locale as string) || 'ja';
-  const homePath = locale === 'en' ? '/' : `/${locale}/`;
+  const homePath = locale === 'en' ? '/' : `/${locale}`;
   const t = useTranslations();
   // 参照を固定する。@supabase/ssr は browser で singleton を返すのでここは保険だが、
   // 固定しないと下の useCallback が毎レンダー作り直され、初期化の effect が回り続けて

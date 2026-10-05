@@ -5,7 +5,7 @@ import { useTimeblockInspectorStore } from '@/features/timeblock';
 import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 
 const navigation = vi.hoisted(() => ({
-  pathname: '/ja/',
+  pathname: '/ja',
 }));
 
 vi.mock('next/navigation', () => ({
@@ -64,7 +64,7 @@ import { GlobalOverlays } from './GlobalOverlays';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  navigation.pathname = '/ja/';
+  navigation.pathname = '/ja';
   useTimeblockInspectorStore.getState().openInspector('record-1', 'record');
   useActivityDetailStore.getState().close();
 });

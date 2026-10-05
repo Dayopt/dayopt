@@ -193,7 +193,7 @@ describe('MFAVerifyPage', () => {
 
       render(<MFAVerifyPage />);
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja/'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja'));
       expect(mockChallenge).not.toHaveBeenCalled();
     });
   });
@@ -220,7 +220,7 @@ describe('MFAVerifyPage', () => {
 
       fireEvent.change(getOtpInput(), { target: { value: '123456' } });
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja/'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja'));
       expect(mockRefresh).toHaveBeenCalled();
     });
 
@@ -241,7 +241,7 @@ describe('MFAVerifyPage', () => {
 
       fireEvent.change(getOtpInput(), { target: { value: '123456' } });
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja/'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja'));
     });
 
     // GoTrue の message は英語。そのまま出すと日本語の利用者に英語が出る。
@@ -259,7 +259,7 @@ describe('MFAVerifyPage', () => {
       });
       expect(screen.getByRole('alert')).not.toHaveTextContent('Invalid TOTP code entered');
       expect(getOtpInput()).toHaveValue('');
-      expect(mockPush).not.toHaveBeenCalledWith('/ja/');
+      expect(mockPush).not.toHaveBeenCalledWith('/ja');
     });
 
     it('未知の code でも英語の生メッセージは出さない', async () => {
@@ -330,7 +330,7 @@ describe('MFAVerifyPage', () => {
         expect(mockVerifyRecoveryCode).toHaveBeenCalledWith({ code: 'ABCD-1234' });
       });
       expect(mockToastSuccess).toHaveBeenCalledWith('auth.mfaVerify.recoverySuccess');
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja/'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/ja'));
       expect(mockRefresh).toHaveBeenCalled();
     });
 
@@ -348,7 +348,7 @@ describe('MFAVerifyPage', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('auth.mfaVerify.recoveryInvalid');
       });
       expect(mockToastSuccess).not.toHaveBeenCalled();
-      expect(mockPush).not.toHaveBeenCalledWith('/ja/');
+      expect(mockPush).not.toHaveBeenCalledWith('/ja');
     });
 
     it('想定外エラー時、genericエラーを表示しSentryへ報告する', async () => {
@@ -365,7 +365,7 @@ describe('MFAVerifyPage', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('common.errors.generic');
       });
       expect(mockCaptureUnexpectedTrpcClientFailure).toHaveBeenCalled();
-      expect(mockPush).not.toHaveBeenCalledWith('/ja/');
+      expect(mockPush).not.toHaveBeenCalledWith('/ja');
     });
   });
 });
