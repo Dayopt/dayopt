@@ -423,6 +423,31 @@ export function compareSchemaContracts(base, candidate) {
   return { narrowing, removed };
 }
 
+/** Compare the stored consumer contract and a real baseline generated with the same CLI. */
+export function compareUpgradeConsumerContracts(stored, baseline, upgraded) {
+  const tracked = compareSchemaContracts(stored, upgraded);
+  const baselineDrift = compareSchemaContracts(stored, baseline);
+  const actual = compareSchemaContracts(baseline, upgraded);
+  // Only column/write representations already present in the real baseline can be discounted.
+  // Object removals, RPC signatures, enum values and every actual before/after change stay blocking.
+  for (const kind of Object.keys(tracked.removed)) {
+    const preexisting = ['columnTypes', 'writeContracts'].includes(kind)
+      ? baselineDrift.removed[kind]
+      : [];
+    tracked.removed[kind] = [
+      ...new Set([
+        ...tracked.removed[kind].filter((entry) => !preexisting.includes(entry)),
+        ...actual.removed[kind],
+      ]),
+    ];
+  }
+  return {
+    narrowing: Object.values(tracked.removed).some((entries) => entries.length > 0),
+    removed: tracked.removed,
+    baselineDrift: baselineDrift.removed,
+  };
+}
+
 /**
  * base と candidate の migration ファイル集合から upgrade 計画を作る。
  * @param {{ base: string[], candidate: string[], changed: { status: string, path: string }[], pocRetirementValidated?: boolean }} input
@@ -738,6 +763,12 @@ export function runDbUpgradeCheck({
       retirement && historicalPocBaseline
         ? exec('psql', [...PSQL, '-At', '-c', POC_STATE_SQL])
         : null;
+    // Generate the actual pre-upgrade schema with the exact same CLI as the upgraded schema.
+    const baselineTypes = exec('pnpm', ['exec', 'prettier', '--stdin-filepath', TYPES_PATH], {
+      input: exec('supabase', ['gen', 'types', 'typescript', '--local'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    });
     // 2. candidate の migration だけを当てる（version 順に依存せず未適用を全部）
     exec('supabase', ['migration', 'up', '--local', '--include-all'], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -780,10 +811,12 @@ export function runDbUpgradeCheck({
     else result.checks.freshEquivalence = 'generated types identical to the fresh database';
     // 6. old consumer: base 世代の型が参照するオブジェクトが残っている
     const baseTypes = exec('git', ['show', `${baseSha}:${TYPES_PATH}`]);
-    const comparison = compareSchemaContracts(
+    const comparison = compareUpgradeConsumerContracts(
       extractSchemaContract(baseTypes),
+      extractSchemaContract(baselineTypes),
       extractSchemaContract(upgradedTypes),
     );
+    result.checks.baselineTypeDrift = JSON.stringify(comparison.baselineDrift);
     if (comparison.narrowing) {
       const onlyRetiredPocFunctions = onlyRetiredPocFunctionsWereRemoved(
         comparison,
@@ -803,7 +836,7 @@ export function runDbUpgradeCheck({
       }
     } else
       result.checks.oldConsumer =
-        'every table / column (type, nullability, writability) / relationship / view column / function signature / enum value used by the base types still exists';
+        'stored consumer objects and actual baseline types remain compatible; unchanged baseline column/write representation drift is reported separately';
     // 7. 生成型に現れない schema（index / constraint / trigger）も fresh と一致する。既存行の有無で
     //    分岐する migration は fresh と upgraded で違う catalog を作り得るので、ここで fresh を
     //    作り直して catalog を比較する（追加分は戻してあるので reset = candidate 全部）
