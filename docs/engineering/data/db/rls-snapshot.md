@@ -557,7 +557,10 @@ local と production の差は検出し、権限方針の判断は #1715 で行�
 | postgres       | public | r           | authenticated | MAINTAIN, REFERENCES, TRIGGER, TRUNCATE                                 |
 | postgres       | public | r           | postgres      | DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE |
 | postgres       | public | r           | service_role  | MAINTAIN, REFERENCES, TRIGGER, TRUNCATE                                 |
+| postgres       | public | S           | anon          | UPDATE                                                                  |
+| postgres       | public | S           | authenticated | UPDATE                                                                  |
 | postgres       | public | S           | postgres      | SELECT, UPDATE, USAGE                                                   |
+| postgres       | public | S           | service_role  | UPDATE                                                                  |
 | supabase_admin | public | f           | anon          | EXECUTE                                                                 |
 | supabase_admin | public | f           | authenticated | EXECUTE                                                                 |
 | supabase_admin | public | f           | postgres      | EXECUTE                                                                 |
