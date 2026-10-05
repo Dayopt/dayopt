@@ -29,6 +29,9 @@ export function renderReport(
   const safeResults = report.results as Result[];
   return [
     'Dayopt infrastructure doctor（読み取り専用）',
+    `実行repo: ${report.repo_revision ?? 'unknown'}`,
+    `期待値baseline: ${report.expectation_revision ?? 'unknown'}`,
+    `確認日時: ${report.checked_at_jst ?? 'unknown'}`,
     JSON.stringify(report.counts),
     ...safeResults.map(
       (result) =>

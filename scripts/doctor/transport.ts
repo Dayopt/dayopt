@@ -349,17 +349,39 @@ export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch 
         case 'vercel.binding': {
           const metadata = cache.get(`env:${project}`) ?? (await request('vercel.env', params));
           const bindings = [];
-          for (const entry of array(row(metadata).envs)) {
+          let entries = array(row(metadata).envs).filter((entry) => {
             const key = String(entry.key);
             const targets = Array.isArray(entry.target) ? entry.target : [];
             if (
               params.environment !== 'all' &&
               (params.environment === 'production'
                 ? !targets.includes('production')
-                : !targets.includes('preview'))
+                : !targets.includes('preview') ||
+                  (params.environment === 'integration' &&
+                    entry.gitBranch != null &&
+                    entry.gitBranch !== 'integration'))
             )
-              continue;
-            if (!PUBLIC_BINDING_KEYS.has(key) && !PRESENCE_KEYS.has(key)) continue;
+              return false;
+            return PUBLIC_BINDING_KEYS.has(key) || PRESENCE_KEYS.has(key);
+          });
+          if (params.environment === 'integration') {
+            // Select effective metadata before any value GET, so superseded defaults
+            // and unrelated Preview branches are never read.
+            const resolved = new Map<string, Row>();
+            for (const entry of entries) {
+              const key = String(entry.key);
+              const existing = resolved.get(key);
+              if (!existing || entry.gitBranch === 'integration') resolved.set(key, entry);
+            }
+            entries = [...resolved.values()].map((entry) => ({
+              ...entry,
+              target: ['preview'],
+              gitBranch: 'integration',
+            }));
+          }
+          for (const entry of entries) {
+            const key = String(entry.key);
+            const targets = Array.isArray(entry.target) ? entry.target : [];
             let value: unknown = { present: true };
             if (PUBLIC_BINDING_KEYS.has(key)) {
               if (entry.type === 'sensitive') value = { unavailable: 'sensitive' };

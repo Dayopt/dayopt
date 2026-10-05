@@ -245,4 +245,53 @@ describe('doctor read transport', () => {
     ]);
     expect(mock).toHaveBeenCalledTimes(1);
   });
+  it.each([false, true])(
+    'resolves Integration bindings independently of override order (%s)',
+    async (overrideFirst) => {
+      const base = { id: 'default', key: 'BILLING_ENFORCED', type: 'plain', target: ['preview'] };
+      const override = {
+        id: 'integration',
+        key: 'BILLING_ENFORCED',
+        type: 'plain',
+        target: ['preview'],
+        gitBranch: 'integration',
+      };
+      const mock = vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/env/')) return json({ value: 'true' });
+        return json({
+          envs: [
+            ...(overrideFirst ? [override, base] : [base, override]),
+            {
+              id: 'pr',
+              key: 'BILLING_ENFORCED',
+              type: 'plain',
+              target: ['preview'],
+              gitBranch: 'feature/pr-1',
+            },
+            {
+              id: 'default-only',
+              key: 'STRIPE_LIVEMODE',
+              type: 'plain',
+              target: ['preview', 'production'],
+            },
+          ],
+        });
+      });
+      const result = await createTransport(ENV, mock)('vercel.binding', {
+        project: 'product',
+        environment: 'integration',
+      });
+      expect(result).toEqual([
+        { key: 'BILLING_ENFORCED', target: ['preview'], gitBranch: 'integration', value: 'true' },
+        { key: 'STRIPE_LIVEMODE', target: ['preview'], gitBranch: 'integration', value: 'true' },
+      ]);
+      expect(mock).toHaveBeenCalledTimes(3);
+      const requestedPaths = mock.mock.calls.map(([input]) => new URL(String(input)).pathname);
+      expect(requestedPaths.some((path) => path.endsWith('/env/default'))).toBe(false);
+      expect(requestedPaths.some((path) => path.endsWith('/env/pr'))).toBe(false);
+      expect(requestedPaths.some((path) => path.endsWith('/env/integration'))).toBe(true);
+      expect(requestedPaths.some((path) => path.endsWith('/env/default-only'))).toBe(true);
+    },
+  );
 });

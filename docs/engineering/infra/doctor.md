@@ -33,6 +33,8 @@ pnpm run doctor --format json
 
 `--offline`はYAML、正本ファイル、検査定義を確認し、認証・通信をしない。通常実行は結果を標準出力へ出す。結果ファイルは自動作成しない。必要なら呼び出し元でリダイレクトする。
 
+通常のテキスト出力にも実行repoのrevision、期待値のbaseline、確認日時を表示する。期待値のbaselineは台帳の`scope.repository_baseline`であり、現在の期待値ファイルを保存したcommitとは限らない。
+
 ## 対象と正本
 
 [expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。現行の追加確認は[inventory-2026-10-05.md](./inventory-2026-10-05.md)、直前の追補は[inventory-2026-10-04.md](./inventory-2026-10-04.md)、前回の追補は[inventory-2026-10-03.md](./inventory-2026-10-03.md)、接続・検査の詳細snapshotは[inventory-2026-10-01.md](./inventory-2026-10-01.md)、初回の履歴は[inventory-2026-09-30.md](./inventory-2026-09-30.md)。観測値で期待値を自動上書きしない。
@@ -42,6 +44,8 @@ pnpm run doctor --format json
 API/CLI readerはAPIが返すmetadataの安全な列だけを射影する。Googleの登録callback、Gmail SMTP、実際のsource map適用、secret replica値の一致など、現在のAPI資格情報で証明できない事項は`manual`または`blocked`。ソースファイルの存在、PING、domain verification、HTTP metadata取得だけで動作成功と扱わない。
 
 一般Preview、Integration、明示MCP OAuth Previewは別契約。ProductionのSupabase refをPreviewが使えば差異。IntegrationのStripe Test/Calendarは一律禁止しない。ProductのPostHog有効環境には削除credentialが必要だが、削除処理を持たないWebには同じキーを要求しない。
+
+Integrationの接続・有効化設定は共通Preview設定に`integration` branchの上書きを適用して照合する。他のPR branchの設定はこの照合に含めない。全環境のenv metadata監査は`shared`として別に報告する。存在する有効化フラグの値を取得できない場合は明示的な`false`と区別して`blocked`にし、ProductionのSupabase接続先はHTTPSのorigin全体で比較する。
 
 公開domainのhealth/versionを配信中revisionの根拠にする。`targets.production`や最新deploymentを現在の配信と同一視しない。repo revisionが配信revisionより新しくても、その事実だけで失敗にしない。新しいrepo契約のlive適用は別確認。
 

@@ -90,6 +90,40 @@ describe('doctor comparisons', () => {
       evaluateBindings([production, binding('NEXT_PUBLIC_SUPABASE_URL', null)], pins).status,
     ).toBe('blocked');
   });
+  it('requires the exact Supabase Production origin for Production bindings', () => {
+    for (const value of [
+      `https://${prodRef}.attacker.example`,
+      `http://${prodRef}.supabase.co`,
+      `https://${prodRef}.supabase.co:8443`,
+      `https://user:pass@${prodRef}.supabase.co`,
+    ]) {
+      expect(
+        evaluateBindings([binding('NEXT_PUBLIC_SUPABASE_URL', value, 'production', null)], pins),
+      ).toMatchObject({
+        status: 'drift',
+        reason: expect.stringContaining('production_database_mismatch'),
+      });
+    }
+    expect(evaluateBindings([production], pins).status).toBe('pass');
+    for (const value of [
+      `http://${prodRef}.supabase.co`,
+      `https://${prodRef}.supabase.co:8443`,
+      'not a URL',
+    ]) {
+      expect(
+        evaluateBindings([production, binding('NEXT_PUBLIC_SUPABASE_URL', value)], pins),
+      ).toMatchObject({ status: 'drift' });
+    }
+    expect(
+      evaluateBindings(
+        [
+          production,
+          binding('NEXT_PUBLIC_SUPABASE_URL', 'https://tilwaprottpyhlfoggbb.supabase.co'),
+        ],
+        pins,
+      ).status,
+    ).toBe('pass');
+  });
   it('requires deletion credential when either Preview analytics switch is enabled', () => {
     for (const key of ['POSTHOG_SERVER_ENABLED', 'NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED']) {
       expect(evaluateBindings([production, binding(key, true)], pins)).toMatchObject({
@@ -103,6 +137,30 @@ describe('doctor comparisons', () => {
         ).status,
       ).toBe('pass');
     }
+  });
+  it('blocks unreadable PostHog switches while retaining explicit false and drift precedence', () => {
+    expect(
+      evaluateBindings([production, binding('POSTHOG_SERVER_ENABLED', null)], pins),
+    ).toMatchObject({
+      status: 'blocked',
+      reason: expect.stringContaining('posthog_flag_unreadable'),
+    });
+    expect(
+      evaluateBindings(
+        [
+          production,
+          binding('POSTHOG_SERVER_ENABLED', null),
+          binding('NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED', true),
+        ],
+        pins,
+      ),
+    ).toMatchObject({
+      status: 'drift',
+      reason: expect.stringContaining('posthog_enabled_without_deletion_key'),
+    });
+    expect(
+      evaluateBindings([production, binding('POSTHOG_SERVER_ENABLED', false)], pins).status,
+    ).toBe('pass');
   });
   it('requires deletion credentials for enabled Production analytics too', () => {
     expect(
@@ -159,6 +217,16 @@ describe('doctor comparisons', () => {
       row.key === 'STRIPE_ACCOUNT_ID' ? { ...row, value: null } : row,
     );
     expect(evaluateBindings(unreadable, pins).status).toBe('blocked');
+  });
+  it('blocks an unreadable Integration billing switch without treating it as disabled', () => {
+    expect(evaluateBindings([production, binding('BILLING_ENFORCED', null)], pins)).toMatchObject({
+      status: 'blocked',
+      reason: expect.stringContaining('integration_billing_flag_unreadable'),
+    });
+    expect(evaluateBindings([production, binding('BILLING_ENFORCED', false)], pins).status).toBe(
+      'pass',
+    );
+    expect(evaluateBindings([production], pins).status).toBe('pass');
   });
   it('requires Calendar encryption replica when a Calendar client is selected', () => {
     const configured = [

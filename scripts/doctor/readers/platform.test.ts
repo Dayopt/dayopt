@@ -399,6 +399,27 @@ describe('platform readers (fixture request only)', () => {
     expect(JSON.stringify(observations)).not.toContain(SECRET);
   });
 
+  it('scopes Integration binding reads while labeling full environment metadata as shared', async () => {
+    const { ctx, request } = context(vercelFixture(), 'integration');
+    const observations = await readPlatform('vercel', ctx);
+    expect(request.mock.calls.filter(([operation]) => operation === 'vercel.binding')).toHaveLength(
+      2,
+    );
+    expect(
+      request.mock.calls
+        .filter(([operation]) => operation === 'vercel.binding')
+        .every(([, params]) => params?.environment === 'integration'),
+    ).toBe(true);
+    expect(
+      observations
+        .filter((row) => row.key.endsWith('environment_metadata'))
+        .every((row) => row.environment === 'shared'),
+    ).toBe(true);
+    expect(
+      observations.find((row) => row.key === 'vercel.product.public_bindings')?.environment,
+    ).toBe('integration');
+  });
+
   it('preserves origin-only bindings and does not hide a real trailing slash', async () => {
     const bindings = [
       {

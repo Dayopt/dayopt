@@ -278,7 +278,7 @@ async function vercel(ctx: ReaderContext): Promise<Observation[]> {
       ctx,
       'vercel.env',
       `vercel.${project}.environment_metadata`,
-      ctx.environment,
+      'shared',
       (value) => {
         const envs = rows(value, 'envs');
         return {

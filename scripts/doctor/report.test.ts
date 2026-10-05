@@ -59,4 +59,14 @@ describe('doctor report', () => {
     });
     expect(report.results[1].required).toBe(true);
   });
+  it('includes the repository and expectation revisions and run time in text output', () => {
+    const report = renderReport([result('pass')], 'text', {
+      repo_revision: 'abcdef123456',
+      expectation_revision: '123456abcdef',
+      checked_at_jst: '2026-10-06 12:00:00 JST',
+    });
+    expect(report).toContain('実行repo: abcdef123456');
+    expect(report).toContain('期待値baseline: 123456abcdef');
+    expect(report).toContain('確認日時: 2026-10-06 12:00:00 JST');
+  });
 });

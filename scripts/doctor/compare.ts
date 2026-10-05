@@ -182,23 +182,32 @@ export function evaluateBindings(
       missing.push('sensitive_database_binding');
       continue;
     }
-    const ref = (() => {
+    const parsed = (() => {
       try {
-        return new URL(String(binding.value)).hostname.split('.')[0];
+        return new URL(binding.value);
       } catch {
-        return '';
+        return null;
       }
     })();
+    const productionOrigin = `https://${productionRef}.supabase.co`;
+    const exactProductionOrigin = Boolean(
+      parsed &&
+      parsed.origin === productionOrigin &&
+      parsed.username === '' &&
+      parsed.password === '',
+    );
     if (
       Array.isArray(binding.target) &&
       binding.target.includes('production') &&
-      ref !== productionRef
+      !exactProductionOrigin
     )
       failures.push('production_database_mismatch');
+    if (Array.isArray(binding.target) && binding.target.includes('preview') && !parsed)
+      failures.push('invalid_preview_database_url');
     if (
       Array.isArray(binding.target) &&
       binding.target.includes('preview') &&
-      ref === productionRef
+      parsed?.hostname === `${productionRef}.supabase.co`
     )
       failures.push('production_database_in_preview');
   }
@@ -225,15 +234,23 @@ export function evaluateBindings(
             entry.target.includes(scope),
         );
       const get = (key: string) => effective(key)?.value;
+      const serverAnalytics = effective('POSTHOG_SERVER_ENABLED');
+      const browserAnalytics = effective('NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED');
+      const analyticsEnabled = serverAnalytics?.value === true || browserAnalytics?.value === true;
       if (
         expected.require_posthog_deletion !== false &&
-        (get('POSTHOG_SERVER_ENABLED') === true ||
-          get('NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED') === true)
-      ) {
+        ((serverAnalytics && serverAnalytics.value !== true && serverAnalytics.value !== false) ||
+          (browserAnalytics && browserAnalytics.value !== true && browserAnalytics.value !== false))
+      )
+        missing.push('posthog_flag_unreadable');
+      if (expected.require_posthog_deletion !== false && analyticsEnabled) {
         if (get('POSTHOG_PERSONAL_API_KEY') !== true)
           failures.push('posthog_enabled_without_deletion_key');
       }
-      if (branch === 'integration' && get('BILLING_ENFORCED') === true) {
+      const billing = effective('BILLING_ENFORCED');
+      if (branch === 'integration' && billing && billing.value !== true && billing.value !== false)
+        missing.push('integration_billing_flag_unreadable');
+      if (branch === 'integration' && billing?.value === true) {
         if (get('STRIPE_LIVEMODE') == null || get('STRIPE_ACCOUNT_ID') == null)
           missing.push('integration_stripe_sensitive_identity');
         else if (
