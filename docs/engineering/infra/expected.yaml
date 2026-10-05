@@ -1176,9 +1176,14 @@ ui_only:
       'service': 'github',
       'category': 'collector_unavailable',
       'items':
-        ['installed Apps permissions', 'repository selection', 'Slack workspace / channel binding'],
-      'reason': '現readerはrepository hooksのみでApp installation権限を収集しない。API未提供とは判定しない',
-      'next_step': '既存認証済みGitHub SettingsでDayoptのApp権限・repo対象だけ確認。installや権限拡張はしない',
+        [
+          'installed Apps permissions',
+          'repository selection',
+          'Slack workspace / channel binding',
+          'pending installation / permission update details',
+        ],
+      'reason': 'Organization UIでApp名とpending request数は見えるが、個別設定はGitHub sudo reauthenticationを要求。現readerもinstallation権限を収集しない',
+      'next_step': '既存認証済みGitHub Settingsで現行権限・repo対象とpending内容を読み取る。installや権限更新の承認・変更はしない',
       'check_ids': ['github.installed_apps'],
       'documentation_urls': [],
     }
@@ -1282,8 +1287,8 @@ ui_only:
       'service': 'stripe',
       'category': 'current_permission',
       'items': ['Live account / prices / webhook / Portal'],
-      'reason': '現agent経路はhuman Live資格情報を読めない。MCPはTest accountのみ',
-      'next_step': 'Testは既存agent資格情報で別照会。Liveの9/30証拠は再取得済みにしない',
+      'reason': 'Productionの既存agent readerはcredential_or_collector_failed。Stripe MCP account discoveryも失敗し、Live accountを選択できない',
+      'next_step': '既存のread-only Live credential経路が利用可能な時だけ照合する。credential発行・scope変更・mode切替はしない',
       'check_ids': ['stripe.account', 'stripe.active_prices', 'stripe.webhooks', 'stripe.portal'],
       'documentation_urls': [],
     }
@@ -1302,8 +1307,8 @@ ui_only:
       'service': 'resend',
       'category': 'current_permission',
       'items': ['send credential master', 'webhook replica values / Auth Edge sender'],
-      'reason': '現agent経路はhuman masterを読めない。MCPでdomain / webhook metadataは読める',
-      'next_step': 'Resend GET webhookはsigning_secretを返せるが、生応答・署名値を出さない。replica一致は別照合',
+      'reason': 'Doctorの既存op readerは4項目すべてcredential_or_collector_failed。MCPのdomain/webhook metadataだけではAPI key scopeとsecret replica一致を確認できない',
+      'next_step': '既存read-only経路でmetadataだけ照合する。Resend GET webhookが返すsigning_secretは出力・保存せず、credential発行や変更をしない',
       'check_ids': ['resend.sender_and_signature_replicas'],
       'documentation_urls': ['https://resend.com/docs/api-reference/webhooks/get-webhook'],
     }
