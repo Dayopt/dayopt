@@ -28,7 +28,7 @@ flowchart TD
   n2 --> n3
   n3 -->|"MFA が必要なら"| n4
   n4 -->|"mfa.verify"| n5
-  n5 -->|"/ja/calendar へ移動"| n6
+  n5 -->|"/ja へ移動"| n6
   n6 --> n7
 ```
 
@@ -239,7 +239,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
 
 - 画面: 「セッションを確認できませんでした」の画面。もう一度試すかサインアウトできる。
 - データ: 変化なし。
-- 再試行: 利用者が「もう一度試す」を押す。/calendar と /auth/login の無限往復を避けるため専用画面にしている。
+- 再試行: 利用者が「もう一度試す」を押す。/ と /auth/login の無限往復を避けるため専用画面にしている。
 - 痕跡: logger.warn だけ。
 - **最初に見る場所**: Vercel のログで「MFA assurance lookup failed」を探す → Supabase の Auth。
 - 根拠:
@@ -249,7 +249,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
 
 ### 7. カレンダーに着地する（ブラウザ）
 
-サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ /calendar へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。
+サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ / へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。
 
 - **ここを変えると**: 無操作・発行からそれぞれ 30 日を超えるとサインアウトし、/auth/login?reason=timeout へ戻る（無操作の方は 30 日なので実質無効）。
 - **コード**:
@@ -263,7 +263,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
 <details>
 <summary>⚡ redirect に外部 URL が入っている — 画面: 何も起きない / データ: 変化なし / 再試行: 不要 / 痕跡: 残らない</summary>
 
-- 画面: 何も起きない。/calendar へ着地する。
+- 画面: 何も起きない。/ へ着地する。
 - データ: 変化なし。
 - 再試行: 不要。
 - 痕跡: 何も残らない。
@@ -765,13 +765,13 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
       "id": "proxy",
       "svc": "vercel",
       "short": "proxy がセッションを確認",
-      "via": "/ja/calendar へ移動",
+      "via": "/ja へ移動",
       "title": "proxy.ts がセッションと AAL を確かめる",
       "what": "保護された画面へのリクエストはすべて proxy.ts を通る。cookie のセッションを更新し、未ログインなら元のパスを redirect に入れてサインインへ、aal2 が要るのに aal1 なら MFA 画面へ送る。",
       "change": "保護する画面を足す時は access-policy の protectedProductPaths に入れる。入れ忘れると未ログインでも開ける。",
       "screen": {
         "t": "blank",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "text": "読み込み中…"
       },
       "refs": [
@@ -814,7 +814,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
           "screenAfter": {
             "t": "form",
             "title": "サインイン",
-            "url": "/ja/auth/login?redirect=/calendar",
+            "url": "/ja/auth/login?redirect=/",
             "fields": [
               ["メールアドレス", "m@example.com"],
               ["パスワード", "••••••••"]
@@ -829,7 +829,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
           "label": "AAL の確認に失敗",
           "screen": "「セッションを確認できませんでした」の画面。もう一度試すかサインアウトできる。",
           "data": "変化なし。",
-          "retry": "利用者が「もう一度試す」を押す。/calendar と /auth/login の無限往復を避けるため専用画面にしている。",
+          "retry": "利用者が「もう一度試す」を押す。/ と /auth/login の無限往復を避けるため専用画面にしている。",
           "trace": "logger.warn だけ。",
           "look": "Vercel のログで「MFA assurance lookup failed」を探す → Supabase の Auth。",
           "refs": [
@@ -867,11 +867,11 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
       "svc": "browser",
       "short": "カレンダーに着地",
       "title": "カレンダーに着地する",
-      "what": "サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ /calendar へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。",
+      "what": "サインイン前に開こうとしていた画面（redirect）があればそこへ、無ければ / へ。カレンダーは Plan・Record・Google の予定・統計を server で先に取ってから描く。",
       "change": "無操作・発行からそれぞれ 30 日を超えるとサインアウトし、/auth/login?reason=timeout へ戻る（無操作の方は 30 日なので実質無効）。",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
@@ -907,7 +907,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
         {
           "id": "open-redirect",
           "label": "redirect に外部 URL が入っている",
-          "screen": "何も起きない。/calendar へ着地する。",
+          "screen": "何も起きない。/ へ着地する。",
           "data": "変化なし。",
           "retry": "不要。",
           "trace": "何も残らない。",

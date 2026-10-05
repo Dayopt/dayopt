@@ -306,7 +306,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -322,7 +322,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
       "screen": {
         "t": "form",
         "title": "仕事",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "fields": [
           ["日付", "今日"],
           ["時間", "9:00 – 10:00"],
@@ -386,7 +386,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           "screenAfter": {
             "t": "form",
             "title": "仕事",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "fields": [
               ["日付", "今日"],
               ["時間", "9:00 – 10:00"]
@@ -452,7 +452,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -542,7 +542,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           "back": "記録失敗のトースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -622,7 +622,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           "back": "重なりのトースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -661,7 +661,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           "back": "記録失敗のトースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -729,7 +729,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -749,7 +749,7 @@ Plan を FOR UPDATE で押さえ、削除済みなら DT001、版が違えば DT
       "via": "応答",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",

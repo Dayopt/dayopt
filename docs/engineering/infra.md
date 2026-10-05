@@ -155,7 +155,10 @@ main merge
 ```
 
 **promote は 2026-09-03 に merge 連動の自動実行へ戻した**（#2268 の手動 dispatch を撤回）。
-手動 dispatch は break-glass（`force`）と drill 専用に残る。安全は「影響のある層 3 が
+手動 dispatch の emergency run も通常の候補固定・検証・smoke・config audit を通す。`force` input は
+廃止され、指定すると release script が失敗する。候補 gate は repository variable
+`RELEASE_CANDIDATE_ENABLED=true` の明示設定時だけ有効になり、未設定時は候補向け strict gate を実行しない。
+有効化後は候補と main の内容・検証証拠が一致しない場合に fail closed で公開を止める。安全は「影響のある層 3 が
 **同一 run で** green」であることで担保し、層 3 の判定は check-run 名の照合ではなく
 `needs.*.result` で行う。層 3（E2E / Web Build & E2E）は nightly.yml から promote.yml へ
 移設した — #2382 が per-merge の層 3 を廃止した根拠は「promote が手動だから赤い main は
@@ -231,7 +234,7 @@ affected と判定した project」** を promote 前に強制する。impact �
 （`RELEASE_IMPACT_<KEY>_AFFECTED`）で渡し、**`'true'` 以外はすべて未検証として扱う**（配線が落ちた
 時に fail open しないため）。破れた run は production を 1 件も触らずに落ち、manifest の
 `status: impact-mismatch` として残る（復旧は rollback ではなく再 run。[runbook.md](../operations/runbook.md)
-Playbook 2 ケース0-B）。`force`（break-glass）は層 3 job 自体を skip する経路なのでこの検査も免除する。
+Playbook 2 ケース0-B）。`force` による層 3 skip や gate 免除の経路はない。
 
 smoke は promote 対象だけでなく **全 candidate に毎回走る**。Auto-assign が有効な段階適用中は
 candidate が待機中に自動割当されて promote 対象が空になるため、promote 対象だけを smoke すると
@@ -247,8 +250,8 @@ promote していない側の失敗でも rollback する — cross-app 破損�
 
 **検出できるのは smoke check に載っている経路だけ**で、cross-app の破損一般ではない。web から
 product への唯一の入口である signup CTA（`app.dayopt.app/auth/signup`）は product の check に含めて
-あるが、それ以外のリンク切れは検出しない。Force Promote ではこの smoke も skip される（break-glass は
-gate を全て飛ばす）。
+あるが、それ以外のリンク切れは検出しない。emergency run も同じ smoke を通り、`force` で gate を
+迂回することはできない。
 
 promote 順は web → product に固定し、2 つ目が失敗した場合は 1 つ目を直前 deployment へ自動 rollback する。
 この run が promote していない project（前の run から対象 SHA を配信している側など）は戻し先を持たない
@@ -269,7 +272,7 @@ run の結果は `release-manifest-<attempt>` artifact（保持 90 日、`github
 「SHA の最新 deployment」ではなく **その ID の deployment だけ**を candidate にする。層 3・candidate smoke・
 Production Config Audit・production domain smoke・live 検証・自動 rollback は通常の release と同じ。
 受理するのは「同じ project の、release 対象と同じ commit の GitHub 連携 production build で、live より
-後に作られたもの」だけで、どれかが読めない時も拒否する（fail closed）。Force Promote とは併用できない。
+後に作られたもの」だけで、どれかが読めない時も拒否する（fail closed）。
 release 対象が `github.sha` である点は変わらず、任意の SHA を指定する口にはならない。手順は
 [runbook](../operations/runbook.md) §同一 commit の再配備。
 

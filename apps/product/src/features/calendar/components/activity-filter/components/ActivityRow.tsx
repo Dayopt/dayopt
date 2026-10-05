@@ -1,17 +1,17 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 import { Eye, EyeOff, MoreHorizontal } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 
 import { SidebarIconButton } from '@/components/shell/sidebar';
 import type { Activity } from '@/features/activities';
+import { useTimeblockInspectorStore } from '@/features/timeblock';
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 import { cn, DropdownMenu, DropdownMenuTrigger, HoverTooltip } from '@dayopt/components';
 
 import { useActivityModalNavigation } from '../../../hooks/useActivityModalNavigation';
-import { buildReportPath } from '../../../lib/panel-url';
 import { DROP_TARGET_UNCATEGORIZED } from '../activity-drop-target';
 import { useActivityQuickCreate } from '../hooks/useActivityQuickCreate';
 import { useActivityDragSource } from '../useActivityDragHandlers';
@@ -27,6 +27,7 @@ interface ActivityRowProps {
   checked: boolean;
   /** 所属カテゴリー ID（null = 未分類） */
   categoryId: string | null;
+  categoryName?: string | null | undefined;
   categoryOptions: CategoryOption[];
   isMobile: boolean;
   onToggle: () => void;
@@ -47,6 +48,7 @@ export function ActivityRow({
   allActivities,
   checked,
   categoryId,
+  categoryName,
   categoryOptions,
   isMobile,
   onToggle,
@@ -55,8 +57,6 @@ export function ActivityRow({
   onShowOnlyActivity,
 }: ActivityRowProps) {
   const t = useTranslations();
-  const locale = useLocale();
-  const router = useRouter();
   const moveActivity = useMoveActivityToCategory(allActivities);
   const { openActivityRenameModal } = useActivityModalNavigation();
 
@@ -79,11 +79,14 @@ export function ActivityRow({
     [moveActivity, activity],
   );
 
-  const handleViewStats = useCallback(() => {
-    // カレンダー内パネル（CalendarReviewRail）は廃止済み（#2181 Step 4）。
-    // アクティビティによるセグメント絞り込みは Step 5（セグメント配線）で復元する。
-    router.push(buildReportPath(locale, new Date()));
-  }, [router, locale]);
+  const handleViewActivityDetails = useCallback(() => {
+    useActivityDetailStore.getState().open({
+      activityId: activity.id,
+      name: activity.name,
+      categoryName: categoryName ?? null,
+    });
+    useTimeblockInspectorStore.getState().closeInspector();
+  }, [activity.id, activity.name, categoryName]);
 
   return (
     <>
@@ -180,7 +183,7 @@ export function ActivityRow({
               }
               onChangeCategory={handleChangeCategory}
               onShowOnlyActivity={onShowOnlyActivity}
-              onViewStats={handleViewStats}
+              onViewActivityDetails={handleViewActivityDetails}
               onArchiveActivity={onArchiveActivity}
               onDeleteActivity={onDeleteActivity}
             />

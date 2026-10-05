@@ -95,7 +95,7 @@ interface CalendarControllerProps {
 
   // --- Context menu actions ---
   onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
-  onViewStats: (timeblock: CalendarDisplayEvent) => void;
+  onViewActivityDetails: (timeblock: CalendarDisplayEvent) => void;
 
   // --- Navigation handlers ---
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
@@ -135,7 +135,7 @@ export function CalendarController({
   onTimeblockUpdate,
   onDeleteTimeblock,
   onDeleteTimeblockConfirm,
-  onViewStats,
+  onViewActivityDetails,
   onNavigate,
   onViewChange,
   onNavigatePrev,
@@ -181,7 +181,7 @@ export function CalendarController({
 
   const closeSaveAsTemplate = useCallback(() => stopSaving(), [stopSaving]);
 
-  // /report 等へ移って戻ると Controller は再マウントするが、store は生き残る。
+  // workspace 外へ移って戻ると Controller は再マウントするが、store は生き残る。
   // 同じ日・日ビューのままなら保存ヘッダーが勝手に再開するので、離れる時に落とす
   useEffect(() => () => stopSaving(), [stopSaving]);
 
@@ -290,7 +290,7 @@ export function CalendarController({
       externalEvents,
       currentDate,
       showWeekends,
-      // カレンダー内 review/diff パネル（CalendarReviewRail）は廃止済み（#2181 Step 6）。
+      // Activity details is opened explicitly from the calendar and shares the inspector slot.
       // グリッドの diff ハイライト自体は View 層に残すが、点灯させる経路が無くなったため常に空。
       showActualDiff: false,
       dayDiffTimeblockIds: EMPTY_DAY_DIFF_TIMEBLOCK_IDS,
@@ -366,7 +366,7 @@ export function CalendarController({
           position={contextMenuPosition}
           onClose={handleCloseContextMenu}
           onDelete={onDeleteTimeblockConfirm}
-          onViewStats={onViewStats}
+          onViewActivityDetails={onViewActivityDetails}
           onDuplicate={handleDuplicate}
         />
       ) : null}

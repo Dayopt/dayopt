@@ -52,8 +52,8 @@ const PRO_BILLING_OVERVIEW: BillingOverview = {
 function MobileOverviewPreview({
   access,
   billingOverview,
-  returnPath = '/calendar',
-  settingsReturnQuery = '?returnTo=%2Fcalendar',
+  returnPath = '/',
+  settingsReturnQuery = '?returnTo=%2F',
 }: {
   access: BillingAccess;
   billingOverview: BillingOverview;
@@ -93,8 +93,8 @@ type Story = StoryObj<typeof meta>;
 /** 無料ユーザー向け Pro 導線を含む設定トップ。 */
 export const Default: Story = {
   args: {
-    returnPath: '/calendar',
-    settingsReturnQuery: '?returnTo=%2Fcalendar',
+    returnPath: '/',
+    settingsReturnQuery: '?returnTo=%2F',
   },
 };
 
@@ -109,16 +109,16 @@ export const ProPlan: Story = {
     />
   ),
   args: {
-    returnPath: '/calendar',
-    settingsReturnQuery: '?returnTo=%2Fcalendar',
+    returnPath: '/',
+    settingsReturnQuery: '?returnTo=%2F',
   },
 };
 
 /** 全グループと無料ユーザー向け Pro 導線を含むモバイル設定トップ。 */
 export const AllPatterns: Story = {
   args: {
-    returnPath: '/calendar',
-    settingsReturnQuery: '?returnTo=%2Fcalendar',
+    returnPath: '/',
+    settingsReturnQuery: '?returnTo=%2F',
   },
   render: (args) => (
     <MobileOverviewPreview

@@ -650,7 +650,7 @@
       "cancelDescription": "サブスクリプションは現在の請求期間の終わりまで有効です。",
       "cancelButton": "サブスクリプションをキャンセル",
       "cancelConfirmTitle": "サブスクリプションをキャンセルしますか？",
-      "cancelConfirmDescription": "契約期間の終了まで全機能を利用できます。終了後も保存済みカレンダーとレポートは閲覧できます。",
+      "cancelConfirmDescription": "契約期間の終了まで全機能を利用できます。終了後も保存済みの予定と記録は閲覧できます。",
       "cancelConfirmAction": "キャンセルする",
       "cancelConfirmCancel": "サブスクリプションを維持",
       "billingHistory": "請求履歴",
@@ -668,25 +668,6 @@
       "canceledTitle": "サブスクリプションがキャンセルされました",
       "canceledDescription": "保存済みデータは閲覧できます。購入すると作成・編集・同期を再開できます。",
       "resubscribe": "購入して再開",
-      "plans": {
-        "free": {
-          "name": "Free",
-          "features": {
-            "timeboxing": "タイムボクシング & 時間記録",
-            "weeklyReview": "週の振り返り",
-            "unlimitedActivities": "アクティビティ無制限",
-            "dataExport": "データエクスポート（CSV / JSON）"
-          }
-        },
-        "pro": {
-          "name": "Pro",
-          "features": {
-            "longRange": "月・年の俯瞰と過去の自分との比較",
-            "googleCalendar": "Google カレンダー同期",
-            "api": "MCP / API アクセス"
-          }
-        }
-      },
       "trialEndsAt": "試用期間は {date} までです",
       "syncingPlan": "お支払いの反映を確認しています…まもなく利用を再開できます",
       "singlePlan": {

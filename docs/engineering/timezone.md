@@ -97,7 +97,7 @@ today.setHours(0, 0, 0, 0); // サーバーTZの0時 ≠ ユーザーの0時
 | `toTZStartISO(date, tz)` | UTC ISO (`"2026-03-25T15:00:00.000Z"`) | 日の開始境界 |
 | `toTZEndISO(date, tz)`   | UTC ISO (`"2026-03-26T14:59:59.999Z"`) | 日の終了境界 |
 
-週・月・年の境界は `@/features/review` の `resolveReportRange(anchorDate, granularity, tz, weekStartsOn)` が返す（`features/review/lib/report-period.ts`）。**半開区間 `[startAt, endAt)`** で、終端は次の期間の開始時刻と一致する。旧 `tzWeekStart` / `tzWeekEnd` は `23:59:59.999` を返す閉区間寄りの表現で、隣接期間の間に 1ms の穴が空いたため削除した（#2575）。
+アクティビティ詳細の対象期間は `features/activities/lib/rolling-calendar-range.ts` の `resolveRollingCalendarDaysRange(timezone, now, 30)` が決める。ユーザーの timezone における今日を含む直近30暦日の**半開区間 `[startAt, endAt)`** を返す。取得サービスは今日の終端を現在時刻で切り、未来の記録時間を合計しない。過去の週・月・年境界を新しい画面用に計算することはない。
 
 `date` は `date-fns` のローカルフィールド演算（`setHours` / `startOfDay` / `addDays` 等）で作った壁時計 Date を渡す（instant ではない）。`toZonedTime` / `formatInTimeZone` を `date` に直接掛けると system TZ とのずれで日付がずれるバグを踏む（#2017 で実際に発生）。月境界の TZ 対応関数は現状無く、月グリッド表示は `@/lib/date/core` の TZ 非依存 `startOfMonth` / `endOfMonth`（ナビゲーション用途のみ、クエリ境界には未使用）を使う。
 
@@ -158,15 +158,10 @@ createPlan({ start_at: start.toISOString() }); // ブラウザTZ ≠ 設定TZ
 ### クエリ境界の計算
 
 ```tsx
-// ✅ 正しい: 半開区間を返す境界関数（週・月・年）
-const { startAt, endAt } = resolveReportRange(anchorDate, 'week', timezone, weekStartsOn);
+// ✅ 正しい: timezone における直近30暦日の半開区間
+const { startAt, endAt } = resolveRollingCalendarDaysRange(timezone, now, 30);
 // 選択は重なりで書き、取得後に [max(start, S), min(end, E)) へ clip する
-const data = api.review.getReportPeriod.useQuery({
-  anchorDate,
-  granularity: 'week',
-  timezone,
-  weekStartsOn,
-});
+const data = api.activities.getActivitySummary.useQuery({ timezone });
 
 // ❌ 禁止: startOfWeek + toISOString
 const start = startOfWeek(currentDate);
@@ -196,7 +191,7 @@ const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 | `new Date().toISOString()` で日境界生成     | TZずれ                   | `toTZStartISO` / `toTZEndISO` |
 | `.getDate()` / `.getDay()` で日付比較       | ブラウザTZ依存           | `tzIsSameDay` / `getDateKey`  |
 | `startOfDay()` + `.toISOString()`           | ローカルTZ→UTC変換ずれ   | `toTZStartISO(date, tz)`      |
-| `startOfWeek()` + `.toISOString()`          | 同上                     | `resolveReportRange(...)`     |
+| `startOfWeek()` + `.toISOString()`          | 同上                     | timezone 境界関数を使う       |
 | サーバーで `new Date().setHours(0,0,0,0)`   | サーバーTZ依存           | `toTZStartISO(date, userTz)`  |
 | `'Asia/Tokyo'` ハードコードフォールバック   | 非日本ユーザーに不正確   | `'UTC'`                       |
 

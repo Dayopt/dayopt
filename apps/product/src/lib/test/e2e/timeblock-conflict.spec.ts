@@ -150,7 +150,7 @@ describeWithEnv('Timeblock conflict', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(email);
     await page.locator('input[type="password"]').first().fill(password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
   /** UI が版を握った後に、別 writer として同じ Plan を service_role で更新する。 */
@@ -173,7 +173,7 @@ describeWithEnv('Timeblock conflict', () => {
   test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す', async ({
     page,
   }) => {
-    await page.goto(`/ja/calendar?view=day&date=${PAST_DATE}`);
+    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
     await page.waitForLoadState('networkidle');
 
     const card = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();

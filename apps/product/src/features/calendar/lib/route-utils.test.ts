@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { isCalendarViewPath, resolveWorkspaceTab } from './route-utils';
+import { isCalendarViewPath } from './route-utils';
 
 describe('isCalendarViewPath', () => {
   describe('正常系', () => {
-    it('/calendar（新URL契約、完全一致）→ true', () => {
-      expect(isCalendarViewPath('/calendar')).toBe(true);
+    it('/（ホーム）→ true', () => {
+      expect(isCalendarViewPath('/')).toBe(true);
     });
 
-    it('/calendar?view=week のようにクエリが付いていても true', () => {
-      expect(isCalendarViewPath('/calendar?view=week')).toBe(true);
+    it('/?view=week のようにクエリが付いていても true', () => {
+      expect(isCalendarViewPath('/?view=week')).toBe(true);
     });
   });
 
   describe('false 判定', () => {
-    it('ルート直下（セグメントなし）→ false', () => {
-      expect(isCalendarViewPath('')).toBe(false);
-      expect(isCalendarViewPath('/')).toBe(false);
+    it('空の pathname もホームとして扱う', () => {
+      expect(isCalendarViewPath('')).toBe(true);
+      expect(isCalendarViewPath('/calendar')).toBe(false);
     });
 
     it('未対応セグメントは false', () => {
@@ -25,6 +25,7 @@ describe('isCalendarViewPath', () => {
     });
 
     it('workspace ビュー以外のパスは false', () => {
+      expect(isCalendarViewPath('/report')).toBe(false);
       expect(isCalendarViewPath('/review')).toBe(false);
       expect(isCalendarViewPath('/settings')).toBe(false);
       expect(isCalendarViewPath('/tags')).toBe(false);
@@ -43,23 +44,5 @@ describe('isCalendarViewPath', () => {
       expect(isCalendarViewPath('/week')).toBe(false);
       expect(isCalendarViewPath('/3day')).toBe(false);
     });
-  });
-});
-
-describe('resolveWorkspaceTab', () => {
-  it('/calendar → calendar', () => {
-    expect(resolveWorkspaceTab('/calendar')).toBe('calendar');
-  });
-
-  it('/report → report', () => {
-    expect(resolveWorkspaceTab('/report')).toBe('report');
-  });
-
-  it('/report/anything は report タブではない（完全一致のみ）', () => {
-    expect(resolveWorkspaceTab('/report/anything')).toBe('other');
-  });
-
-  it.each(['/settings', '/tags', '/'])('%s → other（第3のタブは作らない）', (path) => {
-    expect(resolveWorkspaceTab(path)).toBe('other');
   });
 });

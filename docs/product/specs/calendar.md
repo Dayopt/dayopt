@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-08-20
+last_verified: 2026-10-05
 code: apps/product/src/features/calendar
 public_docs:
   - calendar
@@ -19,7 +19,7 @@ Plan（予定）とRecord（記録）を同じ時間軸で配置・閲覧する�
 - Multi-Dayの前後移動は表示列数と同じN日単位とし、週末非表示ではN営業日単位で移動する。隣接する期間に同じ表示日を重複させない
 - 各日カラムをPlanレーンとRecordレーンに分ける。Planは控えめなoutline、Recordは塗りで表示する。レーン幅は区間ごとに動的で、相手レーンに時間の重なるタイムブロックが無ければそのタイムブロックはフル幅表示、重なる時間帯だけ左右split（Plan 38% / Record 62%）にする。ドラッグ中のpointer→lane判定・drag ghost・選択後パレット・選択中previewもこの動的判定に揃えており、境界が見えない（相手のタイムブロックが無い）時刻ではPlan→Recordの意図しない変換は起きない
 - モバイルのビューはDayのみ（[#2299](https://github.com/Dayopt/dayopt/issues/2299)）。選択可否とURL補正は[CalendarNavigationContext](../../../apps/product/src/features/calendar/hooks/navigation/CalendarNavigationContext.tsx)、描画時のフォールバックは[CalendarViewRenderer](../../../apps/product/src/features/calendar/components/controller/components/CalendarViewRenderer.tsx)を正本とする。タブレットのWeek描画のフォールバックと、明示的に選んだMulti-Dayの列数維持は別の規則として扱う。renderer内部の列数制限を、モバイルで選択可能なビューの仕様と混同しない
-- モバイルの検索、作成、Inspector、activity / 日時pickerは[Mobile overlays](./mobile-overlays.md)のmodal性とdismiss契約に従う。振り返りの面・詳細パネルは[Review仕様](./review.md)を正本とする
+- モバイルの検索、作成、Inspector、activity / 日時pickerは[Mobile overlays](./mobile-overlays.md)のmodal性とdismiss契約に従う。アクティビティ詳細は明示的に開くシートとして扱い、常駐させない
 - 新規作成時の保存先は`end_at > now`ならPlan、`end_at <= now`ならRecordとして自動決定し、既存Plan / Recordの編集では種別を維持する
 - 作成中の選択が予定として保存される時、ドラッグ中のpreview・確定後のハイライト・作成パネルに、その日の残り時間「あと {duration}」を出す。残り = 24h − その日の予定合計 − 選択中の長さ。activity filterの影響を受けず、睡眠や外部カレンダーの予定は引かない。マイナスは符号だけで示し、色や警告は付けない。重なりエラー表示中・記録の選択・カードが狭い時は出さない
 - dragによる作成・移動・resizeは15分刻み、Inspectorの時間入力は1分刻みとする。移動・resizeは移動量だけを15分刻みにするため、10:07のタイムブロックを1コマ下げると10:22になり15分gridへ吸着しない。keyboard操作、activity filterも提供する
@@ -33,11 +33,11 @@ Plan（予定）とRecord（記録）を同じ時間軸で配置・閲覧する�
 - PlanとRecordが時間的に少しでも重なる区間はactivityに関係なく左右へ分ける。詳細の「この時間帯の記録」は同じactivityで15分以上重なるRecordを表示する
 - Plan / Recordカードへ予定別の差分は表示しない。予実比較は期間内のRecord合計 / 経過済みPlan合計から導出する
 - 差分の正負は符号と方向iconで示し、成功・失敗を意味する色は使わない
-- 振り返りは独立した`/report`の面で提供する。タブ・期間・URL・詳細パネルの契約は[Review仕様](./review.md#4-期間と-url-契約)を正本とし、Calendarのviewや表示日配列へ集計期間を従属させない。旧`panel=review` / `panel=diff`をCalendarの現行導線として扱わない
+- アクティビティ行またはタイムブロックの操作から、選択したアクティビティの直近30日を表示する詳細パネルを開ける。対象は記録時間・1件あたりの中央値・記録一覧に限り、期間は切り替えない。記録一覧から対象日のカレンダーを開き、該当記録を Inspector に表示する。Inspector と詳細パネルは同時に開かない
 
 ## Stateの正本
 
-- view、date: URL + [CalendarNavigationContext](../../../apps/product/src/features/calendar/hooks/navigation/CalendarNavigationContext.tsx)。振り返りの状態は[Review仕様](./review.md#4-期間と-url-契約)に従う
+- view、date: URL + [CalendarNavigationContext](../../../apps/product/src/features/calendar/hooks/navigation/CalendarNavigationContext.tsx)。ホーム `/` がカレンダーを直接表示する
 - server data: tRPC + TanStack Query
 - drag、filter、scroll等の一時表示状態: Calendar内のZustand store
 - feature間の合成: `apps/product/src/app/**/_composition/`

@@ -91,7 +91,7 @@ test.describe('PWA installability', () => {
  *
  * **この 2 本には認証が要る。** `ServiceWorkerProvider` は `(app)` group の
  * `ProvidersComposition` にしか mount されていない。`/` は `[locale]/page.tsx` で
- * `/{locale}/calendar` へ redirect し、そこは `access-policy.ts` の
+ * `/{locale}` のホームカレンダーへ戻し、そこは `access-policy.ts` の
  * `protectedProductPaths` なので未認証だと `(auth)` group のログイン画面へ飛ぶ。
  * ログイン画面の `PublicProviders` は SW を登録しないため、未認証のまま
  * `getRegistrations()` を待っても永久に空になる（#2647 のセルフレビューで実測）。
@@ -125,7 +125,7 @@ describeWithEnv('PWA Service Worker', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(testUser!.email);
     await page.locator('input[type="password"]').first().fill(testUser!.password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
   test('registers the service worker in a production build', async ({ page }) => {
