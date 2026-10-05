@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   readlinkSync,
   rmSync,
   symlinkSync,
@@ -102,7 +103,22 @@ export function checkPushedDocuments(input, root = process.cwd()) {
         }
       }
       console.log(`→ push文書検査: ${sha}`);
-      execFileSync('pnpm', ['docs:check'], { cwd: snapshot, env, stdio: 'inherit' });
+      const docsCheck = JSON.parse(readFileSync(join(snapshot, 'package.json'), 'utf8')).scripts?.[
+        'docs:check'
+      ];
+      if (docsCheck !== 'tsx scripts/tasks/docs-guard/index.ts')
+        throw new Error('docs:check の実行定義が変わりました');
+      // packageManager指定と実行環境のpnpm版が異なると、snapshot内での起動時に
+      // package manager切替・依存再配置が走り、非対話のpushで失敗することがある。
+      // docs:checkの本体を同じcommitのインストール済みtsxから直接実行する。
+      execFileSync(
+        process.execPath,
+        [
+          join(snapshot, 'node_modules', 'tsx', 'dist', 'cli.mjs'),
+          'scripts/tasks/docs-guard/index.ts',
+        ],
+        { cwd: snapshot, env, stdio: 'inherit' },
+      );
     } finally {
       // 登録解除に失敗した場合は証拠となるworktreeを保持し、成功扱いにしない。
       if (added) git(['worktree', 'remove', '--force', snapshot]);
