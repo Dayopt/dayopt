@@ -712,4 +712,263 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       expect(deletedActivity.data).toEqual([]);
     });
   });
+
+  async function ownedTomorrowPlan() {
+    const result = await adminSupabase
+      .from('plans')
+      .select('id,activity_id,title,note,start_at,end_at,updated_at')
+      .eq('user_id', IDENTITY.userId)
+      .gte('start_at', new Date(`${tomorrow}T00:00:00+09:00`).toISOString())
+      .lt('start_at', new Date(`${tomorrow}T23:59:59+09:00`).toISOString())
+      .single();
+    expect(result.error === null).toBe(true);
+    expect(result.data).not.toBeNull();
+    return result.data!;
+  }
+
+  test('Inspector のメモ編集が保存され、検索から同じ Plan を開き直せる', async ({ page }) => {
+    const plan = await ownedTomorrowPlan();
+    const note = `Search ${IDENTITY.userId.slice(0, 8)}`;
+    await openDay(page, tomorrow);
+    await page.locator('[data-plan-lane-card]').first().click();
+    const input = page.getByRole('textbox', { name: 'メモ', exact: true });
+    await input.fill(note);
+    await input.blur();
+    await expect.poll(async () => (await ownedTomorrowPlan()).note).toBe(note);
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
+    await page.getByRole('button', { name: 'ブロックを検索', exact: true }).first().click();
+    const search = page.getByRole('combobox', { name: '予定と記録を検索', exact: true });
+    await search.fill(note);
+    await page.getByText(note, { exact: true }).click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+      .toBe(`plan:${plan.id}`);
+    expect(new URL(page.url()).searchParams.get('date')).toBe(tomorrow);
+    await expect(input).toHaveValue(note);
+    await expect(search).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(input).toHaveCount(0);
+  });
+
+  test('Plan のドラッグ移動は同じ ID の時刻だけを変更し Record を変更しない', async ({ page }) => {
+    const plan = await ownedTomorrowPlan();
+    const records = await adminSupabase
+      .from('records')
+      .select('*')
+      .eq('user_id', IDENTITY.userId)
+      .order('id');
+    expect(records.error === null).toBe(true);
+    await openDay(page, tomorrow);
+    const { hourHeight } = await revealHour(page, 9);
+    const card = page.locator('[data-plan-lane-card]').first();
+    const box = await card.boundingBox();
+    expect(box).not.toBeNull();
+    const x = box!.x + box!.width / 2;
+    const y = box!.y + box!.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 24, { steps: 4 });
+    await expect.poll(() => page.evaluate(() => document.body.style.cursor)).toBe('grabbing');
+    await page.mouse.move(x, y + hourHeight, { steps: 8 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => {
+        const row = await ownedTomorrowPlan();
+        expect(row.id).toBe(plan.id);
+        return [new Date(row.start_at).toISOString(), new Date(row.end_at).toISOString()];
+      })
+      .toEqual([
+        new Date(`${tomorrow}T10:00:00+09:00`).toISOString(),
+        new Date(`${tomorrow}T11:00:00+09:00`).toISOString(),
+      ]);
+    await page.reload();
+    await expect(page.locator('[data-plan-lane-card]').first()).toBeVisible();
+    const after = await adminSupabase
+      .from('records')
+      .select('*')
+      .eq('user_id', IDENTITY.userId)
+      .order('id');
+    expect(after.error === null).toBe(true);
+    expect(after.data).toEqual(records.data);
+  });
+
+  test('別 writer の更新後の Inspector 編集は競合を示し、最新のメモを保持する', async ({
+    page,
+  }) => {
+    // Restore the explicit 24h format before asserting the Inspector's time value.
+    await page.goto('/ja/settings/display');
+    await page.getByRole('combobox', { name: '時間表示形式', exact: true }).click();
+    await page.getByRole('option', { name: '24時間表記 (13:00)', exact: true }).click();
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('time_format')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        expect(result.error === null).toBe(true);
+        return result.data?.time_format;
+      })
+      .toBe('24h');
+    const plan = await ownedTomorrowPlan();
+    await openDay(page, tomorrow);
+    await page.locator('[data-plan-lane-card]').first().click();
+    await expect(page.getByRole('combobox', { name: '開始時刻', exact: true })).toHaveValue(
+      '10:00',
+    );
+    expect(plan.activity_id).not.toBeNull();
+    const serverNote = `Writer ${IDENTITY.userId.slice(0, 8)}`;
+    const update = await adminSupabase.rpc('update_plan_command_v1', {
+      p_user_id: IDENTITY.userId,
+      p_plan_id: plan.id,
+      p_expected_updated_at: plan.updated_at,
+      p_activity_id: plan.activity_id!,
+      p_activity_id_present: true,
+      p_external_calendar_event_id: null as never,
+      p_title: plan.title,
+      p_start_at: plan.start_at,
+      p_end_at: plan.end_at,
+      p_note: serverNote,
+    });
+    expect(update.error === null).toBe(true);
+    const input = page.getByRole('textbox', { name: 'メモ', exact: true });
+    await input.fill('Stale browser input');
+    await input.blur();
+    await expect(
+      page.getByText('別の場所で変更されたため、最新の内容を読み込みました', { exact: true }),
+    ).toBeVisible();
+    await expect(input).toHaveValue(serverNote);
+    await page.reload();
+    expect((await ownedTomorrowPlan()).note).toBe(serverNote);
+    await page.locator('[data-plan-lane-card]').first().click();
+    await expect(input).toHaveValue(serverNote);
+  });
+
+  test.describe('Templates', () => {
+    // Save/rename/apply/rejected reapply/delete plus navigation and invalidations.
+    test.use({ trpcProcedureBudget: 60 });
+    test('日の Plan をテンプレート保存・改名・別日適用・削除して独立した行を残す', async ({
+      page,
+    }) => {
+      const plan = await ownedTomorrowPlan();
+      const name = `Template ${IDENTITY.userId.slice(0, 8)}`;
+      await openDay(page, tomorrow);
+      await page.getByRole('button', { name: '日', exact: true }).click();
+      await page
+        .getByRole('menuitem', { name: 'この並びをテンプレートとして保存', exact: true })
+        .click();
+      await page.getByRole('textbox', { name: 'テンプレート名', exact: true }).fill(name);
+      await page.getByRole('button', { name: '保存', exact: true }).click();
+      const row = page.locator('[data-template-row]').filter({ hasText: name });
+      await expect(row).toHaveCount(1);
+      const template = await adminSupabase
+        .from('plan_templates')
+        .select('id')
+        .eq('user_id', IDENTITY.userId)
+        .eq('name', name)
+        .single();
+      expect(template.error === null).toBe(true);
+      const blocks = await adminSupabase
+        .from('plan_template_blocks')
+        .select('activity_id,anchor_minute')
+        .eq('user_id', IDENTITY.userId)
+        .eq('template_id', template.data!.id);
+      expect(blocks.error === null).toBe(true);
+      expect(blocks.data).toEqual([{ activity_id: plan.activity_id, anchor_minute: 600 }]);
+      await row.click({ button: 'right' });
+      await page.getByRole('menuitem', { name: '名前を変更', exact: true }).click();
+      const rename = page.getByRole('textbox', { name: 'テンプレート名を変更', exact: true });
+      await rename.fill(`${name} renamed`);
+      await rename.press('Enter');
+      await expect
+        .poll(async () => {
+          const result = await adminSupabase
+            .from('plan_templates')
+            .select('name')
+            .eq('user_id', IDENTITY.userId)
+            .eq('id', template.data!.id)
+            .single();
+          expect(result.error === null).toBe(true);
+          return result.data?.name;
+        })
+        .toBe(`${name} renamed`);
+      await openDay(page, offsetDateParam(2));
+      await page.getByRole('button', { name: `${name} renamed`, exact: true }).click();
+      await expect
+        .poll(async () => {
+          const result = await adminSupabase
+            .from('plans')
+            .select('id,start_at')
+            .eq('user_id', IDENTITY.userId)
+            .gte('start_at', new Date(`${offsetDateParam(2)}T00:00:00+09:00`).toISOString());
+          expect(result.error === null).toBe(true);
+          return result.data?.map((item) => ({
+            different: item.id !== plan.id,
+            at: new Date(item.start_at).toISOString(),
+          }));
+        })
+        .toEqual([
+          { different: true, at: new Date(`${offsetDateParam(2)}T10:00:00+09:00`).toISOString() },
+        ]);
+      await page.reload();
+      await expect(page.locator('[data-plan-lane-card]')).toHaveCount(1);
+      await page.getByRole('button', { name: `${name} renamed`, exact: true }).click();
+      await expect(
+        page.getByText('この時間帯には既にタイムブロックがあり、テンプレートを置けませんでした', {
+          exact: true,
+        }),
+      ).toBeVisible();
+      const unchanged = await adminSupabase
+        .from('plans')
+        .select('id')
+        .eq('user_id', IDENTITY.userId);
+      expect(unchanged.error === null).toBe(true);
+      expect(unchanged.data).toHaveLength(3);
+      await page
+        .locator('[data-template-row]')
+        .filter({ hasText: `${name} renamed` })
+        .click({ button: 'right' });
+      await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+      await page
+        .getByRole('alertdialog')
+        .getByRole('button', { name: '削除', exact: true })
+        .click();
+      await expect
+        .poll(async () => {
+          const result = await adminSupabase
+            .from('plan_templates')
+            .select('id')
+            .eq('user_id', IDENTITY.userId)
+            .eq('id', template.data!.id);
+          expect(result.error === null).toBe(true);
+          return result.data;
+        })
+        .toEqual([]);
+      const remaining = await adminSupabase
+        .from('plans')
+        .select('id')
+        .eq('user_id', IDENTITY.userId);
+      expect(remaining.error === null).toBe(true);
+      expect(remaining.data).toHaveLength(3);
+    });
+  });
+
+  test('月・年の Report 配分と空期間が実際の記録に一致する', async ({ page }) => {
+    const activity = await adminSupabase
+      .from('activities')
+      .select('name')
+      .eq('user_id', IDENTITY.userId)
+      .single();
+    expect(activity.error === null).toBe(true);
+    for (const range of ['month', 'year']) {
+      await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=${range}`);
+      await expectReportAllocationShowsOneHour(page, activity.data!.name);
+    }
+    await page.goto(`/ja/report?date=${offsetDateParam(-40)}&range=week`);
+    await expect(page.locator('[data-report-summary="recorded"]')).toHaveText('0分');
+    await expect(
+      page.locator('[data-report-table="usage"] li').filter({ hasText: activity.data!.name }),
+    ).toHaveCount(0);
+  });
 });

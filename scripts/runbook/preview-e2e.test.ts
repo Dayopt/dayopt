@@ -66,34 +66,42 @@ const env = {
 
 function reviewedReport() {
   const tests = [
-    ...Array.from({ length: 9 }, (_, index) => ({
+    ...Array.from({ length: 14 }, (_, index) => ({
       file: 'critical-path.spec.ts',
       project: 'chromium',
       line: index + 1,
     })),
-    ...Array.from({ length: 3 }, (_, index) => ({
+    ...Array.from({ length: 4 }, (_, index) => ({
       file: 'mobile-critical-path.spec.ts',
       project: 'Mobile Chrome',
       line: index + 1,
     })),
   ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-  return { status: 'passed', expected: 12, tests };
+  return { status: 'passed', expected: 18, tests };
 }
 
 describe('Reviewed Preview declaration matrix', () => {
-  it('accepts exactly the reviewed nine desktop and three mobile declarations', () => {
+  it('accepts exactly the reviewed fourteen desktop and four mobile declarations', () => {
     expect(isPassingPreviewReport(reviewedReport())).toBe(true);
+  });
+  it('rejects the previous nine desktop and three mobile contract', () => {
+    const report = reviewedReport();
+    report.tests.splice(9, 5);
+    report.tests.pop();
+    report.expected = 12;
+    expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects the old seven declarations even if their dynamic expected count agrees', () => {
     const report = reviewedReport();
-    report.tests.splice(4, 5);
+    report.tests.splice(4, 10);
+    report.tests.splice(7, 1);
     report.expected = 7;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects missing added coverage despite a matching dynamic count', () => {
     const report = reviewedReport();
     report.tests.splice(8, 1);
-    report.expected = 11;
+    report.expected = 17;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects duplicate declaration locations that replace a new case', () => {
@@ -106,9 +114,9 @@ describe('Reviewed Preview declaration matrix', () => {
     report.tests[0]!.file = 'mobile-critical-path.spec.ts';
     expect(isPassingPreviewReport(report)).toBe(false);
   });
-  it('rejects twelve distinct declarations split as eight desktop and four mobile', () => {
+  it('rejects eighteen distinct declarations split as thirteen desktop and five mobile', () => {
     const report = reviewedReport();
-    report.tests[8] = { ...report.tests[9]!, line: 4 };
+    report.tests[8] = { ...report.tests[14]!, line: 5 };
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(

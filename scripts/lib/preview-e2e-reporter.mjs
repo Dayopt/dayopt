@@ -5,8 +5,8 @@ const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts'])
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 // Reviewed browser acceptance scope. Changes require a reviewed trusted harness rollout.
 const COVERAGE = [
-  { file: 'critical-path.spec.ts', project: 'chromium', count: 9 },
-  { file: 'mobile-critical-path.spec.ts', project: 'Mobile Chrome', count: 3 },
+  { file: 'critical-path.spec.ts', project: 'chromium', count: 14 },
+  { file: 'mobile-critical-path.spec.ts', project: 'Mobile Chrome', count: 4 },
 ];
 const EXPECTED_COUNT = COVERAGE.reduce((sum, row) => sum + row.count, 0);
 

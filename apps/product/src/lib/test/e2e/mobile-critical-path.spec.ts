@@ -157,4 +157,35 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
       await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
     },
   );
+
+  test(
+    'mobile の設定一覧から表示設定を変更し、戻る導線と永続化を確認する',
+    MOBILE_TAG,
+    async ({ page }) => {
+      await page.goto('/ja/settings?returnTo=%2Fcalendar');
+      await page.getByRole('link', { name: '表示', exact: true }).click();
+      await expect(page).toHaveURL(/\/ja\/settings\/display\?/);
+      const format = page.getByRole('combobox', { name: '時間表示形式', exact: true });
+      await format.click();
+      await page.getByRole('option', { name: '12時間表記 (1:00 PM)', exact: true }).click();
+      await expect
+        .poll(async () => {
+          const result = await adminSupabase
+            .from('user_settings')
+            .select('time_format')
+            .eq('user_id', IDENTITY.userId)
+            .single();
+          expect(result.error === null).toBe(true);
+          return result.data?.time_format;
+        })
+        .toBe('12h');
+      await page.reload();
+      await expect(format).toContainText('12時間表記');
+      await page.getByRole('link', { name: '戻る', exact: true }).click();
+      await expect(page).toHaveURL(/\/ja\/settings\?/);
+      await page.getByRole('link', { name: '戻る', exact: true }).click();
+      await expect(page).toHaveURL(/\/ja\/calendar/);
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
+    },
+  );
 });

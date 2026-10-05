@@ -117,23 +117,30 @@ describe('Cloud Preview evidence and cleanup', () => {
     expect(serialized).not.toContain('PRIVATE_');
     expect(result.tests).toHaveLength(1);
   });
-  it.each(['reviewed', 'old-seven', 'duplicate', 'wrong-pair', 'missing'])(
+  it.each(['reviewed', 'old-twelve', 'old-seven', 'duplicate', 'wrong-pair', 'missing'])(
     'publisher independently enforces reviewed coverage: %s',
     (kind) => {
       const options = fixture();
       const tests = [
-        ...Array.from({ length: 9 }, (_, index) => ({
+        ...Array.from({ length: 14 }, (_, index) => ({
           file: 'critical-path.spec.ts',
           project: 'chromium',
           line: index + 1,
         })),
-        ...Array.from({ length: 3 }, (_, index) => ({
+        ...Array.from({ length: 4 }, (_, index) => ({
           file: 'mobile-critical-path.spec.ts',
           project: 'Mobile Chrome',
           line: index + 1,
         })),
       ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-      if (kind === 'old-seven') tests.splice(4, 5);
+      if (kind === 'old-twelve') {
+        tests.splice(9, 5);
+        tests.pop();
+      }
+      if (kind === 'old-seven') {
+        tests.splice(4, 10);
+        tests.splice(7, 1);
+      }
       if (kind === 'duplicate') tests[8] = { ...tests[0]! };
       if (kind === 'wrong-pair') tests[0]!.file = 'mobile-critical-path.spec.ts';
       if (kind === 'missing') tests.splice(8, 1);
