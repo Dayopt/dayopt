@@ -43,6 +43,14 @@ import {
   POC_TOMBSTONE_SQL,
 } from '../lib/poc-retirement-contract.mjs';
 
+import {
+  POC_FRESH_ABSENCE_SQL,
+  POC_ROWS_FINGERPRINT_SQL,
+  POC_SECURITY_CATALOG_SQL,
+  rehearsePocRetirement,
+} from '../lib/poc-retirement-rehearsal.mjs';
+import { renderPocRetirementRecovery } from '../runbook/poc-retirement-recovery.mjs';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const TYPES_PATH = 'apps/product/src/lib/database/generated/database.types.ts';
 export const MIGRATIONS_DIR = 'supabase/migrations';
@@ -50,7 +58,7 @@ export const MIGRATIONS_DIR = 'supabase/migrations';
 export const SEED_PATH = 'supabase/seed.sql';
 const MIGRATION_FILE = /^(\d{14})_.+\.sql$/;
 export const DB_UPGRADE_JOB = '🧱 DB Upgrade (shadow)';
-export const POC_STATE_SQL = `select 'rate_limit_poc.supabase_rate_limit_state_poc,' || c.oid::text || ',' || md5(coalesce((select string_agg(to_jsonb(t)::text, E'\\n' order by to_jsonb(t)::text) from rate_limit_poc.supabase_rate_limit_state_poc t), '')) from pg_class c where c.oid = 'rate_limit_poc.supabase_rate_limit_state_poc'::regclass union all select 'rate_limit_poc.supabase_webhook_claims_poc,' || c.oid::text || ',' || md5(coalesce((select string_agg(to_jsonb(t)::text, E'\\n' order by to_jsonb(t)::text) from rate_limit_poc.supabase_webhook_claims_poc t), '')) from pg_class c where c.oid = 'rate_limit_poc.supabase_webhook_claims_poc'::regclass order by 1`;
+export const POC_STATE_SQL = POC_ROWS_FINGERPRINT_SQL;
 export const POC_FIXTURE_SQL = `insert into rate_limit_poc.supabase_rate_limit_state_poc values ('retirement_fixture', repeat('a',64), 10, 60, '2026-01-01T00:00:00Z', 2, 3, '2026-01-02T00:00:00Z', '2026-01-01T00:00:01Z'); insert into rate_limit_poc.supabase_webhook_claims_poc values (repeat('b',64), 'processing', '00000000-0000-4000-8000-000000000001', '2026-01-02T00:00:00Z', null, '2026-01-02T00:00:00Z', '2026-01-01T00:00:01Z'), (repeat('c',64), 'processed', null, null, '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z', '2026-01-01T00:00:01Z')`;
 const RETIRED_POC_FUNCTIONS = new Set([
   'check_supabase_rate_limit_poc',
@@ -763,6 +771,10 @@ export function runDbUpgradeCheck({
       retirement && historicalPocBaseline
         ? exec('psql', [...PSQL, '-At', '-c', POC_STATE_SQL])
         : null;
+    const beforePocSecurity =
+      retirement && historicalPocBaseline
+        ? exec('psql', [...PSQL, '-At', '-c', POC_SECURITY_CATALOG_SQL])
+        : null;
     // Generate the actual pre-upgrade schema with the exact same CLI as the upgraded schema.
     const baselineTypes = exec('pnpm', ['exec', 'prettier', '--stdin-filepath', TYPES_PATH], {
       input: exec('supabase', ['gen', 'types', 'typescript', '--local'], {
@@ -793,6 +805,17 @@ export function runDbUpgradeCheck({
       else
         result.checks.pocRowsPreserved =
           'both retired POC tables kept identical synthetic row-state fingerprints';
+    }
+    if (archivedPocSql !== null && beforePocState !== null && beforePocSecurity !== null) {
+      const recovery = rehearsePocRetirement({
+        execPsql: (sql) => exec('psql', [...PSQL, '-At'], { input: sql }),
+        renderRecovery: renderPocRetirementRecovery,
+        archivedSql: archivedPocSql,
+        forwardSql: readFile(POC_RETIREMENT_MANIFEST.forwardRetirementMigrationPath),
+        expectedTableRows: beforePocState,
+        expectedSecurityCatalog: beforePocSecurity,
+      });
+      result.checks.pocRecoveryRehearsal = JSON.stringify(recovery);
     }
     // 4. RLS / GRANT snapshot は upgraded DB でも一致する
     exec('pnpm', ['rls:snapshot:check']);
@@ -842,6 +865,12 @@ export function runDbUpgradeCheck({
     //    作り直して catalog を比較する（追加分は戻してあるので reset = candidate 全部）
     const upgradedCatalog = exec('psql', [...PSQL, '-At', '-c', CATALOG_SQL]);
     exec('supabase', ['db', 'reset', '--local'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    if (retirement) {
+      const freshPocState = exec('psql', [...PSQL, '-At', '-c', POC_FRESH_ABSENCE_SQL]).trim();
+      if (freshPocState !== 'true|0')
+        throw new Error('Fresh retirement schema must not create POC state or RPCs');
+      result.checks.freshPocAbsent = 'rate_limit_poc schema and all named POC RPCs absent';
+    }
     const freshCatalog = exec('psql', [...PSQL, '-At', '-c', CATALOG_SQL]);
     if (upgradedCatalog !== freshCatalog) {
       const upgradedSet = new Set(upgradedCatalog.split('\n'));
