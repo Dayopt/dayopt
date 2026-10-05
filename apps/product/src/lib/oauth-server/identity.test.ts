@@ -6,7 +6,11 @@ import {
   PRODUCT_VERCEL_PROJECT_ID,
 } from '@/lib/dayopt-environment';
 
-import { isOAuthRequestHostAllowed, resolveOAuthEnvironmentConfig } from './identity';
+import {
+  isOAuthRequestHostAllowed,
+  resolveOAuthEnvironmentConfig,
+  resolveOAuthEnvironmentFromEnv,
+} from './identity';
 
 describe('MCP OAuth environment identity', () => {
   it('keeps the established Production identity as the local/default contract', () => {
@@ -401,5 +405,40 @@ describe('MCP OAuth host boundary', () => {
         allowLocalDevelopment: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe('normalized Integration environment binding', () => {
+  const environment = {
+    MCP_OAUTH_ENVIRONMENT: 'integration',
+    DAYOPT_ENVIRONMENT: 'integration',
+    NEXT_PUBLIC_DAYOPT_ENVIRONMENT: 'integration',
+    VERCEL_PROJECT_ID: PRODUCT_VERCEL_PROJECT_ID,
+    VERCEL_BRANCH_URL: PRODUCT_INTEGRATION_APP_ORIGIN.slice('https://'.length),
+    OAUTH_AUTHORIZATION_SERVER_URI: PRODUCT_INTEGRATION_APP_ORIGIN,
+    MCP_CANONICAL_RESOURCE_URI: PRODUCT_INTEGRATION_APP_ORIGIN,
+    VERCEL_ENV: 'preview',
+    VERCEL_TARGET_ENV: 'preview',
+    VERCEL_GIT_COMMIT_REF: 'integration',
+    NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCT_INTEGRATION_SUPABASE_REF}.supabase.co`,
+  };
+  it('keeps the complete Integration binding through the shared env normalizer', () => {
+    expect(resolveOAuthEnvironmentFromEnv(environment)).toMatchObject({
+      environment: 'integration',
+      surfacesEnabled: true,
+    });
+    expect(
+      resolveOAuthEnvironmentFromEnv(
+        Object.fromEntries(Object.entries(environment).map(([key, value]) => [key, ` ${value}\n`])),
+      ),
+    ).toEqual(resolveOAuthEnvironmentFromEnv(environment));
+  });
+  it.each([
+    'DAYOPT_ENVIRONMENT',
+    'NEXT_PUBLIC_DAYOPT_ENVIRONMENT',
+    'VERCEL_PROJECT_ID',
+    'NEXT_PUBLIC_SUPABASE_URL',
+  ])('rejects an incomplete Integration binding: %s', (key) => {
+    expect(() => resolveOAuthEnvironmentFromEnv({ ...environment, [key]: undefined })).toThrow();
   });
 });

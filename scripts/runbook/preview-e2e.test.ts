@@ -128,7 +128,7 @@ describe('Preview E2E runner', () => {
       'private',
     );
   });
-  it('trusted supervisor starts the candidate worker in its own checkout without management tokens', async () => {
+  it('runs the credentialed harness only from the trusted checkout, ignoring a candidate root', async () => {
     const s = scenario();
     const candidateRoot = join(s.root, 'candidate');
     const bin = join(s.root, 'bin');
@@ -140,7 +140,7 @@ describe('Preview E2E runner', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
-fs.writeFileSync(path.join(process.cwd(), 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
 fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify({status:'passed',expected:2,tests:['chromium','Mobile Chrome'].map(project=>({file:'critical-path.spec.ts',project,status:'passed',expectedPassed:true,retry:0}))}));
 `,
     );
@@ -154,7 +154,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env: { ...env, PATH: `${bin}:${process.env.PATH}` },
-      candidateRoot,
+      ...{ candidateRoot },
       runDirectory,
       runId,
       cloudUserIds,
@@ -164,9 +164,9 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     expect(result.status).toBe('passed');
     expect(result.evidenceDirectory).toBe(join(runDirectory, 'evidence'));
     expect(
-      JSON.parse(readFileSync(join(candidateRoot, 'worker-observation.json'), 'utf8')),
+      JSON.parse(readFileSync(join(result.evidenceDirectory, 'worker-observation.json'), 'utf8')),
     ).toEqual({
-      cwd: realpathSync(candidateRoot),
+      cwd: realpathSync(process.cwd()),
       hasManagement: false,
       runId,
       cloudIntent: '1',

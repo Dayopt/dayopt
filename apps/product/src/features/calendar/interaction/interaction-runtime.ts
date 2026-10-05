@@ -17,7 +17,6 @@ import type {
   InteractionAction,
   InteractionState,
   TimeblockRect,
-  TimeRange,
 } from '../domain/interaction/types';
 
 /** useInteraction フックへの入力プロパティ */
@@ -38,8 +37,6 @@ export interface UseInteractionProps {
   resizeDisabledPlanId?: string | null;
   /** Pixels per hour */
   hourHeight: number;
-  /** 2レーン表示のPlan幅（%） */
-  planLaneWidthPercent?: number | undefined;
   /** Callback when an event is moved or resized */
   onEventUpdate?: (
     eventId: string,
@@ -50,8 +47,6 @@ export interface UseInteractionProps {
       expectedUpdatedAt?: string;
     },
   ) => Promise<void | { skipToast: true }> | void;
-  /** Plan を Record レーンへdropした時の記録化 */
-  onPlanRecord?: ((planId: string, range: TimeRange) => void) | undefined;
   /** Callback when an event is clicked (not dragged) */
   onEventClick?: (event: CalendarDisplayEvent) => void;
   /** Callback when a time range is selected on the grid */
@@ -105,7 +100,6 @@ export interface InteractionRuntime {
   events: CalendarDisplayEvent[];
   allEvents: CalendarDisplayEvent[];
   hourHeight: number;
-  planLaneWidthPercent: number;
   date: Date;
   displayDates: Date[] | undefined;
   viewMode: 'day' | '3day' | '5day' | 'week';
@@ -113,7 +107,6 @@ export interface InteractionRuntime {
   resizeDisabledPlanId: string | null | undefined;
   onEventClick: UseInteractionProps['onEventClick'];
   onEventUpdate: UseInteractionProps['onEventUpdate'];
-  onPlanRecord: UseInteractionProps['onPlanRecord'];
   onTimeRangeSelect: UseInteractionProps['onTimeRangeSelect'];
   haptic: ReturnType<typeof useHapticFeedback>;
   startDragStore: CalendarDragStoreState['startDrag'];
@@ -129,13 +122,6 @@ export interface InteractionRefs {
   timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
   /** drag 開始時にキャッシュする day-column NodeList */
   dayColumnsRef: React.MutableRefObject<NodeListOf<HTMLElement> | null>;
-  /** pending → dragging の初回 mousemove で解決したレーンの受け渡し */
-  pendingTargetLaneRef: React.MutableRefObject<'plan' | 'record' | null>;
-  /** drop 判定用の source / target レーン */
-  dragLaneRef: React.MutableRefObject<{
-    source: 'plan' | 'record';
-    target: 'plan' | 'record';
-  } | null>;
   /** drag / resize開始時にユーザーが見ていたraw DB version。 */
   interactionVersionRef: React.MutableRefObject<string | null>;
 }

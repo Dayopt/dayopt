@@ -6,6 +6,7 @@
 
 /* ライトモード */
 :root {
+  --brand-ink: #26251f; /* Approved Dayopt logo */
   /* ============================================
    * Surface体系（3段階 + muted）
    * container(沈む) → background(基準) → card(浮く)
@@ -158,6 +159,7 @@
 
 /* ダークモード */
 .dark {
+  --brand-ink: #ffffff;
   /* ============================================
    * Surface体系（3段階 + muted・warm H60 C=0.008）
    * container(沈む) → background(基準) → card(浮く)

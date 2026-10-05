@@ -40,14 +40,9 @@
         "toggleWeekends": "週末の表示を切り替え",
         "createBlock": "タイムブロックを作成",
         "createBlockNow": "現在時刻にタイムブロックを作成",
-        "copyBlock": "選択中のタイムブロックをコピー",
-        "pasteBlock": "コピーしたタイムブロックを貼り付け",
         "deleteBlock": "選択中のタイムブロックを削除",
         "closeInspector": "タイムブロックの詳細を閉じる"
       }
-    },
-    "clipboard": {
-      "recordRequiresPast": "記録は過去の時間に貼り付けてください"
     },
     "panel": {
       "resizeLabel": "右パネルの幅を変更"
@@ -62,8 +57,7 @@
       "density_compact": "コンパクト",
       "density_default": "標準",
       "density_spacious": "ゆったり",
-      "generalSettings": "一般設定",
-      "stats": "振り返り"
+      "generalSettings": "一般設定"
     },
     "timeblock": {
       "adjustEndTime": "ドラッグして終了時間を調整",
@@ -107,7 +101,6 @@
       "goToToday": "今日へ移動",
       "close": "閉じる",
       "openCalendar": "カレンダーを開く",
-      "openReport": "レポートを開く",
       "previousMonth": "前の月",
       "nextMonth": "次の月",
       "selectMonth": "月を選択",
@@ -156,7 +149,7 @@
       "merge": "他のアクティビティに統合",
       "showOnlyThisActivity": "このアクティビティだけ表示",
       "showOnlyThisCategory": "このカテゴリーだけ表示",
-      "viewStats": "振り返りを見る",
+      "viewActivityDetails": "アクティビティの詳細",
       "hide": "カレンダーから非表示",
       "show": "カレンダーに表示",
       "expandCategory": "カテゴリーを展開",

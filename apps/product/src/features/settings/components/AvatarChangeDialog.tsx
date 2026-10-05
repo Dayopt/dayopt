@@ -48,13 +48,14 @@ export function AvatarChangeDialog({ open, onOpenChange }: AvatarChangeDialogPro
       setIsUploading(true);
       try {
         const publicUrl = await uploadAvatar(file, userId);
-        setAvatarUrl(publicUrl);
 
         await updateProfile.mutateAsync({ avatarUrl: publicUrl });
 
-        await observeAuthOperation('update_avatar_metadata', () =>
+        const { error } = await observeAuthOperation('update_avatar_metadata', () =>
           supabase.auth.updateUser({ data: { avatar_url: publicUrl } }),
         );
+        if (error) throw error;
+        setAvatarUrl(publicUrl);
       } catch (error) {
         logger.error('Avatar upload error:', error);
         throw error;
@@ -70,14 +71,15 @@ export function AvatarChangeDialog({ open, onOpenChange }: AvatarChangeDialogPro
 
     setIsUploading(true);
     try {
-      await deleteAvatar(userId);
-      setAvatarUrl(null);
-
       await updateProfile.mutateAsync({ avatarUrl: null });
 
-      await observeAuthOperation('remove_avatar_metadata', () =>
+      const { error } = await observeAuthOperation('remove_avatar_metadata', () =>
         supabase.auth.updateUser({ data: { avatar_url: null } }),
       );
+      if (error) throw error;
+      setAvatarUrl(null);
+      // 保存済みの参照を解除してから回収する。更新失敗時は参照先の画像を残す。
+      await deleteAvatar(userId);
     } catch (error) {
       logger.error('Avatar delete error:', error);
       throw error;

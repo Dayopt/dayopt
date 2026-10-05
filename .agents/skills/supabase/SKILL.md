@@ -1,6 +1,6 @@
 ---
 name: supabase
-description: 新規 Supabase migration ファイル(`supabase/migrations/*.sql`)を追加する時、既存 schema に RLS ポリシーを設計・変更する時、Storage バケットポリシーを編集する時、Realtime 購読(`postgres_changes`)を新規実装する時、Edge Functions(`supabase/functions/`)を追加・デプロイする時、Integration または Production へ DB 変更を適用する時に発動。Supabase Branching による local → PR Preview → persistent Integration → production 運用パターンを適用する。アプリケーション層のみの変更では発動しない。
+description: 新規 Supabase migration ファイル(`supabase/migrations/*.sql`)を追加する時、既存 schema に RLS ポリシーを設計・変更する時、Storage バケットポリシーを編集する時、Realtime 購読(`postgres_changes`)を新規実装する時、Edge Functions(`supabase/functions/`)を追加・デプロイする時、production main への DB 変更を適用する時に発動。通常PRはPersistent nonproduction branchを共有し、DB/shared-backend isolationが要る時だけSupabase Preview Branchを使う。アプリケーション層のみの変更では発動しない。
 effort: high
 maxTurns: 25
 ---
@@ -9,15 +9,16 @@ maxTurns: 25
 
 Dayoptでの Supabase 運用パターンを支援するスキル。
 
-> ## 現状: Supabase Branching 運用
+> ## 現状: Cloud-first / Local-optional（2026-09-28）
 >
-> Dayopt は **Production project (`dayopt`, ref `yvglwblxrnrenfifsnje`)、PR ごとの ephemeral Preview Branch、および persistent `integration` branch (`tilwaprottpyhlfoggbb`)** で運用する。標準ルートは `local → PR Preview → persistent Integration → production`。専用 Vercel project は `product-integration`、その Git の Production branch は `integration` にする。Supabase Production branch は `main` のまま維持する。
+> Dayopt は **1 Supabase project (`dayopt`, ref `yvglwblxrnrenfifsnje`)** を使い、Production `main` と Persistent nonproduction `integration` branch (`tilwaprottpyhlfoggbb`) を分ける。通常PRの `product` Vercel Preview と固定 Integration入口は同じPersistent nonproduction branchを使う。PR専用Supabase Preview Branchは、migration / RLS / 共通Auth・Storage・Edge Function等の隔離が必要な変更だけに使う。標準ルートは `PR Preview → production`、Localは任意。
 >
 > **現状で守ること**:
 >
 > - migration owner は Supabase GitHub integration
-> - Vercel Preview は PR 用 Supabase Preview Branch を参照
-> - Persistent Integration への変更は GitHub `integration` branch と Supabase `[remotes.integration]` の固定 ref で対応させる
+> - 通常のProduct Vercel PreviewはPersistent nonproduction `integration` branchを参照
+> - shared-backend変更を隔離する時だけPR用Supabase Preview Branchを作成し、DB mode/ref/migrations/seedと対象deploymentが揃うまで実E2Eしない
+> - Preview branch作成を必要とする変更で作成・同期に失敗した時は停止し、Persistent / Productionへfallbackしない
 > - GitHub Actions から `supabase db push` しない
 > - 手動 `db push` は emergency only
 > - PR Preview credentials は 1Password に保存しない
@@ -43,37 +44,38 @@ Dayoptでの Supabase 運用パターンを支援するスキル。
 
 ### 原則
 
-**1 Supabase project + ephemeral PR Preview branches + one persistent Integration branch**
+**1 Supabase project + 1 persistent nonproduction branch + 必要時だけephemeral PR Preview branches**
 
 git の世界観と揃える:
 
 - `main` = production
-- `integration` = persistent Integration branch (`tilwaprottpyhlfoggbb`)、専用 Vercel project `product-integration` と固定接続
-- `feat/*` = preview branch(PR単位、自動生成・自動破棄)
+- `integration` = Persistent nonproduction branch。通常Previewと固定 Integration app が共有する
+- `feat/*` = DB/shared-backend isolation が必要なPRだけ Supabase Preview branchを使う
 
 ### 環境マップ
 
-| 環境            | 実体                            | ライフサイクル                        | 用途                                                              |
-| --------------- | ------------------------------- | ------------------------------------- | ----------------------------------------------------------------- |
-| **Preview**     | Supabase preview branch         | migration/config PR open〜merge/close | branch単位の migration / RLS 検証                                 |
-| **Integration** | persistent branch `integration` | 常設                                  | 固定 URL の Auth / OAuth / browser / sandbox 検証、合成 seed のみ |
-| **Production**  | main project `main`             | 永続                                  | 実ユーザー                                                        |
-| **Local**       | `supabase start`                | 任意                                  | 手元の開発                                                        |
+| 環境                 | 実体                                               | ライフサイクル     | 用途                                    |
+| -------------------- | -------------------------------------------------- | ------------------ | --------------------------------------- |
+| **通常PR Preview**   | Persistent `integration` branch                    | 常設               | 通常のProduct Preview / 合成データ      |
+| **隔離PR Preview**   | PR専用 Supabase Preview branch                     | 対象PR open〜close | DB・共通Auth/Storage/Function変更の検証 |
+| **固定 Integration** | Persistent `integration` branch                    | 常設               | 固定URLが要るOAuth・外部連携確認        |
+| **Production**       | main project                                       | 永続               | 実ユーザー                              |
+| **Local**            | `supabase start`（必要時は明示した非本番接続も可） | 任意               | 手元の開発                              |
 
 ### 守るもの・捨てるもの
 
 **守る:**
 
-- 本番データ・認証ユーザー・APIキーは Supabase branch 機構で完全隔離
-- Integration は data-less persistent branch を作り、`supabase/seed.sql` の固定 synthetic user だけを使う。任意 signup は無効
-- Integration 用 Vercel / Supabase / Redis / Stripe / OAuth secrets は専用設定とし、Production values をコピーしない
-- 開発作業は Integration/Production の DB を直接変更せず、GitHub integration が適用する migration を使う
+- Production project/ref・実ユーザー・credentialをPersistent nonproductionやPR Previewから隔離する
+- shared branchへ破壊的なDB実験を持ち込まない。必要な変更はephemeral branchで検証する
+- 合成データを使い、ProductionのDBを直接変更しない
 - migration は git history に残り、CI で検証されたものだけが production に到達
 
 **捨てる(=意図的に採用しない):**
 
-- Supabase プロジェクトの物理分離(1 organization で完結)
-- ローカル開発からの Integration / production 直結
+- Supabase プロジェクトや固定Dashboardの追加
+- 2本目のPersistent nonproduction branchやStaging環境
+- LocalからProductionへの接続
 - Dashboard SQL Editor での手動 production migration
 
 ## Migration 運用
@@ -85,51 +87,39 @@ git の世界観と揃える:
 git checkout -b feat/add-xxx
 
 # 2. migration ファイル作成
-pnpm migration:create add_xxx
+npx supabase migration new add_xxx
 
 # 3. SQL編集
 # supabase/migrations/YYYYMMDDHHMMSS_add_xxx.sql
 
-# 4. push → PR to integration
+# 4. push → PR
 git push -u origin feat/add-xxx
-gh pr create --base integration
+gh pr create
 
-# 5. 自動実行
-# - Supabase preview branch 自動生成
-# - migration が preview branch で実行
-# - CI で status check 実行
-# - Vercel Preview が preview branch に接続
+# 5. isolation が必要な変更だけSupabase Previewを用意
+# - Supabase GitHub integrationが対象migrationを検出する場合はPreview branchを作成
+# - branch/ref、migration、seed、Auth/Storage/Function readinessを確認
+# - URL/key同期と新しいVercel Preview deploymentを照合
+# - 普通のアプリPRはPersistent integration branchを使い、Supabase Previewを作らない
 
-# 6. Preview checks + review → merge into integration
-# - persistent Supabase Integration branch に migrations/config を反映
-# - product-integration が固定 URL で Integration branch を deploy
-# - Auth / CRUD / read-only MCP / 必要な sandbox flow を確認
+# 6. PR レビュー・動作確認
 
-# 7. Integration 済みの同じ変更 tree で PR integration → main
-# - promotion PR の temporary Preview / checks も完了させる
-# 8. main merge
+# 7. main merge
 # - production に migration 自動適用
 # - Vercel production 自動デプロイ
 ```
 
-### Integration branch への適用
+### Persistent Integration branch の扱い
 
-Cloud-first Product changes は Integration で確認してから main へ進める。通常 branch protections / CI は維持し、Supabase Preview を生成した PR は merge 後に temporary branch が削除されたことを確認する。merge 不能ならその temporary branch だけ削除し、persistent Integration は残す。
+`integration` はProjectを増やさない唯一のPersistent nonproduction branchである。通常のProduct Previewと固定Integration入口が共有する。新しいstaging / persistent branchを追加しない。外部連携の固定callback検証はVercelの既存 `product` ProjectにあるIntegration branch Previewを使い、DB migrationの隔離先とは混同しない。
 
-`supabase/config.toml` の `[remotes.integration]` が persistent branch の config / seed を管理する。Supabase Production integration の branch は `main` のまま維持する。
-
-PR Preview branch は migration / Supabase config 変更を独立して確かめる用途で、一時的に使う:
-
-```bash
-# PR branch を integration に merge
-# → temporary Preview は自動破棄され、persistent Integration に migration/config が反映される
-```
+本番相当のschema変更はSupabase PreviewとCIで検証してから既存のmain migration ownerへ渡す。Stripe SandboxやOAuth callbackは非本番用credential/accountを使う。ProductionとIntegrationを同時に変更しない。
 
 ### Preview branch の作られ方
 
 「Supabase preview branch 自動生成」が起きるのは **PR の diff に migration（schema に実影響する変更）が含まれる時だけ**。branch が作られない時に bot が出す文言（`there are no changes detected in supabase directory`）は「directory の変更」と読めるが、**ディレクトリ単位ではない** — `supabase/` 直下に任意のファイルを置いても、`supabase/seed.sql` を編集しても発火しない。「適当なファイルを触って Preview 用の branch を出す」opt-in は成立しない。
 
-**帰結**: `supabase/` を触らない PR の Vercel Preview には Supabase env が注入されず、auth など DB 接続が要る挙動は検証できない（env validation で 500 になる）。**Preview での実挙動確認に依存した検証計画を立てない。** local + production 確認で回すのが既定（[#1461](https://github.com/Dayopt/dayopt/issues/1461)）。
+**帰結**: Supabase Previewを作る条件に該当しない通常PRには、そのPR専用のURL/keyが同期されない。Product Vercel PreviewはProject Preview scopeの非本番Persistent URL/publishable key/server keyを使う。隔離が要るPRでSupabase branchが作られず、手動作成branchのcredential同期も確認できない場合は、shared DBへfallbackせず検証を止める。isolated deployment readinessには新しい対象SHA・deployment・DB ref・migration/seedを使う。
 
 ### 未 merge の migration を書き直す時
 
@@ -152,7 +142,9 @@ supabase --experimental branches create <name> \
 
 省略すると action run の `git_config.ref` が空になり、`migrate` step が `DEAD` で停止する。git `main` への紐付けは **409 で拒否される**（default branch が占有済み）。実在する feature branch に紐付ければ全 migration が適用される。
 
-**2. 手動 Preview branch の credential は Vercel へ同期されない**（Supabase GitHub integration が作る PR Preview branch の同期経路とは異なる）。Preview を実際に動かす目的では使えない。Persistent Integration は別経路で、`[remotes.integration]` の固定 ref と `product-integration` 専用 env を使う。
+**2. 手動 branch の credential は Vercel へ同期されない**（integration が自分で branch を作る経路でしか同期が走らないため）。Preview を実際に動かす目的では使えない。
+
+PR専用branchを作る時は、PR番号・Git branch・Supabase branch ID/ref・ownerを記録し、対象PRの検証とmergeまで進める。mergeできない場合は、対象PR専用・非default・非persistentとIDで確認できたbranchだけを削除し、branch一覧で消滅を再確認する。Persistent `integration` とProduction `main` はこのcleanup対象にしない。
 
 **削除は 2 段階**（persistent の場合）:
 
@@ -212,53 +204,15 @@ supabase/migrations/YYYYMMDDHHMMSS_description.sql
 
 例: `20260420000000_add_streak_column.sql`
 
-### マイグレーションテンプレート
+### マイグレーションの実装例
 
-```sql
--- テーブル作成
-CREATE TABLE IF NOT EXISTS public.new_table (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+新しいユーザーデータtableは、現行の
+[`20260818130000_create_segments.sql`](../../../supabase/migrations/20260818130000_create_segments.sql)
+を例にする。RLS・必要なpolicy・REVOKE先行のGRANT・権限不変条件・updated_atを
+同一transactionで定義している。参照先のpolicyやgrantをそのまま複製せず、対象の操作境界に合わせる。
 
--- RLSを有効化
-ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
-
--- Data API への明示 GRANT（RLS とセットで必須）
--- Supabase は新規 public テーブルを Data API に自動公開しなくなる方向のため、
--- authenticated role での PostgREST アクセス権を明示的に付与する。
--- anon は原則付与しない（公開読み取りが必要なテーブルのみ SELECT を個別付与）。
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.new_table TO authenticated;
-
--- RLSポリシー
-CREATE POLICY "Users can view own data"
-  ON public.new_table FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own data"
-  ON public.new_table FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own data"
-  ON public.new_table FOR UPDATE
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own data"
-  ON public.new_table FOR DELETE
-  USING (auth.uid() = user_id);
-
--- updated_atトリガー
-CREATE TRIGGER set_updated_at
-  BEFORE UPDATE ON public.new_table
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_updated_at();
-
--- インデックス
-CREATE INDEX idx_new_table_user_id ON public.new_table(user_id);
-```
+必要な条件は下のチェックリストと[データ分離の正本](../../../docs/engineering/invariants.md#データ分離rls)
+で確認する。別の短縮SQL雛形は置かず、権限検査や現行helperの欠落を防ぐ。
 
 ### マイグレーション作成時チェックリスト
 
@@ -430,19 +384,19 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PREVIEW_R
 npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 ```
 
-通常は GitHub Actions が自動実行する。
+通常の経路は上の[デプロイ経路](#デプロイ経路)を参照する。実行済みかどうかは対象環境のデプロイ記録で確認する。
 
 ### Secrets 管理
 
 #### マトリクス
 
-| Secret                   | Preview             | Integration                              | Production               | 備考                                   |
-| ------------------------ | ------------------- | ---------------------------------------- | ------------------------ | -------------------------------------- |
-| `RESEND_API_KEY`         | 設定しない          | 任意。専用 recipient にだけ送る          | **Production key**       | Integration と Production を共有しない |
-| `RESEND_FROM_EMAIL`      | 設定しない          | verified sender + fixed test recipient   | `noreply@dayopt.app`     | 環境別                                 |
-| `NEXT_PUBLIC_APP_URL`    | preview URL         | `https://product-integration-dayopt.vercel.app` | `https://app.dayopt.app` | 環境別                                 |
-| `CRON_SECRET`            | 不要                | 任意の専用 secret                        | Production secret        | secret を環境間で共有しない            |
-| `SEND_EMAIL_HOOK_SECRET` | Preview branch 固有 | Integration branch 固有                  | Production secret        | Supabase Auth hook 設定時に発行        |
+| Secret                   | Preview           | Staging               | Production               | 備考                            |
+| ------------------------ | ----------------- | --------------------- | ------------------------ | ------------------------------- |
+| `RESEND_API_KEY`         | test key          | test key              | **live key**             | Resend は test/live の2分割     |
+| `RESEND_FROM_EMAIL`      | `noreply-dev@...` | `noreply-staging@...` | `noreply@dayopt.app`     | 環境別                          |
+| `NEXT_PUBLIC_APP_URL`    | preview URL       | staging URL           | `https://app.dayopt.app` | 環境別                          |
+| `CRON_SECRET`            | (不要)            | UUID-staging          | UUID-production          | `openssl rand -hex 32`          |
+| `SEND_EMAIL_HOOK_SECRET` | test値            | staging値             | production値             | Supabase Auth hook 設定時に発行 |
 
 **Supabase platform 自動注入(触らない):**
 
@@ -463,9 +417,8 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 #### Resend key の切り分け
 
-- Preview では Resend を設定しない。
-- Integration は別 key と fixed test mailbox を使い、実ユーザー宛てへ送らない。
-- Production key と Integration key を共有しない。送信先 allowlist と外部サービス側設定も併用する。
+- **test key**: preview / staging で共用。Resend test mode なので実メール送信されない
+- **live key**: production 専用。実ユーザーにメール送信する
 
 ## 絶対ルール
 
@@ -502,7 +455,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 ### Edge Functions
 
 - デプロイは必ず `--use-api` フラグ付きで実行
-- production の secrets を preview / integration にコピーしない
+- production の secrets を preview / staging にコピーしない
 - `RESEND_API_KEY` の live key は production のみ
 - cron function は preview にデプロイしない（現状そのような function は無い）
 
@@ -514,9 +467,9 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ### 環境操作
 
-- Integration と Production の DB に手動で直接変更を加えない。migration を Git に記録し、Integration で確認してから Production に進める
+- Staging と Production は同時に触らない（`AGENTS.md` §Deploy / Release）
 - production への変更は必ず preview branch での検証を経る
-- Integration は合成データのみで、固定 URL の認証・OAuth・CRUD・Stripe Sandbox・許可済みテスト接続を確認する用途に限る
+- staging は「Stripe検証 / hotfix / closed beta」以外の目的では触らない
 
 ## 実測で分かった罠（local DB / 生成物 / PostgREST）
 

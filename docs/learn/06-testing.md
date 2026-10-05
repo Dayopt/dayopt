@@ -58,6 +58,11 @@ last_verified: 2026-09-21
 - **経路全体**:
   - [`apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts) で `test('過去 Plan をドラッグ移動すると新しい時刻が保存される'` を探す（E2E。過去 Plan を動かして DB に残ることまで見る）
   - [`apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts) で `test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す'` を探す（E2E。Inspector の古い入力が別の場所の値を潰さないこと）
+- **1. ドラッグを離す**:
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと同じ領域へdropしてもPlanの時刻を更新する'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと重なる場所へ移動してもRecord重複として拒否しない'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('別のPlanと重なる移動は拒否する'` を探す
+  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('別のRecordと重なる移動は拒否する'` を探す
 - **2. 更新を依頼**:
   - [`apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx`](../../apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx) で `it('過去の plan を過去の範囲内へ動かしても新しい時刻で mutate を呼ぶ'` を探す
   - [`apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx`](../../apps/product/src/features/calendar/hooks/operations/useTimeblockOperations.test.tsx) で `it('record を未来へ動かす更新は timeLocked トーストを出し mutate を呼ばない'` を探す
@@ -79,26 +84,24 @@ last_verified: 2026-09-21
 ### Record を作る・Plan を記録する
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (3) の過去の時間帯から作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
+  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('過去帯をドラッグして Record を記録し、リロード後も残る'` を探す（E2E。入口 (2) の過去の時間帯から明示的に作る経路。「そのまま記録」を通しで守る E2E は見つからなかった）
 - **1. 入口を選ぶ**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('時間帯の記録の有無で予定の記録操作を消さない'` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('drop previewの終了が未来なら過去Planでも記録callbackを呼ばない'` を探す
-- **2. 列へ落とす**:
-  - [`apps/product/src/features/calendar/lib/plan-record-drop.test.ts`](../../apps/product/src/features/calendar/lib/plan-record-drop.test.ts) で `it('Planの内容とdrop先のpreview rangeから独立Record入力を作る'` を探す
-  - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordレーンへのdropはplan更新ではなく記録mutationへ委譲する'` を探す
-- **3. 編集を保存しきる**:
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す
+  - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('明示的なRecord作成は既存Recordと重なる時に作成しない'` を探す
+- **2. 編集を保存しきる**:
   - [`apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts`](../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts) で `it('最新編集の保存完了後にだけPlanを記録する'` を探す
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('記録前にdebounceを止め、最新のアクティビティとメモをsnapshot保存する'` を探す
-- **4. 記録を依頼**:
+- **3. 記録を依頼**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx`](../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx) で `it('記録commandも自動再送を無効にする'` を探す
   - [`apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts`](../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.test.ts) で `it('Record作成中は二重実行を無効化する'` を探す
-- **6. RPC で記録**:
+- **5. RPC で記録**:
   - [`apps/product/src/features/timeblock/server/timeblock-command-client.test.ts`](../../apps/product/src/features/timeblock/server/timeblock-command-client.test.ts) で `it('stale versionと消えたversioned targetを別のstable codeへ変換する'` を探す
-- **7. Plan を写して作る**:
+- **6. Plan を写して作る**:
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('rejects future Records and ignores the drained legacy link argument'` を探す（local Supabase が要る integration）
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('allows a Plan and Record to occupy the same time across separate lanes'` を探す
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('serializes confirm-day against one-tap Plan recording'` を探す
-- **8. 出して取り消しを出す**:
+- **7. 出して取り消しを出す**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx`](../../apps/product/src/features/timeblock/hooks/useTimeblockRecordMutations.test.tsx) で `it('ワンタップ記録のトーストから作った Record を取り消せる'` を探す
   - [`apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx`](../../apps/product/src/features/timeblock/components/editor/TimeblockInspectorForm.test.tsx) で `it('記録成功後のRecord IDをInspector切替へ渡す'` を探す
 
@@ -126,39 +129,6 @@ last_verified: 2026-09-21
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('allows either Record restore or overlapping create, never both'` を探す
 - **8. 入れ直す**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx`](../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx) で `it('restore commandの返却行を一致する一覧へ再挿入する'` を探す
-
-### レポートを開く（集計）
-
-- **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('記録した実績が /report の 1 章（配分）に反映される'` を探す（E2E。カレンダーで作った Record が週のレポートに出るところまで）
-  - [`apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts`](../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts) で `test('記録の同一週内移動でInspectorの一覧だけが変わり予定比は変わらない'` を探す（E2E。差分タブの予定比が Plan と Record の対応付けに依らないこと）
-- **1. 期間を決める**:
-  - [`apps/product/src/features/review/lib/report-tab.test.ts`](../../apps/product/src/features/review/lib/report-tab.test.ts) で `it('省略と不正値は時間の使い方へ丸める'` を探す
-- **2. 集計を問い合わせる**:
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('タブを切り替えても期間の query は同じ引数のまま（往復しない）'` を探す
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('項目が足りない古い形の集計が復元されても描ける'` を探す
-- **4. Router で検証**:
-  - [`apps/product/src/features/review/server/router.test.ts`](../../apps/product/src/features/review/server/router.test.ts) で `it('client 入力ではなく認証済み context の userId で集計する'` を探す
-  - [`apps/product/src/features/review/server/router.test.ts`](../../apps/product/src/features/review/server/router.test.ts) で ``it('不正な粒度を受け付けない（`day` は廃止した）'`` を探す
-- **5. 期間の境界を出す**:
-  - [`apps/product/src/features/review/lib/report-period.test.ts`](../../apps/product/src/features/review/lib/report-period.test.ts) で `it('timezone ごとに UTC の瞬間が変わる'` を探す
-  - [`apps/product/src/features/review/lib/report-period.test.ts`](../../apps/product/src/features/review/lib/report-period.test.ts) で `it('DST 開始週でも lengthMinutes は 10080 のまま（意図的に無視する）'` を探す
-  - [`apps/product/src/features/review/lib/report-period.test.ts`](../../apps/product/src/features/review/lib/report-period.test.ts) で `it('隣り合う週の間に隙間が無い（1ms の穴を作らない）'` を探す
-- **6. 行を取る**:
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('期間境界を跨ぐ記録が clip され、跨いだ先の期間にも計上される'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('別ユーザーの記録・予定・アクティビティを混ぜない'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('削除済み記録を除外し、残存する予定は計上する'` を探す
-- **7. TS で集計**:
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `describe('ReportAggregationService.getReportPeriod'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('planPast は開始が now 以下の予定だけを数える'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('アクティビティごとに 1 件の長さの度数を返し、自動移行の記録は数えない'` を探す
-- **8. 派生して描く**:
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('睡眠を隠すと V から睡眠分が抜け、余白の値は変わらない'` を探す
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('カードの前期間比を、見えているアクティビティだけで出す'` を探す
-- **9. 詳細を開いた時だけ取る**:
-  - [`apps/product/src/features/review/server/report-detail-service.test.ts`](../../apps/product/src/features/review/server/report-detail-service.test.ts) で `it('分布は明細の 200 件上限に切られず、全件から出す'` を探す
-  - [`apps/product/src/features/review/server/report-detail-service.test.ts`](../../apps/product/src/features/review/server/report-detail-service.test.ts) で `it('auto_migrated の記録は合計に入るが中央値からは除く'` を探す
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('期間を移すと詳細パネルは閉じる'` を探す
 
 ### ログイン（MFA 含む）
 
@@ -257,9 +227,17 @@ last_verified: 2026-09-21
 
 - **経路全体**:
   - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('exportData の plan / record を安全な CSV Blob としてダウンロードする'` を探す（component test。問い合わせの結果が CSV の Blob になって保存されるまで（期間指定は通っていない））
-- **4. Service が 6 本読む**:
+- **2. 押した時に問い合わせる**:
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('成功後の再取得失敗を古いdataで成功扱いしない'` を探す
+- **4. Service が6種類を読む**:
   - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('plans / records / categories / activities / settings をexportする'` を探す
   - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('profileが未作成ならnullとしてexportする'` を探す
+- **5. 行を読む**:
+  - [`apps/product/src/features/auth/server/user-service.test.ts`](../../apps/product/src/features/auth/server/user-service.test.ts) で `it('Data API上限を越す1201件を4種類とも欠落なくexportする'` を探す（実SDKと合成HTTP上限で全件を照合。後続ページ失敗も別caseで拒否を検査する。実DB検証ではない。）
+- **7. 期間で絞る**:
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `it('期間で絞ってもqueryの全件データを変更しない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'%sの%sの全日を設定TZで選び、隣接日を含めない'` を探す
+  - [`apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx`](../../apps/product/src/features/settings/components/DataSettings.csv-export.test.tsx) で `'不完全・逆転した期間 %s〜%s を全期間として出力しない'` を探す
 - **8. CSV か JSON にする**:
   - [`apps/product/src/features/settings/lib/timeblock-csv-export.test.ts`](../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts) で `it('defined columns以外の内部値はexportしない'` を探す
   - [`apps/product/src/features/settings/lib/timeblock-csv-export.test.ts`](../../apps/product/src/features/settings/lib/timeblock-csv-export.test.ts) で `describe('escapeTimeblockCsvField'` を探す
@@ -351,11 +329,9 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける
 - [Plan を保存](journeys/save-plan.md) の 7. Router → Service
 - [Plan を保存](journeys/save-plan.md) の 10. 確定して取り直す
-- [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 1. ドラッグを離す
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service
-- [Record を作る・Plan を記録する](journeys/record-plan.md) の 5. Router → Service
+- [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門
 - [ログイン（MFA 含む）](journeys/login.md) の 1. サインイン画面
 - [ログイン（MFA 含む）](journeys/login.md) の 3. MFA が要るか確かめる
 - [ログイン（MFA 含む）](journeys/login.md) の 5. コードを検証
@@ -366,11 +342,8 @@ last_verified: 2026-09-21
 - [パスワードを再設定する](journeys/password-reset.md) の 2. Auth が token を発行
 - [パスワードを再設定する](journeys/password-reset.md) の 5. 設定画面を出す
 - [データを書き出す](journeys/data-export.md) の 1. 形式と範囲を選ぶ
-- [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門
-- [データを書き出す](journeys/data-export.md) の 5. 行を読む
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る
-- [データを書き出す](journeys/data-export.md) の 7. 期間で絞る
 - [Google Calendar 連携](journeys/google-calendar.md) の 1. 連携設定で接続
 - [Google Calendar 連携](journeys/google-calendar.md) の 2. /start で準備
 - [Google Calendar 連携](journeys/google-calendar.md) の 3. Google の同意画面
@@ -413,7 +386,7 @@ last_verified: 2026-09-21
 <details>
 <summary>1. 保存時の重なり判定のバグを直す。まずどの層に赤を入れるか</summary>
 
-重なり判定の関数がある層の Unit。DB の排他制約が関わるなら Integration。E2E は、中核の流れ（Plan → Record → Report）を壊す種類の時だけ足す。
+重なり判定の関数がある層の Unit。DB の排他制約が関わるなら Integration。E2E は、中核の流れ（Plan → Record → カレンダー）を壊す種類の時だけ足す。
 
 </details>
 

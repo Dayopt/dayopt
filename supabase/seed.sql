@@ -124,7 +124,7 @@ INSERT INTO public.activities (id, user_id, category_id, name) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
--- Plan / Record（2週間分: 今日を基準に14日前〜今日）
+-- Plan / Record（初回ユーザー作成日を終端とする固定の14日間）
 -- ============================================================
 -- 平日は4-6 timeblock/日、週末は1-2 timeblock/日
 
@@ -132,6 +132,7 @@ DO $$
 DECLARE
   v_user_id UUID := '00000000-0000-0000-0000-000000000001';
   v_date DATE;
+  v_anchor_date DATE;
   v_dow INT;
   v_activity_ids UUID[] := ARRAY[
     'a0000000-0000-0000-0000-000000000001',
@@ -141,8 +142,15 @@ DECLARE
     'a0000000-0000-0000-0000-000000000005'
   ];
 BEGIN
+  -- Keep the initial fixture window across days without deleting user edits.
+  -- Auth created_at survives ON CONFLICT, unlike the wall clock on every push.
+  SELECT (created_at AT TIME ZONE 'UTC')::DATE INTO STRICT v_anchor_date
+  FROM auth.users WHERE id = v_user_id;
+  IF v_anchor_date IS NULL THEN
+    RAISE EXCEPTION 'seed fixture creation date is missing';
+  END IF;
   FOR i IN 0..13 LOOP
-    v_date := CURRENT_DATE - (13 - i);
+    v_date := v_anchor_date - (13 - i);
     v_dow := EXTRACT(DOW FROM v_date)::INT; -- 0=Sun, 6=Sat
 
     -- Supabase re-runs branch seeds on each commit. Stable IDs and natural-key

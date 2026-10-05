@@ -9,7 +9,7 @@ const LOCAL_DB_URL = 'http://127.0.0.1:54321';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY!;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 const RUN_LOCAL = process.env.USE_LOCAL_DB === 'true';
-const TEST_PASSWORD = 'account-gate-password';
+const TEST_PASSWORD = 'account-gate-Test123';
 const DIGEST_A = 'a'.repeat(64);
 const DIGEST_B = 'b'.repeat(64);
 const CUSTOMER_EMAIL_DIGEST = 'c'.repeat(64);

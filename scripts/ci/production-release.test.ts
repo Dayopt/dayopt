@@ -1070,28 +1070,34 @@ describe('runProductionRelease', () => {
     expect(logs.join('\n')).toMatch(/could not be restored for web/);
   });
 
-  it('reports whether the gate checks actually ran', async () => {
-    const normal = createReleaseWorld();
-    await expect(release({ fetchImpl: normal.fetchImpl })).resolves.toMatchObject({
+  it('rejects Force Promote before making any Vercel API call', async () => {
+    const world = createReleaseWorld();
+
+    await expect(
+      release({ fetchImpl: world.fetchImpl, force: true, impactAffected: {} }),
+    ).rejects.toThrow(/Force Promote is no longer supported/);
+
+    expect(world.fetchImpl).not.toHaveBeenCalled();
+    expect(world.promoted()).toEqual([]);
+    expect(world.rolledBack()).toEqual([]);
+  });
+
+  it('runs candidate smoke and Production Config Audit on the normal release path', async () => {
+    const world = createReleaseWorld();
+
+    await expect(release({ fetchImpl: world.fetchImpl })).resolves.toMatchObject({
+      status: 'promoted',
       gateChecksRan: true,
     });
 
-    const forced = createReleaseWorld();
-    await expect(release({ fetchImpl: forced.fetchImpl, force: true })).resolves.toMatchObject({
-      gateChecksRan: false,
-    });
-  });
-
-  it('skips smoke and audit under Force Promote', async () => {
-    const world = createReleaseWorld();
-    const fetchImpl = vi.fn(async (input: URL | string, init?: RequestInit) => {
-      if (String(input).includes('/env')) throw new Error('audit must not run under force');
-      return world.fetchImpl(input, init);
-    });
-
-    await expect(release({ fetchImpl, force: true })).resolves.toMatchObject({
-      status: 'promoted',
-    });
+    const requestedUrls = world.fetchImpl.mock.calls.map(([input]) => String(input));
+    expect(requestedUrls.some((url) => url.startsWith('https://dpl_web_new.vercel.app/'))).toBe(
+      true,
+    );
+    expect(requestedUrls.some((url) => url.startsWith('https://dpl_product_new.vercel.app/'))).toBe(
+      true,
+    );
+    expect(requestedUrls.some((url) => url.includes('/env'))).toBe(true);
     expect(world.promoted()).toEqual(['web', 'product']);
   });
 });
@@ -1512,9 +1518,7 @@ describe('runProductionRelease (affected-aware)', () => {
     ).rejects.toThrow(/web: production moved to dpl_web_hotfix after the gates ran/);
   });
 
-  it('checks deployment identity even under Force Promote', async () => {
-    // Force Promote が免除するのは health / config の gate であって、
-    // 「promote した SHA が今も live」という主張そのものではない。
+  it('checks deployment identity after all release gates run', async () => {
     const world = createReleaseWorld({
       webAliasSequence: [
         'dpl_web_old',
@@ -1525,7 +1529,7 @@ describe('runProductionRelease (affected-aware)', () => {
       ],
     });
 
-    await expect(release({ fetchImpl: world.fetchImpl, force: true })).rejects.toThrow(
+    await expect(release({ fetchImpl: world.fetchImpl })).rejects.toThrow(
       /web: production serves dpl_web_hotfix, not the released dpl_web_new/,
     );
   });
@@ -2576,18 +2580,6 @@ describe('層 3 coverage の不変条件（#2574）', () => {
     expect(world.pointCalls).toEqual([]);
   });
 
-  it('force は検査ごと免除する（impact job が壊れている時の break-glass）', async () => {
-    // force は層 3 job 自体を skip する（promote.yml の e2e / web job の `if:`）。
-    // ここで検査を効かせると、最後の手段が最も要る場面で使えなくなる。
-    const world = createReleaseWorld();
-    await expect(
-      release({ fetchImpl: world.fetchImpl, force: true, impactAffected: {} }),
-    ).resolves.toMatchObject({ status: 'promoted' });
-    // `status: 'promoted'` は promote 0 件でも成立しうる（Auto-assign で先に配信済み）。
-    // force 経路で promote 自体が行われなくなる書き換えを捕まえるため実 promote を見る。
-    expect(world.promoted()).toEqual(['web', 'product']);
-  });
-
   it('待機中に外部 promote された project も検査対象にする（pending ではなく targets で見る）', async () => {
     // **この PR が塞ぐ穴そのもの。** 待機中に人 / Auto-assign が同じ candidate を
     // 先に live にすると、その project は `pending` から外れる（二重 promote を
@@ -3047,12 +3039,12 @@ describe('runProductionRelease（同一 commit の再配備）', () => {
     expect(world.pointCalls).toEqual([]);
   });
 
-  it('Force Promote とは組み合わせられない', async () => {
+  it('rejects the legacy Force Promote option on redeploy before API access', async () => {
     const world = createRedeployWorld();
 
     await expect(
       release({ fetchImpl: world.fetchImpl, redeploy: REDEPLOY, force: true }),
-    ).rejects.toThrow(/cannot be combined with Force Promote/);
+    ).rejects.toThrow(/Force Promote is no longer supported/);
     expect(world.fetchImpl).not.toHaveBeenCalled();
   });
 

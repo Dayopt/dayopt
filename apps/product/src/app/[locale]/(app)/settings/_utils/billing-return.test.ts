@@ -17,7 +17,7 @@ describe('parseBillingReturn', () => {
 
   it('復帰 query が無ければ null を返す', () => {
     expect(parseBillingReturn(new URLSearchParams(''))).toBeNull();
-    expect(parseBillingReturn(new URLSearchParams('panel=review'))).toBeNull();
+    expect(parseBillingReturn(new URLSearchParams('view=week'))).toBeNull();
   });
 
   it("'true' 以外の値は復帰扱いしない", () => {
@@ -35,22 +35,22 @@ describe('parseBillingReturn', () => {
 describe('removeBillingReturnParams', () => {
   it('復帰 query だけを取り除き、他は温存する', () => {
     const result = removeBillingReturnParams(
-      new URLSearchParams('returnTo=%2Fcalendar&success=true&panel=review'),
+      new URLSearchParams('returnTo=%2F%3Fview%3Dweek&success=true&view=week'),
     );
 
     expect(result.get('success')).toBeNull();
-    expect(result.get('returnTo')).toBe('/calendar');
-    expect(result.get('panel')).toBe('review');
+    expect(result.get('returnTo')).toBe('/?view=week');
+    expect(result.get('view')).toBe('week');
   });
 
   it('canceled と portal_return も取り除く', () => {
     const result = removeBillingReturnParams(
-      new URLSearchParams('canceled=true&portal_return=true&panel=review'),
+      new URLSearchParams('canceled=true&portal_return=true&view=week'),
     );
 
     expect(result.get('canceled')).toBeNull();
     expect(result.get('portal_return')).toBeNull();
-    expect(result.get('panel')).toBe('review');
+    expect(result.get('view')).toBe('week');
   });
 
   it('元の URLSearchParams を破壊しない', () => {

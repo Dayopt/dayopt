@@ -22,8 +22,6 @@ interface SidebarProps {
   user: { name: string; email: string; avatar: string | null };
   /** ヘッダー左側（現在のワークスペース名。composition layerから注入） */
   headerTitle: ReactNode;
-  /** ヘッダー右側、閉じるボタンの左に置く切替タブ（composition layerから注入） */
-  headerTabs: ReactNode;
   /** フッターに配置するアクション（通知アイコン等） */
   footerActions?: ReactNode;
   /**
@@ -72,7 +70,6 @@ export function Sidebar({
   children,
   user,
   headerTitle,
-  headerTabs,
   footerActions,
   pinnedContent,
   'aria-label': ariaLabel,
@@ -86,7 +83,7 @@ export function Sidebar({
       className="border-border bg-surface-container text-foreground group flex h-full w-full flex-col border-r"
       aria-label={ariaLabel}
     >
-      {/* Header - 現在のワークスペース名 + Close + 切替タブ。AppHeader.tsx と高さを揃える（h-14） */}
+      {/* Header - ブランド名 + Close。AppHeader.tsx と高さを揃える（h-14） */}
       <div className="flex h-14 shrink-0 items-center justify-between px-2">
         <div className="flex min-w-0 items-center gap-2 pl-2">{headerTitle}</div>
         <div className="flex items-center gap-1">
@@ -105,7 +102,6 @@ export function Sidebar({
               <PanelLeft className="size-4" />
             </Button>
           </HoverTooltip>
-          {headerTabs}
         </div>
       </div>
 

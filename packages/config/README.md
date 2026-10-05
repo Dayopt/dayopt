@@ -9,13 +9,11 @@
 
 ## 構造
 
-```
-packages/config/
-  src/
-    constants.ts   ブランド / domain / URL / 公開 email / createDayoptUrl
-    i18n.ts        locale 定義（SUPPORTED_LOCALES / DEFAULT_LOCALE / LOCALE_PREFIX / Locale）
-    index.ts       barrel（consumer はここから import）
-```
+<!-- docs-live:files:start -->
+
+正本は [packages/config/src/](src)。現在の一覧は `pnpm docs:read packages/config/README.md` で生成して読む。
+
+<!-- docs-live:files:end -->
 
 consumer は常に `@dayopt/config`（barrel）から import する。内部ファイル分割は consumer に影響しない。
 

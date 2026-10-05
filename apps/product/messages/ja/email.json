@@ -77,7 +77,7 @@
     "heading": "Dayopt サブスクリプションが解約されました",
     "body": "契約が終了しました。最後の契約期間の終了日は {periodEndDate} です。",
     "labelProAccessUntil": "Dayopt 利用可能期限",
-    "afterPeriodNote": "保存済みカレンダーとレポートは閲覧できます。データのエクスポートと削除もできます。",
+    "afterPeriodNote": "保存済みの予定と記録は閲覧できます。データのエクスポートと削除もできます。",
     "resubscribeHint": "「設定 → お支払い」からいつでも再登録できます。",
     "ctaButton": "アカウントを管理",
     "thankYou": "Dayopt メンバーとしてご利用いただきありがとうございました。"

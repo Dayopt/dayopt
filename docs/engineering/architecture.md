@@ -172,9 +172,9 @@ graph TD
   subgraph L0["Layer 0"]
     activities["activities (Layer 0)"]
     external_calendar["external-calendar (Layer 0)"]
+    review["review (Layer 0)"]
   end
   subgraph L1["Layer 1"]
-    review["review (Layer 1)"]
     timeblock["timeblock (Layer 1)"]
   end
   subgraph L2["Layer 2"]
@@ -190,7 +190,6 @@ graph TD
   calendar --> activities
   calendar --> external_calendar
   calendar --> timeblock
-  review --> activities
   settings --> auth
   settings --> calendar
   settings --> external_calendar
@@ -219,8 +218,7 @@ flowchart LR
 ```
 
 - 日付と view range は URL と `CalendarNavigationContext` が source of truth。
-- 振り返りは `/report` として独立した画面。かつて Calendar shell の右パネル（`panel=review` / `panel=diff`）だったが、
-  現在その query は legacy redirect の入口としてだけ残る（`panel-url.ts` / `proxy.ts`。2026-09-16 に記述を更新）。
+- ローカライズされたホーム `/` が Calendar を表示する。アクティビティ詳細はユーザー操作で開く overlay として Calendar shell に合成し、タイムブロック Inspector と排他にする。
 - Zustand は drag、inline create、clipboard、inspector、shell などの一時 UI state と、表示モード・アクティビティフィルターのユーザー設定だけを担う。URL/Context の値を永続化しない。
 - Plan / Record / activity などのサーバーデータは Zustand に複製せず、tRPC / TanStack Query 経由で扱う。
 
@@ -802,7 +800,7 @@ erDiagram
     string created_at
     string event_name
     string id
-    json properties
+    NonNullable_Json properties
     string user_id
   }
   profiles {
@@ -838,7 +836,7 @@ erDiagram
     string user_id FK
   }
   reports {
-    json content
+    NonNullable_Json content
     string created_at
     string id
     string period_end
@@ -877,8 +875,8 @@ erDiagram
     string user_id FK
   }
   undo_receipt_field_changes {
-    json after_value
-    json before_value
+    NonNullable_Json after_value
+    NonNullable_Json before_value
     string effect_id FK
     string field_name
     string user_id FK
@@ -966,7 +964,7 @@ erDiagram
 単一 `entries` テーブル（ADR-011）に予定 range と実績 range を同居させ、実績を read 時に自動導出するモデルは、1予定に対する複数回の記録を表現できない・自動記録が見積もり精度などの KPI を歪める、という限界を抱えていた。ADR-025 でこれを Plan / Record の2独立エンティティへ分割し、記録を自動導出ではなく明示操作に反転した。物理テーブルと公開契約は `plans` / `records` に統一している。
 
 - 状態導出（`upcoming` / `active` / `past`）は Plan / Record それぞれの時間位置から行う
-- 保存先は選択 UI ではなく `end_at > now` か否かで一意に決まる（`end_at > now` → Plan、`end_at <= now` → Record）
+- 新規作成の既定は `end_at > now` → Plan、`end_at <= now` → Record（`resolveTimeblockDestination`）。作成 Inspector では終了が現在以前なら Plan / Record を選べる。未来は Plan のみ（`resolveTimeblockKindChoice`）
 - 詳細は ADR-025（削除済み、git 履歴参照） 参照
 
 #### カテゴリー / アクティビティの所有者整合
@@ -1098,7 +1096,7 @@ apps への adoption は完了している。ADR-021（削除済み、git 履歴
 Dayopt の見た目の source of truth。React component は持たず、tokens と theme（+ token showcase の Story）だけを扱う。
 CSS variables は無 prefix（`--background`, `--primary`, `--radius-*` など）が唯一の canonical 体系。旧 `--dayopt-*` prefix は ADR-021 で廃止した。
 
-公開面は `exports` の `./tokens.css` と `./scrollbar.css` の 2 subpath だけ。個別 token CSS（`src/tokens/*.css`, `src/tailwind-theme.css`）は `tokens.css` が相対 import で集約して供給し、直接 import できる subpath としては公開しない。docs やコメントから個別ファイルを指す時は、import 可能な subpath と誤読されないよう `packages/foundations/src/tokens/colors.css` のような repo 相対 path で書く。
+現在の公開 subpath は末尾で manifest の `exports` から生成して読む。個別 token CSS（`src/tokens/*.css`, `src/tailwind-theme.css`）は `tokens.css` が相対 import で集約して供給し、直接 import できる subpath としては公開しない。docs やコメントから個別ファイルを指す時は、import 可能な subpath と誤読されないよう `packages/foundations/src/tokens/colors.css` のような repo 相対 path で書く。
 
 Storybook 表示: `Shared/Foundations/*`（Colors / Typography / Spacing / Radius / Elevation / Z-Index / Motion / Icons / Overview）
 
@@ -1296,3 +1294,11 @@ Future extraction:
 - billing / legal / pricing 文言は i18n の表示責務と `packages/billing` の public constants の境界を分けて扱う。
 - admin app または別 runtime が同じ permission model を必要とした時点で、product auth domain を `packages/auth` の pure model として昇格する。
 - 昇格後も Supabase client, cookie, middleware, session refresh, route handler は product 側に残す。
+
+## 機械取得する現状
+
+<!-- docs-live:facts:start -->
+
+抽出対象の登録は [scripts/lib/docs-live/facts.ts](../../scripts/lib/docs-live/facts.ts)。現在の一覧は `pnpm docs:read docs/engineering/architecture.md` で生成して読む。
+
+<!-- docs-live:facts:end -->

@@ -17,7 +17,7 @@ const i18n = {
     body: 'Click the button below to log in to your Dayopt account. No password needed.',
     ctaButton: 'Log In to Dayopt',
     buttonFallback: "If the button doesn't work, copy and paste this link into your browser:",
-    expiryNote: 'This link will expire in 1 hour.',
+    expiryNote: 'This link expires. If it has expired, request a new link.',
     ignoreLine:
       "If you didn't request this login link, you can safely ignore this email. Someone may have entered your email address by mistake.",
     teamSignature: 'The Dayopt Team',
@@ -28,7 +28,8 @@ const i18n = {
     ctaButton: 'Dayopt にログイン',
     buttonFallback:
       'ボタンが機能しない場合は、以下のリンクをブラウザにコピー＆ペーストしてください：',
-    expiryNote: 'このリンクは1時間で有効期限が切れます。',
+    expiryNote:
+      'このリンクには有効期限があります。期限が切れた場合は、再度リンクをリクエストしてください。',
     ignoreLine:
       'ログインリンクをリクエストした覚えがない場合は、このメールを無視してください。他の方がメールアドレスを間違えて入力した可能性があります。',
     teamSignature: 'Dayopt チーム',

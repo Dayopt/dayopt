@@ -126,6 +126,40 @@ describe('React Email templates', () => {
   );
 
   describe('generated auth email previews', () => {
+    // Hook payload has no expiry. A duration cannot be inferred from the action:
+    // auth.email.otp_expiry governs both links and varies across environments.
+    it.each(
+      (['en', 'ja'] as const).flatMap((locale) => [
+        {
+          name: `recovery (${locale})`,
+          locale,
+          element: PasswordResetEmail({
+            userName: 'Synthetic User',
+            resetUrl: 'https://app.dayopt.test/auth/confirm?token_hash=synthetic&type=recovery',
+            locale,
+          }),
+        },
+        {
+          name: `magic link (${locale})`,
+          locale,
+          element: MagicLinkEmail({
+            loginUrl: 'https://app.dayopt.test/auth/confirm?token_hash=synthetic&type=magiclink',
+            locale,
+          }),
+        },
+      ]),
+    )(
+      'expired $name explains requesting a new link without an unverified duration',
+      async ({ element, locale }) => {
+        const text = await render(element, { plainText: true });
+        expect(text).not.toMatch(/\d+\s*(?:hours?|minutes?|seconds?|時間|分|秒)/i);
+        expect(text).toMatch(locale === 'en' ? /expir/i : /期限/);
+        expect(text).toMatch(
+          locale === 'en' ? /request (?:a|another|a new) link/i : /再度.*リクエスト/,
+        );
+      },
+    );
+
     it('preserves the signup text, fallback name, and confirmation URL', async () => {
       const confirmUrl = 'https://app.dayopt.app/auth/confirm?token_hash=test&type=signup';
       const html = await render(ConfirmEmail({ userName: '', confirmUrl, locale: 'en' }));
@@ -151,7 +185,6 @@ describe('React Email templates', () => {
       const resetUrl = 'https://app.dayopt.app/auth/reset?token_hash=test&type=recovery';
       const html = await render(PasswordResetEmail({ userName: 'Tomoya', resetUrl, locale: 'en' }));
 
-      expect(html).toContain('This link will expire in 24 hours.');
       expect(html.match(/your settings/g)).toHaveLength(2);
       expect(html).toContain('href="https://app.dayopt.app/settings/account"');
       expect(countHtmlOccurrences(html, resetUrl)).toBe(3);
@@ -206,11 +239,10 @@ describe('React Email templates', () => {
       expect(countHtmlOccurrences(html, confirmUrl)).toBe(3);
     });
 
-    it('preserves the magic-link expiry and application link', async () => {
+    it('preserves the magic-link application link', async () => {
       const loginUrl = 'https://app.dayopt.app/auth/magic-link?token_hash=test&type=magic_link';
       const html = await render(MagicLinkEmail({ loginUrl, locale: 'ja' }));
 
-      expect(html).toContain('このリンクは1時間で有効期限が切れます。');
       expect(html).toContain('href="https://app.dayopt.app"');
       expect(countHtmlOccurrences(html, loginUrl)).toBe(3);
     });

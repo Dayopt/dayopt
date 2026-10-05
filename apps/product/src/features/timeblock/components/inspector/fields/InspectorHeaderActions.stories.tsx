@@ -29,8 +29,7 @@ type Story = StoryObj;
 
 const fullPlannedMenu = getTimeblockMenuItems({
   activityId: 'activity-1',
-  onViewStats: fn(),
-  onCopy: fn(),
+  onViewActivityDetails: fn(),
   onDuplicate: fn(),
   onDelete: fn(),
 });
@@ -38,15 +37,13 @@ const fullPlannedMenu = getTimeblockMenuItems({
 /** Record のメニュー。 */
 const recordMenu = getTimeblockMenuItems({
   activityId: 'activity-1',
-  onViewStats: fn(),
-  onCopy: fn(),
+  onViewActivityDetails: fn(),
   onDuplicate: fn(),
   onDelete: fn(),
 });
 
-const copyAndDeleteMenu = getTimeblockMenuItems({
+const duplicateAndDeleteMenu = getTimeblockMenuItems({
   activityId: 'activity-1',
-  onCopy: fn(),
   onDuplicate: fn(),
   onDelete: fn(),
 });
@@ -64,11 +61,11 @@ export const WithMenu: Story = {
   ),
 };
 
-/** コピー・複製と削除（振り返りなし）。 */
-export const CopyAndDelete: Story = {
+/** 複製と削除（振り返りなし）。 */
+export const DuplicateAndDelete: Story = {
   render: () => (
     <div className="w-72">
-      <InspectorHeaderActions menuItems={copyAndDeleteMenu} onCloseInspector={fn()} />
+      <InspectorHeaderActions menuItems={duplicateAndDeleteMenu} onCloseInspector={fn()} />
     </div>
   ),
 };

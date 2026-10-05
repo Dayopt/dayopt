@@ -16,11 +16,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   PRODUCT_BUILD_SCRIPTS,
+  PUBLIC_DOCUMENT_BUILD_INPUTS,
   formatGithubOutput,
   formatSummary,
   readWorkspaceGraph,
   resolveImpact,
   resolveVercelIgnore,
+  resolveWorkspaceTestScope,
 } from './impact.mjs';
 
 /**
@@ -87,6 +89,67 @@ describe('workspace 依存グラフ', () => {
   });
 });
 
+describe('SQL検証のCI配線', () => {
+  it('SQLテスト単独の変更でも隔離DBのintegration検証を要求する', () => {
+    const impact = resolveImpact(['supabase/tests/integration-oauth-identity.sql']);
+    expect(impact.integration).toBe(true);
+  });
+});
+
+describe('workspace test scope', () => {
+  it('Product の変更は Product 側の related 判定へ任せる', () => {
+    expect(
+      resolveWorkspaceTestScope(['apps/product/src/features/plans/ui/Plan.tsx']).workspaces,
+    ).toEqual([]);
+  });
+
+  it('Web の変更は Web の test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['apps/web/src/app/page.tsx']).workspaces).toEqual([
+      { name: '@dayopt/web', script: 'test:run' },
+    ]);
+  });
+
+  it('共有 components package は利用する Web の test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['packages/components/src/button.tsx']).workspaces).toEqual([
+      { name: '@dayopt/web', script: 'test:run' },
+    ]);
+  });
+
+  it('workspace manifest・lockfile・未知 path は test 対象を全件に倒す', () => {
+    const all = [
+      { name: '@dayopt/billing', script: 'test:run' },
+      { name: '@dayopt/i18n', script: 'test:run' },
+      { name: '@dayopt/observability', script: 'test:run' },
+      { name: '@dayopt/web', script: 'test:run' },
+    ];
+    expect(resolveWorkspaceTestScope(['packages/i18n/package.json']).workspaces).toEqual(all);
+    expect(resolveWorkspaceTestScope(['pnpm-lock.yaml']).workspaces).toEqual(all);
+    expect(resolveWorkspaceTestScope(['new-root-policy.json']).workspaces).toEqual(all);
+  });
+
+  it('共有setup action の変更は全 workspace test を実行する', () => {
+    expect(resolveWorkspaceTestScope(['.github/actions/setup/action.yml'])).toMatchObject({
+      scope: 'all',
+      workspaces: [
+        { name: '@dayopt/billing', script: 'test:run' },
+        { name: '@dayopt/i18n', script: 'test:run' },
+        { name: '@dayopt/observability', script: 'test:run' },
+        { name: '@dayopt/web', script: 'test:run' },
+      ],
+    });
+  });
+
+  it('docs・workflow・scripts のみなら別workspace testを要求しない', () => {
+    expect(
+      resolveWorkspaceTestScope([
+        'docs/engineering/testing.md',
+        '.github/workflows/ci.yml',
+        'scripts/ci/check.mjs',
+      ]).workspaces,
+    ).toEqual([]);
+  });
+});
+
 describe('docs のみの変更', () => {
   it.each([
     [['docs/strategy.md']],
@@ -149,6 +212,14 @@ describe('app とその依存', () => {
 
   it('supabase/migrations → product + integration', () => {
     expectImpact(['supabase/migrations/20260804000000_add_table.sql'], {
+      product: true,
+      productJourney: true,
+      integration: true,
+    });
+  });
+
+  it('supabase seed and database regression tests → product + integration', () => {
+    expectImpact(['supabase/seed.sql', 'supabase/tests/seed-idempotency.sql'], {
       product: true,
       productJourney: true,
       integration: true,
@@ -340,6 +411,28 @@ describe('Vercel の build が実行する root script', () => {
 });
 
 describe('vercel.json ignoreCommand contract（Vercel Ignored Build Step）', () => {
+  it('ブランド説明の正本変更は docs-only で skip せず、両方の公開ビルドが必要になる', () => {
+    expectImpact(['docs/business/brand.md'], {
+      product: true,
+      web: true,
+      productJourney: true,
+      webPreviewSmoke: true,
+    });
+  });
+  it('配布文書の生成器・正本を変更すると両 app を rebuild し、Turbo cache も無効にする', () => {
+    const turbo = JSON.parse(readFileSync(join(rootDir, 'turbo.json'), 'utf8')) as {
+      globalDependencies: string[];
+    };
+    for (const path of PUBLIC_DOCUMENT_BUILD_INPUTS) {
+      expectImpact([path], {
+        product: true,
+        web: true,
+        productJourney: true,
+        webPreviewSmoke: true,
+      });
+      expect(turbo.globalDependencies).toContain(path);
+    }
+  });
   // apps/{product,web}/vercel.json の `ignoreCommand` が壊れると、Vercel の build container が
   // その project の全 deployment を無条件 build（コマンド解決失敗は exit != 0 = build 継続なので
   // 安全側だが Impact Resolver の判定が一切効かなくなる）に倒れる。path は Root Directory 基準の

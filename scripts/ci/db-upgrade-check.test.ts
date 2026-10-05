@@ -12,6 +12,7 @@ import {
   compareCounts,
   compareRowIdentity,
   compareSchemaContracts,
+  compareUpgradeConsumerContracts,
   extractSchemaContract,
   parseCounts,
   parsePrimaryKeys,
@@ -389,11 +390,13 @@ describe('runDbUpgradeCheck orchestration', () => {
     upgradedTypes = typesFixture(),
     freshTypes = typesFixture(),
     baseTypes = typesFixture(),
+    baselineTypes = '',
     changed = 'A\tsupabase/migrations/20260917000000_b.sql\n',
     migrationUpFails = false,
     resetFails = false,
     rowsAfter = 'public.activities,(a1)\npublic.activities,(a2)\npublic.activities,(a3)\n',
     freshCatalog = 'index:public.activities_pkey CREATE UNIQUE INDEX ...\n',
+    env = { GITHUB_EVENT_NAME: 'pull_request', GITHUB_REF: 'refs/pull/2926/merge' },
   } = {}) {
     const calls: Call[] = [];
     const moves: [string, string][] = [];
@@ -404,6 +407,7 @@ describe('runDbUpgradeCheck orchestration', () => {
     const exec = (file: string, args: string[]) => {
       calls.push([file, args]);
       const joined = `${file} ${args.join(' ')}`;
+      if (joined.startsWith('git rev-parse --verify origin/main')) return 'c'.repeat(40);
       if (joined.startsWith('git rev-parse --verify HEAD^1')) return 'b'.repeat(40);
       if (joined.startsWith('git rev-parse --verify HEAD^2')) return 'a'.repeat(40);
       if (joined.startsWith('git ls-tree'))
@@ -438,11 +442,18 @@ describe('runDbUpgradeCheck orchestration', () => {
           ? 'public.activities,3\nauth.users,1\n'
           : countsAfter;
       if (joined.startsWith('pnpm rls:snapshot:check')) return '';
-      if (joined.startsWith('supabase gen types')) return upgradedTypes;
-      if (joined.startsWith('pnpm exec prettier')) return upgradedTypes;
+      if (joined.startsWith('supabase gen types'))
+        return calls.some(([f, a]) => f === 'supabase' && a[0] === 'migration')
+          ? upgradedTypes
+          : baselineTypes || baseTypes;
+      if (joined.startsWith('pnpm exec prettier'))
+        return calls.some(([f, a]) => f === 'supabase' && a[0] === 'migration')
+          ? upgradedTypes
+          : baselineTypes || baseTypes;
       throw new Error(`unexpected exec: ${joined}`);
     };
     const result = runDbUpgradeCheck({
+      env,
       exec,
       readFile: (path) => (path === SEED_PATH ? files.get(SEED_PATH)! : freshTypes),
       writeFile: (path, text) => files.set(path, text),
@@ -482,9 +493,30 @@ describe('runDbUpgradeCheck orchestration', () => {
       'dataPreserved',
       'rlsSnapshot',
       'freshEquivalence',
+      'baselineTypeDrift',
       'oldConsumer',
       'catalogEquivalence',
     ]);
+  });
+
+  it('uses main for a manually dispatched branch whose HEAD is a main-sync merge commit', () => {
+    const { result, calls } = harness({
+      env: {
+        GITHUB_EVENT_NAME: 'workflow_dispatch',
+        GITHUB_REF: 'refs/heads/codex/preview-shared-db-2910',
+      },
+    });
+    expect(result.baseSha).toBe('c'.repeat(40));
+    expect(calls).not.toContainEqual(['git', ['rev-parse', '--verify', 'HEAD^1^{commit}']]);
+  });
+
+  it('uses the base parent only for the GitHub PR merge ref', () => {
+    expect(harness().result.baseSha).toBe('b'.repeat(40));
+    expect(
+      harness({
+        env: { GITHUB_EVENT_NAME: 'pull_request', GITHUB_REF: 'refs/heads/codex/candidate' },
+      }).result.baseSha,
+    ).toBe('c'.repeat(40));
   });
 
   it('stashes an added migration with an older timestamp so the base reset cannot apply it before seed', () => {
@@ -579,5 +611,47 @@ describe('runDbUpgradeCheck orchestration', () => {
     });
     expect(result.status).toBe('fail');
     expect(result.problems[0]).toMatch(/base revision unavailable/);
+  });
+});
+
+describe('actual baseline type-generation drift', () => {
+  const contract = (text: string) => extractSchemaContract(text);
+  it('discounts a stored type representation only when it already exists before upgrade', () => {
+    const stored = typesFixture();
+    const actual = stored.replaceAll('archived_at?: string | null;', 'archived_at?: never;');
+    const result = compareUpgradeConsumerContracts(
+      contract(stored),
+      contract(actual),
+      contract(actual),
+    );
+    expect(result.narrowing).toBe(false);
+    expect(result.baselineDrift.writeContracts).toEqual([
+      'activities.archived_at (insert): string | null → never',
+    ]);
+  });
+  it('still rejects a real migration write-contract narrowing with the same stored types', () => {
+    const stored = typesFixture();
+    const narrowed = stored.replaceAll('archived_at?: string | null;', 'archived_at?: never;');
+    expect(
+      compareUpgradeConsumerContracts(contract(stored), contract(stored), contract(narrowed))
+        .narrowing,
+    ).toBe(true);
+  });
+  it('does not discount a removed object even when stored types already differ from baseline', () => {
+    const stored = typesFixture().replace('      activities: {', '      legacy: {');
+    const actual = typesFixture();
+    expect(
+      compareUpgradeConsumerContracts(contract(stored), contract(actual), contract(actual)).removed
+        .tables,
+    ).toEqual(['legacy']);
+  });
+  it('rejects a further change after pre-existing drift', () => {
+    const stored = typesFixture();
+    const baseline = stored.replaceAll('archived_at?: string | null;', 'archived_at?: never;');
+    const upgraded = baseline.replaceAll('archived_at?: never;', 'archived_at: number;');
+    expect(
+      compareUpgradeConsumerContracts(contract(stored), contract(baseline), contract(upgraded))
+        .narrowing,
+    ).toBe(true);
   });
 });

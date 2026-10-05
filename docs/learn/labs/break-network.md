@@ -104,7 +104,7 @@ window.fetch = async function (input, init) {
 [
   {
     "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
-    "find": "onSettled: invalidate"
+    "find": "onSettled: settleAndInvalidate"
   },
   {
     "path": "supabase/migrations/20260708232500_add_time_model_tables.sql",

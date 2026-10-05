@@ -13,10 +13,14 @@
 import { PanelLeft } from 'lucide-react';
 
 import { FeatureErrorBoundary } from '@/components/ui/feedback/error-boundary';
+import { ConnectedActivitySummaryPanel } from '@/features/activities';
 import { CalendarController, useCalendarNavigation } from '@/features/calendar';
+import { MEDIA_QUERIES } from '@/lib/breakpoints';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { Button } from '@dayopt/components';
 import { ConnectedMobileAccountButton } from '../../_shell/MobileAccountButton';
+import { useActivityRecordJump } from './useActivityRecordJump';
 import { useCalendarComposition } from './useCalendarComposition';
 
 interface CalendarViewClientProps {
@@ -31,6 +35,8 @@ export function CalendarViewClient({ translations }: CalendarViewClientProps) {
   const calendarNavigation = useCalendarNavigation();
   const sidebar = useShellStore.use.sidebar();
   const toggleSidebar = useShellStore.use.toggleSidebar();
+  const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
+  const { onJumpToRecord } = useActivityRecordJump();
 
   // CalendarNavigationProvider は base-layout-content.tsx で常にレンダリングされるため、
   // calendarNavigation は常に利用可能。
@@ -102,8 +108,7 @@ export function CalendarViewClient({ translations }: CalendarViewClientProps) {
           onTimeblockUpdate={composition.onTimeblockUpdate}
           onDeleteTimeblock={composition.onDeleteTimeblock}
           onDeleteTimeblockConfirm={composition.onDeleteTimeblockConfirm}
-          onViewStats={composition.onViewStats}
-          onCopy={composition.onCopy}
+          onViewActivityDetails={composition.onViewActivityDetails}
           onNavigate={composition.onNavigate}
           onViewChange={composition.onViewChange}
           onNavigatePrev={composition.onNavigatePrev}
@@ -116,6 +121,10 @@ export function CalendarViewClient({ translations }: CalendarViewClientProps) {
           rightSlot={<ConnectedMobileAccountButton className="md:hidden" />}
         />
       </FeatureErrorBoundary>
+      <ConnectedActivitySummaryPanel
+        surface={isMobile ? 'sheet' : 'panel'}
+        onOpenRecord={onJumpToRecord}
+      />
     </div>
   );
 }

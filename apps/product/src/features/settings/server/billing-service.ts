@@ -441,6 +441,37 @@ async function getInvoicesByCustomerId(stripe: Stripe, customerId: string): Prom
   }));
 }
 
+interface BillingSubscriptionSnapshot {
+  subscriptionId: string | null;
+  status: string;
+  updatedAt: string;
+}
+
+/** Capture the profile before a provider read so a concurrent transition cannot be overwritten. */
+export async function getBillingSubscriptionSnapshot(
+  supabase: SupabaseClient<Database>,
+  customerId: string,
+): Promise<BillingSubscriptionSnapshot> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('subscription_id, subscription_status, updated_at')
+    .eq('stripe_customer_id', customerId)
+    .single();
+  if (error) {
+    throw new BillingServiceError('FETCH_FAILED', 'Failed to read billing subscription state', {
+      cause: captureUnexpectedDatabaseError(error, {
+        feature: 'billing',
+        operation: 'read_subscription_snapshot',
+      }),
+    });
+  }
+  return {
+    subscriptionId: data.subscription_id,
+    status: data.subscription_status,
+    updatedAt: data.updated_at,
+  };
+}
+
 /**
  * Webhook: サブスクリプションステータスを同期
  *
@@ -451,15 +482,23 @@ export async function syncSubscriptionStatus(
   stripeCustomerId: string,
   subscriptionId: string | null,
   status: SubscriptionStatus,
+  expected?: BillingSubscriptionSnapshot,
 ): Promise<void> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('profiles')
     .update({
       subscription_status: status,
       subscription_id: subscriptionId,
     })
-    .eq('stripe_customer_id', stripeCustomerId)
-    .select('id');
+    .eq('stripe_customer_id', stripeCustomerId);
+  if (expected) {
+    query = query.eq('subscription_status', expected.status).eq('updated_at', expected.updatedAt);
+    query =
+      expected.subscriptionId === null
+        ? query.is('subscription_id', null)
+        : query.eq('subscription_id', expected.subscriptionId);
+  }
+  const { data, error } = await query.select('id');
 
   if (error) {
     logger.error('Failed to sync subscription status', { status });

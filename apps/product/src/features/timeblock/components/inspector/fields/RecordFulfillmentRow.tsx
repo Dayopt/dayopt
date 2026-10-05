@@ -3,24 +3,24 @@
 /**
  * 充実度インライン行（Record 専用、#2317）
  *
- * icon + label（左）、3つのトグルテキストボタン（右、User指示で#2412のicon版から変更）。
+ * icon + label（左）、3段階のアイコン付きトグルボタン（右）。
  * ワンクリックで選択、もう一回クリックで解除（既定は未入力）。
  * Plan には無い概念なので、TimeblockInspectorForm は kind === 'record' の時だけ描画する。
  */
 
 import { useCallback } from 'react';
 
-import { Smile } from 'lucide-react';
+import { Frown, Meh, Smile } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { cn } from '@dayopt/components';
 
 import type { Fulfillment } from '../../../schemas/timeblock';
 
-const FULFILLMENT_OPTIONS: { value: Fulfillment }[] = [
-  { value: 'low' },
-  { value: 'medium' },
-  { value: 'high' },
+const FULFILLMENT_OPTIONS: { value: Fulfillment; icon: typeof Smile }[] = [
+  { value: 'low', icon: Frown },
+  { value: 'medium', icon: Meh },
+  { value: 'high', icon: Smile },
 ];
 
 interface RecordFulfillmentRowProps {
@@ -29,7 +29,7 @@ interface RecordFulfillmentRowProps {
   disabled?: boolean;
 }
 
-/** Inspector の充実度入力行（3 段階トグルアイコン、再クリックで解除） */
+/** Inspector の充実度入力行（アイコンとテキストの3段階トグル、再クリックで解除） */
 export function RecordFulfillmentRow({
   value,
   onChange,
@@ -55,7 +55,7 @@ export function RecordFulfillmentRow({
         親（bg-muted px-4）のcontent edgeに揃える（User指示）。negative marginは使わない。
       */}
       <div className="flex items-center gap-1">
-        {FULFILLMENT_OPTIONS.map(({ value: option }) => {
+        {FULFILLMENT_OPTIONS.map(({ value: option, icon: Icon }) => {
           const isSelected = value === option;
           return (
             <button
@@ -65,7 +65,7 @@ export function RecordFulfillmentRow({
               onClick={() => handleToggle(option)}
               aria-pressed={isSelected}
               className={cn(
-                'border-border rounded-lg border px-2 py-1 text-sm font-medium transition-colors',
+                'border-border inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-sm font-medium transition-colors',
                 'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none',
                 'disabled:pointer-events-none disabled:opacity-50',
                 isSelected
@@ -73,6 +73,7 @@ export function RecordFulfillmentRow({
                   : 'text-muted-foreground hover:bg-state-hover hover:text-foreground',
               )}
             >
+              <Icon aria-hidden="true" className="size-4 shrink-0" />
               {t(`options.${option}`)}
             </button>
           );

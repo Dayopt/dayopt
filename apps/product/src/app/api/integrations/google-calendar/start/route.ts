@@ -5,7 +5,10 @@ import {
   normalizeLocale,
   setConnectFlowCookie,
 } from '@/features/external-calendar/server/connect-flow';
-import { getReconnectTarget } from '@/features/external-calendar/server/connection-service';
+import {
+  beginCalendarOAuthAttempt,
+  getReconnectTarget,
+} from '@/features/external-calendar/server/connection-service';
 import {
   buildAuthorizationUrl,
   generatePkcePair,
@@ -27,8 +30,8 @@ import { z } from 'zod';
 /** AES-256-GCM に node:crypto が要る。Edge では動かない。 */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-/** Supabase auth + Pro entitlement 確認 + rate limit + reconnect target 取得の合算。Google への redirect のみで外部往復は無い。 */
-export const maxDuration = 60;
+/** auth / MFA / Pro / rate limit / reconnect target / fenced OAuth attempt の直列往復をカバーする。 */
+export const maxDuration = 90;
 
 /**
  * Google カレンダー接続の開始。
@@ -160,6 +163,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const state = generateState();
   const { verifier, challenge } = generatePkcePair();
   const locale = normalizeLocale(requestUrl.searchParams.get('locale') ?? undefined);
+  let attemptId: string;
+
+  try {
+    attemptId = await beginCalendarOAuthAttempt({
+      userId: user.id,
+      state,
+      verifier,
+    });
+  } catch (error) {
+    captureUnexpectedError(
+      error instanceof Error ? error : new Error('failed to begin calendar OAuth attempt'),
+      {
+        feature: 'external_calendar',
+        operation: 'begin_oauth_attempt',
+        route: '/api/integrations/google-calendar/start',
+      },
+    );
+    logger.error('[calendar-connect] failed to begin fenced OAuth attempt');
+    return NextResponse.json({ error: 'Failed to start calendar connection' }, { status: 500 });
+  }
 
   const response = NextResponse.redirect(
     buildAuthorizationUrl({
@@ -175,6 +198,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     {
       state,
       verifier,
+      attemptId,
       locale,
       userId: user.id,
       ...(reconnectConnectionId?.success

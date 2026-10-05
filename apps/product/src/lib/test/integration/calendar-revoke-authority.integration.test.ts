@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -117,9 +119,116 @@ async function claimOne() {
   return data;
 }
 
+function legacyCutoverFixture(): void {
+  assertNoCalendarAuthorityProject();
+  ownerSql(
+    `INSERT INTO auth.users (id, aud, role, email, encrypted_password,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES (:'user_id'::UUID, 'authenticated', 'authenticated', :'user_email', '',
+  '{}'::JSONB, '{}'::JSONB, now(), now());
+INSERT INTO public.calendar_connections (id, user_id, provider, provider_account_id,
+  granted_scopes, refresh_token_enc, status, data_generation)
+VALUES (:'connection_id'::UUID, :'user_id'::UUID, 'google', 'cutover-owned-subject',
+  ARRAY['https://www.googleapis.com/auth/calendar.events.readonly'],
+  'cutover-owned-ciphertext', 'active', 0);`,
+    {
+      user_id: userId,
+      user_email: userEmail,
+      connection_id: connectionId,
+    },
+  );
+}
+
+function cutoverSql(commit: boolean): string {
+  const source = readFileSync(
+    resolve(process.cwd(), '../../scripts/runbook/calendar-authority-cutover.sql'),
+    'utf8',
+  );
+  const candidate = source
+    .replaceAll(
+      '52921473418-gb3f8tb66kf7itic5r7ra32saojgmkfh.apps.googleusercontent.com',
+      oauthClientId,
+    )
+    .replaceAll('52921473418', projectKey);
+  // The default remains rollback; only isolated fixture tests replace its final statement.
+  if (!candidate.endsWith('ROLLBACK;\n')) throw new Error('Cutover must default to rollback');
+  return commit ? candidate.slice(0, -'ROLLBACK;\n'.length) + 'COMMIT;\n' : candidate;
+}
+
 describe.skipIf(!RUN_LOCAL)('Calendar revoke authority worker contract', () => {
   afterEach(() => {
     cleanupFixture();
+  });
+
+  it('dry-runs authority cutover without retaining fences or changing the legacy connection', () => {
+    // Protect rollback: compare complete fixture row, including token and generation.
+    legacyCutoverFixture();
+    const before = ownerSql(
+      `SELECT row_to_json(c)::TEXT FROM public.calendar_connections c WHERE id = :'connection_id'::UUID;`,
+      { connection_id: connectionId },
+    );
+    ownerSql(cutoverSql(false));
+    expect(ownerSql('SELECT count(*) FROM private.calendar_authority_projects;')).toBe('0');
+    expect(ownerSql('SELECT count(*) FROM private.calendar_authority_fences;')).toBe('0');
+    expect(
+      ownerSql(
+        `SELECT row_to_json(c)::TEXT FROM public.calendar_connections c WHERE id = :'connection_id'::UUID;`,
+        { connection_id: connectionId },
+      ),
+    ).toBe(before);
+  });
+
+  it('activates exactly the owned legacy connection while preserving its credential and status', () => {
+    // Protect the production-shaped provision -> backfill -> activation path.
+    legacyCutoverFixture();
+    const before = ownerSql(
+      `SELECT (to_jsonb(c) - 'authority_fence_id' - 'authority_epoch' - 'updated_at')::TEXT FROM public.calendar_connections c WHERE id = :'connection_id'::UUID;`,
+      { connection_id: connectionId },
+    );
+    ownerSql(cutoverSql(true));
+    expect(
+      serviceRoleSql(
+        `SELECT activated::TEXT || ':' || unbound_connections::TEXT || ':' || pending_operations::TEXT FROM public.get_calendar_authority_readiness_v1(:'project_key', :'oauth_client_id');`,
+        { project_key: projectKey, oauth_client_id: oauthClientId },
+      ),
+    ).toBe('true:0:0');
+    expect(
+      ownerSql(
+        `SELECT (to_jsonb(c) - 'authority_fence_id' - 'authority_epoch' - 'updated_at')::TEXT FROM public.calendar_connections c WHERE id = :'connection_id'::UUID;`,
+        { connection_id: connectionId },
+      ),
+    ).toBe(before);
+    expect(
+      ownerSql(
+        `SELECT count(*) FROM public.calendar_connections WHERE id=:'connection_id'::UUID AND authority_fence_id IS NOT NULL AND authority_epoch IS NOT NULL;`,
+        { connection_id: connectionId },
+      ),
+    ).toBe('1');
+  });
+
+  it('rejects a changed generation before provisioning or scheduling revocation', () => {
+    // Protect fail-closed: mismatched legacy data must never be promoted by this runbook.
+    legacyCutoverFixture();
+    ownerSql(
+      `UPDATE public.calendar_connections SET data_generation = 1 WHERE id=:'connection_id'::UUID;`,
+      { connection_id: connectionId },
+    );
+    expect(() => ownerSql(cutoverSql(true))).toThrow('Calendar cutover baseline changed');
+    expect(ownerSql('SELECT count(*) FROM private.calendar_authority_projects;')).toBe('0');
+    expect(ownerSql('SELECT count(*) FROM private.calendar_revoke_outbox;')).toBe('0');
+  });
+
+  it('rejects replay after activation without changing the established authority', () => {
+    // Protect immutable identity and unknown-response recovery: do not replay a cutover.
+    legacyCutoverFixture();
+    ownerSql(cutoverSql(true));
+    const before = ownerSql(
+      'SELECT row_to_json(p)::TEXT FROM private.calendar_authority_projects p;',
+    );
+    expect(() => ownerSql(cutoverSql(true))).toThrow('Calendar cutover baseline changed');
+    expect(
+      ownerSql('SELECT row_to_json(p)::TEXT FROM private.calendar_authority_projects p;'),
+    ).toBe(before);
   });
 
   it('serializes claims and replays only the exact lease outcome before guard settlement', async () => {

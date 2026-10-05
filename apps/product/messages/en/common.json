@@ -209,7 +209,7 @@
     },
     "trialEnded": {
       "title": "Your 45-day trial has ended",
-      "description": "View your saved calendar and reports, export or delete your data, or subscribe to resume editing.",
+      "description": "View your saved plans and records, export or delete your data, or subscribe to resume editing.",
       "continueFree": "View saved data",
       "continuePro": "Subscribe"
     },

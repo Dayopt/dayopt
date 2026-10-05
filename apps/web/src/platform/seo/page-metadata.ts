@@ -1,13 +1,21 @@
+import type { OgCategory, OgLayout } from '@dayopt/assets/og';
 import { env } from '@web/platform/config/env';
 import type { Metadata } from 'next';
 
+import { normalizeOgLocale } from './og-category-label';
 import { siteConfig } from './site-config';
 
 export interface SEOData {
   title?: string;
+  /** Browser tab title; defaults to the page title derived from `title`. */
+  documentTitle?: string;
+  /** Social cards use the brand name when the page headline is editorial copy. */
+  ogTitle?: string;
   description?: string;
   keywords?: string[];
-  image?: string;
+  category?: OgCategory;
+  layout?: OgLayout;
+  screenshot?: string;
   url?: string;
   type?: 'website' | 'article';
   publishedTime?: string;
@@ -45,9 +53,13 @@ function formatLocaleForOpenGraph(locale: string): string {
 export function generateSEOMetadata(data: SEOData = {}): Metadata {
   const {
     title,
+    documentTitle,
+    ogTitle,
     description = siteConfig.description,
     keywords = [],
-    image,
+    category = 'product',
+    layout,
+    screenshot,
     url,
     type = 'website',
     publishedTime,
@@ -60,7 +72,8 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
     noindex = false,
   } = data;
 
-  const pageTitle = title ? `${title} | ${siteConfig.name}` : siteConfig.title;
+  const pageTitle = documentTitle || (title ? `${title} | ${siteConfig.name}` : siteConfig.title);
+  const socialTitle = ogTitle || pageTitle;
   const normalizedPath = normalizePath(stripLocaleFromUrl(url || ''));
   const canonicalUrl =
     locale === 'en'
@@ -68,12 +81,14 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
       : `${siteConfig.url}/${locale}${normalizedPath}`;
 
   const ogSearchParams = new URLSearchParams({
-    title: title || siteConfig.title,
+    title: ogTitle || title || siteConfig.title,
     description,
+    category,
+    locale: normalizeOgLocale(locale),
   });
-  const pageImage = image
-    ? `${siteConfig.url}${image}`
-    : `${siteConfig.url}/api/og?${ogSearchParams.toString()}`;
+  if (layout) ogSearchParams.set('layout', layout);
+  if (screenshot) ogSearchParams.set('screenshot', screenshot);
+  const pageImage = `${siteConfig.url}/api/og?${ogSearchParams.toString()}`;
 
   const allKeywords = [...siteConfig.keywords, ...keywords, ...tags].filter(Boolean);
 
@@ -117,7 +132,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
       type: type as 'website' | 'article',
       locale: formatLocaleForOpenGraph(locale),
       url: canonicalUrl,
-      title: pageTitle,
+      title: socialTitle,
       description,
       siteName: siteConfig.name,
       images: [
@@ -125,7 +140,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
           url: pageImage,
           width: 1200,
           height: 630,
-          alt: title || siteConfig.title,
+          alt: ogTitle || title || siteConfig.title,
         },
       ],
       ...(type === 'article' && {
@@ -138,7 +153,7 @@ export function generateSEOMetadata(data: SEOData = {}): Metadata {
     },
     twitter: {
       card: 'summary_large_image',
-      title: pageTitle,
+      title: socialTitle,
       description,
       images: [pageImage],
       creator: siteConfig.twitterHandle,
@@ -164,10 +179,14 @@ export function generateArticleMetadata(data: {
   type: 'blog' | 'docs';
 }): Metadata {
   const { type, slug, publishedAt, updatedAt, authors, tags, category } = data;
+  const ogCategory: OgCategory =
+    type === 'docs' ? 'docs' : category?.toLowerCase() === 'release' ? 'release' : 'journal';
 
   return generateSEOMetadata({
-    ...data,
+    title: data.title,
+    description: data.description,
     url: `/${type}/${slug}`,
+    category: ogCategory,
     type: 'article',
     publishedTime: publishedAt,
     modifiedTime: updatedAt || publishedAt,

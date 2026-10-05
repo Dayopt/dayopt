@@ -58,7 +58,9 @@ export function previewWorkerEnvironment(
 }
 
 /** @returns {Promise<number>} */
-function executePlaywright(env, candidateRoot = ROOT) {
+// The privileged harness, config and every transitive import belong to this
+// trusted checkout. The candidate application is reached only over HTTPS.
+function executePlaywright(env) {
   // Cloud runners and the optional Mac path are POSIX. Own the process group so
   // a deadline cannot leave browsers running after private output is removed.
   return new Promise((resolveExit) => {
@@ -74,7 +76,7 @@ function executePlaywright(env, candidateRoot = ROOT) {
         'playwright.preview.config.ts',
       ],
       {
-        cwd: candidateRoot,
+        cwd: ROOT,
         env,
         stdio: 'ignore',
         detached: true,
@@ -139,7 +141,6 @@ function executePlaywright(env, candidateRoot = ROOT) {
  *   request: any,
  *   env?: NodeJS.ProcessEnv,
  *   observe?: typeof observePreviewReadiness,
- *   candidateRoot?: string,
  *   execute?: (env: any) => Promise<number>,
  *   recover?: typeof recoverPreviewUsers,
  *   tempRoot?: string,
@@ -153,8 +154,7 @@ export async function runPreviewE2E({
   request,
   env = process.env,
   observe = observePreviewReadiness,
-  candidateRoot = ROOT,
-  execute = (workerEnv) => executePlaywright(workerEnv, candidateRoot),
+  execute = (workerEnv) => executePlaywright(workerEnv),
   recover = recoverPreviewUsers,
   tempRoot = previewE2EStateRoot(env),
   onStarted = () => {},

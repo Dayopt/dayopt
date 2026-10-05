@@ -23,6 +23,7 @@ DECLARE
   v_identity RECORD;
   v_repeated RECORD;
   v_extra_user UUID := gen_random_uuid();
+  v_failures TEXT[] := '{}'::TEXT[];
 BEGIN
   IF has_function_privilege('anon', 'public.ensure_mcp_integration_environment_identity_v1()', 'EXECUTE')
     OR has_function_privilege('authenticated', 'public.ensure_mcp_integration_environment_identity_v1()', 'EXECUTE')
@@ -52,6 +53,64 @@ BEGIN
   END;
 
   PERFORM set_config('request.jwt.claims', '{"role":"service_role","ref":"tilwaprottpyhlfoggbb"}', true);
+  -- Each unexpected success is rolled back before the next negative case.
+  -- Report all missing guards together rather than allowing an earlier identity
+  -- to make later tests pass via the unrelated singleton error.
+  BEGIN
+    UPDATE auth.users SET last_sign_in_at = pg_catalog.now();
+    PERFORM public.ensure_mcp_integration_environment_identity_v1();
+    RAISE EXCEPTION 'Used user fields unexpectedly accepted' USING ERRCODE = 'PT001';
+  EXCEPTION
+    WHEN SQLSTATE 'DI005' THEN NULL;
+    WHEN SQLSTATE 'PT001' THEN v_failures := array_append(v_failures, 'used user fields');
+  END;
+
+  BEGIN
+    INSERT INTO auth.sessions(id, user_id, created_at, updated_at)
+    VALUES (gen_random_uuid(), '00000000-0000-0000-0000-000000000001',
+      pg_catalog.now(), pg_catalog.now());
+    PERFORM public.ensure_mcp_integration_environment_identity_v1();
+    RAISE EXCEPTION 'Auth session unexpectedly accepted' USING ERRCODE = 'PT001';
+  EXCEPTION
+    WHEN SQLSTATE 'DI005' THEN NULL;
+    WHEN SQLSTATE 'PT001' THEN v_failures := array_append(v_failures, 'Auth session');
+  END;
+
+  BEGIN
+    INSERT INTO auth.oauth_client_states(id, provider_type, code_verifier, created_at)
+    VALUES (gen_random_uuid(), 'google', 'isolated-integration-test', pg_catalog.now());
+    PERFORM public.ensure_mcp_integration_environment_identity_v1();
+    RAISE EXCEPTION 'Auth OAuth state unexpectedly accepted' USING ERRCODE = 'PT001';
+  EXCEPTION
+    WHEN SQLSTATE 'DI005' THEN NULL;
+    WHEN SQLSTATE 'PT001' THEN v_failures := array_append(v_failures, 'Auth OAuth state');
+  END;
+
+  BEGIN
+    PERFORM public.provision_mcp_preview_environment_identity_v1(
+      'https://product-git-integration-dayopt.vercel.app',
+      'https://product-git-integration-dayopt.vercel.app', 'tilwaprottpyhlfoggbb');
+    RAISE EXCEPTION 'Preview RPC accepted fixed Integration' USING ERRCODE = 'PT001';
+  EXCEPTION
+    WHEN invalid_parameter_value THEN NULL;
+    WHEN SQLSTATE 'PT001' THEN v_failures := array_append(v_failures, 'fixed Integration via Preview RPC');
+  END;
+
+  BEGIN
+    INSERT INTO public.mcp_environment_identity (
+      environment, authorization_server_uri, resource_uri, supabase_project_ref
+    ) VALUES ('preview', 'https://product-git-integration-dayopt.vercel.app',
+      'https://product-git-integration-dayopt.vercel.app', 'tilwaprottpyhlfoggbb');
+    RAISE EXCEPTION 'Preview constraint accepted fixed Integration' USING ERRCODE = 'PT001';
+  EXCEPTION
+    WHEN check_violation THEN NULL;
+    WHEN SQLSTATE 'PT001' THEN v_failures := array_append(v_failures, 'fixed Integration via constraint');
+  END;
+
+  IF pg_catalog.cardinality(v_failures) > 0 THEN
+    RAISE EXCEPTION 'Missing Integration identity guards: %', v_failures;
+  END IF;
+
   BEGIN
     INSERT INTO public.mcp_environment_identity (
       environment, authorization_server_uri, resource_uri, supabase_project_ref

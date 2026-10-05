@@ -46,7 +46,8 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
         locale: 'ja',
         enforcement: 'active',
         pattern: '(?<!ゴミ)箱',
-        reason: '/report だけで使われている 3 つ目の呼称。「タイムブロック」か「件」に寄せる',
+        reason:
+          '削除済みの旧 /report 画面にあった 3 つ目の呼称。新しい UI では「タイムブロック」か「件」に寄せる',
       },
       {
         term: 'エントリ',
@@ -74,7 +75,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
         locale: 'en',
         enforcement: 'active',
         pattern: '\\bboxe?s?\\b',
-        reason: '/report の 3 つ目の呼称',
+        reason: '削除済みの旧 /report 画面にあった 3 つ目の呼称',
       },
       {
         term: 'event',
@@ -232,8 +233,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: 'セグメント',
     en: 'Segment',
     usage:
-      '旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去し、/report のアクティビティ単位フィルタへ置き換えた。DB テーブルだけが残る',
-    code: { feature: 'review' },
+      '旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去。関連する DB テーブルだけが残る',
     db: ['segments', 'segment_activities'],
     refs: ['#2162'],
     forbidden: [
@@ -243,7 +243,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
         enforcement: 'active',
         // 「約束」を巻き込まない
         pattern: '(?<!約)束',
-        reason: '/report のモバイル chip だけで使われている別名。「セグメント」に一本化する',
+        reason: '撤去前のセグメント機能で使われた別名。現在の UI 表記としては使わない',
       },
       {
         term: 'レンズ',
@@ -268,7 +268,6 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: '未分類',
     en: 'Uncategorized',
     usage: 'どのカテゴリーにも入っていない時間の残余バケット',
-    code: { identifiers: ['UNCATEGORIZED_KEY'] },
   },
   {
     id: 'plan-template',
@@ -294,30 +293,18 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
 
   // ─── UI 用語: 画面と操作 ───
   {
-    id: 'review',
+    id: 'activity-details',
     layer: 'ui',
     status: 'current',
-    concept: 'Review',
-    ja: '振り返り',
-    en: 'Review',
-    usage: 'ページ名・機能名。route は /report、i18n namespace も report',
-    code: { feature: 'review', i18nNamespace: 'report' },
-    mcpTools: ['review.get'],
-    note: 'feature dir / tRPC router は review、route と i18n namespace は report で割れている（コード識別子の整理は別 issue）',
-    forbidden: [
-      {
-        term: 'レビュー',
-        locale: 'ja',
-        enforcement: 'active',
-        allowIfValueIncludes: [
-          'プレビュー',
-          '法的レビュー',
-          'レビューを受ける',
-          'レビューインサイト',
-        ],
-        reason: 'コードレビューや評価を連想させる。ページ名は「振り返り」',
-      },
-    ],
+    concept: 'Activity details',
+    ja: 'アクティビティ詳細',
+    en: 'Activity details',
+    usage: 'カレンダーから明示的に開く、直近30日の記録時間・中央値・記録一覧',
+    code: {
+      identifiers: ['ConnectedActivitySummaryPanel'],
+      feature: 'activities',
+      i18nNamespace: 'activities',
+    },
   },
   {
     id: 'inspector',
@@ -475,135 +462,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ],
   },
 
-  // ─── UI 用語: /report のタブと面 ───
-  {
-    id: 'report-tab-usage',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Time spent (report tab)',
-    ja: '時間の使い方',
-    en: 'Time spent',
-    usage: 'タブ。事実だけで何にいくら使ったかを見る面。中身は配分の面',
-    code: { identifiers: ['ReportTabs'] },
-  },
-  {
-    id: 'report-tab-diff',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Plan vs. record (report tab)',
-    ja: '差分',
-    en: 'Plan vs. record',
-    usage: 'タブ。予定と記録の違いを見る面。中身は執行の面。「レビュー」は禁止語なので付けない',
-    code: { identifiers: ['ReportTabs'] },
-  },
-  {
-    id: 'report-tab-reflect',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Reflection (report tab)',
-    ja: '振り返り',
-    en: 'Reflection',
-    usage: 'タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語',
-    code: { identifiers: ['ReportTabs'] },
-  },
-  {
-    id: 'report-chapter-allocation',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Allocation (chapter 1)',
-    ja: '配分',
-    en: 'Allocation',
-    usage: '1 章。時間そのものを分母（週 = 168h）に置いて、どこへ流れたかを見る',
-    code: { identifiers: ['AllocationChapter'] },
-  },
-  {
-    id: 'report-chapter-execution',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Execution (chapter 2)',
-    ja: '執行',
-    en: 'Execution',
-    usage: '2 章。予定に対して記録がどう動いたか。全体遵守率のような合成値は作らない',
-    code: { identifiers: ['ExecutionChapter'] },
-  },
-  {
-    id: 'report-chapter-quality',
-    layer: 'ui',
-    status: 'current',
-    concept: 'Quality (chapter 3)',
-    ja: '質',
-    en: 'Quality',
-    usage: '3 章。投下時間と充実 / 消耗の関係を見る。中の散布図が「羅針盤」',
-    code: { identifiers: ['QualityChapter'] },
-  },
-
   // ─── 設計語（UI 文言には出さない） ───
-  {
-    id: 'ink',
-    layer: 'design',
-    status: 'current',
-    concept: 'Ink',
-    ja: 'インク',
-    en: 'Ink',
-    usage: '記録として書かれた時間。決算バーの塗り',
-    code: { identifiers: ['buildInkColumns'] },
-  },
-  {
-    id: 'margin',
-    layer: 'design',
-    status: 'current',
-    concept: 'Margin',
-    ja: '余白',
-    en: 'Margin',
-    usage:
-      '記録が書かれていない時間。見出しに数字で出すだけで、配分には混ぜず塗らない。フィルタで動かない',
-    code: { identifiers: ['marginMinutes'] },
-    forbidden: [
-      {
-        term: '空白',
-        locale: 'ja',
-        enforcement: 'active',
-        onlyNamespaces: ['report'],
-        reason:
-          'レポートでは「余白」。入力バリデーションの whitespace 義は別物なので report namespace だけを見る',
-      },
-      {
-        term: '無駄',
-        locale: 'ja',
-        enforcement: 'active',
-        reason: '余白に良し悪しの評価を持ち込まない',
-      },
-    ],
-  },
-  {
-    id: 'ledger-bar',
-    layer: 'design',
-    status: 'current',
-    concept: 'Ledger bar',
-    ja: '決算バー',
-    en: 'Ledger bar',
-    usage: '1 章の横 1 本のバー。塗りがインク、塗り残しが余白。UI にラベルとしては出さない',
-  },
-  {
-    id: 'mirror',
-    layer: 'design',
-    status: 'current',
-    concept: 'Mirror',
-    ja: '見積もりの鏡',
-    en: 'Mirror',
-    usage: '2 章の節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す',
-    code: { identifiers: ['buildMirrorRows'] },
-  },
-  {
-    id: 'compass',
-    layer: 'design',
-    status: 'current',
-    concept: 'Compass',
-    ja: '羅針盤',
-    en: 'Compass',
-    usage: '3 章の散布図。横軸が投下時間、縦軸が充実と消耗の差。平均・回帰線・象限は作らない',
-    code: { identifiers: ['CompassScatter', 'buildCompassPoints'] },
-  },
   {
     id: 'two-lane',
     layer: 'design',
@@ -622,8 +481,18 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     ja: '保存先ルール',
     en: 'Destination rule',
     usage:
-      '新規作成は end_at だけで宛先が決まる（未来なら予定、過去なら記録）。種別選択の UI は置かない',
-    code: { identifiers: ['resolveTimeblockDestination'] },
+      '新規作成の既定は end_at で決まる。過去枠は予定 / 記録を選べる。正本: docs/product/specs/plan-record.md',
+    code: { identifiers: ['resolveTimeblockDestination', 'resolveTimeblockKindChoice'] },
+  },
+
+  // MCP の既存公開契約。product の画面構成とは独立して維持する。
+  {
+    id: 'mcp-review',
+    layer: 'code',
+    status: 'current',
+    concept: 'MCP review.get',
+    usage: '公開済みの read-only MCP 契約。product のアクティビティ詳細とは独立して維持する',
+    mcpTools: ['review.get'],
   },
 
   // ─── コード内部語 ───

@@ -30,12 +30,13 @@ describe('EventContextMenu', () => {
         timeblock={migratedRecord}
         position={{ x: 0, y: 0 }}
         onClose={vi.fn()}
-        onCopy={vi.fn()}
+        onDuplicate={vi.fn()}
         onDelete={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('common.actions.copy')).toBeInTheDocument();
+    expect(screen.queryByText('common.actions.copy')).not.toBeInTheDocument();
+    expect(screen.getByText('common.actions.duplicate')).toBeInTheDocument();
     expect(screen.queryByText('common.actions.delete')).not.toBeInTheDocument();
   });
 
@@ -52,7 +53,7 @@ describe('EventContextMenu', () => {
         timeblock={plan}
         position={{ x: 0, y: 0 }}
         onClose={vi.fn()}
-        onCopy={vi.fn()}
+        onDuplicate={vi.fn()}
       />,
     );
 

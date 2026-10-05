@@ -22,7 +22,7 @@ user_invocable: true
 この skill は **explicit な監査依頼のみを契機とする**。参考として近接するが発動しないケース:
 
 - 検出したギャップの docs 本文執筆 → `docs-writing` skill
-- 内部ドキュメント（repo 直下 `docs/`）の鮮度チェック → `/gardening` の Step 2
+- 内部ドキュメント（repo 直下 `docs/`）の棚卸し・正本の解決確認 → `pnpm docs:audit` と [文書の標準手順](../../../docs/README.md#ai-の標準手順)
 - ブログのネタ出し → `blog-ideas` skill
 
 ## 実行手順
@@ -30,6 +30,8 @@ user_invocable: true
 ### Step 1: 情報収集
 
 **まず `pnpm docs:coverage` を実行する。** 機能 ⇄ 公開 docs ⇄ LP の対応表が出力され、A（未カバー）と C（en/ja 非対称）の一次情報になる。目視の棚卸しから始めない。
+
+本文の現状説明を評価する時は `pnpm --silent docs:read <repo-relative-path>` で取得する。読取成功は正本の解決の証拠であり、公開機能との意味の一致や本番稼働の証拠ではない。公開 renderer の表示と実装との照合は従来どおり行う。
 
 その上で以下を並行で読み込む:
 
@@ -133,4 +135,4 @@ EOF
 
 - docs の本文を自動生成する（検出と報告のみ。執筆は `docs-writing` skill）
 - 全機能の docs を一気に書く（優先度の高いものから段階的に）
-- 内部開発ドキュメント（repo 直下 `docs/`）の監査（`/gardening` Step 2 の領域）
+- 内部開発ドキュメント（repo 直下 `docs/`）の監査（`pnpm docs:audit` と文書の標準手順の領域）

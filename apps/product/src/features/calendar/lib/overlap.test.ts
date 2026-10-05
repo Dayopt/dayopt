@@ -144,7 +144,7 @@ describe('checkClientSideOverlapByKind', () => {
     ).toBe(true);
   });
 
-  it('Plan→Record dropはドラッグ元PlanではなくRecordとの重複を判定する', () => {
+  it('PlanをRecordと重なる時刻へ動かしてもRecord重複にしない', () => {
     const plan = createEvent({
       id: 'plan',
       kind: 'plan',
@@ -164,12 +164,12 @@ describe('checkClientSideOverlapByKind', () => {
         plan.id,
         new Date('2026-01-15T10:15'),
         new Date('2026-01-15T10:45'),
-        { now, targetKind: 'record' },
+        { now },
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it('Record→Plan laneでも元のRecord kindを指定すればPlan重複を無視する', () => {
+  it('RecordをPlanと重なる時刻へ動かしてもPlan重複にしない', () => {
     const record = createEvent({
       id: 'record',
       kind: 'record',
@@ -189,7 +189,7 @@ describe('checkClientSideOverlapByKind', () => {
         record.id,
         new Date('2026-01-15T10:15'),
         new Date('2026-01-15T10:45'),
-        { now, targetKind: 'record' },
+        { now },
       ),
     ).toBe(false);
   });

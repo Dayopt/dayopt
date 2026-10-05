@@ -112,8 +112,7 @@ function ContextMenuTrigger({
 
 const allHandlers = {
   onDelete: fn(),
-  onViewStats: fn(),
-  onCopy: fn(),
+  onViewActivityDetails: fn(),
   onDuplicate: fn(),
 };
 
@@ -126,13 +125,12 @@ export const Default: Story = {
   render: () => <ContextMenuTrigger timeblock={completedPlanTimeblock} menuProps={allHandlers} />,
 };
 
-/** コピー・複製と削除。 */
-export const CopyAndDelete: Story = {
+/** 複製と削除。 */
+export const DuplicateAndDelete: Story = {
   render: () => (
     <ContextMenuTrigger
       timeblock={completedPlanTimeblock}
       menuProps={{
-        onCopy: fn(),
         onDuplicate: fn(),
         onDelete: fn(),
       }}
@@ -203,13 +201,12 @@ export const AllPatterns: Story = {
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-muted-foreground text-xs">コピー・複製と削除</span>
+        <span className="text-muted-foreground text-xs">複製と削除</span>
         <div className="relative" style={{ height: 80 }}>
           <EventContextMenu
             timeblock={completedPlanTimeblock}
             position={{ x: 0, y: 0 }}
             onClose={fn()}
-            onCopy={fn()}
             onDuplicate={fn()}
             onDelete={fn()}
           />

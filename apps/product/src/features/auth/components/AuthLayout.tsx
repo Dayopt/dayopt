@@ -1,5 +1,7 @@
 'use client';
 
+import { Logo } from '@dayopt/components';
+
 import type React from 'react';
 
 import { usePathname } from 'next/navigation';
@@ -20,7 +22,8 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center p-2">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 p-2">
+      <Logo size="lg" />
       <div className="bg-card lg:border-border-subtle w-full max-w-sm p-6 lg:rounded-2xl lg:border lg:p-8 lg:shadow-sm">
         {children}
       </div>

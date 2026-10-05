@@ -1,32 +1,21 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
+import { isCancelledError, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 
 import { toast } from '@/lib/toast';
 import { api } from '@/lib/trpc';
 
-import type { PublicRecordRow } from '@/lib/database';
-
 import { useTimeblockInspectorStore } from '../stores/useTimeblockInspectorStore';
-import { insertTimeModelRowIntoMatchingLists } from './useTimeblockWriteMutations';
-
-function isRecordsListQuery(query: { queryKey: unknown }): boolean {
-  const key = query.queryKey;
-  return (
-    Array.isArray(key) && Array.isArray(key[0]) && key[0][0] === 'records' && key[0][1] === 'list'
-  );
-}
-
-function isTimeModelListQuery(query: { queryKey: unknown }): boolean {
-  const key = query.queryKey;
-  return (
-    Array.isArray(key) &&
-    Array.isArray(key[0]) &&
-    (key[0][0] === 'plans' || key[0][0] === 'records') &&
-    key[0][1] === 'list'
-  );
-}
+import {
+  deleteTimeblockCacheRows,
+  insertTimeModelRowIntoMatchingLists,
+  isTimeblockCacheCurrent,
+  restoreTimeblockLists,
+  settleTimeblockCache,
+  snapshotTimeblockLists,
+  writeTimeblockCache,
+} from './useTimeblockWriteMutations';
 
 function isTimeOverlapError(error: { message: string }): boolean {
   const serviceCode =
@@ -48,20 +37,19 @@ export function useTimeblockRecordMutations() {
   const undoRecord = api.recordCommands.delete.useMutation({
     retry: false,
     onMutate: async (input) => {
-      await utils.records.list.cancel();
-      const snapshots = queryClient.getQueriesData({ predicate: isRecordsListQuery });
-      queryClient.setQueriesData<PublicRecordRow[]>({ predicate: isRecordsListQuery }, (old) =>
-        old?.filter((row) => row.id !== input.id),
-      );
-      return { snapshots };
+      const context = await snapshotTimeblockLists(queryClient);
+      deleteTimeblockCacheRows(queryClient, context, 'records', new Set([input.id]));
+      return context;
     },
     onError: (_error, _input, context) => {
-      for (const [queryKey, data] of context?.snapshots ?? []) {
-        queryClient.setQueryData(queryKey, data);
-      }
+      restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(_error)) return;
       toast.error(t('toast.undoFailed'));
     },
-    onSettled: () => {
+    onSettled: (_data, _error, _input, context) => {
+      const current = isTimeblockCacheCurrent(queryClient, context);
+      settleTimeblockCache(queryClient, context);
+      if (!current) return;
       void utils.records.list.invalidate();
       void queryClient.invalidateQueries({
         predicate: ({ queryKey }) =>
@@ -73,12 +61,14 @@ export function useTimeblockRecordMutations() {
   const recordPlan = api.planCommands.record.useMutation({
     retry: false,
     onMutate: async () => {
-      await Promise.all([utils.plans.list.cancel(), utils.records.list.cancel()]);
-      return { snapshots: queryClient.getQueriesData({ predicate: isTimeModelListQuery }) };
+      return snapshotTimeblockLists(queryClient);
     },
-    onSuccess: (record) => {
-      insertTimeModelRowIntoMatchingLists(queryClient, 'records', record);
-      utils.records.getById.setData({ id: record.id }, record);
+    onSuccess: (record, _input, context) => {
+      if (!context || !isTimeblockCacheCurrent(queryClient, context)) return;
+      writeTimeblockCache(queryClient, context, () => {
+        insertTimeModelRowIntoMatchingLists(queryClient, 'records', record);
+        utils.records.getById.setData({ id: record.id }, record);
+      });
       toast.success(t('toast.recorded'), {
         duration: 5000,
         action: {
@@ -94,12 +84,14 @@ export function useTimeblockRecordMutations() {
       });
     },
     onError: (error, _input, context) => {
-      for (const [queryKey, data] of context?.snapshots ?? []) {
-        queryClient.setQueryData(queryKey, data);
-      }
+      restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(error)) return;
       toast.error(isTimeOverlapError(error) ? t('toast.overlap') : t('toast.recordFailed'));
     },
-    onSettled: () => {
+    onSettled: (_data, _error, _input, context) => {
+      const current = isTimeblockCacheCurrent(queryClient, context);
+      settleTimeblockCache(queryClient, context);
+      if (!current) return;
       void utils.plans.list.invalidate();
       void utils.records.list.invalidate();
       void queryClient.invalidateQueries({
@@ -112,23 +104,27 @@ export function useTimeblockRecordMutations() {
   const confirmDay = api.planCommands.confirmDay.useMutation({
     retry: false,
     onMutate: async () => {
-      await Promise.all([utils.plans.list.cancel(), utils.records.list.cancel()]);
-      return { snapshots: queryClient.getQueriesData({ predicate: isTimeModelListQuery }) };
+      return snapshotTimeblockLists(queryClient);
     },
-    onSuccess: (records) => {
-      for (const record of records) {
-        insertTimeModelRowIntoMatchingLists(queryClient, 'records', record);
-        utils.records.getById.setData({ id: record.id }, record);
-      }
+    onSuccess: (records, _input, context) => {
+      if (!context || !isTimeblockCacheCurrent(queryClient, context)) return;
+      writeTimeblockCache(queryClient, context, () => {
+        for (const record of records) {
+          insertTimeModelRowIntoMatchingLists(queryClient, 'records', record);
+          utils.records.getById.setData({ id: record.id }, record);
+        }
+      });
       toast.success(t('toast.dayConfirmed'));
     },
     onError: (error, _input, context) => {
-      for (const [queryKey, data] of context?.snapshots ?? []) {
-        queryClient.setQueryData(queryKey, data);
-      }
+      restoreTimeblockLists(queryClient, context);
+      if (isCancelledError(error)) return;
       toast.error(isTimeOverlapError(error) ? t('toast.overlap') : t('toast.confirmFailed'));
     },
-    onSettled: () => {
+    onSettled: (_data, _error, _input, context) => {
+      const current = isTimeblockCacheCurrent(queryClient, context);
+      settleTimeblockCache(queryClient, context);
+      if (!current) return;
       void utils.plans.list.invalidate();
       void utils.records.list.invalidate();
       void queryClient.invalidateQueries({

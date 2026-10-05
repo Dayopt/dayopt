@@ -57,7 +57,6 @@ export { useCalendarSettings } from './hooks/useCalendarSettings';
 export { useCalendarNavigationStore } from './stores/useCalendarNavigationStore';
 export type { UserSettings } from './stores/userSettings';
 export { useTemplateSaveStore } from './stores/useTemplateSaveStore';
-export { useTimeblockClipboardStore } from './stores/useTimeblockClipboardStore';
 // =============================================================================
 // Hooks
 // =============================================================================
@@ -87,10 +86,8 @@ export {
 // =============================================================================
 // Lib / Utils
 // =============================================================================
-export { formatCalendarDateParam, parseCalendarDateParam } from './lib/date-param';
-export { buildReportPath } from './lib/panel-url';
-export { isCalendarViewPath, resolveWorkspaceTab } from './lib/route-utils';
-export type { WorkspaceTab } from './lib/route-utils';
+export { parseCalendarDateParam } from './lib/date-param';
+export { isCalendarViewPath } from './lib/route-utils';
 export {
   buildTimeblockSearchResultPath,
   resolveTimeblockSearchResultDate,

@@ -107,12 +107,12 @@ Edge Function send-auth-email が hook の署名を検証し、PasswordResetEmai
 
 - **なぜ必要か**: token_hash を検証できるのは app の /auth/confirm だけなので、リンクは必ずそこを通す。origin を二重に確かめるのは、Supabase 側の Redirect URLs 設定がずれただけで token が第三者の origin へ載るのを防ぐため。
 - **入力 → 出力**: hook payload（user、email_data） → 件名「Dayopt パスワードのリセット」のメール
-- **ここを変えると**: この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。
+- **ここを変えると**: この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - **コード**:
   - [`supabase/functions/send-auth-email/index.ts`](../../../supabase/functions/send-auth-email/index.ts) で `element: React.createElement(PasswordResetEmail, {` を探す
   - [`supabase/functions/send-auth-email/confirm-url.ts`](../../../supabase/functions/send-auth-email/confirm-url.ts) で `export function resolveConfirmOrigin` を探す
   - [`supabase/functions/send-auth-email/subjects.ts`](../../../supabase/functions/send-auth-email/subjects.ts) で `recovery: 'Dayopt パスワードのリセット',` を探す
-  - [`supabase/functions/send-auth-email/PasswordResetEmail.tsx`](../../../supabase/functions/send-auth-email/PasswordResetEmail.tsx) で `expiryNote: 'このリンクは24時間で有効期限が切れます。',` を探す（production のリンクは mailer_otp_exp = 3600 秒。文面と食い違う）
+  - [`supabase/functions/send-auth-email/PasswordResetEmail.tsx`](../../../supabase/functions/send-auth-email/PasswordResetEmail.tsx) で `<Text style={styles.smallText}>{t.expiryNote}</Text>` を探す（有効期限と、期限切れの場合に再リクエストする案内。期限の数値は環境の Auth 設定に従う）
 - **この段を守るテスト**:
   - [`scripts/__tests__/send-auth-email-confirm-url.test.ts`](../../../scripts/__tests__/send-auth-email-confirm-url.test.ts) で `攻撃者 origin の redirect_to でも token_hash は app origin にしか載らない` を探す
   - [`scripts/__tests__/send-auth-email-idempotency.test.ts`](../../../scripts/__tests__/send-auth-email-idempotency.test.ts) で `同じ webhook-id の再試行では同じ key になる（重複配送しない）` を探す
@@ -135,7 +135,7 @@ Edge Function send-auth-email が hook の署名を検証し、PasswordResetEmai
 
 verifyOtp で token_hash を検証する。access_token 付きの session が立てば、type が recovery の時だけ next を無視して /auth/reset-password へ固定で送る。session が立たなければ /auth/confirmed の結果ページへ送る。
 
-- **なぜ必要か**: 以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま /calendar へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。
+- **なぜ必要か**: 以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま / へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。
 - **入力 → 出力**: token_hash、type=recovery、next → recovery session の cookie と、/auth/reset-password への redirect
 - **ここを変えると**: signup・email_change も同じ route を通る。分岐を変える時は type ごとの着地先をテストで確かめる。/auth/confirm と /auth/reset-password はサインイン中でも通れる path に登録してある（access-policy.ts）。
 - **コード**:
@@ -284,7 +284,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
 
 - **なぜ必要か**: アカウントを乗っ取られた人が最初にやるのがパスワードの再設定。その操作で攻撃者の refresh token も道連れにする。
 - **入力 → 出力**: updateUser の成功 → 他端末の session の失効と、成功画面
-- **ここを変えると**: 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- **ここを変えると**: 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 - **コード**:
   - [`apps/product/src/features/auth/stores/useAuthStore.ts`](../../../apps/product/src/features/auth/stores/useAuthStore.ts) で `() => supabase.auth.signOut({ scope: 'others' }),` を探す
   - [`apps/product/src/features/auth/components/ResetPasswordForm.tsx`](../../../apps/product/src/features/auth/components/ResetPasswordForm.tsx) で ``router.push(`/${locale}/auth/login`);`` を探す
@@ -557,7 +557,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
         "in": "hook payload（user、email_data）",
         "out": "件名「Dayopt パスワードのリセット」のメール"
       },
-      "change": "この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メール本文の「24 時間」とリンクの実際の有効時間はここでは揃えていない（下の注意を参照）。",
+      "change": "この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。",
       "refs": [
         {
           "path": "supabase/functions/send-auth-email/index.ts",
@@ -573,8 +573,8 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
         },
         {
           "path": "supabase/functions/send-auth-email/PasswordResetEmail.tsx",
-          "find": "expiryNote: 'このリンクは24時間で有効期限が切れます。',",
-          "why": "production のリンクは mailer_otp_exp = 3600 秒。文面と食い違う"
+          "find": "<Text style={styles.smallText}>{t.expiryNote}</Text>",
+          "why": "有効期限と、期限切れの場合に再リクエストする案内。期限の数値は環境の Auth 設定に従う"
         }
       ],
       "tests": [
@@ -648,7 +648,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
       "via": "メールのリンク",
       "title": "/auth/confirm で token を検証して session を作る",
       "what": "verifyOtp で token_hash を検証する。access_token 付きの session が立てば、type が recovery の時だけ next を無視して /auth/reset-password へ固定で送る。session が立たなければ /auth/confirmed の結果ページへ送る。",
-      "why": "以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま /calendar へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。",
+      "why": "以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま / へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。",
       "io": {
         "in": "token_hash、type=recovery、next",
         "out": "recovery session の cookie と、/auth/reset-password への redirect"
@@ -1050,7 +1050,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
         "in": "updateUser の成功",
         "out": "他端末の session の失効と、成功画面"
       },
-      "change": "今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。",
+      "change": "今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。",
       "refs": [
         {
           "path": "apps/product/src/features/auth/stores/useAuthStore.ts",

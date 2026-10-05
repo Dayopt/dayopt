@@ -48,6 +48,10 @@ describe('Cloud Preview credential wiring', () => {
     expect(cloud).not.toMatch(/path:.*(private|screenshot|\*\*)/);
     expect(cloud.match(/always\(\) && steps.execute.outcome != 'skipped'/g)).toHaveLength(3);
   });
+  it('never installs or executes candidate dependencies on the credentialed worker', () => {
+    expect(cloud).not.toMatch(/pnpm --dir candidate/);
+    expect(cloud).toContain('pnpm --dir apps/product exec playwright install --with-deps chromium');
+  });
   it('passes user input through environment JSON rather than interpolating it into shell', () => {
     expect(cloud).toContain('PREVIEW_REQUEST_JSON: ${{ toJSON(inputs) }}');
     for (const line of cloud.split('\n').filter((line) => line.includes('run:'))) {

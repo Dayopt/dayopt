@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-10-03
+last_verified: 2026-09-30
 code: apps/product/src/features/external-calendar
 ---
 
@@ -10,7 +10,7 @@ Google Calendar の接続・同期・ゴースト表示・明示変換を、固�
 
 ## 実行前条件
 
-- 2026-10-03 時点でユーザーから、Dayopt ログイン・Google Calendar 一覧の読込・取り込みは成功し、手動同期は失敗したと報告された。画面、配備 SHA、同期結果は独立には再確認していない。ここから同期、ghost 表示、変換、Google 側へ書き戻さないこと、切断までの未確認項目を続ける。
+- 共有 Integration の Calendar 実測に対する保留解除を確認する。固定 Integration の設定保存・接続・同期・変換・切断・配備は引き続き保留。#2910 所有の合成2ユーザーを通常 PR の immutable Preview で検証する限定解除を、Calendar 実測の許可へ読み替えない。
 - 固定 URL は `https://product-git-integration-dayopt.vercel.app`。その時点の配備 SHA、Supabase ref、migration、Calendar authority readiness を記録する。過去の Ready 表示を現在の証拠にしない。
 - Supabase は `integration` ブランチを確認する。本番 ref `yvglwblxrnrenfifsnje` が接続先なら実測しない。
 - Calendar OAuth の5変数は [シークレット台帳](./secrets.md) に従う。Preview / integration 専用 client・secret・暗号鍵と固定 callback を使い、値を証跡へ記載しない。
@@ -51,7 +51,6 @@ Dayopt Google ログインの `redirect_uri_mismatch` は別の認証経路の�
 | 終了済みのゴーストを1回タップ               | 選択した1件だけ Record に確定。未来終了の Record は作られない                                             |
 | 再読込・連続タップ                          | 同じ予定が重複して作成されない。確定済みのゴーストは表示されない                                          |
 | 古いタブから再確定                          | 2タブに同じゴーストを表示し、片方で確定・移動した後でも、もう片方の元時間への操作で二重確定しない         |
-| 二重確定の競合                              | 1件だけが有効な Plan / Record となり、もう一方には取り込み済みの理由が表示される                          |
 | 成功トーストの取り消し                      | 作成した Plan / Record が消え、ゴーストに戻る                                                             |
 | 時間重複で変換失敗                          | エラー表示後にゴーストが復元され、意図しない確定はない                                                    |
 | 日・週・狭い幅の表示                        | 日付・時刻・日跨ぎの表示が正しく、3種を識別できる                                                         |
@@ -77,13 +76,6 @@ Story・mock test・CI・health はそれぞれの範囲の証拠であり、Goo
 
 これは対象 HEAD のコード経路の確認であり、Google 原本を実際に比較した結果ではない。実接続後に専用予定の変換・編集・取り消しを実行し、Google 原本が保持されることを別途確認する。
 
-### ユーザー報告と read-only schema 確認（2026-10-03）
-
-- ユーザー報告: 専用Dayoptユーザーでログインでき、Google Calendar 一覧の読込と取り込みは成功した。手動同期は失敗した。画面・deployment SHA・同期結果はこの確認では独立に再取得していない。
-- Supabase Integration の migration 履歴には二重確定防止 migration `20260930014002_prevent_duplicate_external_calendar_conversion` がまだ無い。
-- read-only 集計では、Integration の `plans` と `records` のどちらも、有効な `external_calendar_event_id` 重複グループは 0 件だった。migration の事前条件は通る見込みだが、migration は未適用であり、競合防止はまだ有効になっていない。
-- `main` と `integration` は履歴が分岐しており、main 全体を Integration へ同期する方法はこの目的に対して広すぎる。二重確定修正は Integration 現行コードへの選択的 backport としてローカル検証中。GitHub・Supabase・Vercel への反映はしていない。
-
 ### 共有環境の再開状況（2026-09-29）
 
 [2026-09-29 の #2867 調整記録](https://github.com/Dayopt/dayopt/issues/2867#issuecomment-5887746642) では、#2867 は blocked、前の検証 handle は全て terminal と記録された。以前の active / inProgress の観測を現在も実行中という根拠にしない。#2910 所有の新規合成2ユーザーを通常 PR の immutable Preview で login・CRUD・ユーザー分離検証・所有 cleanup する範囲だけ、共有保留から除外された。
@@ -91,6 +83,12 @@ Story・mock test・CI・health はそれぞれの範囲の証拠であり、Goo
 固定 Integration の origin / SHA / alias / env / 配備、DB schema、Auth / OAuth 設定、Google 接続・同期設定、既存利用者と #2867 の所有データは引き続き保留。本レーンの接続・同期・変換・切断は未実施。2026-09-30 にユーザーから二重確定防止と競合表示の対応指示を受け、旧行復元を拒否する推奨案のローカル実装を進めた。#2867 の Google アカウント選択までの記録は、本レーンによる権限付与・同期成功の証拠ではない。
 
 再開時は Chrome の「ともや」で、メールログイン済みの専用 Dayopt ユーザーから Calendar 接続を開始する。管理用 Chrome で止まっている Google 同意画面を、そのまま本レーンの接続に流用しない。
+
+### Integration の報告・read-only確認（2026-10-03）
+
+- ユーザーは専用 Dayopt アカウントのログイン、Google Calendar 一覧の表示、取り込み成功と、手動同期の失敗を報告した。画面・deployment SHA・同期結果はその時点で独立確認されていない。
+- 当時の read-only schema 集計では、`plans` と `records` の有効な `external_calendar_event_id` 重複グループは各 0 件だった。一方、二重確定防止 migration `20260930014002_prevent_duplicate_external_calendar_conversion` は共有 Integration DB に未適用で、DB 制約による保護は有効と確認できていない。
+- これらは記録時点の報告・読取結果であり、現在の配備・DB状態を証明しない。固定 Integration の接続・同期・migration・配備を行う前に、冒頭の保留解除とその時点のSHA・DB ref・migration状態を確認する。
 
 ### ローカル確認記録（2026-09-29）
 

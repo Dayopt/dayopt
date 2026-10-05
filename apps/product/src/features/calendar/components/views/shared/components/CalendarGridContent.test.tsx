@@ -21,10 +21,8 @@ vi.mock('@/features/activities', () => ({
 
 vi.mock('@/features/timeblock', () => ({
   formatDiffMinutes: (minutes: number) => `${minutes}`,
-  isPlanRecordDrop: (source: string, target: string) => source === 'plan' && target === 'record',
   resolveTimeblockDestination: () => 'plan',
   overlappingRecords: () => [],
-  useTimeblockWriteMutations: () => ({ createRecord: { mutate: vi.fn() } }),
 }));
 
 // ghost 変換ロジック自体は useConvertGhostEvent.test.ts が検証する。ここでは
@@ -100,7 +98,6 @@ vi.mock('./TwoLaneTimeblockRenderer', () => ({
   ),
 }));
 
-import { useCalendarDragStore } from '../../../../stores/useCalendarDragStore';
 import {
   buildDragPreviewTimeblock,
   CalendarGridContent,
@@ -133,7 +130,6 @@ function makeCalendarEvent(
 describe('CalendarGridContent', () => {
   afterEach(() => {
     ghostMock.timeblockId = null;
-    useCalendarDragStore.getState().endDrag();
   });
 
   it.each([
@@ -219,7 +215,7 @@ describe('CalendarGridContent', () => {
     expect(previewTimeblock.kind).toBe('plan');
   });
 
-  it('Planのdrag previewはPlanレーンのoutlineカードで表示する（#2250: previewTime に重なる Record が存在する場合は split 幅）', () => {
+  it('Planのdrag previewはRecordと重なってもPlanレーンのoutlineカードで表示する', () => {
     const plan = makeCalendarEvent('plan');
     // ghostMock.previewTime（10:00-11:00 UTC）に重なる Record を counterpart として用意する。
     const counterpartRecord = makeCalendarEvent('record', {
@@ -230,7 +226,6 @@ describe('CalendarGridContent', () => {
       displayEndDate: new Date('2026-07-15T11:00:00.000Z'),
     });
     ghostMock.timeblockId = plan.id;
-    useCalendarDragStore.getState().updateDrag({ targetLane: 'plan' });
 
     const { container } = render(
       <CalendarGridContent
@@ -250,7 +245,6 @@ describe('CalendarGridContent', () => {
   it('previewTime に重なる Record が無い場合、Plan の drag preview はフル幅になる（#2250 P1 regression）', () => {
     const plan = makeCalendarEvent('plan');
     ghostMock.timeblockId = plan.id;
-    useCalendarDragStore.getState().updateDrag({ targetLane: 'plan' });
 
     const { container } = render(
       <CalendarGridContent
@@ -265,56 +259,9 @@ describe('CalendarGridContent', () => {
     expect(card).toHaveStyle({ left: '0%', width: 'calc(100% - 4px)' });
   });
 
-  it('PlanをRecordレーンへdragすると紐づくRecordの塗りカードでpreviewする（#2250: previewTime に重なる Plan が存在する場合は split 幅）', () => {
-    const plan = makeCalendarEvent('plan');
-    // ghostMock.previewTime（10:00-11:00 UTC）に重なる Plan を counterpart として用意する。
-    const counterpartPlan = makeCalendarEvent('plan', {
-      id: 'plan-counterpart',
-      startDate: new Date('2026-07-15T10:00:00.000Z'),
-      endDate: new Date('2026-07-15T11:00:00.000Z'),
-      displayStartDate: new Date('2026-07-15T10:00:00.000Z'),
-      displayEndDate: new Date('2026-07-15T11:00:00.000Z'),
-    });
-    ghostMock.timeblockId = plan.id;
-    useCalendarDragStore.getState().updateDrag({ targetLane: 'record' });
-
-    const { container } = render(
-      <CalendarGridContent
-        date={new Date('2026-07-15T00:00:00.000Z')}
-        timeblocks={[plan, counterpartPlan]}
-        dayIndex={0}
-      />,
-    );
-
-    const card = container.querySelector('[data-record-lane-card]');
-    expect(card).not.toBeNull();
-    expect(card).not.toHaveAttribute('data-record-planned');
-    expect(card).toHaveStyle({ left: '38%', width: 'calc(62% - 4px)' });
-    expect(container.querySelector('[data-plan-lane-card]')).toBeNull();
-  });
-
-  it('previewTime に重なる Plan が無い場合、Record 変換 drag preview はフル幅になる（#2250 P1 regression）', () => {
-    const plan = makeCalendarEvent('plan');
-    ghostMock.timeblockId = plan.id;
-    useCalendarDragStore.getState().updateDrag({ targetLane: 'record' });
-
-    const { container } = render(
-      <CalendarGridContent
-        date={new Date('2026-07-15T00:00:00.000Z')}
-        timeblocks={[plan]}
-        dayIndex={0}
-      />,
-    );
-
-    const card = container.querySelector('[data-record-lane-card]');
-    expect(card).not.toBeNull();
-    expect(card).toHaveStyle({ left: '0%', width: 'calc(100% - 4px)' });
-  });
-
-  it('RecordをPlanレーン上へdragしてもRecordの塗りカードを維持する', () => {
+  it('Recordのdrag previewはRecordレーンの塗りカードを維持する', () => {
     const record = makeCalendarEvent('record', {});
     ghostMock.timeblockId = record.id;
-    useCalendarDragStore.getState().updateDrag({ targetLane: 'plan' });
 
     const { container } = render(
       <CalendarGridContent
