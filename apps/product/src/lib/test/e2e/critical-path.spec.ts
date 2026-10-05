@@ -472,7 +472,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await page.goto('/ja/settings/display');
     await page.getByRole('combobox', { name: '言語', exact: true }).click();
     await page.getByRole('option', { name: 'English', exact: true }).click();
-    await expect(page).toHaveURL(/\/en\/settings\/display$/);
+    await expect(page).toHaveURL(/\/settings\/display$/);
     await expect
       .poll(async () => {
         const result = await adminSupabase
@@ -485,7 +485,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('en');
     await page.reload();
-    await expect(page).toHaveURL(/\/en\/settings\/display$/);
+    await expect(page).toHaveURL(/\/settings\/display$/);
     await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toContainText(
       'English',
     );
