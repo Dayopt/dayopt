@@ -29,7 +29,13 @@ export default defineConfig({
   retries: 0,
   reporter: [['line']],
   outputDir: process.env.E2E_ISOLATED_ARTIFACT_DIR ?? '/tmp/dayopt-product-isolated-e2e',
-  use: { serviceWorkers: 'allow', trace: 'off', video: 'off', screenshot: 'only-on-failure' },
+  use: {
+    ...localConfig.use,
+    serviceWorkers: 'allow',
+    trace: 'off',
+    video: 'off',
+    screenshot: 'only-on-failure',
+  },
   webServer: {
     ...localConfig.webServer!,
     command: 'pnpm build && pnpm start',
