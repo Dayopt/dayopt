@@ -57,8 +57,7 @@
       "density_compact": "Compact",
       "density_default": "Default",
       "density_spacious": "Spacious",
-      "generalSettings": "General settings",
-      "stats": "Review"
+      "generalSettings": "General settings"
     },
     "timeblock": {
       "adjustEndTime": "Drag to adjust end time",
@@ -102,7 +101,6 @@
       "goToToday": "Go to today",
       "close": "Close",
       "openCalendar": "Open calendar",
-      "openReport": "Open report",
       "previousMonth": "Previous month",
       "nextMonth": "Next month",
       "selectMonth": "Select month",
@@ -151,7 +149,7 @@
       "merge": "Merge into another activity",
       "showOnlyThisActivity": "Show only this activity",
       "showOnlyThisCategory": "Show only this category",
-      "viewStats": "View review",
+      "viewActivityDetails": "View activity details",
       "hide": "Hide from calendar",
       "show": "Show in calendar",
       "expandCategory": "Expand category",

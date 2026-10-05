@@ -43,6 +43,28 @@ function databaseBoundary() {
       activity(ACTIVITY, OWNER),
       activity('30000000-0000-4000-8000-000000000002', OTHER),
     ],
+    records: [
+      {
+        id: '50000000-0000-4000-8000-000000000001',
+        user_id: OWNER,
+        activity_id: ACTIVITY,
+        deleted_at: null,
+        title: 'Owned record',
+        start_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+        end_at: new Date(Date.now() - 15 * 60_000).toISOString(),
+        source: 'manual',
+      },
+      {
+        id: '50000000-0000-4000-8000-000000000002',
+        user_id: OTHER,
+        activity_id: ACTIVITY,
+        deleted_at: null,
+        title: 'Other user record',
+        start_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+        end_at: new Date(Date.now() - 15 * 60_000).toISOString(),
+        source: 'manual',
+      },
+    ],
   };
   const exchanges: Exchange[] = [];
   let fence = false;
@@ -76,12 +98,19 @@ function databaseBoundary() {
     }
     let selected = rows[table].filter((row) =>
       [...url.searchParams].every(([key, value]) => {
-        if (key === 'select' || key === 'order') return true;
+        if (key === 'select' || key === 'order' || key === 'offset' || key === 'limit') return true;
         if (value === 'is.null') return row[key] === null;
         if (value.startsWith('eq.')) return String(row[key]) === value.slice(3);
+        if (value.startsWith('lt.'))
+          return Date.parse(String(row[key])) < Date.parse(value.slice(3));
+        if (value.startsWith('gt.'))
+          return Date.parse(String(row[key])) > Date.parse(value.slice(3));
         throw new Error(`Unsupported fixture filter: ${key}=${value}`);
       }),
     );
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? selected.length);
+    selected = selected.slice(offset, offset + limit);
     if (body && request.method === 'POST') {
       selected = [{ ...category('40000000-0000-4000-8000-000000000001', OWNER), ...body }];
       rows[table].push(...selected);
@@ -152,6 +181,12 @@ const cases: {
     name: 'listActivities',
     call: (api) => api.listActivities(),
     table: 'activities',
+    method: 'GET',
+  },
+  {
+    name: 'getActivitySummary',
+    call: (api) => api.getActivitySummary({ activityId: ACTIVITY, timezone: 'UTC' }),
+    table: 'records',
     method: 'GET',
   },
   { name: 'listTree', call: (api) => api.listTree() },
@@ -247,7 +282,14 @@ describe('activities API: real router / middleware / service with DB HTTP bounda
       const operation = call(caller());
       await expect(operation).resolves.toBeDefined();
       const result = await operation;
-      if (name === 'listTree') {
+      if (name === 'getActivitySummary') {
+        expect(result).toMatchObject({
+          totalRecordCount: 1,
+          recordedMinutes: 15,
+          records: [expect.objectContaining({ title: 'Owned record' })],
+        });
+        expect(JSON.stringify(result)).not.toContain(OTHER);
+      } else if (name === 'listTree') {
         expect(result).toMatchObject({
           categories: [{ category: { id: CATEGORY }, activities: [{ id: ACTIVITY }] }],
           uncategorized: [],
@@ -443,4 +485,14 @@ describe('activities API: real router / middleware / service with DB HTTP bounda
       ]);
     },
   );
+
+  it('getActivitySummary scopes records to the authenticated user', async () => {
+    const result = await caller().getActivitySummary({ activityId: ACTIVITY, timezone: 'UTC' });
+
+    expect(result).toMatchObject({ totalRecordCount: 1, recordedMinutes: 15 });
+    expect(result.records).toEqual([expect.objectContaining({ title: 'Owned record' })]);
+    expect(db.exchanges.filter(({ table }) => table === 'records')).toEqual([
+      expect.objectContaining({ method: 'GET' }),
+    ]);
+  });
 });

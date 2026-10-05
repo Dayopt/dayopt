@@ -18,7 +18,7 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from '@dayopt/config';
  * - エンコードされたバイパス (`%2F%2Fevil.com`)
  * - raw / encoded backslash (`/%5C%5Cevil.com`)
  */
-export function getSafeRedirectPath(next: string | null, fallback = '/calendar'): string {
+export function getSafeRedirectPath(next: string | null, fallback = '/'): string {
   if (!next) return fallback;
 
   // 相対パスでない、またはプロトコル相対URL
@@ -57,7 +57,7 @@ export function getSafeRedirectPath(next: string | null, fallback = '/calendar')
 export function getSafeLocalizedRedirectPath(
   next: string | null,
   locale: string,
-  fallback = '/calendar',
+  fallback = '/',
 ): string {
   const safePath = getSafeRedirectPath(next, fallback);
   const hasLocalePrefix = SUPPORTED_LOCALES.some(

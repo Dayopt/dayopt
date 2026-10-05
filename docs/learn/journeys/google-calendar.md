@@ -979,7 +979,7 @@ CRON_SECRET で呼び出し元を確かめ、write fence を見て、開始と�
       "change": "変換した Plan には source: external_calendar と元の予定の ID が付く。Google の予定を消しても、変換済みの Plan は残る。",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "ext",

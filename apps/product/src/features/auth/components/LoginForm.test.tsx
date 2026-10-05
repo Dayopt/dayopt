@@ -135,7 +135,7 @@ describe('LoginForm', () => {
 
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password123');
-        expect(mockPush).toHaveBeenCalledWith('/ja/calendar');
+        expect(mockPush).toHaveBeenCalledWith('/ja/');
       });
     });
 
@@ -285,7 +285,7 @@ describe('LoginForm', () => {
   describe('redirectパラメータ対応', () => {
     it('redirectパラメータがある場合、ログイン後にそのパスへ遷移する', async () => {
       mockSearchParams = new URLSearchParams(
-        `redirect=${encodeURIComponent('/calendar/week?date=2026-03-25&panel=review')}`,
+        `redirect=${encodeURIComponent('/?date=2026-03-25&view=week')}`,
       );
       const user = userEvent.setup();
       mockSignIn.mockResolvedValue({
@@ -300,7 +300,7 @@ describe('LoginForm', () => {
       await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/ja/calendar/week?date=2026-03-25&panel=review');
+        expect(mockPush).toHaveBeenCalledWith('/ja/?date=2026-03-25&view=week');
       });
     });
 
@@ -338,7 +338,7 @@ describe('LoginForm', () => {
       await user.click(screen.getByRole('button', { name: 'auth.loginForm.loginButton' }));
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/ja/calendar');
+        expect(mockPush).toHaveBeenCalledWith('/ja/');
       });
     });
   });

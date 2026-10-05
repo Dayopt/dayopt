@@ -4,25 +4,23 @@ import { getSafeLocalizedRedirectPath, getSafeRedirectPath } from './safe-redire
 
 describe('getSafeRedirectPath', () => {
   it('allows same-origin relative paths', () => {
-    expect(getSafeRedirectPath('/calendar?date=2026-07-06&view=week')).toBe(
-      '/calendar?date=2026-07-06&view=week',
-    );
+    expect(getSafeRedirectPath('/?date=2026-07-06&view=week')).toBe('/?date=2026-07-06&view=week');
   });
 
   it('rejects absolute and protocol-relative URLs', () => {
-    expect(getSafeRedirectPath('https://evil.example')).toBe('/calendar');
-    expect(getSafeRedirectPath('//evil.example/path')).toBe('/calendar');
-    expect(getSafeRedirectPath('/%2F%2Fevil.example/path')).toBe('/calendar');
+    expect(getSafeRedirectPath('https://evil.example')).toBe('/');
+    expect(getSafeRedirectPath('//evil.example/path')).toBe('/');
+    expect(getSafeRedirectPath('/%2F%2Fevil.example/path')).toBe('/');
   });
 
   it('rejects raw and encoded backslash redirects', () => {
-    expect(getSafeRedirectPath('/\\evil.example/path')).toBe('/calendar');
-    expect(getSafeRedirectPath('/%5C%5Cevil.example/path')).toBe('/calendar');
-    expect(getSafeRedirectPath('/%5cevil.example/path')).toBe('/calendar');
+    expect(getSafeRedirectPath('/\\evil.example/path')).toBe('/');
+    expect(getSafeRedirectPath('/%5C%5Cevil.example/path')).toBe('/');
+    expect(getSafeRedirectPath('/%5cevil.example/path')).toBe('/');
   });
 
   it('rejects decoded scheme payloads', () => {
-    expect(getSafeRedirectPath('/https%3A%2F%2Fevil.example')).toBe('/calendar');
+    expect(getSafeRedirectPath('/https%3A%2F%2Fevil.example')).toBe('/');
   });
 });
 
@@ -31,7 +29,7 @@ describe('getSafeLocalizedRedirectPath', () => {
     expect(getSafeLocalizedRedirectPath('/settings', 'ja')).toBe('/ja/settings');
   });
 
-  it.each(['/ja/settings', '/ja?panel=settings', '/en/report?range=year'])(
+  it.each(['/ja/settings', '/ja/?view=day', '/en/settings'])(
     'does not duplicate an existing locale prefix: %s',
     (path) => {
       expect(getSafeLocalizedRedirectPath(path, 'ja')).toBe(path);
@@ -43,6 +41,6 @@ describe('getSafeLocalizedRedirectPath', () => {
   });
 
   it('localizes the safe fallback for an external redirect', () => {
-    expect(getSafeLocalizedRedirectPath('https://evil.example', 'ja')).toBe('/ja/calendar');
+    expect(getSafeLocalizedRedirectPath('https://evil.example', 'ja')).toBe('/ja/');
   });
 });

@@ -29,7 +29,7 @@ const meta = {
     onOpenRenameDialog: fn(),
     onChangeCategory: fn(),
     onShowOnlyActivity: fn(),
-    onViewStats: fn(),
+    onViewActivityDetails: fn(),
     onArchiveActivity: fn(),
     onDeleteActivity: fn(),
   },
@@ -108,7 +108,7 @@ export const AllPatterns: Story = {
           onOpenRenameDialog={fn()}
           onChangeCategory={fn()}
           onShowOnlyActivity={fn()}
-          onViewStats={fn()}
+          onViewActivityDetails={fn()}
           onArchiveActivity={fn()}
           onDeleteActivity={fn()}
         />

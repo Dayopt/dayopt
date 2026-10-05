@@ -26,6 +26,7 @@ export default function MFAVerifyPage() {
   const searchParams = useSearchParams();
   const params = useParams();
   const locale = (params?.locale as string) || 'ja';
+  const homePath = locale === 'en' ? '/' : `/${locale}/`;
   const t = useTranslations();
   // 参照を固定する。@supabase/ssr は browser で singleton を返すのでここは保険だが、
   // 固定しないと下の useCallback が毎レンダー作り直され、初期化の effect が回り続けて
@@ -87,10 +88,10 @@ export default function MFAVerifyPage() {
             return;
           }
         } else {
-          router.push(`/${locale}/calendar`);
+          router.push(homePath);
         }
       } else {
-        router.push(`/${locale}/calendar`);
+        router.push(homePath);
       }
     } catch (err) {
       logger.error('MFA initialization failed:', err);
@@ -103,7 +104,7 @@ export default function MFAVerifyPage() {
       });
       setError(t('common.errors.mfa.verifyFailed'));
     }
-  }, [router, supabase, t, locale, issueChallenge]);
+  }, [router, supabase, t, homePath, issueChallenge]);
 
   // 初期化は mount につき 1 回。`checkMFARequired` は `t` に依存しており、その参照は
   // レンダーごとに変わりうる。素直に依存させると effect が回り続け、そのたびに
@@ -153,7 +154,7 @@ export default function MFAVerifyPage() {
         return;
       }
 
-      const next = getSafeRedirectPath(searchParams?.get('next') ?? null, `/${locale}/calendar`);
+      const next = getSafeRedirectPath(searchParams?.get('next') ?? null, homePath);
       router.refresh();
       router.push(next);
     } catch (err) {
@@ -185,7 +186,7 @@ export default function MFAVerifyPage() {
       await vanillaTrpc.user.verifyRecoveryCode.mutate({ code: trimmed });
 
       toast.success(t('auth.mfaVerify.recoverySuccess'));
-      const next = getSafeRedirectPath(searchParams?.get('next') ?? null, `/${locale}/calendar`);
+      const next = getSafeRedirectPath(searchParams?.get('next') ?? null, homePath);
       router.refresh();
       router.push(next);
     } catch (err) {

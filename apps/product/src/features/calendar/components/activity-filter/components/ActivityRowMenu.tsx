@@ -33,7 +33,7 @@ interface ActivityRowMenuProps {
   onOpenRenameDialog: () => void;
   onChangeCategory: (categoryId: string | null) => void;
   onShowOnlyActivity: () => void;
-  onViewStats?: (() => void) | undefined;
+  onViewActivityDetails?: (() => void) | undefined;
   onArchiveActivity?: (() => void) | undefined;
   onDeleteActivity?: (() => void) | undefined;
 }
@@ -52,7 +52,7 @@ export function ActivityRowMenu({
   onOpenRenameDialog,
   onChangeCategory,
   onShowOnlyActivity,
-  onViewStats,
+  onViewActivityDetails,
   onArchiveActivity,
   onDeleteActivity,
 }: ActivityRowMenuProps) {
@@ -144,10 +144,10 @@ export function ActivityRowMenu({
         {t('calendar.filter.showOnlyThisActivity')}
       </DropdownMenuItem>
 
-      {onViewStats && (
-        <DropdownMenuItem onClick={onViewStats}>
+      {onViewActivityDetails && (
+        <DropdownMenuItem onClick={onViewActivityDetails}>
           <BarChart3 className="size-4" />
-          {t('calendar.filter.viewStats')}
+          {t('calendar.filter.viewActivityDetails')}
         </DropdownMenuItem>
       )}
 

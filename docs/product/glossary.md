@@ -17,7 +17,7 @@ Dayopt の語彙の正本。UI で使う言葉、docs でだけ使う設計語�
 | `design` | docs / spec で使う設計語。UI には出ない | なし（レビューで拾う）                                 |
 | `code`   | 識別子と DB 名の対応。UI 表記を持たない | なし（`pnpm lint:boundaries` 等が別の面を見る）        |
 
-「決算バー」「羅針盤」のような設計語を UI 文言に書かないこと、逆に UI 用語をコード識別子の正解と取り違えないことが、層を分ける目的。
+設計語を UI 文言に書かないこと、逆に UI 用語をコード識別子の正解と取り違えないことが、層を分ける目的。
 
 ## 確認コマンド
 
@@ -45,40 +45,33 @@ pnpm copy:check:strict
 
 ### UI 用語
 
-| Concept                      | ja                   | en              | code / DB                                                                            | 禁止表記 (ja)                     | 禁止表記 (en)                      | 使い方                                                                                |
-| ---------------------------- | -------------------- | --------------- | ------------------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------- |
-| Timeblock                    | タイムブロック       | Timeblock       | `features/timeblock` / `messages/timeblock.json`                                     | ブロック / 箱 / エントリ / タスク | block / box / event / entry / task | カレンダー上の時間ブロック。予定 / 記録の総称                                         |
-| Plan                         | 予定                 | Plan            | `PlanEvent` / `features/timeblock`<br>`plans`                                        | 計画                              | —                                  | これからやる時間の宣言。時間軸のどこにでも置ける独立エンティティ                      |
-| Record                       | 記録                 | Record          | `RecordEvent` / `features/timeblock`<br>`records`                                    | 実績                              | —                                  | 実際に使った時間。予定とは独立して保存し、未来には終われない                          |
-| Timeboxing                   | タイムボックス       | Timebox         | —                                                                                    | —                                 | —                                  | 時間を区切って作業する手法そのもの。説明文脈で使う（個々の時間は「タイムブロック」）  |
-| Activity                     | アクティビティ       | Activity        | `features/activities` / `messages/activities.json`<br>`activities`                   | タグ / ラベル                     | —                                  | 予定と記録の単位。最も具体的な分類で、無限に増えてよい                                |
-| Category                     | カテゴリー           | Category        | `categories`                                                                         | —                                 | —                                  | 所属の主軸。1 アクティビティは最大 1 カテゴリー。色とアイコンを持つ                   |
-| Uncategorized                | 未分類               | Uncategorized   | `UNCATEGORIZED_KEY`                                                                  | —                                 | —                                  | どのカテゴリーにも入っていない時間の残余バケット                                      |
-| Plan template                | テンプレート         | Template        | `planTemplates` / `features/timeblock`<br>`plan_templates` / `plan_template_blocks`  | 型                                | —                                  | 1 日の予定の並びを保存して別の日へ適用する仕組み                                      |
-| Review                       | 振り返り             | Review          | `features/review` / `messages/report.json`                                           | レビュー                          | —                                  | ページ名・機能名。route は /report、i18n namespace も report                          |
-| Inspector                    | インスペクタ         | Inspector       | `DockedInspectorPanel` / `features/timeblock`                                        | —                                 | —                                  | タイムブロックをクリックした時に開く詳細パネル                                        |
-| Draft                        | ドラフト             | Draft           | `isDraft`                                                                            | —                                 | —                                  | 未保存のプレビュー状態のタイムブロック。ドラッグ中・複製直後など                      |
-| Archive                      | アーカイブ           | Archive         | `archiveActivity`<br>`activities.archived_at` / `categories.archived_at`             | —                                 | —                                  | アクティビティ / カテゴリーを一覧から隠す。過去の記録は残る（削除ではない）           |
-| Trash                        | ゴミ箱               | Trash           | `deleted_at`<br>`plans.deleted_at` / `records.deleted_at`                            | —                                 | —                                  | 削除したタイムブロックの soft delete 置き場。復元できる                               |
-| Confirm day                  | この日を確定         | Confirm day     | `confirmDay`<br>`confirm_day_plans_command_v1`                                       | —                                 | —                                  | 過去の予定をまとめて記録へ変換する操作                                                |
-| Fulfillment                  | 充実度               | Fulfillment     | `'low' \| 'medium' \| 'high'`<br>`records.fulfillment`                               | —                                 | —                                  | 記録に付ける 3 値。low = 消耗 / medium = 普通 / high = 充実                           |
-| Progress                     | 進捗                 | Progress        | —                                                                                    | 達成                              | —                                  | 予定に対して記録がどこまで進んだかを数字で示す                                        |
-| External calendar event      | 外部カレンダーの予定 | External event  | `ExternalCalendarEvent` / `features/external-calendar`<br>`external_calendar_events` | —                                 | —                                  | Google Calendar 等から同期した予定。未変換のものはゴーストとして薄く出す              |
-| Account                      | アカウント           | Account         | —                                                                                    | —                                 | —                                  | 設定ページ名                                                                          |
-| Sign in                      | サインイン           | Sign in         | —                                                                                    | ログイン                          | log in                             | 認証アクション                                                                        |
-| Sign out                     | サインアウト         | Sign out        | —                                                                                    | ログアウト                        | log out                            | 認証解除アクション                                                                    |
-| Time spent (report tab)      | 時間の使い方         | Time spent      | `ReportTabs`                                                                         | —                                 | —                                  | タブ。事実だけで何にいくら使ったかを見る面。中身は配分の面                            |
-| Plan vs. record (report tab) | 差分                 | Plan vs. record | `ReportTabs`                                                                         | —                                 | —                                  | タブ。予定と記録の違いを見る面。中身は執行の面。「レビュー」は禁止語なので付けない    |
-| Reflection (report tab)      | 振り返り             | Reflection      | `ReportTabs`                                                                         | —                                 | —                                  | タブ。それが良い使い方だったかを見る面。中身は質の面。ja はページ名（Review）と同じ語 |
+| Concept                 | ja                   | en               | code / DB                                                                            | 禁止表記 (ja)                     | 禁止表記 (en)                      | 使い方                                                                               |
+| ----------------------- | -------------------- | ---------------- | ------------------------------------------------------------------------------------ | --------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ |
+| Timeblock               | タイムブロック       | Timeblock        | `features/timeblock` / `messages/timeblock.json`                                     | ブロック / 箱 / エントリ / タスク | block / box / event / entry / task | カレンダー上の時間ブロック。予定 / 記録の総称                                        |
+| Plan                    | 予定                 | Plan             | `PlanEvent` / `features/timeblock`<br>`plans`                                        | 計画                              | —                                  | これからやる時間の宣言。時間軸のどこにでも置ける独立エンティティ                     |
+| Record                  | 記録                 | Record           | `RecordEvent` / `features/timeblock`<br>`records`                                    | 実績                              | —                                  | 実際に使った時間。予定とは独立して保存し、未来には終われない                         |
+| Timeboxing              | タイムボックス       | Timebox          | —                                                                                    | —                                 | —                                  | 時間を区切って作業する手法そのもの。説明文脈で使う（個々の時間は「タイムブロック」） |
+| Activity                | アクティビティ       | Activity         | `features/activities` / `messages/activities.json`<br>`activities`                   | タグ / ラベル                     | —                                  | 予定と記録の単位。最も具体的な分類で、無限に増えてよい                               |
+| Category                | カテゴリー           | Category         | `categories`                                                                         | —                                 | —                                  | 所属の主軸。1 アクティビティは最大 1 カテゴリー。色とアイコンを持つ                  |
+| Uncategorized           | 未分類               | Uncategorized    | —                                                                                    | —                                 | —                                  | どのカテゴリーにも入っていない時間の残余バケット                                     |
+| Plan template           | テンプレート         | Template         | `planTemplates` / `features/timeblock`<br>`plan_templates` / `plan_template_blocks`  | 型                                | —                                  | 1 日の予定の並びを保存して別の日へ適用する仕組み                                     |
+| Activity details        | アクティビティ詳細   | Activity details | `ConnectedActivitySummaryPanel` / `features/activities` / `messages/activities.json` | —                                 | —                                  | カレンダーから明示的に開く、直近30日の記録時間・中央値・記録一覧                     |
+| Inspector               | インスペクタ         | Inspector        | `DockedInspectorPanel` / `features/timeblock`                                        | —                                 | —                                  | タイムブロックをクリックした時に開く詳細パネル                                       |
+| Draft                   | ドラフト             | Draft            | `isDraft`                                                                            | —                                 | —                                  | 未保存のプレビュー状態のタイムブロック。ドラッグ中・複製直後など                     |
+| Archive                 | アーカイブ           | Archive          | `archiveActivity`<br>`activities.archived_at` / `categories.archived_at`             | —                                 | —                                  | アクティビティ / カテゴリーを一覧から隠す。過去の記録は残る（削除ではない）          |
+| Trash                   | ゴミ箱               | Trash            | `deleted_at`<br>`plans.deleted_at` / `records.deleted_at`                            | —                                 | —                                  | 削除したタイムブロックの soft delete 置き場。復元できる                              |
+| Confirm day             | この日を確定         | Confirm day      | `confirmDay`<br>`confirm_day_plans_command_v1`                                       | —                                 | —                                  | 過去の予定をまとめて記録へ変換する操作                                               |
+| Fulfillment             | 充実度               | Fulfillment      | `'low' \| 'medium' \| 'high'`<br>`records.fulfillment`                               | —                                 | —                                  | 記録に付ける 3 値。low = 消耗 / medium = 普通 / high = 充実                          |
+| Progress                | 進捗                 | Progress         | —                                                                                    | 達成                              | —                                  | 予定に対して記録がどこまで進んだかを数字で示す                                       |
+| External calendar event | 外部カレンダーの予定 | External event   | `ExternalCalendarEvent` / `features/external-calendar`<br>`external_calendar_events` | —                                 | —                                  | Google Calendar 等から同期した予定。未変換のものはゴーストとして薄く出す             |
+| Account                 | アカウント           | Account          | —                                                                                    | —                                 | —                                  | 設定ページ名                                                                         |
+| Sign in                 | サインイン           | Sign in          | —                                                                                    | ログイン                          | log in                             | 認証アクション                                                                       |
+| Sign out                | サインアウト         | Sign out         | —                                                                                    | ログアウト                        | log out                            | 認証解除アクション                                                                   |
 
 ### 設計語（UI 文言には出さない）
 
 | Concept          | ja           | en               | 禁止表記 (ja) | 使い方                                                                                                 |
 | ---------------- | ------------ | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
-| Ink              | インク       | Ink              | —             | 記録として書かれた時間。レポートの現行表示は docs/product/specs/review.md を参照                       |
-| Margin           | 余白         | Margin           | 空白 / 無駄   | 記録が書かれていない時間。見出しに数字で出すだけで、配分には混ぜず塗らない。フィルタで動かない         |
-| Mirror           | 見積もりの鏡 | Mirror           | —             | 「差分」タブの節。記録 / 過去予定の係数を癖の強い順に最大 3 件出す                                     |
-| Compass          | 羅針盤       | Compass          | —             | 「振り返り」タブの散布図。軸と集計の正本は docs/product/specs/review.md を参照                         |
 | Two-lane view    | 2 レーン表示 | Two-lane view    | —             | 予定レーン（アウトライン・淡色）と記録レーン（塗り・主役）を横並びに出す                               |
 | Destination rule | 保存先ルール | Destination rule | —             | 新規作成の既定は end_at で決まる。過去枠は予定 / 記録を選べる。正本: docs/product/specs/plan-record.md |
 
@@ -86,6 +79,7 @@ pnpm copy:check:strict
 
 | Concept               | 識別子                                         | DB                                                                     | 意味                                                                                                                                                            | 状態 |
 | --------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| MCP review.get        | —                                              | —                                                                      | 公開済みの read-only MCP 契約。product のアクティビティ詳細とは独立して維持する                                                                                 | 現行 |
 | Timeblock destination | `TimeblockDestination` / `kind` / `lane`       | —                                                                      | 予定 / 記録の判別子。canonical は 'plan' \| 'record'。kind / lane / destination / sourceKind / resourceType が現状混在している                                  | 現行 |
 | Timeblock state       | `TimeblockState`                               | —                                                                      | 時間位置から導く 3 値（upcoming / active / past）。実体は useCalendarData が持つ                                                                                | 現行 |
 | Source                | `PlanSource` / `RecordSource`                  | `plans.source` / `records.source`                                      | 作成時に確定する不変の provenance。plans は manual / external_calendar / api、records はそれに from_plan / auto_migrated を加えた 5 値                          | 現行 |
@@ -106,29 +100,26 @@ pnpm copy:check:strict
 | 禁止語     | locale | 推奨           | 強制    | 例外                                                                                                                                     | 理由                                                                                                                          |
 | ---------- | ------ | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | ブロック   | ja     | タイムブロック | CI 必須 | キー `[Ii]pBlocked`                                                                                                                      | 総称は「タイムブロック」に統一する。単独の「ブロック」は妨害の意味とも読める                                                  |
-| 箱         | ja     | タイムブロック | CI 必須 | —                                                                                                                                        | /report だけで使われている 3 つ目の呼称。「タイムブロック」か「件」に寄せる                                                   |
+| 箱         | ja     | タイムブロック | CI 必須 | —                                                                                                                                        | 削除済みの旧 /report 画面にあった 3 つ目の呼称。新しい UI では「タイムブロック」か「件」に寄せる                              |
 | エントリ   | ja     | タイムブロック | CI 必須 | —                                                                                                                                        | ADR-025 で廃止した旧 Entry 単一モデルの呼称。Plan / Record に分割済み                                                         |
 | タスク     | ja     | タイムブロック | CI 必須 | キー `^legal\\.` / キー `^app\\.keywords`                                                                                                | GTD のタスクリスト項目と混同する。Dayopt が置くのはタスクではなく時間。法的文書と SEO keyword は据え置き                      |
 | block      | en     | Timeblock      | CI 必須 | —                                                                                                                                        | ja「タイムブロック」に対応する en は Timeblock。単独の block は使わない                                                       |
-| box        | en     | Timeblock      | CI 必須 | —                                                                                                                                        | /report の 3 つ目の呼称                                                                                                       |
+| box        | en     | Timeblock      | CI 必須 | —                                                                                                                                        | 削除済みの旧 /report 画面にあった 3 つ目の呼称                                                                                |
 | event      | en     | Timeblock      | CI 必須 | キー `^calendar\\.external\\.` / キー `externalEvents` / キー `ghost` / キー `^legal\\.` / キー `googleCalendar` / 概念 `external-event` | event は外部カレンダー由来の予定を指す語。Dayopt 自身の時間には使わない                                                       |
 | entry      | en     | Timeblock      | CI 必須 | キー `^oauth\\.consent\\.scope\\.` / キー `^settings\\.integrations\\.mcpConnections\\.scopes\\.`                                        | 旧 Entry モデルの呼称。OAuth scope 名 read:entries は外部契約なので据え置き                                                   |
 | task       | en     | Timeblock      | CI 必須 | キー `^legal\\.` / キー `^app\\.keywords`                                                                                                | ja「タスク」と同じ理由                                                                                                        |
 | 実績       | ja     | 記録           | CI 必須 | —                                                                                                                                        | UI では「記録」に統一する。「実績」は評価の含みがあり、判定せず数字で示すという原則に反する                                   |
 | タグ       | ja     | アクティビティ | CI 必須 | —                                                                                                                                        | 所属（集計が合う軸）と横断参照（分析）を 1 語に混ぜており集計が濁る。#2162 でアクティビティ / カテゴリー / セグメントへ全置換 |
 | ラベル     | ja     | アクティビティ | CI 必須 | —                                                                                                                                        | 1 対象に複数付けられる印象を与える。1 タイムブロック 1 アクティビティ                                                         |
-| 束         | ja     | セグメント     | CI 必須 | —                                                                                                                                        | /report のモバイル chip だけで使われている別名。「セグメント」に一本化する                                                    |
+| 束         | ja     | セグメント     | CI 必須 | —                                                                                                                                        | 撤去前のセグメント機能で使われた別名。現在の UI 表記としては使わない                                                          |
 | レンズ     | ja     | セグメント     | CI 必須 | —                                                                                                                                        | 同上。spec と UI で「レンズ」「束」「セグメント」が三つ巴になっていた                                                         |
 | lens       | en     | Segment        | CI 必須 | —                                                                                                                                        | ja「レンズ」と同じ理由                                                                                                        |
 | 型         | ja     | テンプレート   | CI 必須 | —                                                                                                                                        | 同じ namespace 内で「テンプレート」と割れていた。DB / en / サイドバー見出しに合わせて「テンプレート」へ寄せる                 |
-| レビュー   | ja     | 振り返り       | CI 必須 | 値に「プレビュー」 / 値に「法的レビュー」 / 値に「レビューを受ける」 / 値に「レビューインサイト」                                        | コードレビューや評価を連想させる。ページ名は「振り返り」                                                                      |
 | 達成       | ja     | 進捗           | CI 必須 | —                                                                                                                                        | 「達成率」「達成度」は良し悪しの判定語。判定せず数字で示すという copywriting 原則に反する                                     |
 | ログイン   | ja     | サインイン     | CI 必須 | キー `^legal\\.`                                                                                                                         | 「サインイン」に統一する。法的文書は改訂扱いになるため据え置き                                                                |
 | log in     | en     | Sign in        | CI 必須 | キー `^legal\\.`                                                                                                                         | en 側も log in / sign in で割れている                                                                                         |
 | ログアウト | ja     | サインアウト   | CI 必須 | キー `^legal\\.`                                                                                                                         | 「サインアウト」に統一する                                                                                                    |
 | log out    | en     | Sign out       | CI 必須 | キー `^legal\\.`                                                                                                                         | ja「ログアウト」と同じ理由                                                                                                    |
-| 空白       | ja     | 余白           | CI 必須 | `report` namespace のみ検査                                                                                                              | レポートでは「余白」。入力バリデーションの whitespace 義は別物なので report namespace だけを見る                              |
-| 無駄       | ja     | 余白           | CI 必須 | —                                                                                                                                        | 余白に良し悪しの評価を持ち込まない                                                                                            |
 
 ### キー名に使わない token
 
@@ -177,7 +168,7 @@ Plan（予定）と Record（記録）は独立エンティティで、その総
 - **保存先ルール**: 新規作成の既定は終了時刻で決まる。過去枠では Plan / Record を選び直せる。既定の作成手数を増やさず、過去 Plan を編集できるのに作れない非対称を解消するため。現在の契約は [Plan / Record の仕様](./specs/plan-record.md#新規作成時の保存先ルール)を参照する
 - **強制点は DB trigger / SQL 関数**。アプリ層（service / MCP client / UI）はその写し
 
-Review で区別する 2 つの状態:
+Calendar Inspector で区別する 2 つの状態:
 
 - **未記録の予定** — 過去の Plan で Record が無い。「まだ記録していない」
 - **この時間帯の記録** — 同じアクティビティで予定と15分以上重なる Record。対応関係は保存せず、表示時に導出する
@@ -186,13 +177,11 @@ Review で区別する 2 つの状態:
 
 2026-08-18 に「タグ」の多重所属を廃止し、アクティビティ・カテゴリー・セグメントへ置換した（#2162）。タグは「所属（集計の足し算が合う軸）」と「横断参照（分析）」を 1 つの仕組みに混ぜており、集計が濁っていた。
 
-セグメントは 2026-09-15 に UI / tRPC / MCP から撤去した。アクティビティ単位のフィルタで「この数個だけで見る」が足り、保存クエリを別概念として持つ理由が無くなったため。現在の分類と「アクティビティなし」/「未分類」の区別は [Activities の仕様](./specs/activities.md)、フィルタは [振り返り仕様](./specs/review.md#2-フィルタ)を参照する。
+セグメントは 2026-09-15 に UI / tRPC / MCP から撤去した。現在の分類と「アクティビティなし」/「未分類」の区別は [Activities の仕様](./specs/activities.md)を参照する。カレンダーから開くアクティビティ詳細は [Calendar仕様](./specs/calendar.md)に従う。MCP の `review.get` は画面とは独立した公開読取契約として維持する。
 
-### レポートのタブと設計語（`/report`）
+### アクティビティ詳細
 
-2026-09-15 に 4 章構成から目的別の 3 タブへ再編し、「整える」を撤去した。問いごとに読む面を分けるためで、旧章名を現行 UI の名前として使わない。タブ名は上の生成表、面の中身と集計の意味は [振り返り仕様](./specs/review.md#1-3-タブ)を参照する。
-
-配分は記録時間の合計を分母にし、余白は数字で添える。旧決算バーの塗り残しという説明を現行表示へ戻さない。見積もりの鏡や羅針盤は設計語であり、「精度」「達成」「スコア」のような評価語を UI 文言に混ぜない。
+アクティビティ詳細は、直近30日の記録時間・中央値・記録一覧だけを表示する補助面。全体の配分や比較、評価は行わない。ページ構成と一覧からカレンダーへ移る操作は [Calendar仕様](./specs/calendar.md)が正本。
 
 ### 同音異義と除外の判断理由
 
@@ -200,7 +189,6 @@ Review で区別する 2 つの状態:
 
 - **「カテゴリ」を禁止語から外した**（2026-08-18、#2162）— 部分一致では正解語「カテゴリー」がすべて違反判定される。旧モデルでは `カテゴリ` は「タグの代替表現」として禁止していたが、3 構造モデルで「カテゴリー」が正解語に昇格したため役目を終えた。同じ形を避けるため、「ブロック」は `(?<!タイム)ブロック`、「箱」は `(?<!ゴミ)箱`、「束」は `(?<!約)束` という lookbehind 付きで判定する
 - **「計画」は機械判定しない** — 名詞の「計画」は使わないが、動詞「計画する」「計画どおり」は正当。部分一致では割れないのでレビューで拾う
-- **「空白」は `report` namespace だけ見る** — レポートの「余白」の禁止代替語としては正しいが、入力バリデーションの whitespace 義（「改行や空白のみは使用できません」）は別物
 - **「ラベル」は値だけを見る** — 禁止しているのは UI 文言に出る「ラベル」で、a11y の `aria-label` は別義。キー名の検査 token に `label` を入れていないので `ariaLabel` は当たらない（値側の active ルールには除外を付けない — 未検証の抜け道になる）
 - **「イベント」「event」は外部カレンダーでは正当** — Google Calendar のイベントを指す文脈と、Dayopt 自身の時間を指す旧語彙を区別するため、`calendar.external.*` / `externalEvents` / ghost 系のキーだけ許容する
 - **外部契約のキー名は据え置き** — OAuth scope 名 `read:entries` と、それに従属する MCP 接続画面のキーは旧語彙のままにする。改名は外部 consumer を壊す（REVIEW-3）

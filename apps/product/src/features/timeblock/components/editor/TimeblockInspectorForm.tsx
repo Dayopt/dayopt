@@ -85,7 +85,7 @@ interface TimeModelInspectorFormProps {
   relationships?: TimeblockRelationships | undefined;
   /** 関係行または記録直後の対象を同じ Inspector で開く。 */
   onOpenRelationship?: ((id: string, kind: TimeblockDestination) => void) | undefined;
-  onViewStats?: ((tagId: string) => void) | undefined;
+  onViewActivityDetails?: ((tagId: string) => void) | undefined;
   /** 現在の入力内容から独立複製の下書きを開く。 */
   onStartDuplicate?: ((draft: TimeblockDuplicateDraft) => void) | undefined;
   /** 複製用の未保存下書き。指定時は既存行を自動保存しない。 */
@@ -135,7 +135,7 @@ export function TimeblockInspectorForm({
   record,
   relationships,
   onOpenRelationship,
-  onViewStats,
+  onViewActivityDetails,
   onStartDuplicate,
   duplicateDraft,
   onCancelDuplicate,
@@ -590,8 +590,10 @@ export function TimeblockInspectorForm({
     : // eslint-disable-next-line react-hooks/refs -- helperはcallbackを実行せずmenu itemへ格納するだけ
       getTimeblockMenuItems({
         activityId: value.activityId,
-        onViewStats:
-          onViewStats && value.activityId ? () => onViewStats(value.activityId ?? '') : undefined,
+        onViewActivityDetails:
+          onViewActivityDetails && value.activityId
+            ? () => onViewActivityDetails(value.activityId ?? '')
+            : undefined,
         onDuplicate: canUseProduct && onStartDuplicate ? handleStartDuplicate : undefined,
         onDelete: isMigrated ? undefined : handleDelete,
       });

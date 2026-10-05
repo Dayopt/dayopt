@@ -193,7 +193,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
       "short": "main へ merge",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
@@ -247,7 +247,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -299,7 +299,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
           "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -375,7 +375,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
           "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -430,7 +430,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
           "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -477,7 +477,7 @@ release job が migration の反映を確かめ（今は advisory で warning �
       "via": "新版を配信",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
