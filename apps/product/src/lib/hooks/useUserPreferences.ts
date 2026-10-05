@@ -25,9 +25,9 @@ function getBrowserTimezone(): string {
 }
 
 /**
- * 日付表記は画面の言語（next-intl の locale）に揃える。user_settings の
- * preferredLocale はメール等の配信言語で、設定の「言語」select は URL locale だけを
- * 切り替えるため両者はずれうる。ja の画面に MM/dd/yyyy が出ていた（2026-09-14）。
+ * 日付表記は画面の言語（next-intl の locale）に揃える。user_settings の preferredLocale は
+ * メール等の配信言語で、表示設定の「言語」select はこれも更新するが、日付形式自体は
+ * 保存値ではなく画面の locale から決める。
  */
 function resolveDateFormat(locale: string): UserPreference['dateFormat'] {
   return locale === 'ja' ? 'yyyy/MM/dd' : 'MM/dd/yyyy';

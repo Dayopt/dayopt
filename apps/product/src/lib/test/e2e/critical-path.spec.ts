@@ -468,11 +468,11 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       .toBe(TIMEZONE);
   });
 
-  test('言語の変更がリロード後も保持される', async ({ page }) => {
+  test('言語の変更後も設定画面に留まり、リロード後も保持される', async ({ page }) => {
     await page.goto('/ja/settings/display');
     await page.getByRole('combobox', { name: '言語', exact: true }).click();
     await page.getByRole('option', { name: 'English', exact: true }).click();
-    await expect(page).toHaveURL(/\/en\/calendar$/);
+    await expect(page).toHaveURL(/\/en\/settings\/display$/);
     await expect
       .poll(async () => {
         const result = await adminSupabase
@@ -485,14 +485,13 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       })
       .toBe('en');
     await page.reload();
-    await expect(page).toHaveURL(/\/en\/calendar$/);
-    await page.goto('/en/settings/display');
+    await expect(page).toHaveURL(/\/en\/settings\/display$/);
     await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toContainText(
       'English',
     );
     await page.getByRole('combobox', { name: 'Language', exact: true }).click();
     await page.getByRole('option', { name: '日本語', exact: true }).click();
-    await expect(page).toHaveURL(/\/ja\/calendar$/);
+    await expect(page).toHaveURL(/\/ja\/settings\/display$/);
     await expect
       .poll(async () => {
         const result = await adminSupabase
