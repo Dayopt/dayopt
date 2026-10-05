@@ -10,7 +10,7 @@ import { suppressConsentBanner } from './suppress-consent-banner';
  * クリティカルパス E2E（desktop / mobile）が共有する seed と操作の足場。
  *
  * spec ごとに `createCriticalPathIdentity` で別ユーザーを作る。desktop と mobile が
- * 同じユーザーを共有すると、serial で作った Plan / Record が互いの Activity Summary 集計へ
+ * 同じユーザーを共有すると、serial で作った Plan / Record が互いの Report 集計へ
  * 混ざり、`1時間` の assertion が片方の成否に依存する。
  */
 
