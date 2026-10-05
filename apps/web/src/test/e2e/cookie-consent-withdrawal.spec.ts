@@ -1,5 +1,5 @@
 import { BROWSER_TELEMETRY_CONSENT_STORAGE_KEY } from '@dayopt/observability';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from './public-test';
 
 import commonEn from '../../../messages/en/common.json' with { type: 'json' };
 
@@ -26,7 +26,7 @@ async function readStoredConsent(page: Page) {
   return raw === null ? null : (JSON.parse(raw) as { analytics: boolean; marketing: boolean });
 }
 
-test('footer の Cookie 設定から、保存済みの分析同意を撤回・再許可できる', async ({
+test('footer の Cookie 設定から、保存済みの分析同意を撤回・再許可できる @mobile', async ({
   page,
   context,
 }) => {

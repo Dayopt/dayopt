@@ -25,8 +25,14 @@ const REQUIRED_INPUT_KEYS = [
   'preview_db_mode',
 ];
 const OPTIONAL_RECOVERY_INPUT_KEYS = ['preview_recover_run', 'preview_recover_attempt'];
-const SUPPORTED_INPUT_KEYS = [...REQUIRED_INPUT_KEYS, ...OPTIONAL_RECOVERY_INPUT_KEYS];
+const OPTIONAL_POLICY_INPUT_KEYS = ['preview_merged_validation'];
+const SUPPORTED_INPUT_KEYS = [
+  ...REQUIRED_INPUT_KEYS,
+  ...OPTIONAL_RECOVERY_INPUT_KEYS,
+  ...OPTIONAL_POLICY_INPUT_KEYS,
+];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const SHA = /^[a-f0-9]{40}$/;
 const PROJECT_REF = /^[a-z]{20}$/;
 const SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
 
@@ -62,6 +68,11 @@ function parseInputs(requestJson) {
     // GitHub's manual dispatch UI omits optional inputs left empty.
     OPTIONAL_RECOVERY_INPUT_KEYS.every((key) => !Object.hasOwn(inputs, key) || inputs[key] === ''),
     'recovery inputs cannot be used for Preview E2E',
+  );
+  requireCondition(
+    !Object.hasOwn(inputs, 'preview_merged_validation') ||
+      typeof inputs.preview_merged_validation === 'boolean',
+    'merged validation input is invalid',
   );
   requireCondition(inputs.preview_e2e === true, 'Preview E2E was not explicitly enabled');
   requireCondition(
@@ -118,6 +129,8 @@ function parseInputs(requestJson) {
     supabaseProjectRef,
     supabaseBranchId,
     databaseMode,
+    mergedValidation: inputs.preview_merged_validation === true,
+    mergeCommitSha: null,
   };
 }
 
@@ -211,9 +224,10 @@ async function readPullRequest({ prNumber, token, fetchImpl }) {
 function validatePullRequest(pullRequest, request) {
   requireCondition(
     pullRequest?.number === request.prNumber &&
-      pullRequest.state === 'open' &&
-      pullRequest.draft === false,
-    'PR must be open and ready for review',
+      (request.mergedValidation
+        ? pullRequest.state === 'closed' && pullRequest.merged === true
+        : pullRequest.state === 'open' && pullRequest.draft === false),
+    request.mergedValidation ? 'PR must be merged' : 'PR must be open and ready for review',
   );
   requireCondition(
     pullRequest.head?.repo?.full_name === GITHUB_REPOSITORY &&
@@ -221,12 +235,23 @@ function validatePullRequest(pullRequest, request) {
       pullRequest.base?.repo?.full_name === GITHUB_REPOSITORY,
     'PR source and destination must be internal Dayopt/dayopt branches',
   );
+  if (request.mergedValidation) {
+    requireCondition(pullRequest.base.ref === 'integration', 'merged PR base must be integration');
+    requireCondition(
+      typeof pullRequest.merge_commit_sha === 'string' && SHA.test(pullRequest.merge_commit_sha),
+      'merged PR commit is invalid',
+    );
+  } else {
+    requireCondition(
+      typeof pullRequest.head.sha === 'string' &&
+        pullRequest.head.sha.toLowerCase() === request.sha,
+      'PR head does not match the requested commit SHA',
+    );
+  }
   requireCondition(
-    typeof pullRequest.head.sha === 'string' && pullRequest.head.sha.toLowerCase() === request.sha,
-    'PR head does not match the requested commit SHA',
-  );
-  requireCondition(
-    pullRequest.base.ref === 'main' || pullRequest.base.ref === 'integration',
+    request.mergedValidation ||
+      pullRequest.base.ref === 'main' ||
+      pullRequest.base.ref === 'integration',
     'PR base must be main or integration',
   );
   requireCondition(
@@ -235,6 +260,45 @@ function validatePullRequest(pullRequest, request) {
     'PR source branch is not allowed',
   );
   return pullRequest.head.ref;
+}
+
+async function verifyMergedCommitBinding({ pullRequest, request, workflowSha, token, fetchImpl }) {
+  requireCondition(
+    request.mergedValidation &&
+      typeof workflowSha === 'string' &&
+      SHA.test(workflowSha) &&
+      typeof pullRequest.merge_commit_sha === 'string' &&
+      SHA.test(pullRequest.merge_commit_sha),
+    'trusted Integration workflow SHA is required for merged validation',
+  );
+  const mergeCommitSha = pullRequest.merge_commit_sha.toLowerCase();
+  const { body: mergeCommit } = await readGitHubJson({
+    url: apiUrl(`/repos/${GITHUB_REPOSITORY}/git/commits/${mergeCommitSha}`),
+    token,
+    fetchImpl,
+  });
+  requireCondition(
+    mergeCommit?.sha?.toLowerCase() === mergeCommitSha &&
+      Array.isArray(mergeCommit.parents) &&
+      mergeCommit.parents.length === 2 &&
+      SHA.test(mergeCommit.parents[0]?.sha ?? '') &&
+      mergeCommit.parents[1]?.sha?.toLowerCase() === request.sha,
+    'merged PR commit does not have the requested candidate as its second parent',
+  );
+  const { body: comparison } = await readGitHubJson({
+    url: apiUrl(`/repos/${GITHUB_REPOSITORY}/compare/${mergeCommitSha}...${workflowSha}`),
+    token,
+    fetchImpl,
+  });
+  requireCondition(
+    ['ahead', 'identical'].includes(comparison?.status) &&
+      comparison.merge_base_commit?.sha?.toLowerCase() === mergeCommitSha &&
+      Number.isSafeInteger(comparison.ahead_by) &&
+      Number.isSafeInteger(comparison.behind_by) &&
+      comparison.behind_by === 0,
+    'merged PR commit is not in the trusted Integration workflow history',
+  );
+  return mergeCommitSha;
 }
 
 function isSupabasePath(path) {
@@ -300,8 +364,8 @@ async function verifySharedDatabaseChanges({ request, token, fetchImpl }) {
 
 /**
  * Verify a manual Cloud Preview request against live, read-only GitHub state.
- * @param {{ eventName: string, repository: string, ref: string, token: string, requestJson: string, fetchImpl?: typeof fetch }} options
- * @returns {Promise<{ prNumber: number, sha: string, deploymentId: string, branchName: string, supabaseProjectRef: string, supabaseBranchId: string, databaseMode: 'shared' | 'ephemeral' }>}
+ * @param {{ eventName: string, repository: string, ref: string, token: string, requestJson: string, workflowSha?: string, fetchImpl?: typeof fetch }} options
+ * @returns {Promise<{ prNumber: number, sha: string, deploymentId: string, branchName: string, supabaseProjectRef: string, supabaseBranchId: string, databaseMode: 'shared' | 'ephemeral', mergedValidation: boolean, mergeCommitSha: string | null }>}
  */
 export async function verifyPreviewCloudTrust({
   eventName,
@@ -309,6 +373,7 @@ export async function verifyPreviewCloudTrust({
   ref,
   token,
   requestJson,
+  workflowSha,
   fetchImpl = fetch,
 }) {
   requireCondition(eventName === 'workflow_dispatch', 'only workflow_dispatch is allowed');
@@ -322,6 +387,10 @@ export async function verifyPreviewCloudTrust({
     'read-only GitHub token is required',
   );
   const request = parseInputs(requestJson);
+  requireCondition(
+    !request.mergedValidation || (typeof workflowSha === 'string' && SHA.test(workflowSha)),
+    'trusted Integration workflow SHA is required for merged validation',
+  );
 
   await verifyPreviewEnvironmentBoundary({ token: token.trim(), fetchImpl });
   const pullRequest = await readPullRequest({
@@ -330,6 +399,15 @@ export async function verifyPreviewCloudTrust({
     fetchImpl,
   });
   const branchName = validatePullRequest(pullRequest, request);
+  const mergeCommitSha = request.mergedValidation
+    ? await verifyMergedCommitBinding({
+        pullRequest,
+        request,
+        workflowSha,
+        token: token.trim(),
+        fetchImpl,
+      })
+    : null;
   await verifySharedDatabaseChanges({ request, token: token.trim(), fetchImpl });
 
   // Detect a branch update or PR state change while paginating its file list.
@@ -342,14 +420,27 @@ export async function verifyPreviewCloudTrust({
     validatePullRequest(latestPullRequest, request) === branchName,
     'PR changed during trust verification',
   );
+  if (request.mergedValidation) {
+    const latestMergeCommitSha = await verifyMergedCommitBinding({
+      pullRequest: latestPullRequest,
+      request,
+      workflowSha,
+      token: token.trim(),
+      fetchImpl,
+    });
+    requireCondition(
+      latestMergeCommitSha === mergeCommitSha,
+      'PR merge changed during trust verification',
+    );
+  }
 
-  return { ...request, branchName };
+  return { ...request, branchName, mergeCommitSha };
 }
 
 function validateOutputRequest(request) {
   requireCondition(
     isRecord(request) &&
-      Object.keys(request).length === 7 &&
+      Object.keys(request).length === 9 &&
       [
         'prNumber',
         'sha',
@@ -358,6 +449,8 @@ function validateOutputRequest(request) {
         'supabaseProjectRef',
         'supabaseBranchId',
         'databaseMode',
+        'mergedValidation',
+        'mergeCommitSha',
       ].every((key) => Object.hasOwn(request, key)) &&
       Number.isSafeInteger(request.prNumber) &&
       request.prNumber > 0 &&
@@ -370,7 +463,11 @@ function validateOutputRequest(request) {
       PROJECT_REF.test(request.supabaseProjectRef) &&
       typeof request.supabaseBranchId === 'string' &&
       UUID.test(request.supabaseBranchId) &&
-      ['shared', 'ephemeral'].includes(request.databaseMode),
+      ['shared', 'ephemeral'].includes(request.databaseMode) &&
+      typeof request.mergedValidation === 'boolean' &&
+      (request.mergedValidation
+        ? typeof request.mergeCommitSha === 'string' && SHA.test(request.mergeCommitSha)
+        : request.mergeCommitSha === null),
     'validated request is invalid',
   );
   requireCondition(
@@ -412,6 +509,8 @@ export function writeValidatedPreviewCloudRequest({
     supabaseProjectRef: request.supabaseProjectRef,
     supabaseBranchId: request.supabaseBranchId,
     databaseMode: request.databaseMode,
+    mergedValidation: request.mergedValidation,
+    mergeCommitSha: request.mergeCommitSha,
   };
   const serialized = `${JSON.stringify(safeRequest, null, 2)}\n`;
   writeFile(requestPath, serialized, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
@@ -463,6 +562,7 @@ if (isDirectExecution(import.meta.url)) {
       ref: process.env.GITHUB_REF,
       token: process.env.GITHUB_TOKEN,
       requestJson: process.env.PREVIEW_REQUEST_JSON,
+      workflowSha: process.env.GITHUB_SHA,
     });
     writeValidatedPreviewCloudRequest({
       request,

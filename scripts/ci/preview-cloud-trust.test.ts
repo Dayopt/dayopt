@@ -14,6 +14,8 @@ const persistentRef = 'tilwaprottpyhlfoggbb';
 const persistentBranchId = '4c2ed092-cba3-4f37-98e1-78f61cdf52ed';
 const productionRef = 'yvglwblxrnrenfifsnje';
 const sha = 'a'.repeat(40);
+const mergeCommitSha = 'b'.repeat(40);
+const workflowSha = 'c'.repeat(40);
 
 const context = {
   eventName: 'workflow_dispatch',
@@ -39,6 +41,8 @@ type GithubWorldOptions = {
   environment?: Record<string, unknown>;
   branchPolicies?: Record<string, unknown>;
   filesByPage?: Record<number, GithubFile[]>;
+  mergeCommitParents?: Array<{ sha: string }>;
+  compare?: Record<string, unknown>;
 };
 
 function pullRequest(overrides: Record<string, unknown> = {}) {
@@ -69,6 +73,13 @@ function githubWorld({
     branch_policies: [{ name: 'integration', type: 'branch' }],
   },
   filesByPage = { 1: [{ filename: 'apps/product/src/example.ts', status: 'modified' }] },
+  mergeCommitParents = [{ sha: 'd'.repeat(40) }, { sha }],
+  compare = {
+    status: 'ahead',
+    ahead_by: 1,
+    behind_by: 0,
+    merge_base_commit: { sha: mergeCommitSha },
+  },
 }: GithubWorldOptions = {}) {
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(
@@ -88,6 +99,12 @@ function githubWorld({
       return Response.json(branchPolicies);
     }
     if (url.pathname === '/repos/Dayopt/dayopt/pulls/2910') return Response.json(pr);
+    if (url.pathname === `/repos/Dayopt/dayopt/git/commits/${mergeCommitSha}`) {
+      return Response.json({ sha: mergeCommitSha, parents: mergeCommitParents });
+    }
+    if (url.pathname === `/repos/Dayopt/dayopt/compare/${mergeCommitSha}...${workflowSha}`) {
+      return Response.json(compare);
+    }
     if (url.pathname === '/repos/Dayopt/dayopt/pulls/2910/files') {
       expect(url.searchParams.get('per_page')).toBe('100');
       const page = Number(url.searchParams.get('page'));
@@ -118,9 +135,148 @@ describe('Preview Cloud trust gate', () => {
       supabaseProjectRef: persistentRef,
       supabaseBranchId: persistentBranchId,
       databaseMode: 'shared',
+      mergedValidation: false,
+      mergeCommitSha: null,
     });
     expect(fetchImpl).toHaveBeenCalledTimes(5);
     expect(JSON.stringify(result)).not.toContain('read-only-token');
+  });
+
+  it('accepts a merged Integration PR only when its exact head is the merge commit second parent and that merge is in the trusted workflow SHA', async () => {
+    const inputs = {
+      ...JSON.parse(context.requestJson),
+      preview_merged_validation: true,
+    };
+    const { fetchImpl } = githubWorld({
+      pr: pullRequest({
+        state: 'closed',
+        merged: true,
+        merge_commit_sha: mergeCommitSha,
+        head: {
+          sha,
+          ref: 'codex/cloud-preview-test-2910',
+          repo: { full_name: 'Dayopt/dayopt', fork: false },
+        },
+      }),
+    });
+
+    await expect(
+      verifyPreviewCloudTrust({
+        ...context,
+        workflowSha,
+        requestJson: JSON.stringify(inputs),
+        fetchImpl,
+      }),
+    ).resolves.toMatchObject({
+      sha,
+      mergeCommitSha,
+      mergedValidation: true,
+      branchName: 'codex/cloud-preview-test-2910',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(9);
+    expect(fetchImpl.mock.calls.map(([input]) => new URL(String(input)).pathname)).toEqual([
+      '/repos/Dayopt/dayopt/environments/Preview%20%E2%80%93%20product',
+      '/repos/Dayopt/dayopt/environments/Preview%20%E2%80%93%20product/deployment-branch-policies',
+      '/repos/Dayopt/dayopt/pulls/2910',
+      `/repos/Dayopt/dayopt/git/commits/${mergeCommitSha}`,
+      `/repos/Dayopt/dayopt/compare/${mergeCommitSha}...${workflowSha}`,
+      '/repos/Dayopt/dayopt/pulls/2910/files',
+      '/repos/Dayopt/dayopt/pulls/2910',
+      `/repos/Dayopt/dayopt/git/commits/${mergeCommitSha}`,
+      `/repos/Dayopt/dayopt/compare/${mergeCommitSha}...${workflowSha}`,
+    ]);
+  });
+
+  it.each([
+    ['an open PR', { state: 'open', merged: false }],
+    ['a closed but unmerged PR', { state: 'closed', merged: false }],
+    ['a merge into main', { base: { ref: 'main', repo: { full_name: 'Dayopt/dayopt' } } }],
+  ])(
+    'rejects merged validation for %s before reading commit ancestry',
+    async (_label, override) => {
+      const { fetchImpl } = githubWorld({
+        pr: pullRequest({
+          state: 'closed',
+          merged: true,
+          merge_commit_sha: mergeCommitSha,
+          head: {
+            sha,
+            ref: 'codex/cloud-preview-test-2910',
+            repo: { full_name: 'Dayopt/dayopt', fork: false },
+          },
+          ...override,
+        }),
+      });
+      const inputs = { ...JSON.parse(context.requestJson), preview_merged_validation: true };
+      await expect(
+        verifyPreviewCloudTrust({
+          ...context,
+          workflowSha,
+          requestJson: JSON.stringify(inputs),
+          fetchImpl,
+        }),
+      ).rejects.toThrow();
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it.each([
+    [
+      'a merge commit with a different second parent',
+      [{ sha: 'd'.repeat(40) }, { sha: 'e'.repeat(40) }],
+      undefined,
+    ],
+    [
+      'a workflow SHA that does not contain the merge commit',
+      undefined,
+      {
+        status: 'diverged',
+        ahead_by: 1,
+        behind_by: 1,
+        merge_base_commit: { sha: 'f'.repeat(40) },
+      },
+    ],
+  ])('rejects %s', async (_label, mergeCommitParents, compare) => {
+    const { fetchImpl } = githubWorld({
+      pr: pullRequest({
+        state: 'closed',
+        merged: true,
+        merge_commit_sha: mergeCommitSha,
+        head: {
+          sha,
+          ref: 'codex/cloud-preview-test-2910',
+          repo: { full_name: 'Dayopt/dayopt', fork: false },
+        },
+      }),
+      ...(mergeCommitParents ? { mergeCommitParents } : {}),
+      ...(compare ? { compare } : {}),
+    });
+    const inputs = { ...JSON.parse(context.requestJson), preview_merged_validation: true };
+    await expect(
+      verifyPreviewCloudTrust({
+        ...context,
+        workflowSha,
+        requestJson: JSON.stringify(inputs),
+        fetchImpl,
+      }),
+    ).rejects.toThrow();
+    expect(
+      fetchImpl.mock.calls.filter(([input]) => String(input).includes('/pulls/2910/files')),
+    ).toHaveLength(0);
+  });
+
+  it('requires a valid trusted Integration workflow SHA for merged validation before API access', async () => {
+    const { fetchImpl } = githubWorld();
+    const inputs = { ...JSON.parse(context.requestJson), preview_merged_validation: true };
+    await expect(
+      verifyPreviewCloudTrust({
+        ...context,
+        workflowSha: 'short',
+        requestJson: JSON.stringify(inputs),
+        fetchImpl,
+      }),
+    ).rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -145,6 +301,8 @@ describe('Preview Cloud trust gate', () => {
       supabaseProjectRef: persistentRef,
       supabaseBranchId: persistentBranchId,
       databaseMode: 'shared',
+      mergedValidation: false,
+      mergeCommitSha: null,
     });
     expect(fetchImpl).toHaveBeenCalledTimes(5);
   });

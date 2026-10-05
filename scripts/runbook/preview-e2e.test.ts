@@ -30,6 +30,8 @@ const ready = {
   deploymentId: 'dpl_test',
   prNumber: 2910,
   branchName: 'codex/test',
+  mergedValidation: false,
+  mergeCommitSha: null,
   databaseMode: 'ephemeral',
   supabaseBranchId: '11111111-1111-1111-1111-111111111111',
   migrationVersions: ['20260901000000'],
@@ -92,6 +94,48 @@ function reviewedReport() {
     'mobile-summary-to-inspector',
     'mobile-settings-display',
   ];
+  const publicFlowIds = [
+    ['smoke.spec.ts', 'product-smoke-unauth-redirect'],
+    ['smoke.spec.ts', 'product-smoke-en-signup-locale'],
+    ['smoke.spec.ts', 'product-smoke-ja-signup-locale'],
+    ['a11y.spec.ts', 'product-a11y-login'],
+    ['auth.spec.ts', 'product-auth-signup-page'],
+    ['auth.spec.ts', 'product-auth-login-page'],
+    ['auth.spec.ts', 'product-auth-password-page'],
+    ['pwa.spec.ts', 'product-pwa-manifest'],
+  ] as const;
+  const authenticatedFlows = [
+    ['account-deletion.spec.ts', 'chromium', 'product-account-deletion'],
+    ['auth.spec.ts', 'chromium', 'product-auth-login-valid'],
+    ['auth.spec.ts', 'chromium', 'product-auth-login-invalid'],
+    ['a11y.spec.ts', 'chromium', 'product-a11y-calendar'],
+    ['a11y.spec.ts', 'chromium', 'product-a11y-settings'],
+    ['calendar-navigation.spec.ts', 'chromium', 'product-calendar-view-navigation'],
+    ['calendar-navigation.spec.ts', 'chromium', 'product-calendar-sidebar-navigation'],
+    ['block-search.spec.ts', 'chromium', 'product-search-desktop'],
+    ['block-search.spec.ts', 'Mobile Chrome', 'product-search-mobile'],
+    ['plan-record-timeblock.spec.ts', 'chromium', 'product-plan-record-calendar'],
+    ['plan-record-timeblock.spec.ts', 'chromium', 'product-record-inspector-url'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-week'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-prefixless'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-default-week'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-invalid-view'],
+    ['derived-plan-record-flow.spec.ts', 'chromium', 'product-derived-plan-record'],
+    ['timeblock-conflict.spec.ts', 'chromium', 'product-plan-conflict'],
+    ['timeblock-drag-move.spec.ts', 'chromium', 'product-plan-drag-move'],
+    ['timeblock-inspector-toggle.spec.ts', 'chromium', 'product-inspector-toggle'],
+    ['mobile-navigation.spec.ts', 'Mobile Chrome', 'product-mobile-settings-navigation'],
+    ['mobile-navigation.spec.ts', 'Mobile Chrome', 'product-mobile-calendar-navigation'],
+    ['billing.spec.ts', 'chromium', 'product-billing-checkout-mocked'],
+    ['billing.spec.ts', 'chromium', 'product-billing-portal-mocked'],
+    ['billing.spec.ts', 'chromium', 'product-billing-checkout-success-return'],
+    ['billing.spec.ts', 'chromium', 'product-billing-checkout-cancel-return'],
+    ['billing.spec.ts', 'chromium', 'product-billing-portal-return'],
+    ['calendar-initial-load.spec.ts', 'chromium', 'product-initial-desktop-tokyo'],
+    ['calendar-initial-load.spec.ts', 'chromium', 'product-initial-desktop-la'],
+    ['calendar-initial-load.spec.ts', 'Mobile Chrome', 'product-initial-mobile-tokyo'],
+    ['calendar-initial-load.spec.ts', 'Mobile Chrome', 'product-initial-mobile-la'],
+  ] as const;
   const tests = [
     ...desktopFlowIds.map((flowId, index) => ({
       file: 'critical-path.spec.ts',
@@ -105,18 +149,30 @@ function reviewedReport() {
       flowId,
       line: index + 1,
     })),
+    ...publicFlowIds.map(([file, flowId], index) => ({
+      file,
+      project: 'chromium',
+      flowId,
+      line: index + 1,
+    })),
+    ...authenticatedFlows.map(([file, project, flowId], index) => ({
+      file,
+      project,
+      flowId,
+      line: index + 1,
+    })),
   ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-  return { status: 'passed', expected: 21, tests };
+  return { status: 'passed', expected: 59, tests };
 }
 
 describe('Reviewed Preview declaration matrix', () => {
-  it('accepts exactly the reviewed seventeen desktop and four mobile declarations', () => {
+  it('accepts exactly fifty desktop and nine mobile declarations', () => {
     expect(isPassingPreviewReport(reviewedReport())).toBe(true);
   });
-  it('rejects the previous sixteen desktop and four mobile contract', () => {
+  it('rejects the previous twenty-one authenticated-only contract', () => {
     const report = reviewedReport();
-    report.tests.splice(16, 1);
-    report.expected = 20;
+    report.tests.splice(17, 8);
+    report.expected = 21;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects the previous nine desktop and three mobile contract', () => {
@@ -223,6 +279,30 @@ describe('Preview E2E runner', () => {
       'private',
     );
   });
+  it('revalidates a merged candidate against the trusted Integration workflow SHA at readiness', async () => {
+    const s = scenario();
+    const mergeCommitSha = 'c'.repeat(40);
+    const workflowSha = 'd'.repeat(40);
+    const mergedReady = { ...ready, mergedValidation: true, mergeCommitSha };
+    const observe = vi.fn(async () => mergedReady);
+    const result = await runPreviewE2E({
+      request: { mergedValidation: true, mergeCommitSha },
+      env: { ...env, GITHUB_SHA: workflowSha },
+      observe,
+      execute: s.execute,
+      recover: s.recover,
+      tempRoot: s.root,
+    });
+    expect(result.status).toBe('passed');
+    expect(observe).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ mergedValidation: true, mergeCommitSha, workflowSha }),
+    );
+    expect(observe).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ mergedValidation: true, mergeCommitSha, workflowSha }),
+    );
+  });
   it('trusted supervisor keeps Playwright in its own checkout without management tokens', async () => {
     const s = scenario();
     const candidateRoot = join(s.root, 'candidate');
@@ -235,7 +315,7 @@ describe('Preview E2E runner', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
-fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID, accountDeletion:process.env.E2E_PREVIEW_DELETION_USER_ID}));
 fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify(${JSON.stringify(reviewedReport())}));
 `,
     );
@@ -245,7 +325,9 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const cloudUserIds = {
       desktop: '22222222-2222-4222-8222-222222222222',
       mobile: '33333333-3333-4333-8333-333333333333',
+      accountDeletion: '44444444-4444-4444-8444-444444444444',
     };
+    s.recover.mockResolvedValueOnce({ status: 'clean', checked: 3, recovered: 0 });
     const result = await runPreviewE2E({
       request: {},
       env: { ...env, PATH: `${bin}:${process.env.PATH}` },

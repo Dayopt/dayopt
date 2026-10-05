@@ -1,7 +1,6 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 // Reviewed browser acceptance scope. Changes require a reviewed trusted harness rollout.
 const COVERAGE = [
@@ -38,7 +37,118 @@ const COVERAGE = [
       'mobile-settings-display',
     ],
   },
+  {
+    file: 'account-deletion.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-account-deletion'],
+  },
+  {
+    file: 'auth.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-auth-signup-page', 'product-auth-login-page', 'product-auth-password-page'],
+  },
+  { file: 'pwa.spec.ts', project: 'chromium', flowIds: ['product-pwa-manifest'] },
+  {
+    file: 'smoke.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'product-smoke-unauth-redirect',
+      'product-smoke-en-signup-locale',
+      'product-smoke-ja-signup-locale',
+    ],
+  },
+  { file: 'a11y.spec.ts', project: 'chromium', flowIds: ['product-a11y-login'] },
+  {
+    file: 'auth.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-auth-login-valid', 'product-auth-login-invalid'],
+  },
+  {
+    file: 'a11y.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-a11y-calendar', 'product-a11y-settings'],
+  },
+  {
+    file: 'calendar-navigation.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-calendar-view-navigation', 'product-calendar-sidebar-navigation'],
+  },
+  {
+    file: 'block-search.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-search-desktop'],
+  },
+  {
+    file: 'block-search.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: ['product-search-mobile'],
+  },
+  {
+    file: 'plan-record-timeblock.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-plan-record-calendar', 'product-record-inspector-url'],
+  },
+  {
+    file: 'deep-link.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'product-deep-link-week',
+      'product-deep-link-prefixless',
+      'product-deep-link-default-week',
+      'product-deep-link-invalid-view',
+    ],
+  },
+  {
+    file: 'derived-plan-record-flow.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-derived-plan-record'],
+  },
+  {
+    file: 'timeblock-conflict.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-plan-conflict'],
+  },
+  {
+    file: 'timeblock-drag-move.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-plan-drag-move'],
+  },
+  {
+    file: 'timeblock-inspector-toggle.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-inspector-toggle'],
+  },
+  {
+    file: 'mobile-navigation.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: ['product-mobile-settings-navigation', 'product-mobile-calendar-navigation'],
+  },
+  {
+    file: 'billing.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'product-billing-checkout-mocked',
+      'product-billing-portal-mocked',
+      'product-billing-checkout-success-return',
+      'product-billing-checkout-cancel-return',
+      'product-billing-portal-return',
+    ],
+  },
+  {
+    file: 'calendar-initial-load.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-initial-desktop-tokyo', 'product-initial-desktop-la'],
+  },
+  {
+    file: 'calendar-initial-load.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: ['product-initial-mobile-tokyo', 'product-initial-mobile-la'],
+  },
 ];
+const FILES = new Set(COVERAGE.map((row) => row.file));
+export function isPreviewE2EFile(file) {
+  return typeof file === 'string' && FILES.has(file);
+}
 const EXPECTED_FLOWS = new Map(
   COVERAGE.flatMap((row) => row.flowIds.map((flowId) => [flowId, row])),
 );

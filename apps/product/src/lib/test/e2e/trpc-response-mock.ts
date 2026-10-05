@@ -1,6 +1,26 @@
 import type { Route } from '@playwright/test';
 import superjson from 'superjson';
 
+import { validatePreviewOrigin } from '../preview-access';
+
+async function fetchMockBatch(route: Route, url: URL) {
+  if (!process.env.E2E_PREVIEW_ORIGIN) return route.fetch();
+  const origin = validatePreviewOrigin(process.env.E2E_PREVIEW_ORIGIN);
+  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (url.origin !== origin || !url.pathname.startsWith('/api/trpc/') || !secret) {
+    throw new Error('Preview batch mock target is invalid');
+  }
+  // Page route handlers precede the context fence. Fetch only the pinned first
+  // hop here, so neither the bypass nor the synthetic session follows redirects.
+  const headers = { ...route.request().headers() };
+  delete headers['x-vercel-protection-bypass'];
+  delete headers['x-vercel-set-bypass-cookie'];
+  return route.fetch({
+    maxRedirects: 0,
+    headers: { ...headers, 'x-vercel-protection-bypass': secret },
+  });
+}
+
 /**
  * tRPC httpBatchLink の batch レスポンス envelope を組み立てる E2E 共有ヘルパー。
  *
@@ -114,7 +134,7 @@ export async function fulfillTrpcProcedure<T>(
     return;
   }
 
-  const response = await route.fetch();
+  const response = await fetchMockBatch(route, url);
   const body: unknown = await response.json();
   if (!Array.isArray(body) || body.length !== pathList.length) {
     throw new Error(

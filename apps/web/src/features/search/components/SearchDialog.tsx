@@ -6,7 +6,7 @@ import type { SearchResponse } from '@web/types/api';
 import { Clock, Edit, FileText, Search, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { fetchSearchResults } from '../search-client';
 
@@ -14,9 +14,10 @@ interface SearchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locale: string;
+  returnFocusRef: RefObject<HTMLButtonElement | null>;
 }
 
-export function SearchDialog({ open, onOpenChange, locale }: SearchDialogProps) {
+export function SearchDialog({ open, onOpenChange, locale, returnFocusRef }: SearchDialogProps) {
   const t = useTranslations('search');
   const [query, setQuery] = useState('');
   const [previewResults, setPreviewResults] = useState<SearchResponse['results']>([]);
@@ -128,7 +129,13 @@ export function SearchDialog({ open, onOpenChange, locale }: SearchDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-popover border-border shadow-card max-w-2xl gap-0 overflow-hidden p-0 [&>button]:hidden">
+      <DialogContent
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocusRef.current?.focus();
+        }}
+        className="bg-popover border-border shadow-card max-w-2xl gap-0 overflow-hidden p-0 [&>button]:hidden"
+      >
         {/* 検索ヘッダー */}
         <div className="border-border flex items-center gap-4 border-b p-4">
           <Search className="text-muted-foreground size-5 flex-shrink-0" />

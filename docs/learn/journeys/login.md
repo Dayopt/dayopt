@@ -36,7 +36,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('正しい認証情報でログインしカレンダーへ遷移する'` を探す
+- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-login-valid` を探す
 
 ### 1. サインイン画面で入力する（ブラウザ）
 
@@ -70,7 +70,7 @@ flowchart TD
   - [`apps/product/src/features/auth/stores/useAuthStore.ts`](../../../apps/product/src/features/auth/stores/useAuthStore.ts) で `supabase.auth.signInWithPassword` を探す
   - [`apps/product/src/lib/sentry/integration.ts`](../../../apps/product/src/lib/sentry/integration.ts) で `export function isExpectedAuthError` を探す
 - **この段を守るテスト**:
-  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('誤った認証情報でエラー表示'` を探す
+  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-login-invalid` を探す
 
 <details>
 <summary>⚡ パスワードが違う — 画面: エラー表示 / データ: 変化なし / 再試行: 利用者がやり直す / 痕跡: 残らない</summary>
@@ -508,7 +508,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
       "tests": [
         {
           "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
-          "find": "test('誤った認証情報でエラー表示'"
+          "find": "@preview-e2e/product-auth-login-invalid"
         }
       ]
     },
@@ -937,7 +937,7 @@ mfa.verify で検証する。通ればセッションが aal2 に上がり、nex
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
-      "find": "test('正しい認証情報でログインしカレンダーへ遷移する'"
+      "find": "@preview-e2e/product-auth-login-valid"
     }
   ]
 }

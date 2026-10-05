@@ -1,54 +1,34 @@
 # Integration trusted Playwright scope
 
-This rollout targets the existing `integration` branch. The original nine desktop
-and three mobile cases were reviewed in PR #3021; this follow-up expands that same
-trusted harness to seventeen desktop and four mobile declarations. The current
-workspace uses Activity Summary in place of the retired Report screen. No schema
-change or POC retirement PR is required. Existing migration history is intact.
+This extends the existing Integration runner from PR #3021. The reviewed Preview suite now contains **59 browser flows: 50 Chromium desktop and 9 Mobile Chrome**. It uses the existing product Preview deployment and the shared nonproduction Integration Supabase branch; it never targets Production.
 
-| File                           | Project         | Count | Browser acceptance                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------ | --------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `critical-path.spec.ts`        | `chromium`      |    17 | Plan/Record creation and persistence; Activity Summary 30-day totals, median, records, empty state and Record navigation with unchanged Plan/Record readback; profile/time format/theme/timezone/language persistence; actual JSON/date-filtered CSV download; activity/category CRUD; Inspector note edit and search reopen; same-ID Plan drag with unchanged Record readback; concurrent writer conflict; template save/rename/apply/overlap rejection/delete |
-| `mobile-critical-path.spec.ts` | `Mobile Chrome` |     4 | Touch Plan/Record creation and reload; ActivityChipRow → Activity Summary → Record Inspector navigation; settings overview → display preference persistence → overview → workspace                                                                                                                                                                                                                                                                              |
+| Spec                                 | Project                     | Flows | Coverage                                                                                                                                                                                            |
+| ------------------------------------ | --------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `critical-path.spec.ts`              | `chromium`                  |    17 | Plan/Record create and persistence; Activity Summary; profile, time format, theme, timezone and locale; CSV export; activity/category CRUD; Inspector notes/search; Plan drag; conflicts; templates |
+| `mobile-critical-path.spec.ts`       | `Mobile Chrome`             |     4 | Touch Plan/Record create and reload; Activity Summary to Record Inspector; settings persistence                                                                                                     |
+| `account-deletion.spec.ts`           | `chromium`                  |     1 | Delete a newly created, run-scoped Free synthetic account and confirm Auth absence                                                                                                                  |
+| `smoke.spec.ts`                      | `chromium`                  |     3 | Unauthenticated redirect and English/Japanese signup-locale preservation                                                                                                                            |
+| `a11y.spec.ts`                       | `chromium`                  |     3 | Login, Calendar and Settings accessibility scans                                                                                                                                                    |
+| `auth.spec.ts`                       | `chromium`                  |     5 | Signup/login/password page delivery and valid/invalid synthetic-user login                                                                                                                          |
+| `pwa/pwa.spec.ts`                    | `chromium`                  |     1 | Manifest response and same-origin icons                                                                                                                                                             |
+| `calendar-navigation.spec.ts`        | `chromium`                  |     2 | Calendar view and sidebar navigation                                                                                                                                                                |
+| `block-search.spec.ts`               | `chromium`, `Mobile Chrome` |     2 | Desktop and mobile activity search                                                                                                                                                                  |
+| `plan-record-timeblock.spec.ts`      | `chromium`                  |     2 | Plan/Record calendar behavior and Record Inspector URL                                                                                                                                              |
+| `deep-link.spec.ts`                  | `chromium`                  |     4 | Week, prefixless, default-week and invalid-view links                                                                                                                                               |
+| `derived-plan-record-flow.spec.ts`   | `chromium`                  |     1 | Plan-to-Record relationship                                                                                                                                                                         |
+| `timeblock-conflict.spec.ts`         | `chromium`                  |     1 | Concurrent Plan update conflict                                                                                                                                                                     |
+| `timeblock-drag-move.spec.ts`        | `chromium`                  |     1 | Plan drag movement                                                                                                                                                                                  |
+| `timeblock-inspector-toggle.spec.ts` | `chromium`                  |     1 | Inspector open/close behavior                                                                                                                                                                       |
+| `mobile-navigation.spec.ts`          | `Mobile Chrome`             |     2 | Mobile Settings and Calendar navigation                                                                                                                                                             |
+| `billing.spec.ts`                    | `chromium`                  |     5 | Checkout/portal UI and return states with intercepted Stripe endpoints                                                                                                                              |
+| `calendar-initial-load.spec.ts`      | `chromium`, `Mobile Chrome` |     4 | Tokyo and Los Angeles initial Calendar state on desktop and mobile                                                                                                                                  |
 
-The reporter and publisher require all 21 declarations to pass on their first
-attempt, with unique positive safe source lines under these exact file/project
-pairs. Old seven-, twelve- and twenty-case reports, omissions, duplicates and incorrect
-pairings fail. For failed declarations, public evidence may include at most 40
-failed-step rows, each limited to category, allowlisted spec file, positive
-source line and capped duration. Titles, passwords, error messages, headers,
-cookies, screenshots and bodies remain excluded. The intent's workflow SHA
-identifies the trusted source; the request binds the candidate SHA/deployment
-and nonproduction DB.
+The reporter and trusted publisher require every reviewed flow to pass on its first attempt under the exact spec/project pair. Missing, skipped, retried, duplicated or substituted declarations fail the run. The candidate branch cannot change the trusted fixture, identity, access or reporting contracts without matching the Integration copy.
 
-The suites retain exactly two synthetic identities. Fixture/identity contracts,
-durable ownership journal, cleanup/readback, network fence, private output,
-process shutdown, workers=1 and retries=0 are unchanged. New DB reads are scoped
-to the owned user and known IDs. The competing writer updates only that user's
-Plan through the existing RPC. Templates and blocks already cascade with the
-owned Auth identity; successful template deletion also confirms applied Plans
-remain. No additional account is seeded.
+The immutable run intent allocates separate desktop, mobile and account-deletion Auth IDs before candidate execution. The trusted runner checks all three are absent in the selected Integration Auth project before starting a browser. Each fixture journals before creation, then verifies the returned ID and run marker; an existing ID is never reused. Account deletion creates only its own synthetic email, checks Free status, no Stripe customer and no Calendar/OAuth records immediately before the UI action, then confirms the same Auth ID is absent. Cleanup can remove only journaled users whose ID, email namespace and `e2e_run_id` match the run. Intent schema v1 remains readable for recovery of interrupted earlier runs; new runs use schema v2 with all three IDs.
 
-Before execution, the existing verified runner checks the live eligible candidate
-PR, pinned deployment SHA, automation access, nonproduction DB ref, fixture key,
-health and exact candidate migration versions. A mismatch fails closed. Never
-relax readiness or alter applied migration history to run. Candidate code cannot
-replace privileged trusted-checkout imports.
+The two Service Worker/offline tests remain outside this remote suite because the Preview context deliberately blocks service workers to keep browser network requests inside the origin fence. The HTTP CSRF test also remains outside this remote suite: it requires the attacker page to use the app's same hostname on a different port, which a local attacker cannot preserve against a remote Vercel hostname. These three tests are still collected by the ordinary Playwright configuration but are **not claimed as verified by the 59-flow Integration run**.
 
-Auth confirmation/recovery/password-change/MFA need a dedicated reviewed provider
-lane with an owned account, confirmed test mail sink and authenticator/recovery
-code handling. OAuth Calendar needs approved synthetic provider consent and
-separate sync/ghost/conversion/no-writeback evidence. Billing needs Stripe test
-mode, test checkout/webhook/portal evidence and scoped provider cleanup. Account
-deletion needs a separate explicitly approved destructive test lane. These flows
-are outside this pinned-origin/Supabase/CAPTCHA network fence and are not proved
-by this suite. Import has no current Product UI. Template drag/edit is not wired
-in the current sidebar; this suite exercises save, rename, click apply and delete.
-These boundaries do not claim all flows passed.
+Real email confirmation, MFA/recovery codes, OAuth Calendar consent/sync/writeback and real Stripe checkout/webhooks are not exercised by these flows. Auth tests use the synthetic account and billing routes are intercepted, so those results do not prove provider behavior. OAuth and billing need their dedicated nonproduction provider fixtures before those external contracts can be run safely.
 
-Local unit checks, typechecking and Playwright collection prove contracts and
-collection only. A verified cloud run must pass all 21 cases on their first
-attempt, confirm cleanup and preserve post-readiness identity. Existing
-five-minute Playwright / seven-minute supervisor limits are unchanged because
-no expanded-run duration has been measured. A timeout is a failed run;
-collection evidence cannot replace it.
+Local unit tests, typechecking and Playwright `--list` validate contracts and collection only. Integration completion requires the post-merge workflow to verify the closed PR, merge commit, exact Preview deployment SHA, nonproduction database identity, migration inventory, health before and after, all 59 first-attempt results and cleanup. A timeout, incomplete reporter artifact or unconfirmed cleanup is a failed run.

@@ -4,7 +4,9 @@ import { Button } from '@dayopt/components';
 import { Link } from '@dayopt/i18n/navigation';
 import {
   BROWSER_TELEMETRY_CONSENT_EVENT,
+  getBrowserTelemetryConsentStorage,
   isBrowserTelemetryConsentStorageChange,
+  readBrowserTelemetryConsent,
 } from '@dayopt/observability';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
@@ -88,7 +90,8 @@ export function CookieConsentBannerView({
 
 /** Ask once before enabling browser error monitoring or analytics. */
 export function CookieConsentBanner() {
-  const t = useTranslations('common.cookies.banner');
+  const t = useTranslations('common.cookies');
+  const [hasSaveFailed, setHasSaveFailed] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -126,6 +129,12 @@ export function CookieConsentBanner() {
 
   const chooseConsent = (analytics: boolean) => {
     persistBrowserTelemetryConsent(analytics);
+    const stored = readBrowserTelemetryConsent(getBrowserTelemetryConsentStorage());
+    if (stored?.analytics !== analytics) {
+      setHasSaveFailed(true);
+      return;
+    }
+    setHasSaveFailed(false);
     setVisible(false);
   };
 
@@ -133,11 +142,12 @@ export function CookieConsentBanner() {
 
   return (
     <CookieConsentBannerView
-      title={t('title')}
-      description={t('description')}
-      learnMoreLabel={t('learnMore')}
-      necessaryOnlyLabel={t('necessaryOnly')}
-      allowAnalyticsLabel={t('allowAnalytics')}
+      title={t('banner.title')}
+      description={t('banner.description')}
+      learnMoreLabel={t('banner.learnMore')}
+      necessaryOnlyLabel={t('banner.necessaryOnly')}
+      allowAnalyticsLabel={t('banner.allowAnalytics')}
+      notice={hasSaveFailed ? t('settings.saveFailed') : undefined}
       onNecessaryOnly={() => chooseConsent(false)}
       onAllowAnalytics={() => chooseConsent(true)}
     />

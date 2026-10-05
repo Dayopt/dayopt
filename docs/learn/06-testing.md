@@ -56,8 +56,8 @@ last_verified: 2026-09-21
 ### Plan / Record を動かす・直す
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts) で `test('過去 Plan をドラッグ移動すると新しい時刻が保存される'` を探す（E2E。過去 Plan を動かして DB に残ることまで見る）
-  - [`apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts) で `test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す'` を探す（E2E。Inspector の古い入力が別の場所の値を潰さないこと）
+  - [`apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts) で `@preview-e2e/product-plan-drag-move` を探す（E2E。過去 Plan を動かして DB に残ることまで見る）
+  - [`apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts`](../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts) で `@preview-e2e/product-plan-conflict` を探す（E2E。Inspector の古い入力が別の場所の値を潰さないこと）
 - **1. ドラッグを離す**:
   - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと同じ領域へdropしてもPlanの時刻を更新する'` を探す
   - [`apps/product/src/features/calendar/interaction/useInteraction.test.ts`](../../apps/product/src/features/calendar/interaction/useInteraction.test.ts) で `it('Recordと重なる場所へ移動してもRecord重複として拒否しない'` を探す
@@ -133,9 +133,9 @@ last_verified: 2026-09-21
 ### ログイン（MFA 含む）
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('正しい認証情報でログインしカレンダーへ遷移する'` を探す
+  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-login-valid` を探す
 - **2. パスワードを確かめる**:
-  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('誤った認証情報でエラー表示'` を探す
+  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-login-invalid` を探す
 - **4. 6 桁のコード入力**:
   - [`apps/product/src/features/auth/components/MFAVerifyForm.test.tsx`](../../apps/product/src/features/auth/components/MFAVerifyForm.test.tsx) で `it('6桁入力でonVerifyTotpが呼ばれる'` を探す
 - **6. proxy がセッションを確認**:
@@ -146,7 +146,7 @@ last_verified: 2026-09-21
 ### サインアップ → ウェルカムメール
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('サインアップページがフォームと規約・ログイン導線を配信する'` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
+  - [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-signup-page` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
 - **5. 送る権利を取る**:
   - [`apps/product/src/features/auth/server/welcome-email.test.ts`](../../apps/product/src/features/auth/server/welcome-email.test.ts) で `it('掴めなければ送らない（2 通目を出さないことがこの関数の存在理由）'` を探す
   - [`apps/product/src/features/auth/server/welcome-email.test.ts`](../../apps/product/src/features/auth/server/welcome-email.test.ts) で `it('claim が失敗したら送らず Sentry へ残す'` を探す

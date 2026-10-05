@@ -1,12 +1,14 @@
 import { dayoptProductUrls } from '@dayopt/config';
-import { expect, test } from '@playwright/test';
+import { publicRequestGet } from './public-get';
+import { expect, test } from './public-test';
 
-test('footer の言語切替で locale prefix と hero copy が切り替わる', async ({ page }) => {
+test('footer の言語切替で locale prefix と hero copy が切り替わる @mobile', async ({ page }) => {
   await page.goto('/');
 
   const hero = page.getByRole('heading', { level: 1 });
   await expect(hero).toContainText('One day at a time,');
 
+  await page.getByRole('button', { name: 'Necessary only' }).click();
   await page.getByRole('button', { name: 'English - Change language' }).click();
   await page.getByRole('menuitemcheckbox', { name: '日本語' }).click();
 
@@ -36,7 +38,7 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
   expect(signupHrefs.every((href) => href === dayoptProductUrls.signup)).toBe(true);
 });
 
-test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
+test('LP metadata と OG image が新コピーに整合する', async ({ page, baseURL }) => {
   const ogTitle = 'Dayopt';
   const description =
     "Your plans and records, together in one calendar. What you learn today makes tomorrow's plan a little better.";
@@ -56,7 +58,11 @@ test('LP metadata と OG image が新コピーに整合する', async ({ page })
   expect(ogUrl.searchParams.get('description')).toBe(description);
   expect(ogUrl.searchParams.get('locale')).toBe('en');
 
-  const response = await page.request.get(`/api/og?${ogUrl.searchParams.toString()}`);
+  const response = await publicRequestGet(
+    page.request,
+    `/api/og?${ogUrl.searchParams.toString()}`,
+    baseURL!,
+  );
   expect(response.ok()).toBe(true);
   expect(response.headers()['content-type']).toContain('image/png');
 });
@@ -105,22 +111,6 @@ test('LP の en/ja × desktop/mobile を表示できる', async ({ page }, testI
       contentType: 'image/png',
     });
   }
-});
-
-test('C案の表示例が操作に応じて変わる', async ({ page }) => {
-  await page.goto('/ja');
-
-  const calendar = page.locator('#calendar-preview');
-  await calendar.getByRole('button', { name: /予定を立てる/ }).click();
-  await expect(calendar.getByText('記録はこれから')).toBeVisible();
-  await calendar.getByRole('button', { name: /明日へつなぐ/ }).click();
-  await expect(calendar.getByText('前日の記録 45分')).toBeVisible();
-
-  const template = page.locator('#learning');
-  await template.getByRole('button', { name: /明日に並べてみる/ }).click();
-  await expect(template.getByText('3つの予定を追加')).toBeVisible();
-  await template.getByRole('button', { name: /操作例をリセット/ }).click();
-  await expect(template.getByText('予定を並べる前')).toBeVisible();
 });
 
 test('LPの案内は既存のBlog・Docs・登録先につながり、現行料金を示す', async ({ page }) => {

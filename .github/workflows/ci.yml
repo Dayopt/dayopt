@@ -41,8 +41,12 @@ on:
         description: Run Preview E2E or recover a completed Preview run
         type: boolean
         default: false
+      preview_merged_validation:
+        description: Allow only a merged Integration PR whose merge is in this workflow SHA
+        type: boolean
+        default: false
       preview_pr:
-        description: Open internal PR number
+        description: Internal PR number for the selected open or merged policy
         type: string
       preview_sha:
         description: Reviewed 40-character candidate SHA
@@ -623,6 +627,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
           PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
+          PREVIEW_MERGED_VALIDATION: ${{ inputs.preview_merged_validation }}
         run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
 
   preview-recovery:
@@ -648,6 +653,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
           PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
+          PREVIEW_MERGED_VALIDATION: ${{ inputs.preview_merged_validation }}
         run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
       - id: recover
         name: Revalidate the completed source and recover only its planned synthetic users
