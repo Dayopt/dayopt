@@ -369,8 +369,8 @@ allowlist、MCP registry）に載っていないかを併せて確かめる。
 | ----------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `useShellStore`               | 31           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/CalendarViewClient.tsx`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`            |
 | `useAuthStore`                | 22           | `apps/product/src/app/[locale]/(app)/_providers/_composition/QueryCacheAuthBoundary.tsx`, `apps/product/src/app/[locale]/(app)/_shell/MobileAccountButton.tsx`, `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`                  |
-| `useTimeblockInspectorStore`  | 19           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarComposition.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`         |
-| `useActivityDetailStore`      | 7            | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useActivityRecordJump.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`                     |
+| `useTimeblockInspectorStore`  | 20           | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useCalendarComposition.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`         |
+| `useActivityDetailStore`      | 8            | `apps/product/src/app/[locale]/(app)/(workspace)/_composition/useActivityRecordJump.ts`, `apps/product/src/app/[locale]/(app)/_overlays/GlobalOverlays.tsx`, `apps/product/src/app/[locale]/(app)/_shell/desktop-layout.tsx`                     |
 | `useInlineCreateStore`        | 7            | `apps/product/src/features/calendar/components/controller/hooks/useCalendarHandlers.ts`, `apps/product/src/features/calendar/components/create/InlineCreatePanel.tsx`, `apps/product/src/features/calendar/components/create/useInlineCreate.ts` |
 | `useBillingPollStore`         | 4            | `apps/product/src/app/[locale]/(app)/_shell/useAppInlineBanner.ts`, `apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx`, `apps/product/src/features/settings/components/BillingSettings.tsx`                                      |
 | `useCalendarFilterStore`      | 4            | `apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx`, `apps/product/src/features/calendar/components/controller/hooks/useCalendarData.ts`, `apps/product/src/features/calendar/index.ts`                       |
@@ -545,7 +545,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 39     | 8         | 14        | 3 / 14                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
-| `calendar`          | 189    | 94        | 59        | 31 / 59                |
+| `calendar`          | 190    | 96        | 60        | 31 / 60                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
 | `settings`          | 49     | 42        | 22        | 18 / 22                |

@@ -2077,7 +2077,7 @@ graph LR
 | i18n namespace | [calendar](<../../../apps/product/messages/en/calendar.json>) | 直接 |
 
 <details>
-<summary>UI の候補（59）</summary>
+<summary>UI の候補（60）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2085,6 +2085,7 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/ActivityDragContext.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityDragContext.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/components/ActivityDetailsMenuItem.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityDetailsMenuItem.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ActivityRow.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRow.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ArchivedActivityList.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ArchivedActivityList.tsx>) | feature: calendar |
@@ -2145,7 +2146,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（94）</summary>
+<summary>test の候補（96）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2154,6 +2155,8 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts>) | feature: calendar |
