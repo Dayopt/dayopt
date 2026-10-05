@@ -45,34 +45,6 @@ afterEach(() => {
 });
 
 describe('Integration server environment', () => {
-  it.each(['true', 'false'])(
-    'accepts the explicit rate-limit POC switch value %s',
-    async (value) => {
-      const { env } = await loadIntegrationEnv({ SUPABASE_RATE_LIMIT_POC_ENABLED: value });
-      expect(env.SUPABASE_RATE_LIMIT_POC_ENABLED).toBe(value);
-    },
-  );
-
-  it('rejects an invalid rate-limit POC switch value without disclosing it', async () => {
-    const { env } = await loadIntegrationEnv({ SUPABASE_RATE_LIMIT_POC_ENABLED: 'unsafe-value' });
-    expect(() => env.NEXT_PUBLIC_SUPABASE_URL).toThrow('環境変数のバリデーション');
-  });
-
-  it.each(['true', 'false'])(
-    'accepts the explicit webhook-claim POC switch value %s',
-    async (value) => {
-      const { env } = await loadIntegrationEnv({ SUPABASE_WEBHOOK_CLAIM_POC_ENABLED: value });
-      expect(env.SUPABASE_WEBHOOK_CLAIM_POC_ENABLED).toBe(value);
-    },
-  );
-
-  it('rejects an invalid webhook-claim POC switch value without disclosing it', async () => {
-    const { env } = await loadIntegrationEnv({
-      SUPABASE_WEBHOOK_CLAIM_POC_ENABLED: 'unsafe-value',
-    });
-    expect(() => env.NEXT_PUBLIC_SUPABASE_URL).toThrow('環境変数のバリデーション');
-  });
-
   it('allows the exact fixed Integration binding without optional mail or Calendar credentials', async () => {
     const { env } = await loadIntegrationEnv();
     expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe(

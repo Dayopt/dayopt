@@ -8,7 +8,7 @@ code: apps/product/src/features/external-calendar/server/sync-rate-limit.ts
 
 ## Purpose
 
-Compare a small Supabase Postgres implementation with the existing Upstash-backed limiter before moving operational traffic. The additive migration creates two private tables and service-role-only RPCs. Calendar manual sync and the Product Resend webhook have local, explicit opt-in adapters for the fixed Integration deployment; no remote environment is enabled by this prototype.
+Compare a small Supabase Postgres implementation with the existing Upstash-backed limiter before moving operational traffic. The additive migration creates two private tables and service-role-only RPCs. The experiment previously had opt-in Calendar and webhook adapters for fixed Integration; Phase A of #3022 retires these adapters. Historical remote exercises are recorded below.
 
 - A two-bucket weighted sliding window, updated under a transaction-scoped advisory lock per hashed scope and identity.
 - A five-minute webhook processing lease and 35-day processed marker, with token-owned completion and release.
@@ -31,7 +31,7 @@ This POC only evaluates the Calendar manual-sync limiter and webhook duplicate c
 
 ## Correctness checks
 
-The POC SQL is retained at `supabase/poc/rate-limit-idempotency.sql`, outside `supabase/migrations`. Normal Staging-to-Production merges must not install this experiment automatically. Apply the fixture only to an explicitly selected nonproduction POC database, then run:
+The standalone fixture is retained at `supabase/poc/rate-limit-idempotency.sql`. Phase A also retains the byte-identical applied migration at its original active path to preserve the existing Integration history. Hold Production candidates until Phase B replaces the active experimental SQL with the audited retirement marker and forward retirement. Apply the standalone fixture only to an explicitly selected disposable POC database, then run:
 
 ```sh
 psql "$POC_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/poc/rate-limit-idempotency.sql
@@ -81,15 +81,17 @@ Correctness checks passed on this PostgreSQL instance: the transactional SQL/sec
 2. Database failures stop the protected action, and webhook failure returns a retryable error rather than acknowledging the event.
 3. Expired rows are deleted in bounded batches and table/dead-tuple growth remains controlled under sustained synthetic traffic.
 4. Compare end-to-end p95/p99 and DB load with the current Upstash path. Pick explicit acceptable limits before moving any Integration traffic.
-5. The local Calendar app adapter exists but is disabled in deployed environments. Enable one Integration path only after the hosted migration, end-to-end latency, database load, and rollback gates pass. Keep Upstash available for rollback; Production migration and Upstash removal are later, separate gates.
+5. The application runtime adapter is retired in Phase A of #3022. Do not enable the old switches again. A future replacement for Upstash needs a new decision and isolated proof.
 
-## Local Integration adapter
+## Runtime retirement and migration sequence (#3022)
 
-After the migration is present on its nonproduction database, the fixed Integration deployment can opt into Calendar rate limiting with `SUPABASE_RATE_LIMIT_POC_ENABLED=true` and independently opt into Resend webhook claims with `SUPABASE_WEBHOOK_CLAIM_POC_ENABLED=true`. Each switch uses the shared deployment guard, which verifies the Vercel Product project, integration Git branch, exact Integration origin, both Integration environment markers, and Integration Supabase ref. A regular Preview that shares the database does not qualify. Do not set either switch in Production.
+Phase A retires the Calendar and Resend POC runtime adapters. Calendar keeps the existing Upstash limiter; Product webhooks keep the existing Upstash claim/processed markers. Legacy POC environment switches cannot select Supabase RPCs anymore. The experiment and its historical evidence remain in Git and this document.
 
-The Calendar route still applies the same 6-per-hour user budget. Its identifier is hashed with the existing rate-limit identifier function before it reaches the RPC. A denied RPC decision returns 429; an RPC, transport, or malformed-response failure returns 503 and does not call Google sync.
+The applied migration `20261003073817_supabase_rate_limit_idempotency_poc.sql` remains byte-identical in the active migration directory during Phase A. Its removal was rejected by the upgrade check. Keeping it establishes the real existing Integration schema for the upgrade rehearsal. **This intermediate staging tree is not a Production release candidate.** Candidate promotion must hold until Phase B is complete.
 
-The Product Resend webhook uses Supabase claims only when `SUPABASE_WEBHOOK_CLAIM_POC_ENABLED=true` and the fixed-Integration selector passes. During this POC, it first claims in Upstash as a compatibility barrier, then claims in Supabase; it completes the Supabase marker before the Upstash marker. If Supabase reaches its terminal state but completing Upstash fails, keep the five-minute Upstash processing lease rather than releasing it. A retry that finds Supabase already processed promotes its owned Upstash lease to the 35-day processed marker; if promotion fails, leave the lease until its TTL expires so a later retry can try again. Existing completed Upstash events are acknowledged before attempting a new claim, preventing a replay from crossing the backend switch. It still verifies the Resend signature and checks the write fence before claiming. An active lease or database failure does not run webhook effects; failed suppression writes release both token-owned claims so Resend can retry. Keep this dual-claim path until all Upstash-only markers have expired and old Upstash-only deployments can no longer process retries. Production and every other deployment retain the current Upstash-only path.
+Phase B is a separate database retirement PR, after the fixed Integration deployment is proven to serve Phase A and legacy workers are drained. It preserves the original SQL in an immutable archive and the applied version in migration history. A documented retirement marker handles fresh databases without replaying the experimental SQL. A forward migration removes only the retired RPC interfaces and preserves the POC state for recovery. It must rehearse both the original applied-schema path and the fresh Production path and compare their application contracts. Unrelated migration edits/removals remain errors.
+
+No linked/remote DB reset, migration-history repair, POC data deletion, or Production migration was performed. Applying Phase B requires the deployment evidence, backup/recovery, dry-run, independent review and explicit external-operation authority. Upstash stays in place throughout the transition.
 
 ## Hosted Integration state (2026-10-03)
 
