@@ -14,7 +14,7 @@ import {
   expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
-  openDay,
+  openDay as openDayFromFixture,
   revealHour,
   seedCriticalPathUser,
   TIMEZONE,
@@ -71,6 +71,11 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
   await page.mouse.move(x, yFrom + 24, { steps: 4 });
   await page.mouse.move(x, yTo, { steps: 8 });
   await page.mouse.up();
+}
+
+async function openDay(page: Page, dateParam: string) {
+  await openDayFromFixture(page, dateParam);
+  await page.waitForLoadState('networkidle');
 }
 
 describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
