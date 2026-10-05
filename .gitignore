@@ -169,8 +169,6 @@ temp/
 *_CONVERSION_*.md
 
 # Playwright
-# TesterArmy reports, sessions, traces and replay caches are per-run artifacts.
-.e2e/
 /test-results/
 /playwright-report/
 /playwright/.auth/

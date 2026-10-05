@@ -10,6 +10,7 @@ import {
   clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
+  expectIndependentPersistedHour,
   expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
@@ -125,6 +126,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     ).toBeVisible({
       timeout: 10_000,
     });
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', tomorrow, 9);
   });
 
   test('過去帯をドラッグして Record を記録し、リロード後も残る', async ({ page }) => {
@@ -151,6 +153,13 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect(
       page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME }).first(),
     ).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(
+      adminSupabase,
+      IDENTITY.userId,
+      'record',
+      offsetDateParam(-1),
+      9,
+    );
   });
 
   test('過去帯でも予定タブを選べば Plan として作成できる', async ({ page }) => {
@@ -177,6 +186,13 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect(
       page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first(),
     ).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(
+      adminSupabase,
+      IDENTITY.userId,
+      'plan',
+      offsetDateParam(-1),
+      14,
+    );
   });
 
   test('記録した実績が /report の 1 章（配分）に反映される', async ({ page }) => {

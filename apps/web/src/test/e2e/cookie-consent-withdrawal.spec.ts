@@ -26,7 +26,7 @@ async function readStoredConsent(page: Page) {
   return raw === null ? null : (JSON.parse(raw) as { analytics: boolean; marketing: boolean });
 }
 
-test('footer の Cookie 設定から、保存済みの分析同意を撤回・再許可できる', async ({
+test('footer の Cookie 設定から、保存済みの分析同意を撤回・再許可できる @mobile', async ({
   page,
   context,
 }) => {
