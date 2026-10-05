@@ -3,6 +3,10 @@ scope:
   project: Dayopt
   repository_baseline: 650f62dc733831765aa8c110e29533b532e023f2
   mode: read_only
+  purpose: Dayoptの重要なサービス設計を人とagentが見失わず、read-only doctorで日々の実態と観測状況を追う
+  completion_criteria:
+    - 重要な接続・環境分離・権限境界と正本参照が一覧になっている
+    - 実測の差異と取得不能・手動確認が区別されている
   environments:
     - production
     - preview
