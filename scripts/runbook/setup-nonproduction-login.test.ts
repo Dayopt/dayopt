@@ -9,6 +9,7 @@ const script = join(process.cwd(), 'scripts/runbook/setup-nonproduction-login.sh
 
 function runFakeSetup({
   opFails = false,
+  vaultRequired = false,
   policies = 'branch\tmain\nbranch\tintegration',
   environmentPolicy = 'false\ttrue',
 } = {}) {
@@ -21,7 +22,7 @@ function runFakeSetup({
     writeFileSync(startupPath, '# fake startup check\n');
     writeFileSync(
       opPath,
-      `#!/bin/bash\nif [[ "${'${1:-}'}" == item ]]; then\n  field="${'${5:-}'}"\n  [[ "${'${OP_FAIL:-0}'}" == 1 && "$field" == password ]] && exit 1\n  case "$field" in username) printf 'fake@example.test' ;; password) printf 'fake-password' ;; esac\nelse\n  printf 'fake-management-token'\nfi\n`,
+      `#!/bin/bash\nif [[ "${'${1:-}'}" == item ]]; then\n  field=''\n  vault=''\n  while (($#)); do\n    case "$1" in --fields) field="$2"; shift 2 ;; --vault) vault="$2"; shift 2 ;; *) shift ;; esac\n  done\n  [[ "${'${OP_VAULT_REQUIRED:-0}'}" == 1 && -z "$vault" ]] && { printf 'vault required' >&2; exit 1; }\n  [[ "${'${OP_FAIL:-0}'}" == 1 && "$field" == password ]] && exit 1\n  case "$field" in username) printf 'fake@example.test' ;; password) printf 'fake-password' ;; esac\nelse\n  printf 'fake-management-token'\nfi\n`,
     );
     writeFileSync(
       ghPath,
@@ -37,6 +38,8 @@ function runFakeSetup({
         OP_STARTUP_CHECK: startupPath,
         CALLS_FILE: callsPath,
         OP_FAIL: opFails ? '1' : '0',
+        OP_VAULT_REQUIRED: vaultRequired ? '1' : '0',
+        NONPROD_LOGIN_VAULT_ID: 'owner-managed-vault-id',
         POLICIES: policies,
         ENVIRONMENT_POLICY: environmentPolicy,
       },
@@ -62,6 +65,13 @@ describe('setup-nonproduction-login secret sync', () => {
     expect(result.status).not.toBe(0);
     expect(calls).toBe('');
     expect(result.stderr).not.toContain('fake-password');
+  });
+
+  it('passes the owner-supplied vault explicitly when resolving the login item', () => {
+    const { result, calls } = runFakeSetup({ vaultRequired: true });
+    expect(result.status).toBe(0);
+    expect(calls.match(/secret set/g)).toHaveLength(3);
+    expect(calls).not.toContain('owner-managed-vault-id');
   });
 
   it('fails closed when an unexpected branch policy is present', () => {

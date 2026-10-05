@@ -32,10 +32,14 @@ if ! command -v op >/dev/null || ! command -v gh >/dev/null; then
   echo 'Required 1Password or GitHub CLI is unavailable; no changes made.' >&2
   exit 1
 fi
+if [[ -z "${NONPROD_LOGIN_VAULT_ID:-}" ]]; then
+  echo 'NONPROD_LOGIN_VAULT_ID is required to resolve the owner-managed login item; no changes made.' >&2
+  exit 1
+fi
 
 read_item_field() {
   local item="$1" field="$2" result
-  if ! result="$(op item get "$item" --fields "$field" --reveal 2>/dev/null)" || [[ -z "$result" ]]; then
+  if ! result="$(op item get "$item" --vault "$NONPROD_LOGIN_VAULT_ID" --fields "$field" --reveal 2>/dev/null)" || [[ -z "$result" ]]; then
     echo "1Password read failed for a required field ($field); no GitHub writes made." >&2
     return 1
   fi
