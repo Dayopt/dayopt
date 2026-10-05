@@ -1862,7 +1862,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（37）</summary>
+<summary>test の候補（38）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1891,6 +1891,7 @@ graph LR
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
 | [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
 | [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
 | [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
@@ -2462,7 +2463,7 @@ graph LR
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
 | [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/report |
+| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/report / 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
 | [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/report |
 | [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |

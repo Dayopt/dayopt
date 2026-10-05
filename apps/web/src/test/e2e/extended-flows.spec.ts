@@ -80,6 +80,10 @@ test('blog pagination changes articles and filtering from page two finds the fir
   await page.locator('main a[href="/blog?page=2"]').first().click();
   await expect(page).toHaveURL(/\/blog\?page=2/);
   await expect(page.locator('article h2').first()).not.toHaveText(firstTitle!);
+  const pageTwoTitle = await page.locator('article h2').first().textContent();
+  await expect(page.getByRole('searchbox')).toBeEnabled();
   await page.getByRole('searchbox').fill(firstTitle!);
   await expect(page.locator('article h2').first()).toHaveText(firstTitle!);
+  await page.getByRole('searchbox').fill('');
+  await expect(page.locator('article h2').first()).toHaveText(pageTwoTitle!);
 });

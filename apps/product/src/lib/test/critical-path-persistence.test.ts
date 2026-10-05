@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { type AdminSupabase, expectIndependentPersistedHour } from './e2e/critical-path-fixture';
+import { expectIndependentPersistedHour } from './critical-path-persistence';
+import type { AdminSupabase } from './e2e/critical-path-fixture';
 
 const interval = { start_at: '2026-09-10T00:00:00+00:00', end_at: '2026-09-10T01:00:00+00:00' };
 

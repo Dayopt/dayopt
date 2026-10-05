@@ -6,7 +6,7 @@ import { type NavigationItem, type NavigationSection } from '@web/shell/navigati
 import { ExternalLink, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface NavigationItemProps {
   item: NavigationItem;
@@ -87,6 +87,7 @@ export function ClientSidebar({ navigation }: ClientSidebarProps) {
   const pathname = usePathname();
   const t = useTranslations('common');
   const locale = useLocale();
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Cmd+K / Ctrl+K で検索を開く
@@ -106,6 +107,7 @@ export function ClientSidebar({ navigation }: ClientSidebarProps) {
     <div className="flex h-full flex-col">
       {/* Search（旧 docs ヘッダーから移設）— 入力は SearchDialog 側で受け付ける */}
       <button
+        ref={searchTriggerRef}
         type="button"
         onClick={() => setSearchOpen(true)}
         className="border-input bg-background text-muted-foreground hover:bg-state-hover hover:text-foreground mb-6 flex h-8 w-full items-center gap-2 rounded-lg border px-3 text-sm transition-colors"
@@ -114,7 +116,12 @@ export function ClientSidebar({ navigation }: ClientSidebarProps) {
         <span className="flex-1 text-left">{t('actions.search')}</span>
       </button>
 
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} locale={locale} />
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        locale={locale}
+        returnFocusRef={searchTriggerRef}
+      />
 
       {/* Navigation */}
       <nav className="flex-1 space-y-6">
