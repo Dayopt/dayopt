@@ -5,7 +5,7 @@ last_verified: 2026-10-05
 
 # Dayopt サービス棚卸し — 2026-10-05
 
-この追補は10/5にVercelとGitHubから読み取り専用で再取得したPreview配信記録を残す。期待値は[expected.yaml](./expected.yaml)、直前までの全体照合は[10/4の棚卸し](./inventory-2026-10-04.md)を参照する。Google OAuth/Calendarは別セッションの作業範囲なので調査していない。
+この追補は10/5にVercel・GitHub・Supabase・PostHogを読み取り専用で確認した記録を残す。期待値は[expected.yaml](./expected.yaml)、直前までの全体照合は[10/4の棚卸し](./inventory-2026-10-04.md)を参照する。Google OAuth/Calendarは別セッションの作業範囲なので調査していない。
 
 ## Preview配信とbranchの照合
 
@@ -28,12 +28,31 @@ GitHubの完全一致branch endpointとcommit pulls endpointは既存の`op://ag
 
 該当branch refはGitHub上で削除済みだが、同じbranch/SHAのVercel Preview deploymentが2件`READY`で、Config型のbranch overrideもUIに残っている。deploymentが各値を実際に消費したか、値が有効なcredentialか、deployment URLへ一般アクセスできるかは確認していない。Config型は権限のあるproject memberが値を読める可能性があるため、値を表示せずにcredentialかどうかを確定できない。Secret型への変更やrotationはこの読み取り専用棚卸しでは実施しない。
 
+## Supabase DashboardによるAPI blocked項目の補完
+
+2026-10-05 09:05–09:12 JSTに、ログイン済みSupabase Dashboardを画面閲覧のみで確認した。SQL Editor、Table Editor、Auth user一覧、Restore操作は開いていない。
+
+| 確認項目                      | 観測                                                                                                                                                                                                                                                                                         | 判定と限界                                                                                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dayopt organization / project | Organization `Dayopt PRO`。organizationのproject一覧は1件のroot project `dayopt`（Production `yvglwblxrnrenfifsnje`）。                                                                                                                                                                      | Integrationは2つ目の独立organization projectではなく、Production配下のpersistent branchとして表示される。                                       |
+| branch一覧                    | Production `main`（GitHub `Dayopt/dayopt`の`main`）とpersistent `integration`（同repoの`integration`）を表示。Preview branchはなし、scheduled deletion branchもなし。branch一覧に表示された更新時刻はmain `11 Aug 26 09:38:36`、integration `27 Sep 26 13:11:32`（画面にtimezone表示なし）。 | ProductionとIntegrationの対応をDashboardで確認。Integrationのproject refは`tilwaprottpyhlfoggbb`。branch一覧はmigrationやデータ内容を示さない。 |
+| Production / Integration状態  | 両project overviewのstatusは`Healthy`。Integrationは`PERSISTENT`、branch作成8日前、Last migration `supabase_rate_limit_idempotency_poc`。                                                                                                                                                    | Dashboardの状態表示を確認。Preview projectの作成・削除は行っていない。                                                                          |
+| Production backup             | `PHYSICAL` backupが7件。最新は2026-10-04 18:33:47 UTC、表示範囲は9/28–10/4。                                                                                                                                                                                                                 | scheduled backup一覧でmetadataを確認。                                                                                                          |
+| Integration backup            | `PHYSICAL` backupが7件。最新は2026-10-04 19:05:46 UTC、表示範囲は9/28–10/4。                                                                                                                                                                                                                 | branch ref `tilwaprottpyhlfoggbb`のscheduled backup一覧でmetadataを確認。                                                                       |
+| backupの範囲                  | Supabase画面はdatabase backupがproject regionで毎日深夜ごろ作成され、Storage APIのobjectは含まれないと説明。                                                                                                                                                                                 | backup履歴は確認したがrestoreは試しておらず、Storage objectの復旧可能性も検証していない。Restoreボタンは押していない。                          |
+
+同時刻帯の`pnpm doctor --service supabase --format json`は19結果（`pass 11 / drift 1 / blocked 4 / manual 3`、終了コード1）。Production project・Auth config/audit・functions・database metadata・Storage auditはpass。Integration Auth config・functions・database metadataはpass、Integration Auth auditとPreview branchのDB選択はmanual、Production heartbeatとcron reviewもそれぞれdrift/manual。API readerのblockedは`supabase.branches`（403）、Production backup metadata（403）、Integration project metadata（404）、Integration backup metadata（404）。Dashboardはこれら4項目のresource存在・branch名・backup履歴を補うが、DoctorのAPI判定はblockedのまま。API権限や取得経路は変更していない。
+
+## PostHogの読取権限
+
+2026-10-05 09時台のPostHog MCP skill discoveryは`llm_skill:read`不足を返した。利用可能tool一覧にproject settings readerはなかった。Doctorの`posthog.settings`もAPI 403のため、project `625917`のcapture/privacy settingsと削除credential metadataは取得していない。analytics queryによるevent/personデータの代替照合は実施していない。既存接続の権限内で取得不能と記録し、権限変更やcredential作成は行っていない。
+
 ## 全体棚卸しへの反映
 
 2026-10-05 08:51 JSTごろにNode 24.19.0と既存の`op run`認証で全サービスのDoctorを再実行した。95検査定義・100結果（`pass 47 / drift 1 / blocked 36 / manual 16 / not_applicable 0`、終了コード1）で、10/4の集計から変化はない。唯一の差異はProduction `billing-reconciliation` heartbeatで、他の判定不能はblocked 36件・manual 16件。個別のGitHub/Vercel確認は追加証拠として記録し、Doctorの自動判定件数には加えていない。
 
-この追補内ではGitHub branch/PR状態とalias割当を確認済み。残るのは、(1) Preview Config型7項目がcredentialかを値を開かずに特定できないため、設定所有者が分類すること、(2) Doctorに残るblocked 36件・manual 16件・Production heartbeat drift 1件の解消または理由付きの明確化。alias割当とSSO protectionのscopeはAPIで確認したが、実URLへの匿名アクセス試験はしていない。実設定の修正やrotation、heartbeat契約の変更が必要と判明した場合は、読み取り専用棚卸しとは分けて判断する。
+この追補内ではGitHub branch/PR状態・Vercel alias・Supabase branch/backup履歴を確認済み。Supabaseの4件はDoctorのAPI判定上blockedだがDashboard evidenceでresource存在とbackup履歴を補完した。残るのは、(1) Preview Config型7項目がcredentialかを値を開かずに特定できないため、設定所有者が分類すること、(2) PostHog project settingsを読む権限のある経路がないこと、(3) Doctorに残るblocked 36件・manual 16件・Production heartbeat drift 1件の解消または理由付きの明確化。Vercel alias割当とSSO protectionのscopeはAPIで確認したが、実URLへの匿名アクセス試験はしていない。実設定の修正やrotation、heartbeat契約の変更が必要と判明した場合は、読み取り専用棚卸しとは分けて判断する。
 
 ## 変更境界
 
-取得元はVercel MCPのdeployment一覧・詳細・alias一覧・Project metadata、Vercel UIの環境変数metadata、GitHub REST API（`op run`経由）・branch UI、Vercel公式のAuthentication protection仕様、およびDoctorのread-only全件実行。確認時刻は上記のとおり。生API応答、秘密値、顧客データは保存していない。外部サービスへの書き込み・設定変更は行っていない。
+取得元はVercel MCPのdeployment一覧・詳細・alias一覧・Project metadata、Vercel UIの環境変数metadata、GitHub REST API（`op run`経由）・branch UI、Supabase Dashboardのbranch/backup metadata、PostHog MCP tool discovery、Vercel公式のAuthentication protection仕様、およびDoctorのread-only実行。確認時刻は上記のとおり。生API応答、秘密値、顧客データは保存していない。外部サービスへの書き込み・設定変更は行っていない。
