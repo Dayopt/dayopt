@@ -213,6 +213,8 @@ export async function loginAs(page: Page, identity: CriticalPathIdentity) {
 
 export async function openDay(page: Page, dateParam: string) {
   await page.goto(`/ja/calendar?view=day&date=${dateParam}`);
+  // ページ内の通信が落ち着いてからドラッグ座標を送る。
+  await page.waitForLoadState('networkidle');
   await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
 }
 
