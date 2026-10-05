@@ -65,10 +65,13 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     await page.locator('button[type="submit"]').first().click();
     await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
     await page.waitForLoadState('networkidle');
-    const authCookieNames = (await page.context().cookies(baseURL))
-      .map(({ name }) => name)
-      .filter((name) => /-auth-token(?:\.\d+)?$/.test(name));
+    const authCookies = (await page.context().cookies(baseURL)).filter(({ name }) =>
+      /-auth-token(?:\.\d+)?$/.test(name),
+    );
+    const authCookieNames = authCookies.map(({ name }) => name);
+    const authCookieHeader = authCookies.map(({ name, value }) => `${name}=${value}`).join('; ');
     expect(authCookieNames.length).toBeGreaterThan(0);
+    expect(authCookieHeader).not.toBe('');
     const endpoint = new URL('/api/trpc/userSettings.update', baseURL).href;
     const write = (timeFormat: string) => JSON.stringify({ json: { timeFormat } });
     const initial = await page.evaluate(
@@ -265,19 +268,15 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     const actionBrowserHeaders = await actionBrowserRequest.allHeaders();
     const actionBody = actionBrowserRequest.postDataBuffer();
     expect(actionBrowserHeaders.origin).toBe(attackerOrigin);
-    expect(
-      authCookieNames.some((name) => actionBrowserHeaders.cookie?.includes(`${name}=`)),
-      'Server Actionを呼ぶ攻撃元フォームにもログイン済みのSupabase Cookieが送られること',
-    ).toBe(true);
     expect(actionBody).not.toBeNull();
 
-    // Capture the browser's actual Server Action submission, then replay its exact body
-    // with the same session and forged Origin through APIRequestContext to observe the
-    // deterministic Next.js rejection status.
+    // The browser form proves that a forged-Origin Server Action request reaches the route.
+    // Replay its exact body with the authenticated session cookie from this browser context:
+    // form navigation does not guarantee that the browser sends its session cookie.
     const actionResponse = await request.post(actionUrl, {
       headers: {
         origin: attackerOrigin,
-        cookie: actionBrowserHeaders.cookie ?? '',
+        cookie: authCookieHeader,
         'content-type': actionBrowserHeaders['content-type'] ?? '',
       },
       data: actionBody!,

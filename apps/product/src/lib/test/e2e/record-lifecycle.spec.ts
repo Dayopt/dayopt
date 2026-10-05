@@ -60,7 +60,8 @@ describeWithEnv('Isolated Record lifecycle', () => {
   const setTime = async (page: Page, name: string, value: string) => {
     const input = page.getByRole('combobox', { name, exact: true });
     await input.fill(value);
-    await input.press('Enter');
+    await input.press('Tab');
+    await expect(input).toHaveValue(value);
   };
 
   test.beforeAll(async () => {
@@ -218,6 +219,7 @@ describeWithEnv('Isolated Record lifecycle', () => {
     await expect(create).toBeDisabled();
     await setTime(page, '終了時刻', '12:00');
     await setTime(page, '開始時刻', '11:00');
+    await expect(page.getByText('この時間帯には既に記録があります', { exact: true })).toBeHidden();
     await expect(create).toBeEnabled();
     await create.click();
     await expect
