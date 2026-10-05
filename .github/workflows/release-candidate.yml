@@ -1,0 +1,219 @@
+name: Release Candidate
+
+# Schedule is intentionally unset until #3017 agrees timezone and delay budget.
+# Nightly and emergency use this same entry point. No Production credentials.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+      main_sha: ${{ steps.pin.outputs.main_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require approved candidate activation
+        env:
+          ENABLED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}
+        run: test "$ENABLED" = true && test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_MAX_DELAY_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_DELAY_SECONDS }}
+        run: node scripts/ci/release-candidate.mjs pin candidate-pin.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-pin-${{ github.run_attempt }}
+          path: candidate-pin.json
+          if-no-files-found: error
+
+  verify:
+    needs: pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # Candidate source and dependencies run only in this disposable job.
+      - name: Checkout the fixed candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: candidate-pin-${{ github.run_attempt }}
+          path: candidate-pin
+      - uses: ./.github/actions/setup
+      - name: Install browsers
+        run: pnpm exec playwright install --with-deps chromium chromium-headless-shell
+      - id: supabase_version
+        run: |
+          version=$(node -p "require('./package.json').devDependencies.supabase")
+          test -n "$version" && test "$version" != undefined
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: ${{ steps.supabase_version.outputs.version }}
+      - name: Start disposable runner database
+        run: supabase start
+      - name: Record untrusted runner DB report before suites
+        run: node scripts/ci/release-candidate-db.mjs . db-before.json
+      - name: Rehearse the pinned main to candidate migration upgrade
+        id: db_upgrade
+        env:
+          DB_UPGRADE_RESULT_PATH: db-upgrade-result.json
+          CI: true
+        run: |
+          git update-ref refs/remotes/origin/main "${{ needs.pin.outputs.main_sha }}"
+          node scripts/ci/db-upgrade-check.mjs
+      - name: Export disposable database endpoints
+        run: |
+          status=$(supabase status --output json)
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(echo "$status" | jq -er '.PUBLISHABLE_KEY // .ANON_KEY')"
+            echo "SUPABASE_SECRET_KEY=$(echo "$status" | jq -er '.SECRET_KEY // .SERVICE_ROLE_KEY')"
+            echo "DATABASE_URL=$(echo "$status" | jq -er '.DB_URL')"
+          } >> "$GITHUB_ENV"
+      - name: Full unit and workspace tests
+        id: unit
+        run: pnpm test:run
+      - name: Full integration and RLS tests
+        id: integration
+        env:
+          INTEGRATION_AFFECTED: 'true'
+          USE_LOCAL_DB: 'true'
+          NODE_ENV: test
+          CI: true
+        run: node scripts/ci/check.mjs integration
+      - name: Full Product E2E
+        id: e2e
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_e2e_dummy
+          E2E_REQUIRE_SERVICE_ROLE_SUITES: '1'
+        run: pnpm --dir apps/product exec playwright test --project=chromium --project="Mobile Chrome"
+      - name: Web build and E2E
+        id: web
+        run: pnpm build:web && pnpm --filter @dayopt/web test:e2e:smoke
+      - name: Storybook light and dark
+        id: storybook
+        run: |
+          pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected
+          pnpm build-storybook
+          pnpm --filter @dayopt/product exec vitest run --project storybook --project storybook-dark
+      - name: Record untrusted runner DB report after suites
+        run: node scripts/ci/release-candidate-db.mjs . db-after.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-db-reports-${{ github.run_attempt }}
+          path: |
+            db-before.json
+            db-after.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop disposable database
+        if: always()
+        run: supabase stop
+      - name: Save diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-diagnostics-${{ github.run_attempt }}
+          path: |
+            db-upgrade-result.json
+            apps/product/test-results/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  seal:
+    needs: [pin, verify]
+    if: ${{ needs.pin.result == 'success' && needs.verify.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # A new runner checks out trusted control at the pinned main SHA. It never
+      # installs or executes candidate code; candidate files are read as Git data only.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.main_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout candidate source for read-only Git inspection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.sha }}
+          path: candidate-source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Download this attempt inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p seal-inputs/pin seal-inputs/db
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "candidate-pin-$GITHUB_RUN_ATTEMPT" --dir seal-inputs/pin
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "candidate-db-reports-$GITHUB_RUN_ATTEMPT" --dir seal-inputs/db
+      - name: Seal only trusted job results and independently matched migration content
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
+        run: node scripts/ci/release-candidate.mjs seal seal-inputs/pin/candidate-pin.json seal-inputs/db/db-before.json seal-inputs/db/db-after.json candidate-source
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-evidence-${{ github.run_attempt }}
+          path: candidate-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+  notify_failure:
+    needs: [pin, verify, seal]
+    if: ${{ always() && (needs.pin.result != 'success' || needs.verify.result != 'success' || needs.seal.result != 'success') }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: candidate-failure-issue
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No checkout, dependencies or candidate code with the write token.
+      - name: Hold the whole candidate and update its failure Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: 'Release candidate held (#3009)'
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number,title --jq '.[] | select(.title == "Release candidate held (#3009)") | .number' | head -1)
+          body="Writer: Release Candidate workflow. Entire candidate held; no PR removal or partial release. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          if [ -n "$existing" ]; then
+            marker="actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)"
+            found=$({ gh api "repos/$GITHUB_REPOSITORY/issues/$existing" --jq \.body; gh api "repos/$GITHUB_REPOSITORY/issues/$existing/comments" --paginate --jq '.[].body'; } | { rg -F "$marker" || true; })
+            if [ -z "$found" ]; then gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"; fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --label type:bug,area:deployment --body "$body"
+          fi

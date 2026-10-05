@@ -89,7 +89,7 @@ Preview と本番は別の Supabase・別の env。本番の Resend の設定（
   },
   {
     "path": "scripts/ci/production-release.mjs",
-    "find": "Force Promote: skipping smoke and Production Config Audit."
+    "find": "Force Promote is no longer supported"
   },
   {
     "path": "docs/engineering/infra.md",

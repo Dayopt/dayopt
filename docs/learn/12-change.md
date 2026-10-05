@@ -46,7 +46,7 @@ last_verified: 2026-09-21
 - [merge → 本番公開](journeys/deploy.md) の 2. migration 適用 — ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。
 - [merge → 本番公開](journeys/deploy.md) の 4. 影響判定 — 影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。
 - [merge → 本番公開](journeys/deploy.md) の 5. E2E などで検証 — ここが merge 後の本番を守る唯一の実行検証。遅くすると、migration と旧コードが共存する時間も伸びる。
-- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
+- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
 
 #### `AGENTS.md`
 
@@ -784,7 +784,7 @@ last_verified: 2026-09-21
 
 #### `scripts/ci/production-release.mjs`
 
-- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
+- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
 
 #### `scripts/ci/release-impact.mjs`
 
