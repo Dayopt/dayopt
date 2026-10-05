@@ -67,13 +67,12 @@ function mockAal1Session() {
 // しまう形。すべて encode 済み or スラッシュ由来なので browser / CDN で
 // 正規化されずサーバまで到達する。
 const BYPASS_SHAPES = [
-  ['先頭 1 文字を encode', 'https://app.dayopt.app/%63alendar'],
-  ['TAB を encode', 'https://app.dayopt.app/%09calendar'],
-  ['LF を segment 区切りに', 'https://app.dayopt.app/%0A/calendar'],
-  ['連続スラッシュ', 'https://app.dayopt.app//calendar'],
-  ['locale prefix を encode', 'https://app.dayopt.app/%6a%61/calendar'],
-  ['locale 配下の TAB', 'https://app.dayopt.app/ja/%09calendar'],
-  ['locale 配下の連続スラッシュ', 'https://app.dayopt.app/ja//calendar'],
+  ['TAB を encode', 'https://app.dayopt.app/%09'],
+  ['LF を segment 区切りに', 'https://app.dayopt.app/%0A/'],
+  ['連続スラッシュ', 'https://app.dayopt.app//'],
+  ['locale prefix を encode', 'https://app.dayopt.app/%6a%61/'],
+  ['locale 配下の TAB', 'https://app.dayopt.app/ja/%09'],
+  ['locale 配下の連続スラッシュ', 'https://app.dayopt.app/ja//'],
   ['settings の TAB', 'https://app.dayopt.app/%09settings'],
   // `%2E` は decode すると `.` になる。認可分類を canonical で行いつつ
   // 静的アセット判定を raw で行わないと、ここが早期 return に落ちて
@@ -116,7 +115,6 @@ describe('proxy canonicalization は実物の next-intl と一致する', () => 
   // 正常系が巻き添えで壊れていないこと。上の不変条件を「全部 307 にする」で
   // 満たす退行を防ぐ。
   it.each([
-    ['公開トップ', 'https://app.dayopt.app/'],
     ['公開ページ', 'https://app.dayopt.app/pricing'],
     ['auth ページ', 'https://app.dayopt.app/auth/login'],
     ['メンテナンスページ', 'https://app.dayopt.app/maintenance'],
@@ -129,5 +127,14 @@ describe('proxy canonicalization は実物の next-intl と一致する', () => 
     const response = await proxy(new NextRequest(url));
 
     expect(response.status).not.toBe(307);
+  });
+
+  it('ホームのカレンダーは未認証ならログインへ送る', async () => {
+    mockUnauthenticatedSession();
+
+    const response = await proxy(new NextRequest('https://app.dayopt.app/'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toContain('/auth/login');
   });
 });

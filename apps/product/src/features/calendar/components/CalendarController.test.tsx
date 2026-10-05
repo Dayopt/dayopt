@@ -126,7 +126,7 @@ function renderController() {
       onTimeblockUpdate={vi.fn()}
       onDeleteTimeblock={vi.fn()}
       onDeleteTimeblockConfirm={vi.fn()}
-      onViewStats={vi.fn()}
+      onViewActivityDetails={vi.fn()}
       onNavigate={vi.fn()}
       onViewChange={vi.fn()}
       onNavigatePrev={vi.fn()}

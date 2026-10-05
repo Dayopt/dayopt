@@ -35,8 +35,7 @@ interface IconTabSwitcherProps<TValue extends string> {
 /**
  * 少数の排他的な選択肢を横に並べる帯タブ。
  *
- * デスクトップ Sidebar の「カレンダー / レポート」切替（`WorkspaceTabs`）の見た目が正本で、
- * 他の面もこれを共有する（2026-09-07 User 指示）。`SegmentedControl` とは別物として持つ:
+ * `SegmentedControl` とは別物として持つ:
  * あちらは枠線 + 白い選択チップの独立した部品で、こちらは `bg-muted` の帯に沈め、
  * 選択中だけ `bg-state-selected` を持ち上げる。同じ画面に 2 つの見た目を混ぜない。
  *
@@ -44,7 +43,7 @@ interface IconTabSwitcherProps<TValue extends string> {
  * （`packages/components/src/actions/button.tsx` の `_square-sm` と同じ技法）。
  *
  * `href` を持つ項目は `Link`、持たない項目は `button` で描く。前者は遷移が切替そのもの
- * （ワークスペース切替）で、後者はその場の state を変える（レポートの粒度）。
+ * で、後者はその場の state を変える。
  */
 export function IconTabSwitcher<TValue extends string>({
   items,

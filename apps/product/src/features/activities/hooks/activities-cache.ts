@@ -21,7 +21,7 @@ import { ACTIVITY_LIST_INPUT, CATEGORY_LIST_INPUT } from './useActivitiesQuery';
 
 type ActivitiesUtils = Pick<
   ReturnType<typeof trpc.useUtils>,
-  'activities' | 'plans' | 'records' | 'statistics' | 'review'
+  'activities' | 'plans' | 'records' | 'statistics'
 >;
 
 /** ロールバック用のスナップショット */
@@ -151,15 +151,14 @@ export function deleteCategoryFromCaches(utils: ActivitiesUtils, categoryId: str
 }
 
 /**
- * 分類一覧と、その名前・所属・アーカイブ状態を持つレポートを再取得する。
- * レポートは独立したキャッシュなので、一覧だけ更新しても表示やフィルタが古いまま残る。
+ * 分類一覧と、表示中のアクティビティ詳細を再取得する。
  * アーカイブの取り消しもこの経路を通す。
  */
 export function invalidateActivityCaches(utils: ActivitiesUtils): void {
   void utils.activities.listTree.invalidate();
   void utils.activities.listActivities.invalidate();
   void utils.activities.listCategories.invalidate();
-  void utils.review.invalidate();
+  void utils.activities.getActivitySummary.invalidate();
 }
 
 /** アクティビティの割り当てが変わる操作の後始末（予定・記録の表示と集計も動く） */

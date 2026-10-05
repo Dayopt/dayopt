@@ -172,9 +172,9 @@ graph TD
   subgraph L0["Layer 0"]
     activities["activities (Layer 0)"]
     external_calendar["external-calendar (Layer 0)"]
+    review["review (Layer 0)"]
   end
   subgraph L1["Layer 1"]
-    review["review (Layer 1)"]
     timeblock["timeblock (Layer 1)"]
   end
   subgraph L2["Layer 2"]
@@ -190,7 +190,6 @@ graph TD
   calendar --> activities
   calendar --> external_calendar
   calendar --> timeblock
-  review --> activities
   settings --> auth
   settings --> calendar
   settings --> external_calendar
@@ -219,8 +218,7 @@ flowchart LR
 ```
 
 - 日付と view range は URL と `CalendarNavigationContext` が source of truth。
-- 振り返りは `/report` として独立した画面。かつて Calendar shell の右パネル（`panel=review` / `panel=diff`）だったが、
-  現在その query は legacy redirect の入口としてだけ残る（`panel-url.ts` / `proxy.ts`。2026-09-16 に記述を更新）。
+- ローカライズされたホーム `/` が Calendar を表示する。アクティビティ詳細はユーザー操作で開く overlay として Calendar shell に合成し、タイムブロック Inspector と排他にする。
 - Zustand は drag、inline create、clipboard、inspector、shell などの一時 UI state と、表示モード・アクティビティフィルターのユーザー設定だけを担う。URL/Context の値を永続化しない。
 - Plan / Record / activity などのサーバーデータは Zustand に複製せず、tRPC / TanStack Query 経由で扱う。
 

@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE } from '@dayopt/config';
 import { formatInTimeZone } from 'date-fns-tz';
 
 import {
@@ -34,5 +35,6 @@ export function buildTimeblockSearchResultPath({
   params.set('date', formatCalendarDateParam(resolveTimeblockSearchResultDate(startAt, timezone)));
   params.set('view', 'day');
   params.set(TIMEBLOCK_PARAM, serializeTimeblockParam(timeblockId, kind));
-  return `/${locale}/calendar?${params.toString()}`;
+  const localePrefix = locale === DEFAULT_LOCALE ? '' : `/${locale}`;
+  return `${localePrefix}/?${params.toString()}`;
 }

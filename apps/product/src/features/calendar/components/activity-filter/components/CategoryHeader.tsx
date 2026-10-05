@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from 'react';
 
 import {
   Archive,
-  BarChart3,
   ChevronRight,
   Eye,
   MoreHorizontal,
@@ -46,7 +45,6 @@ interface CategoryHeaderProps {
   onIconChange?: ((icon: string | null) => void) | undefined;
   onAddActivityToCategory?: (() => void) | undefined;
   onRenameCategory?: (() => void) | undefined;
-  onViewStats?: (() => void) | undefined;
   onArchiveCategory?: (() => void) | undefined;
   onDeleteCategory?: (() => void) | undefined;
 }
@@ -72,7 +70,6 @@ export function CategoryHeader({
   onIconChange,
   onAddActivityToCategory,
   onRenameCategory,
-  onViewStats,
   onArchiveCategory,
   onDeleteCategory,
 }: CategoryHeaderProps) {
@@ -217,12 +214,6 @@ export function CategoryHeader({
                 <Eye className="size-4" />
                 {t('calendar.filter.showOnlyThisCategory')}
               </DropdownMenuItem>
-              {onViewStats && (
-                <DropdownMenuItem onClick={onViewStats}>
-                  <BarChart3 className="size-4" />
-                  {t('calendar.filter.viewStats')}
-                </DropdownMenuItem>
-              )}
 
               {/* アーカイブ（所属アクティビティも道連れ。可逆なので確認なし） */}
               {onArchiveCategory && (

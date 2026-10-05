@@ -24,6 +24,7 @@ import { z } from 'zod';
 import { handleServiceError } from '@/lib/trpc/errors';
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/procedures';
 import { createActivitiesService } from './activities-service';
+import { createActivitySummaryService } from './activity-summary-service';
 
 const CATEGORY_COLOR = z.enum([
   'red',
@@ -44,8 +45,23 @@ const ICON_NAME = z
   .regex(/^[a-z][a-z0-9-]*$/);
 
 const NAME = z.string().min(1).max(50);
+const TIMEZONE = z.string().min(1).max(64);
 
 export const activitiesRouter = createTRPCRouter({
+  getActivitySummary: protectedProcedure
+    .meta({ description: '直近30日間のアクティビティ記録サマリー' })
+    .input(z.object({ activityId: z.string().uuid(), timezone: TIMEZONE }))
+    .query(async ({ ctx, input }) => {
+      try {
+        return await createActivitySummaryService(ctx.supabase).getActivitySummary(
+          ctx.userId,
+          input,
+        );
+      } catch (error) {
+        return handleServiceError(error);
+      }
+    }),
+
   // ----- Categories -----
 
   listCategories: protectedProcedure

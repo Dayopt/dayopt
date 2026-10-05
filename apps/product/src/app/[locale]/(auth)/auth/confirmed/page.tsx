@@ -6,7 +6,7 @@
  * ## なぜ login ページではなくこの専用ページか
  *
  * login に notice を出す案は、認証済みの browser で確認リンクを開いた場合に成立しない。
- * `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/calendar` へ送り、`/auth/login` は
+ * `proxy.ts` は認証済みユーザーが auth 系 path に来るとホームへ送り、`/auth/login` は
  * `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に含まれない
  * ため、メッセージを表示する前に弾かれる。バウンス先が変わるだけで #1956 の混乱は残る。
  *

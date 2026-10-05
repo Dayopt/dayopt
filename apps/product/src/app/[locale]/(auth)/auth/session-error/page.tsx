@@ -4,9 +4,8 @@
  * `proxy.ts` の MFA AAL gate は `resolveMfaAssurance()` が `lookupFailed: true` を
  * 返すとこのページへ redirect する。以前は `/auth/login` へ送っていたが、
  * `/auth/login` は `authPathsAllowedWhileAuthenticated`（access-policy.ts）に
- * 含まれないため、認証済みユーザーが到達すると即座に `/calendar` へ弾き返され、
- * `/calendar` は protected path なので MFA gate を再度通り lookupFailed が続く限り
- * `/calendar ⇔ /auth/login` の無限 redirect ループになっていた。
+ * 含まれないため、認証済みユーザーが到達すると即座にホームへ弾き返され、
+ * 保護されたカレンダーの MFA gate と無限 redirect ループになる可能性がある。
  *
  * この path は同 allowlist に登録してあるので、認証済みでも表示できる。
  * lookupFailed は user 状態が曖昧な時にも起きうるため、未認証でも表示できる
@@ -45,7 +44,7 @@ export default async function SessionErrorPage() {
 
           <div className="flex flex-col gap-2">
             <Button asChild className="w-full">
-              <Link href="/calendar">{t('retry')}</Link>
+              <Link href="/">{t('retry')}</Link>
             </Button>
             <SignOutButton />
           </div>

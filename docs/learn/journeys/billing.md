@@ -1178,7 +1178,7 @@ Vercel cron が毎日 /api/cron/billing-reconciliation を叩く。Stripe の直
           },
           "screenAfter": {
             "t": "page",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "tone": "bad",
             "title": "設定を読み込めませんでした。もう一度お試しください",
             "button": "もう一度試す"

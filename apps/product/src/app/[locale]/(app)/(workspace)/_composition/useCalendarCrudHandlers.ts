@@ -51,7 +51,7 @@ interface CalendarCrudHandlersResult {
   ) => void | Promise<void> | Promise<{ skipToast: true } | void>;
   onDeleteTimeblock: (timeblockId: string) => Promise<boolean>;
   onDeleteTimeblockConfirm: (timeblock: CalendarDisplayEvent) => void;
-  onViewStats: (timeblock: CalendarDisplayEvent) => void;
+  onViewActivityDetails: (timeblock: CalendarDisplayEvent) => void;
 }
 
 // =============================================================================
@@ -77,7 +77,7 @@ export function useCalendarCrudHandlers({
   // =========================================================================
   // Context Actions（右クリックメニュー）
   // =========================================================================
-  const { handleDeleteTimeblock: handleDeleteTimeblockConfirm, handleViewStats } =
+  const { handleDeleteTimeblock: handleDeleteTimeblockConfirm, handleViewActivityDetails } =
     useTimeblockContextActions();
 
   // =========================================================================
@@ -122,7 +122,7 @@ export function useCalendarCrudHandlers({
       onTimeblockUpdate: handleTimeblockUpdate,
       onDeleteTimeblock: deleteTimeblock,
       onDeleteTimeblockConfirm: handleDeleteTimeblockConfirm,
-      onViewStats: handleViewStats,
+      onViewActivityDetails: handleViewActivityDetails,
     }),
     [
       disabledTimeblockId,
@@ -131,7 +131,7 @@ export function useCalendarCrudHandlers({
       handleTimeblockUpdate,
       deleteTimeblock,
       handleDeleteTimeblockConfirm,
-      handleViewStats,
+      handleViewActivityDetails,
     ],
   );
 }

@@ -308,7 +308,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -321,7 +321,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
       "short": "入口を選ぶ",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
@@ -416,7 +416,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -432,7 +432,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
       "short": "先に消す",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "gone",
@@ -528,7 +528,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -609,7 +609,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -624,7 +624,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
       "via": "応答",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "gone",
@@ -694,7 +694,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -727,7 +727,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -774,7 +774,7 @@ restore は先に描かない。返ってきた行を、条件の合う一覧と
       "via": "応答",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",

@@ -193,7 +193,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
       "short": "main へ merge",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
@@ -247,7 +247,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -299,7 +299,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
           "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -375,7 +375,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
           "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -430,7 +430,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
           "back": "旧版のまま配信",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -477,7 +477,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
       "via": "新版を配信",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
