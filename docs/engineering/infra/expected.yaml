@@ -1350,9 +1350,9 @@ ui_only:
       'id': 'posthog.project.permissions',
       'service': 'posthog',
       'category': 'current_permission',
-      'items': ['project privacy / capture settings'],
-      'reason': 'API403。MCP project-getもproject:read不足。API未提供ではない',
-      'next_step': '既存625917 Dashboardの設定だけ確認。project設定の9/30 MCP証拠を履歴に残す',
+      'items': ['Doctor API reader permission; deployed privacy switches / deletion key replica'],
+      'reason': 'Doctor用op://agent/potshog-readonly/credentialのproject APIは403 insufficient_access。接続済みPostHog MCPでは同じproject metadataを読み取れたため、API未提供ではなくDoctor credential固有の権限不足',
+      'next_step': 'MCP観測を棚卸し記録へ反映する。Doctor自動化の権限回復は既存read-only credentialのscopeまたはreaderを別途確認し、今回の棚卸しではcredential発行・権限変更をしない',
       'check_ids': ['posthog.settings', 'posthog.deployed_privacy_and_deletion'],
       'documentation_urls': [],
     }
