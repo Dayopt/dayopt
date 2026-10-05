@@ -15,7 +15,8 @@ if (!target.safe || process.env.CI !== '1' || process.env.POSTHOG_SERVER_ENABLED
 // Public declarations select the local browser fence before workers collect specs.
 process.env.E2E_ISOLATED_RUN = '1';
 
-export default defineConfig(localConfig, {
+export default defineConfig({
+  ...localConfig,
   testMatch: [
     'calendar-navigation.spec.ts',
     'record-lifecycle.spec.ts',
