@@ -231,6 +231,16 @@ field 名は可能な限り current code の env 名と一致させる。`.op-en
 
 vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayopt/dayopt/issues/2086)、User 裁可）で **`agent` / `ci` / `human` の 3 箱**。軸は環境ではなく**読み手**（誰が読めるか）で、環境の区別は item 名（`stripe-test` / `stripe-live` 等）とタグ体系が担う。旧 vault との対応: `Dayopt-Staging` + `Dayopt-Shared` の AI 消費分 → `agent`、`Dayopt-Shared` の automation token → `ci`、`Dayopt-Production` + `Dayopt-Shared` の login / recovery / 個人系 → `human`。
 
+### 人間用項目の台帳参照
+
+Dashboard の手動確認に使う既存 `human` item は、人間用のまま保持し、`agent` vault へ移動・複製しない。エージェントが項目へアクセスできなくても、棚卸しには「どの項目を人が確認するか」と確認状況を残す。
+
+- `docs/engineering/infra/expected.yaml` では、確認済みなら `vault` と正確な `item` 名を記録する。値を参照する機械処理がある項目だけ、実在を確認した正確な field を `op://` 参照にする。LOGIN item など field 参照を使わない項目に架空の `op://` field を作らない。
+- 所在の確認状態は `unknown` または `user_confirmed` とし、後者には確認日と確認主体を添える。`user_confirmed` は項目の存在を人が確認したという意味で、エージェントによる読取や外部サービス設定・secret replica との値一致を意味しない。
+- `human` Vault を現在の agent 認証から解決できない場合は `unverified` と扱う。アクセスできないことを、項目が存在しない証拠にしない。
+- 1Password の open-item URL は人の画面遷移用リンクに限る。棚卸しの正本は `vault` / `item`（必要な場合のみ確認済み `field`）であり、URLだけを根拠や locator にしない。URLを台帳に保存せず、必要なら人の手元のブックマークで使う。
+- UI上の設定状態、1Password item の存在、サービスへ配布した replica との一致は別々に確認・記録する。secret 値や recovery 情報は台帳に記録しない。
+
 ### `agent`
 
 **AI が `op run` で解決してよい credentials を全部ここに置く**（「入れた瞬間 AI に漏れたとみなしても困らないもの」だけを入れる）。pre-tool-guard の vault allowlist はこの 1 vault のみを通す。

@@ -400,6 +400,17 @@ resources:
     production: yvglwblxrnrenfifsnje
     integration: tilwaprottpyhlfoggbb
   posthog_project: 625917
+  manual_access_policy:
+    human_onepassword_items:
+      locator: vault_and_exact_item_name
+      field_reference: op_ref_only_when_exact_field_is_known_and_referenced
+      open_item_url: not_stored_in_expected_yaml_optional_human_bookmark
+      agent_access: unavailable_by_design
+      presence_status: [unknown, user_confirmed]
+      user_confirmation_requires: [confirmed_by, verified_at]
+      provider_configuration_and_replica_match: separate_verification
+      inaccessible_means: unverified_not_absent
+      secret_values_in_inventory: forbidden
 connections:
   - {
       'id': 'github.product.release',
