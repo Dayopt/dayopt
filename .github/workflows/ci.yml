@@ -25,7 +25,9 @@ on:
   pull_request:
     # Integration の候補も merge 前に同じ品質検査を通す。通常PRを
     # Integration 経由にする規則ではなく、既存の非本番変更経路の検査。
-    branches: [main, integration]
+    # #3022 の staged DB 退役を、元 POC 履歴を持つ Phase A base から shadow 検証する。
+    # Phase A merge 後に #3028 を integration へ retarget する際、この一時 base を外す。
+    branches: [main, integration, codex/integration-reconcile-3009]
     # **`ready_for_review` を明示的に含める。** 既定の types は
     # `opened / synchronize / reopened` だけで ready_for_review を含まないため、
     # これが無いと draft → ready の変換で CI が再発火しない

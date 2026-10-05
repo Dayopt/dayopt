@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -18,6 +19,15 @@ const tombstone = 'canonical tombstone';
 const historicalSql = 'byte-exact historical POC SQL';
 
 describe('pinned POC retirement DB upgrade contract', () => {
+  it('runs the ordinary shadow checks for the exact stacked Phase A base', () => {
+    const workflow = readFileSync(resolve('.github/workflows/ci.yml'), 'utf8');
+    const prTrigger = workflow.split('  pull_request:')[1].split('  workflow_dispatch:')[0];
+    expect(prTrigger).toMatch(/branches: \[main, integration, codex\/integration-reconcile-3009\]/);
+    expect(prTrigger).not.toContain('codex/**');
+    expect(workflow).toContain(
+      "github.event.pull_request.draft != true && !inputs.preview_e2e && needs.impact.outputs.migrations_added == 'true'",
+    );
+  });
   it('allows only the validated same-version tombstone edit and runs the forward migration', () => {
     const changed = [
       { status: 'M', path: originalPath },
