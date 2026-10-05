@@ -300,3 +300,11 @@ describe('POC retirement rehearsal helper', () => {
     expect(attemptedSql).toContain(RETIREMENT_SQL);
   });
 });
+
+describe('PostgreSQL catalog discriminant types', () => {
+  it('casts internal char kinds before text concatenation', () => {
+    expect(POC_SECURITY_CATALOG_SQL).toContain("'|kind=' || c.relkind::text ||");
+    expect(POC_SECURITY_CATALOG_SQL).toContain("'|type=' || c.contype::text ||");
+    expect(POC_SECURITY_CATALOG_SQL).not.toMatch(/\|\| c\.(?:relkind|contype) \|\|/);
+  });
+});

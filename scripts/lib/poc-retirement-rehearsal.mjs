@@ -10,7 +10,7 @@ export const POC_SECURITY_CATALOG_SQL = `with catalog_rows as (
   select 'schema:' || n.nspname || '|owner=' || pg_catalog.pg_get_userbyid(n.nspowner) || '|acl=' || coalesce(n.nspacl::text, '<default>') as item
   from pg_catalog.pg_namespace n where n.nspname = 'rate_limit_poc'
   union all
-  select 'relation:' || n.nspname || '.' || c.relname || '|kind=' || c.relkind || '|owner=' || pg_catalog.pg_get_userbyid(c.relowner) || '|acl=' || coalesce(c.relacl::text, '<default>') || '|rls=' || c.relrowsecurity::text || '|force=' || c.relforcerowsecurity::text || '|options=' || coalesce(array_to_string(c.reloptions, ','), '')
+  select 'relation:' || n.nspname || '.' || c.relname || '|kind=' || c.relkind::text || '|owner=' || pg_catalog.pg_get_userbyid(c.relowner) || '|acl=' || coalesce(c.relacl::text, '<default>') || '|rls=' || c.relrowsecurity::text || '|force=' || c.relforcerowsecurity::text || '|options=' || coalesce(array_to_string(c.reloptions, ','), '')
   from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'rate_limit_poc' and c.relkind in ('r', 'p', 'v', 'm', 'f', 'S')
   union all
@@ -20,7 +20,7 @@ export const POC_SECURITY_CATALOG_SQL = `with catalog_rows as (
   select 'index:' || schemaname || '.' || indexname || '|' || indexdef
   from pg_catalog.pg_indexes where schemaname = 'rate_limit_poc'
   union all
-  select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || '|type=' || c.contype || '|validated=' || c.convalidated::text || '|' || pg_catalog.pg_get_constraintdef(c.oid)
+  select 'constraint:' || n.nspname || '.' || c.conrelid::regclass::text || '.' || c.conname || '|type=' || c.contype::text || '|validated=' || c.convalidated::text || '|' || pg_catalog.pg_get_constraintdef(c.oid)
   from pg_catalog.pg_constraint c join pg_catalog.pg_namespace n on n.oid = c.connamespace
   where n.nspname = 'rate_limit_poc'
   union all
