@@ -63,7 +63,7 @@ async function login(page: Page) {
   await page.locator('input[type="email"], input[name="email"]').first().fill(TEST_EMAIL);
   await page.locator('input[type="password"]').first().fill(TEST_PASSWORD);
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+  await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   // URL 遷移だけでは hydration 完了を保証しない。ショートカットは mount 時の
   // useEffect で registry へ登録されるため、grid の描画を待たずに Ctrl+K を
   // 押すとイベントが誰にも拾われず検索ダイアログが開かない。

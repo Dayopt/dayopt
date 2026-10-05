@@ -1,7 +1,7 @@
 'use client';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { ActivityChipRow, isCalendarViewPath, resolveWorkspaceTab } from '@/features/calendar';
+import { ActivityChipRow, isCalendarViewPath } from '@/features/calendar';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { InlineBanner } from '@dayopt/components';
 import { usePathname } from '@dayopt/i18n/navigation';
@@ -19,14 +19,12 @@ interface MobileLayoutProps {
  * モバイル用レイアウト
  *
  * **構成**:
- * - AppHeader（ナビゲーション。calendar / report / settings は自前のヘッダーを
- *   持つため、ここでは出さない。カレンダーへ戻るトグル（#2300 でフッターの
- *   BottomTabBar を置き換えたもの）は report 側のヘッダーが持つ）
+ * - AppHeader（ナビゲーション。カレンダーと settings は自前のヘッダーを持つため、ここでは出さない）
  * - MainContent
  * - 固定バー群（画面下端。overview.md §5-7-b）: ActivityChipRow（Calendar
  *   タブのみ）。`pb-safe` はこのバー自身に付ける
  *
- * 本文の余白は固定トークン（動的測定なし）で、calendar タブだけ
+ * 本文の余白は固定トークン（動的測定なし）で、home calendar だけ
  * ActivityChipRow 1 段分を確保する。
  */
 export function MobileLayout({ children }: MobileLayoutProps) {
@@ -36,13 +34,9 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   const pathname = usePathname();
 
   const isCalendarView = isCalendarViewPath(pathname);
-  const isReportView = resolveWorkspaceTab(pathname) === 'report';
 
-  // ページ判定: 独自ヘッダーを持つページかどうか（AppHeader表示制御用）。
-  // `/report` は自前で AppHeader を組む（#2575）。カレンダーへ戻るトグルと
-  // アカウントボタンは ReportViewClient が rightSlot へ渡し直す。
   const hasOwnHeader =
-    isCalendarView || isReportView || pathname === '/settings' || pathname.startsWith('/settings/');
+    isCalendarView || pathname === '/settings' || pathname.startsWith('/settings/');
 
   return (
     <>

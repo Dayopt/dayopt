@@ -1,7 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 
 import type { CalendarViewType, MultiDayViewType } from '@/features/calendar';
-import { isReportGranularity, type ReportGranularity } from '@/features/review';
 import { isValidCalendarViewToken } from '@/lib/calendar-view-tokens';
 import type { Locale } from '@dayopt/i18n/routing';
 
@@ -13,7 +12,7 @@ export function parseMultiDayViewParam(nday: string): MultiDayViewType | null {
 }
 
 /**
- * `/calendar?view=` の値を CalendarViewType として解析する。
+ * `/?view=` の値を CalendarViewType として解析する。
  *
  * `view` 省略時（undefined）は呼び出し側で week として扱う（呼び出し側の責務）。
  * 値が指定されていて day/week/2〜7day のいずれにも一致しない場合のみ null を返し、
@@ -25,16 +24,6 @@ export function parseMultiDayViewParam(nday: string): MultiDayViewType | null {
 export function parseCalendarViewParam(view: string | undefined): CalendarViewType | null {
   if (view === undefined) return null;
   return isValidCalendarViewToken(view) ? (view as CalendarViewType) : null;
-}
-
-/**
- * `/report?range=` の値をレポートの粒度として解析する。
- *
- * 省略時・不正値・旧 `day` はすべて `week` へ丸める。日の解像度はカレンダーの仕事なので、
- * レポートは週 / 月 / 年の 3 粒度しか持たない（#2575）。旧リンクは壊れず週へ寄る。
- */
-export function parseReportRangeParam(range: string | undefined): ReportGranularity {
-  return isReportGranularity(range) ? range : 'week';
 }
 
 /**

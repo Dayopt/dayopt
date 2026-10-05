@@ -188,11 +188,8 @@ export const useAuthStore = create<AuthState>()(
             email,
             password,
             options: {
-              // 確認メールのリンク検証後の着地先。send-auth-email hook が
-              // origin + path を confirm route の next に変換する。
-              // 旧 route（/week）を指すと proxy の legacy 写像に依存し、その削除で
-              // 確認リンクの着地が 404 になるため、現行の契約 URL を直接指す。
-              emailRedirectTo: `${window.location.origin}/calendar`,
+              // 確認メールのリンク検証後はカレンダーを表示するホームへ戻す。
+              emailRedirectTo: `${window.location.origin}/`,
               ...(options?.captchaToken && { captchaToken: options.captchaToken }),
               ...(options?.metadata && { data: options.metadata }),
             },
@@ -378,8 +375,8 @@ export const useAuthStore = create<AuthState>()(
               type: 'signup',
               email,
               options: {
-                // 確認リンクの着地先。signUp と同じ契約 URL を指す
-                emailRedirectTo: `${window.location.origin}/calendar`,
+                // 確認リンクの着地先。signUp と同じホームを指す
+                emailRedirectTo: `${window.location.origin}/`,
                 ...(options?.captchaToken && { captchaToken: options.captchaToken }),
               },
             }),

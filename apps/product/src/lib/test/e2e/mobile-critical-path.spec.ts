@@ -10,7 +10,6 @@ import {
   clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
-  expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
   openDay,
@@ -24,7 +23,7 @@ import { test } from './trpc-budget-fixture';
 test.use({ trpcProcedureBudget: 26 });
 
 /**
- * クリティカルパス E2E（mobile）— 計画 → 実績 → 振り返りを **mobile の実導線** で通す（#2743）
+ * クリティカルパス E2E（mobile）— 計画 → 実績を **mobile の実導線** で通す（#2743）
  *
  * desktop の critical-path.spec.ts をエミュレータで流すだけでは mobile の UX を守れない。
  * mobile は操作境界が 3 つ違うので、それぞれを実 UI で通す:
@@ -32,7 +31,7 @@ test.use({ trpcProcedureBudget: 26 });
  * - 作成は **長押し**（タップは無視、`DRAG_CONSTANTS.LONG_PRESS_DURATION`）。動かさずに
  *   離すと `resolveInstantSelection` が default_duration（seed で 60 分）の選択を確定する
  * - 作成 UI は右パネルではなく **Drawer**（`TimeblockInspector` の mobile 分岐）
- * - Report へは **ヘッダーのレポートリンク**（`MobileCalendarHeader`、BottomTabBar は #2300 で廃止）
+ * - 詳細表示は Sidebar のアクティビティメニューから開く
  *
  * `Mobile Chrome` project は `@mobile` tag の test だけを持つ（playwright.config.ts の grep）。
  * CI では promote.yml の層 3 で chromium と同じ invocation に入る。
@@ -145,16 +144,4 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
     await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
   });
-
-  test(
-    'ヘッダーのレポートリンクから開いた Report に記録が反映される',
-    MOBILE_TAG,
-    async ({ page }) => {
-      await openDay(page, offsetDateParam(-1));
-      await page.getByRole('link', { name: 'レポートを開く' }).click();
-      await expect(page).toHaveURL(/\/ja\/report\?/, { timeout: 10_000 });
-
-      await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
-    },
-  );
 });

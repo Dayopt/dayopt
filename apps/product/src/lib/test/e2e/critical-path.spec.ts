@@ -10,7 +10,6 @@ import {
   clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
-  expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
   openDay,
@@ -23,11 +22,11 @@ import { test } from './trpc-budget-fixture';
 test.use({ trpcProcedureBudget: 26 });
 
 /**
- * クリティカルパス E2E（desktop）— 計画 → 実績 → 振り返りの中核ループを実 UI 操作で通す
+ * クリティカルパス E2E（desktop）— 計画 → 実績の中核ループを実 UI 操作で通す
  *
  * 「作成導線が存在する」ではなく、ドラッグ選択 → アクティビティ選択で実際に Plan / Record を作り、
- * リロード後も残る（= DB へ永続化された）ことと、Report の配分へ反映されることを検証する。
- * mobile の同じループは mobile-critical-path.spec.ts（長押し → Drawer → ヘッダーのレポートリンク）。
+ * リロード後も残る（= DB へ永続化された）ことを検証する。
+ * mobile の同じループは mobile-critical-path.spec.ts（長押し → Drawer）。
  *
  * 過去帯ドラッグでパレットが開かない症状は、ドラッグ x 座標が Plan lane 側
  * （`box.width * 0.15`）だったことが原因だった。過去スロットの新規作成は宛先が
@@ -177,12 +176,5 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
     await expect(
       page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first(),
     ).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('記録した実績が /report の 1 章（配分）に反映される', async ({ page }) => {
-    // レポートは週 / 月 / 年の 3 粒度（#2575）。前日の記録は今週の中に入る。
-    await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
-
-    await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
   });
 });

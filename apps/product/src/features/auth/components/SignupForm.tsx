@@ -127,7 +127,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
         turnstile.reset();
       } else if (result.data.session) {
         // メール確認不要 — そのままアプリへ
-        router.push(`/${locale}/calendar`);
+        router.push(locale === 'en' ? '/' : `/${locale}`);
       } else {
         // メール確認が必要 — 確認待ちUIを表示
         setPendingEmail(data.email);

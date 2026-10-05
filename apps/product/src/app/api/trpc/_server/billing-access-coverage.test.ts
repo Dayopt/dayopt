@@ -89,7 +89,6 @@ const MUTATIONS_ALLOWED_AFTER_END = [
   'planCommands.delete',
   'planTemplates.delete',
   'recordCommands.delete',
-  'review.trackOpened',
   'user.deleteAccount',
   'user.deleteAllData',
   'user.deleteBlocks',
@@ -114,7 +113,7 @@ const RESCUE_PATHS = [
   'billing.createPortalSession', // 請求管理
   'plans.list', // 保存済み予定の閲覧
   'records.list',
-  'review.getReportPeriod',
+  'activities.getActivitySummary',
 ];
 
 describe('利用期間終了後の許可・拒否を実 router 全件で固定する', () => {

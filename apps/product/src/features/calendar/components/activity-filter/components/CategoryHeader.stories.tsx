@@ -20,7 +20,7 @@ import { CategoryHeader } from './CategoryHeader';
  * | カラーを変更              |    ○    |   ×    |
  * | アイコンを変更            |    ○    |   ×    |
  * | このカテゴリーだけ表示     |    ○    |   ○    |
- * | 振り返りを見る            |    ○    |   ×    |
+ * | アクティビティの詳細      |    ○    |   ×    |
  * | アーカイブ                |    ○    |   ○    |
  * | 削除                      |    ○    |   ×    |
  */
@@ -45,7 +45,6 @@ const meta = {
     onIconChange: fn(),
     onAddActivityToCategory: fn(),
     onRenameCategory: fn(),
-    onViewStats: fn(),
     onArchiveCategory: fn(),
     onDeleteCategory: fn(),
   },

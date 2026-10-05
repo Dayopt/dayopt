@@ -2,7 +2,7 @@
 
 import { format, getWeek, isSameMonth } from 'date-fns';
 import { enUS, ja } from 'date-fns/locale';
-import { BarChart3, ChevronDown, ChevronUp, Redo2, Search, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Redo2, Search, Undo2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -11,13 +11,11 @@ import { isPastWallDateInTimezone, isTodayWallDateInTimezone } from '@/lib/date/
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { Button, cn } from '@dayopt/components';
-import { Link } from '@dayopt/i18n/navigation';
 
 import type { NavigationDirection } from '@/components/ui/navigation/DateNavigator';
 
 import { MobileMonthGrid } from '@/components/ui/navigation/MobileMonthGrid';
 import { MobileYearStrip } from '@/components/ui/navigation/MobileYearStrip';
-import { formatCalendarDateParam } from '../../../lib/date-param';
 
 interface MobileCalendarHeaderProps {
   currentDate: Date;
@@ -175,23 +173,6 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
                     <TodayIcon className="size-5" />
                   </Button>
                 )}
-                {/* フッターの BottomTabBar 廃止に伴うトグル（#2300）。現在地ではなく
-                  遷移先（レポート）を示すアイコン。SidebarUtilities.tsx のテーマ
-                  切り替えパターンに倣う */}
-                <Button
-                  variant="ghost"
-                  icon
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                  asChild
-                >
-                  <Link
-                    href={`/report?date=${formatCalendarDateParam(currentDate)}`}
-                    aria-label={t('actions.openReport')}
-                  >
-                    <BarChart3 className="size-5" />
-                  </Link>
-                </Button>
                 {rightSlot}
               </div>
             }
@@ -259,8 +240,7 @@ export const MobileCalendarHeader = memo<MobileCalendarHeaderProps>(
                   （週末非表示の複数日ビューでは `generateMultiDayDates` が土日を飛ばす）、
                   端点だけを帯にすると描いていない土日まで「表示中」と塗ってしまう。
                   帯を出すなら `viewDateRange.days` そのものを渡す形へ直してから
-                  （2026-09-07 の反証レビュー指摘）。レポートの期間は常に連続なので
-                  あちらは `displayRange` を使う */}
+                  （2026-09-07 の反証レビュー指摘）。 */}
                 <MobileMonthGrid
                   viewMonth={viewMonth}
                   selectedDate={currentDate}
