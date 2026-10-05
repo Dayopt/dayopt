@@ -543,7 +543,7 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 
 | feature             | source | test file | component | Story のある component |
 | ------------------- | ------ | --------- | --------- | ---------------------- |
-| `activities`        | 39     | 8         | 14        | 3 / 14                 |
+| `activities`        | 39     | 9         | 14        | 3 / 14                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
 | `calendar`          | 190    | 96        | 60        | 31 / 60                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |

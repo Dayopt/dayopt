@@ -118,9 +118,6 @@ export function ActivitySummaryPanel({
                       <span className="text-muted-foreground min-w-28 shrink-0">
                         {formatRecordDate(record.startAt, locale, timezone)}
                       </span>
-                      <span className="text-foreground min-w-0 flex-1 truncate">
-                        {record.title}
-                      </span>
                       <span className="text-muted-foreground shrink-0 tabular-nums">
                         {formatActivityDuration(record.minutes, locale)}
                       </span>

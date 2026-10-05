@@ -108,14 +108,12 @@ export function GlobalOverlays() {
 
   // Inspector から選択中アクティビティの直近30日を開く。
   const handleViewActivityDetails = useCallback(
-    (activityId: string) => {
+    (activityId: string, fallbackName: string) => {
       const activity = getActivityById(activityId);
-      if (!activity) return;
       useActivityDetailStore.getState().open({
         activityId,
-        name: activity.name,
-        categoryName: activity.categoryName,
-        color: activity.color,
+        name: activity?.name ?? fallbackName,
+        ...(activity ? { categoryName: activity.categoryName, color: activity.color } : {}),
       });
       closeInspector();
     },

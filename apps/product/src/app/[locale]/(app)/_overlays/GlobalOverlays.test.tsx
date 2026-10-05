@@ -7,6 +7,15 @@ import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 const navigation = vi.hoisted(() => ({
   pathname: '/ja',
 }));
+const activityLookup = vi.hoisted(() => ({
+  activity: {
+    id: 'activity-1',
+    name: 'Writing',
+    categoryName: 'Work',
+    color: 'blue',
+  } as { id: string; name: string; categoryName: string; color: string } | undefined,
+  isLoading: false,
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => navigation.pathname,
@@ -26,10 +35,12 @@ vi.mock('next/dynamic', () => ({
       ? function Inspector({
           onViewActivityDetails,
         }: {
-          onViewActivityDetails: (id: string) => void;
+          onViewActivityDetails: (id: string, name: string) => void;
         }) {
           return (
-            <button onClick={() => onViewActivityDetails('activity-1')}>Activity details</button>
+            <button onClick={() => onViewActivityDetails('activity-1', 'Inspector activity')}>
+              Activity details
+            </button>
           );
         }
       : () => null,
@@ -43,12 +54,8 @@ vi.mock('@/features/calendar', () => ({
 }));
 vi.mock('@/features/activities', () => ({
   useActivitiesMap: () => ({
-    getActivityById: () => ({
-      id: 'activity-1',
-      name: 'Writing',
-      categoryName: 'Work',
-      color: 'blue',
-    }),
+    getActivityById: () => activityLookup.activity,
+    isLoading: activityLookup.isLoading,
   }),
 }));
 vi.mock('@/components/ui/feedback/toast', () => ({ Toaster: () => null }));
@@ -65,6 +72,13 @@ import { GlobalOverlays } from './GlobalOverlays';
 beforeEach(() => {
   vi.clearAllMocks();
   navigation.pathname = '/ja';
+  activityLookup.activity = {
+    id: 'activity-1',
+    name: 'Writing',
+    categoryName: 'Work',
+    color: 'blue',
+  };
+  activityLookup.isLoading = false;
   useTimeblockInspectorStore.getState().openInspector('record-1', 'record');
   useActivityDetailStore.getState().close();
 });
@@ -77,6 +91,23 @@ it('opens activity details in place and closes the inspector', () => {
     name: 'Writing',
     categoryName: 'Work',
     color: 'blue',
+  });
+  expect(useActivityDetailStore.getState().isOpen).toBe(true);
+  expect(useTimeblockInspectorStore.getState().isOpen).toBe(false);
+});
+
+it('opens activity details using the inspector name while activities are loading', () => {
+  activityLookup.activity = undefined;
+  activityLookup.isLoading = true;
+
+  render(<GlobalOverlays />);
+  fireEvent.click(screen.getByRole('button', { name: 'Activity details' }));
+
+  expect(useActivityDetailStore.getState().target).toEqual({
+    activityId: 'activity-1',
+    name: 'Inspector activity',
+    categoryName: undefined,
+    color: undefined,
   });
   expect(useActivityDetailStore.getState().isOpen).toBe(true);
   expect(useTimeblockInspectorStore.getState().isOpen).toBe(false);

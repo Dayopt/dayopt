@@ -861,11 +861,12 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（22）</summary>
+<summary>test の候補（23）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityRenameModal.test.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
@@ -1282,11 +1283,12 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（22）</summary>
+<summary>test の候補（23）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityRenameModal.test.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
