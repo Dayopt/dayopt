@@ -466,6 +466,27 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     githubSecret,
     githubEnvironments: ['Preview – product'],
   })),
+  // PR-local Auth user bootstrap. The login item ID is user-supplied, but vault
+  // access was unavailable during setup; keep the master references pending
+  // until the owner confirms these locators in the ci vault.
+  ...[
+    ['NONPROD_LOGIN_EMAIL', 's3tems3afbzvvguakggydcgxni', 'username'],
+    ['NONPROD_LOGIN_PASSWORD', 's3tems3afbzvvguakggydcgxni', 'password'],
+    ['SUPABASE_PREVIEW_PROVISION_TOKEN', 'supabase-preview-provision', 'credential'],
+  ].map(([envName, item, field]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'staging',
+      ci,
+      item,
+      'Nonproduction login master locator or GitHub Environment replica is not initialized',
+      envName,
+    ),
+    field,
+    githubSecret: envName,
+    githubEnvironments: ['Nonproduction login'],
+  })),
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),

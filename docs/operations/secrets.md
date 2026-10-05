@@ -584,6 +584,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 | Vercel Production Env（product / web）                                        | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
 | Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                  | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
 | GitHub Actions environment secrets（`production-release` / `production-ops`） | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
+| GitHub Actions environment secrets（`Nonproduction login`）                   | 1Password item `s3tems3afbzvvguakggydcgxni` と `ci/supabase-preview-provision`                                      | `scripts/runbook/setup-nonproduction-login.sh`（専用Environmentへの同期。値はstdin経由）                                                                           |
 | Supabase Dashboard Secrets                                                    | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
 | PR Preview Branch credentials                                                 | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
 | `~/.config/gh-agent/hosts.yml`（開発機、0600）                                | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
@@ -641,6 +642,16 @@ GitHub Actions Secrets は CI/CD 用の replica。build / e2e 用 public env な
 - **同期の手順**: `scripts/runbook/sync-ci-environment-secrets.sh` を User の terminal で実行する（既定 dry-run、`--execute` で反映、`--only <Secret 名>` で 1 つだけ）。値は `op read` から `gh secret set --env` へ pipe で渡し、表示しない。一覧は `ciSecretSchema` の `githubEnvironments` と 1:1 で、`scripts/__tests__/ci-secret-ledger.test.ts` が workflow の宣言・script の一覧と照合する
 - **rotation 時**: 1Password master を更新したら、この script の `--only` で該当 Secret を environment へ同期する。`VERCEL_TOKEN` / `VERCEL_ORG_ID` は 2 つの environment に複製しているので、両方が更新される
 - **Team プランの private repo でも使える**: environment secret と deployment branch policy は GitHub Team の private repo で使える。required reviewers は Enterprise が要るので使わない
+
+#### 非本番共通ログイン（#2910）
+
+`Nonproduction login` はIntegrationとPRごとの専用Preview branchにAuthユーザーを準備する専用Environment。許可branchは `main` と `integration`。登録するのは `NONPROD_LOGIN_EMAIL` / `NONPROD_LOGIN_PASSWORD` と、対象nonproduction branchのManagement API keyを読むための `SUPABASE_PREVIEW_PROVISION_TOKEN`。このtokenにはSupabase `Development Branches: Read` と `API Keys: Read` が必要。Productionでは使わず、既存の `Preview – product` Environmentも変更しない。Supabase GitHub/Vercel integrationが全PR用branchを作成し、Previewへbranch-specific credentialsを渡す設定は現在未確認であり、先にクラウド側で有効化が必要。
+
+1Passwordを正本としてGitHub Environmentの暗号化secretsへ必要分だけ同期する。最初にGitHub Settingsで空の `Nonproduction login` Environmentを作り、deployment branch policyを `main` と `integration` のみにする。次にscoped Management PATを発行し、1Password `ci` vaultに `supabase-preview-provision` item（`credential` field）を準備する。このitemは今回利用可能か確認できていない。PATの権限は `Development Branches: Read` と `API Keys: Read` に限定する。login sourceは1Password item ID `s3tems3afbzvvguakggydcgxni` の `username` / `password` fields。
+
+1Password startup checkが通る環境で `scripts/runbook/setup-nonproduction-login.sh --execute` を実行する。既定はdry-run。scriptは全3値を先に取得して空でないことを確認し、branch policyに `main` / `integration` 以外があれば停止する。値はprocess memoryとstdinだけを通り、一時ファイル、argv、ログへ保存しない。1Password read失敗時は固定メッセージで停止し、GitHub secretsを書かない。同期は3つのsecret更新なので、GitHub側の途中失敗は手動で再実行する。PATを作れない、item参照が不正、またはEnvironment設定が不足する場合は同期完了と扱わない。
+
+`pull_request_target`はworkflowがdefault branchに入るまで自動実行されない。merge後は新規・更新・ready化したinternal PRで自動準備される。Integrationはtrusted Integration refから手動dispatchできる。候補PRのコードはcredentials付きjobでcheckout/実行しない。workflow導入とEnvironment/secret同期の後、Integrationをdispatchし、PR PreviewでAuth password grantを確認する。いずれもアプリUIの実ログイン、redirect、CRUDを別途確認する。
 
 ### Supabase Dashboard Secrets
 
