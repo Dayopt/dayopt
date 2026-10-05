@@ -65,6 +65,10 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     await page.locator('button[type="submit"]').first().click();
     await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
     await page.waitForLoadState('networkidle');
+    const authCookieNames = (await page.context().cookies(baseURL))
+      .map(({ name }) => name)
+      .filter((name) => /-auth-token(?:\.\d+)?$/.test(name));
+    expect(authCookieNames.length).toBeGreaterThan(0);
     const endpoint = new URL('/api/trpc/userSettings.update', baseURL).href;
     const write = (timeFormat: string) => JSON.stringify({ json: { timeFormat } });
     const initial = await page.evaluate(
@@ -133,14 +137,21 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
       );
       const browserRequest = await browserRequestPromise;
       expect(outcome).toBe('browser-blocked');
-      expect((await browserRequest.allHeaders()).origin).toBe(attackerOrigin);
+      const browserHeaders = await browserRequest.allHeaders();
+      const browserCookie = browserHeaders.cookie;
+      expect(browserHeaders.origin).toBe(attackerOrigin);
+      expect(
+        authCookieNames.some((name) => browserCookie?.includes(`${name}=`)),
+        '攻撃元からの要求にもログイン済みの Supabase Cookie が送られること',
+      ).toBe(true);
 
       // CORS may hide the server's response from page.waitForResponse even when the
       // request reached the app. Verify the rejection directly with the same forged
-      // Origin and payload so the guard's HTTP status is observable.
+      // Origin, session cookie, and payload so the guard's HTTP status is observable.
       const rejected = await request.post(endpoint, {
         headers: {
           origin: attackerOrigin,
+          cookie: browserCookie ?? '',
           ...(contentType === 'text/plain' ? { 'content-type': contentType } : {}),
         },
         ...(contentType === 'multipart/form-data'
@@ -166,9 +177,14 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
     const getBrowserRequest = await getBrowserRequestPromise;
     expect(await storedFormat()).toBe('12h');
     expect(getOutcome).toBe('browser-blocked');
-    expect((await getBrowserRequest.allHeaders()).origin).toBe(attackerOrigin);
+    const getBrowserHeaders = await getBrowserRequest.allHeaders();
+    expect(getBrowserHeaders.origin).toBe(attackerOrigin);
+    expect(
+      authCookieNames.some((name) => getBrowserHeaders.cookie?.includes(`${name}=`)),
+      '攻撃元からのGETにもログイン済みのSupabase Cookieが送られること',
+    ).toBe(true);
     const getResponse = await request.get(getEndpoint, {
-      headers: { origin: attackerOrigin },
+      headers: { origin: attackerOrigin, cookie: getBrowserHeaders.cookie ?? '' },
     });
     expect(getResponse.status()).toBe(405);
     expect(await storedFormat()).toBe('12h');
