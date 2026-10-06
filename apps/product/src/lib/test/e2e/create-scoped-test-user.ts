@@ -1,8 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import type { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
 import { resolvePreviewCloudUserId } from '../preview-cloud-identity';
 import { recordPreviewUser } from '../preview-user-lifecycle';
+import { createAdminSupabase } from './critical-path-fixture';
 
 /** Local specs retain separate users. Cloud specs reuse the two preallocated IDs sequentially. */
 export interface ScopedTestUser {
@@ -56,9 +57,7 @@ export async function createScopedTestUser(
     ? `${prefix}-${nonce}@example.com`
     : `e2e-${scope}-${nonce}@example.com`;
   const password = `E2e-${nonce}`;
-  const admin = createClient<Database>(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const admin = createAdminSupabase(supabaseUrl, serviceRoleKey);
   recordPreviewUser(userId, 'creating');
   let created = false;
   try {

@@ -128,7 +128,8 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
     '明日の枠を長押しして Plan を作成し、リロード後も残る',
     mobilePreviewFlowTag('mobile-plan-create'),
     async ({ page }) => {
-      await openDay(page, offsetDateParam(1));
+      const planDate = offsetDateParam(1);
+      await openDay(page, planDate);
 
       await longPressHour(page, 9);
       await pickActivityInDrawer(page, 'plan');
@@ -139,13 +140,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
       await page.reload();
       await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
       await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
-      await expectIndependentPersistedHour(
-        adminSupabase,
-        IDENTITY.userId,
-        'plan',
-        offsetDateParam(1),
-        9,
-      );
+      await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', planDate, 9);
     },
   );
 
@@ -153,7 +148,8 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
     '昨日の枠を長押しして Record を記録し、リロード後も残る',
     mobilePreviewFlowTag('mobile-record-create'),
     async ({ page }) => {
-      await openDay(page, offsetDateParam(-1));
+      const recordDate = offsetDateParam(-1);
+      await openDay(page, recordDate);
 
       // 過去スロットの既定は Record（resolveTimeblockDestination）。タブは触らない
       await longPressHour(page, 9);
@@ -167,13 +163,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
       await page.reload();
       await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
       await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
-      await expectIndependentPersistedHour(
-        adminSupabase,
-        IDENTITY.userId,
-        'record',
-        offsetDateParam(-1),
-        9,
-      );
+      await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'record', recordDate, 9);
     },
   );
 

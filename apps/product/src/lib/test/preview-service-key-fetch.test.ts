@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createScopedTestUser, deleteScopedTestUser } from './e2e/create-scoped-test-user';
 import { createAdminSupabase } from './e2e/critical-path-fixture';
 import { previewServiceKeyFetch } from './preview-service-key-fetch.mjs';
 
@@ -73,7 +74,10 @@ const USER_ID = '11111111-1111-4111-8111-111111111111';
 const MODERN_KEY = KEY;
 const LEGACY_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.fake';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe('critical path fixture SDK admin requests', () => {
   it.each([
@@ -103,6 +107,49 @@ describe('critical path fixture SDK admin requests', () => {
         [`/auth/v1/admin/users/${USER_ID}`, 'GET'],
         [`/auth/v1/admin/users/${USER_ID}`, 'DELETE'],
         ['/rest/v1/profiles', 'POST'],
+      ]);
+      for (const request of requests) {
+        expect(request.headers.get('apikey')).toBe(key);
+        expect(request.headers.get('authorization')).toBe(authorization);
+      }
+    },
+  );
+});
+
+describe('scoped Preview user SDK lifecycle', () => {
+  it.each([
+    ['modern', MODERN_KEY, null],
+    ['legacy', LEGACY_KEY, `Bearer ${LEGACY_KEY}`],
+  ] as const)(
+    'uses the correct %s headers for creation, profile setup and cleanup',
+    async (_kind, key, authorization) => {
+      vi.stubEnv('E2E_PREVIEW_CLOUD_INTENT', undefined);
+      vi.stubEnv('E2E_PREVIEW_EVIDENCE_DIR', undefined);
+      const requests: { path: string; method: string; headers: Headers }[] = [];
+      vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+        const path = new URL(input instanceof Request ? input.url : String(input)).pathname;
+        requests.push({ path, method: init?.method ?? 'GET', headers: new Headers(init?.headers) });
+        const body =
+          path === '/auth/v1/admin/users'
+            ? { id: JSON.parse(String(init?.body)).id }
+            : path.startsWith('/auth/')
+              ? { id: USER_ID }
+              : [];
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+      const url = 'https://offline.invalid';
+      const user = await createScopedTestUser(url, key, 'auth');
+      await deleteScopedTestUser(url, key, user.userId);
+      expect(requests.map(({ path, method }) => [path, method])).toEqual([
+        ['/auth/v1/admin/users', 'POST'],
+        ['/rest/v1/profiles', 'POST'],
+        ...['records', 'plans', 'activities', 'categories', 'user_settings', 'profiles'].map(
+          (table) => [`/rest/v1/${table}`, 'DELETE'],
+        ),
+        [`/auth/v1/admin/users/${user.userId}`, 'DELETE'],
       ]);
       for (const request of requests) {
         expect(request.headers.get('apikey')).toBe(key);

@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import type { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
 
@@ -8,6 +8,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 import { test } from './trpc-budget-fixture';
 
@@ -66,9 +67,7 @@ describeWithEnv('Calendar navigation', () => {
   let adminSupabase: SupabaseClient;
 
   test.beforeAll(async ({}, testInfo) => {
-    adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
 
     const user = await createScopedTestUser(
       SUPABASE_URL!,
