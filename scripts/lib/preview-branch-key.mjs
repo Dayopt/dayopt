@@ -46,7 +46,9 @@ export async function resolvePreviewSecretKey({ projectRef, provisionToken, fetc
     (key) => key.type === 'secret' || (key.type === undefined && key.name === 'secret'),
   );
   const matches = modern.length > 0 ? modern : active.filter((key) => key.name === 'service_role');
-  if (matches.length !== 1)
+  const defaultKeys = matches.filter((key) => key.name === 'default');
+  if (defaultKeys.length === 1) return defaultKeys[0].api_key;
+  if (defaultKeys.length > 1 || matches.length !== 1)
     throw new Error('Preview target secret key is unavailable or ambiguous');
   return matches[0].api_key;
 }

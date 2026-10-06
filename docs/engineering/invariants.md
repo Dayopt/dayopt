@@ -225,9 +225,9 @@ docs へ残している。
 - OAuth authorityのresourceは変更不可のDB environment identityへFKで結ぶ。PR Previewは
   空または未使用の既知auth seed fixtureだけのDBでexact Vercel URLとSupabase project
   ref/JWT refをservice-role RPCから一度だけ設定する。seed UUID/password/provider identityは
-  固定し、Previewでは旧・現行sample emailのどちらか一方へAuth userとemail identityが
-  一貫して一致するtupleだけを許可する。未知user、混在tuple、session、MFA、Auth OAuth state、
-  既存OAuth authorityがあれば拒否する。Integrationの固定identityは従来のemailを維持し、
+  固定し、Preview / Integrationの初回provisioningでは旧・現行sample emailのどちらか一方へ
+  Auth userとemail identityが一貫して一致するtupleだけを許可する。未知user、混在tuple、session、MFA、Auth
+  OAuth state、既存OAuth authorityがあれば拒否する。Integrationの固定identityは従来のemailを維持し、
   Persistent Staging identityは作らない
 - `oauth_connections` / `oauth_authorization_codes` / `oauth_tokens` のstored scopeは、
   write / delete scopeを持つ行が必ず `read:entries` を含む。Candidate 4が `NOT VALID` で
