@@ -100,6 +100,21 @@ Resendのendpointは10/5の早い時刻にも確認記録があり、後のMCP�
 
 ## 検証とレビュー
 
+### 12:38–12:44 JST 削除経路・Preview変数の追加照合
+
+Vercel MCPと既存Dashboardを読み取り、配信SHAにあるコードをローカルGit objectから照合した。secret値をRevealせず、個人event・削除API・cronは実行していない。
+
+- Productの現在のProductionは引き続き`dpl_hpdetJQXMNgMLhvAQutTSzDky3CK` / `47f5d7c414317192bcd173255c092a29cdee0035` / READY。PostHog削除関数、account-deletion selector/coordinator、billing reconciliation route、heartbeat policyの5ファイルはこのSHAとcheckoutで差分なし。
+- ProductのProject変数を全環境で`POSTHOG`検索すると4行すべてPreview。SharedはNo Results Found。削除keyの行は見当たらない。配信中の削除関数は「送信スイッチが両方off、かつ削除keyなし」なら外部削除をせず正常returnする。selectorのlegacy経路とcoordinatorはこの関数を呼ぶため、関数の呼出しだけではPostHog削除完了を証明できない。配信deploymentのenvはMCP応答に含まれず、実際の分岐は未確定。過去の`ingested_event=true`はProductionのidentified userの残存を直接証明しないため、顧客データの削除漏れ発生とは断定しない。
+- 修正候補は既存正本の`op://human/posthog-delete/credential`に対応するProject限定keyの権限を確認し、過去に計測した環境のserver runtimeへ配布すること。Productionを含む適用環境は過去の計測履歴と配信設定を照合して決める。全環境で無条件にkeyを必須化すると、計測履歴のないPreviewでもアカウント削除を止めるため、その変更は今回行わない。
+- Config型の要確認DB変数は古い1branchの7行に限定されない。`codex/poc-retirement-3022`、`codex/cloud-first-preview-2910`、`codex/integration-reconcile-3009`、`codex/integration-calendar-poc-port`の4branchで各7行、計28行を観測。対象名は`POSTGRES_URL`、`POSTGRES_PRISMA_URL`、`POSTGRES_URL_NON_POOLING`、`POSTGRES_PASSWORD`、`SUPABASE_JWT_SECRET`、`SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_SECRET_KEY`。値の有効性・漏洩・各deploymentの利用は未検証。
+- ProductのIntegration一覧にSupabase、Slack、Sentry、Resendを確認。Supabase installation IDは`icfg_ZZhIJpCa3ksZJLqBXjg257gb`で、既存`check-vercel-replica.ts`の注入元記録と一致。installation説明はenv自動同期を明示する。ただし28行それぞれの`configurationId`はUI一覧にないため、すべてが同じ連携由来とは断定しない。既存正本はPreview注入も同じ連携が担うことと、削除後の再注入履歴を記録している。連携全体の切断や個別変数の削除を解決策として先に実行しない。
+- billingの未構成skipと常時heartbeat要求は配信中コードにも存在する。未有効化中のskipを処理完了heartbeatとして偽装せず、activation状態と監視の適用条件を一緒に設計する必要がある。現在の実分岐が未確定のためdoctorのdriftをpassに変更しない。
+
+日々の追跡の補完として、doctorのVercel env metadataに`configuration_id`を追加。許可したID形式のみを返し、値・作成者・不正なIDに埋めた秘密は出力しない。欠測は`null`であり手動管理を意味しない。取得できないAPIをUI確認だけで成功へ置き換えない。
+
+追加testは変更前に失敗し、変更後の`pnpm test:scripts scripts/doctor/readers/platform.test.ts`は16件成功。`pnpm typecheck:scripts`、108定義のoffline検査、`pnpm docs:check`も成功。12:43:45 JSTのVercel対象実行はpass 1 / blocked 13 / manual 1、終了コード2。既存`op run`のcredential/collector失敗は継続しており、連携IDを実APIから取得できたとは報告しない。既存MCP/UIの認証とCLI資格情報のアクセス範囲は別であり、権限を変更していない。
+
 ### 11:56–12:02 JST Cloudflare Dashboardによる追補
 
 ユーザーが既存Cloudflareアカウントにログインした後、ChromeのDayopt Dashboardを読み取りで確認した。設定保存、token発行・変更、object内容の表示、同期・復元、メール送信はしていない。個人宛先、site key、token値はこの記録に含めない。

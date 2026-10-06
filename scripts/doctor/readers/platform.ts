@@ -286,6 +286,12 @@ async function vercel(ctx: ReaderContext): Promise<Observation[]> {
             ...fields(row, ['key', 'type', 'gitBranch']),
             targets: strings(row.target),
             custom_environment_ids: strings(row.customEnvironmentIds),
+            // Missing ownership metadata does not establish a manually managed variable.
+            configuration_id:
+              typeof row.configurationId === 'string' &&
+              /^icfg_[A-Za-z0-9]{1,80}$/.test(row.configurationId)
+                ? row.configurationId
+                : null,
             // Even NEXT_PUBLIC values are never returned from this metadata request.
           })),
           contract_errors: auditProjectMetadata(project, { envs }),

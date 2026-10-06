@@ -66,6 +66,8 @@ pnpm run doctor --format json
 
 API/CLI readerはAPIが返すmetadataの安全な列だけを射影する。Googleの登録callback、Gmail SMTP、実際のsource map適用、secret replica値の一致など、現在のAPI資格情報で証明できない事項は`manual`または`blocked`。ソースファイルの存在、PING、domain verification、HTTP metadata取得だけで動作成功と扱わない。
 
+Vercelのenv metadataには、値を含めず`configuration_id`を記録する。Integration管理の変数を手動設定と区別して調べるためのIDであり、未取得・形式不正は`null`。`null`から手動管理と推測しない。Integrationによる再注入があり得るため、古いbranchの変数を削除するだけで原因解消と扱わない。
+
 一般Preview、Integration、明示MCP OAuth Previewは別契約。ProductionのSupabase refをPreviewが使えば差異。IntegrationのStripe Test/Calendarは一律禁止しない。ProductのPostHog有効環境には削除credentialが必要だが、削除処理を持たないWebには同じキーを要求しない。
 
 Integrationの接続・有効化設定は共通Preview設定に`integration` branchの上書きを適用して照合する。他のPR branchの設定はこの照合に含めない。全環境のenv metadata監査は`shared`として別に報告する。存在する有効化フラグの値を取得できない場合は明示的な`false`と区別して`blocked`にし、ProductionのSupabase接続先はHTTPSのorigin全体で比較する。

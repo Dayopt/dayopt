@@ -361,6 +361,35 @@ describe('platform readers (fixture request only)', () => {
     expect(JSON.stringify(observations)).not.toContain(SECRET);
   });
 
+  it('retains integration ownership evidence without exposing values or untrusted configuration IDs', async () => {
+    const fixture = vercelFixture();
+    fixture['vercel.env'] = {
+      envs: ['icfg_Supabase123', undefined, `https://user:${SECRET}@example.invalid`].map(
+        (configurationId, index) => ({
+          key: `POSTGRES_URL_${index}`,
+          type: 'plain',
+          target: ['preview'],
+          gitBranch: 'codex/example',
+          configurationId,
+          value: SECRET,
+          createdBy: { email: PII },
+        }),
+      ),
+    };
+    const { ctx, request } = context(fixture);
+    const observations = await readPlatform('vercel', ctx);
+    expect(value(observations, 'vercel.product.environment_metadata')).toMatchObject({
+      entries: [
+        { configuration_id: 'icfg_Supabase123' },
+        { configuration_id: null },
+        { configuration_id: null },
+      ],
+    });
+    expect(request.mock.calls.some(([operation]) => operation === 'vercel.env')).toBe(true);
+    expect(JSON.stringify(observations)).not.toContain(SECRET);
+    expect(JSON.stringify(observations)).not.toContain(PII);
+  });
+
   it('projects Vercel bindings by approved types and secrets only by presence', async () => {
     const bindings = [
       {
