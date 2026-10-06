@@ -99,3 +99,10 @@ fi
 # pending-secret "Preview – product" PREVIEW_E2E_SUPABASE_READINESS_TOKEN "op://ci/preview-e2e/PREVIEW_E2E_SUPABASE_READINESS_TOKEN"
 # pending-secret "Preview – product" PREVIEW_E2E_BYPASS_SECRET "op://ci/preview-e2e/PREVIEW_E2E_BYPASS_SECRET"
 # pending-secret "Preview – product" PREVIEW_E2E_SUPABASE_KEY "op://ci/preview-e2e/PREVIEW_E2E_SUPABASE_KEY"
+# The dedicated Nonproduction login environment uses a separate restricted sync
+# script because it is allowed from both main and integration, unlike the main-only CI environments.
+# pending-secret "Nonproduction login" NONPROD_LOGIN_EMAIL "op://ci/s3tems3afbzvvguakggydcgxni/username"
+# pending-secret "Nonproduction login" NONPROD_LOGIN_PASSWORD "op://ci/s3tems3afbzvvguakggydcgxni/password"
+# pending-secret "Nonproduction login" NONPROD_PREVIEW_LOGIN_EMAIL "op://dlmo7yfs5buvd3j3sbikjjqypa/cvac4atl7qjmjfjvottffgndae/username"
+# pending-secret "Nonproduction login" NONPROD_PREVIEW_LOGIN_PASSWORD "op://dlmo7yfs5buvd3j3sbikjjqypa/cvac4atl7qjmjfjvottffgndae/password"
+# pending-secret "Nonproduction login" SUPABASE_PREVIEW_PROVISION_TOKEN "op://ci/supabase-preview-provision/credential"

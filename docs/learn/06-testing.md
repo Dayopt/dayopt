@@ -39,7 +39,7 @@ last_verified: 2026-09-21
 ### Plan を保存
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
+  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('明日の Plan を作成・編集・削除し、変更が永続化される'` を探す（E2E。作成・編集・削除の結果を再読み込み後に確認する）
 - **1. Plan か Record か決める**:
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.test.ts`](../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts) で `it('終了が現在より未来なら Plan を返す'` を探す
   - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す

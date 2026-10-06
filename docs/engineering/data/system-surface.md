@@ -176,7 +176,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 
 ## 設定
 
-### env 変数（64）
+### env 変数（69）
 
 名前と所在だけを載せる（値は 1Password にあり、この生成物は触らない）。
 
@@ -200,6 +200,10 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`   | yes  | public     | production          | supabase                        | —                          |
 | `NEXT_PUBLIC_SUPABASE_URL`               | yes  | public     | production          | supabase                        | —                          |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`         | no   | public     | shared              | turnstile                       | —                          |
+| `NONPROD_LOGIN_EMAIL`                    | no   | secret     | staging             | s3tems3afbzvvguakggydcgxni      | —                          |
+| `NONPROD_LOGIN_PASSWORD`                 | no   | secret     | staging             | s3tems3afbzvvguakggydcgxni      | —                          |
+| `NONPROD_PREVIEW_LOGIN_EMAIL`            | no   | secret     | staging             | cvac4atl7qjmjfjvottffgndae      | —                          |
+| `NONPROD_PREVIEW_LOGIN_PASSWORD`         | no   | secret     | staging             | cvac4atl7qjmjfjvottffgndae      | —                          |
 | `OAUTH_AUTHORIZATION_SERVER_URI`         | no   | public     | staging, production | app                             | —                          |
 | `OAUTH_CHATGPT_REDIRECT_URIS`            | no   | public     | staging, production | app                             | —                          |
 | `OAUTH_CLAUDE_REDIRECT_URIS`             | no   | public     | staging, production | app                             | —                          |
@@ -235,6 +239,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `SUPABASE_AUTH_AUDIT_TOKEN`              | yes  | secret     | production          | supabase-auth-audit             | —                          |
 | `SUPABASE_DB_PASSWORD`                   | yes  | secret     | production          | supabase                        | —                          |
 | `SUPABASE_MIGRATION_READINESS_TOKEN`     | no   | secret     | production          | supabase-migration-readiness    | —                          |
+| `SUPABASE_PREVIEW_PROVISION_TOKEN`       | no   | secret     | staging             | supabase-preview-provision      | —                          |
 | `SUPABASE_PREVIEW_READINESS_TOKEN`       | no   | secret     | staging             | preview-e2e                     | —                          |
 | `SUPABASE_SECRET_KEY`                    | yes  | secret     | production, staging | supabase, preview-e2e           | —                          |
 | `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`       | yes  | secret     | production          | supabase-storage-rls-audit      | —                          |

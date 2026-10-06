@@ -482,6 +482,39 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     githubSecret,
     githubEnvironments: ['Preview – product'],
   })),
+  // Trusted provisioning uses distinct Integration and Preview login items. The Integration
+  // fields were verified through the owner-provided vault locator; the owner designated the
+  // separate Preview item. Neither GitHub replica has been synchronized in this work.
+  ...[
+    ['NONPROD_LOGIN_EMAIL', ci, 's3tems3afbzvvguakggydcgxni', 'username'],
+    ['NONPROD_LOGIN_PASSWORD', ci, 's3tems3afbzvvguakggydcgxni', 'password'],
+    [
+      'NONPROD_PREVIEW_LOGIN_EMAIL',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'username',
+    ],
+    [
+      'NONPROD_PREVIEW_LOGIN_PASSWORD',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'password',
+    ],
+    ['SUPABASE_PREVIEW_PROVISION_TOKEN', ci, 'supabase-preview-provision', 'credential'],
+  ].map(([envName, vault, item, field]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'staging',
+      vault,
+      item,
+      'GitHub Environment replica has not been initialized by the controlled setup run',
+      field,
+    ),
+    field,
+    githubSecret: envName,
+    githubEnvironments: ['Nonproduction login'],
+  })),
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),
