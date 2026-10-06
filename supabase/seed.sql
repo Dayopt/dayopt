@@ -46,7 +46,7 @@ INSERT INTO auth.users (
 ) VALUES (
   '00000000-0000-0000-0000-000000000001',
   '00000000-0000-0000-0000-000000000000',
-  'test@dayopt.dev',
+  'test-seed@dayopt.dev',
   crypt('TestPassword123!', gen_salt('bf')),
   now(),
   '{"provider": "email", "providers": ["email"]}',
@@ -81,9 +81,9 @@ INSERT INTO auth.identities (
 ) VALUES (
   '00000000-0000-0000-0000-000000000001',
   '00000000-0000-0000-0000-000000000001',
-  'test@dayopt.dev',
+  'test-seed@dayopt.dev',
   'email',
-  '{"sub": "00000000-0000-0000-0000-000000000001", "email": "test@dayopt.dev"}',
+  '{"sub": "00000000-0000-0000-0000-000000000001", "email": "test-seed@dayopt.dev"}',
   now(),
   now(),
   now()
