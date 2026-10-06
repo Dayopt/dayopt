@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateWithJev, type JevAnnotation } from './jev-adapter.ts';
+import {
+  evaluateWithJev,
+  JEV_MAX_INPUT_BYTES,
+  JEV_MAX_TOTAL_INPUT_BYTES,
+  jevInputBytes,
+  type JevAnnotation,
+} from './jev-adapter.ts';
 import {
   claimRequests,
   claimRow,
@@ -55,6 +61,52 @@ describe('判断材料の意味と参照を保存する', () => {
     expect(contextRequests({ ...input, sha: 'b'.repeat(40) })[0].request.state).not.toEqual(
       batches[0].request.state,
     );
+  });
+
+  it('日本語の6資料が合計上限を超えても、原文を保持して送信可能なbatchへ分ける', () => {
+    const candidates = input.candidates.slice(0, 6).map((candidate) => ({
+      ...candidate,
+      text: '資料'.repeat(1500),
+    }));
+    const batches = contextRequests({ ...input, candidates });
+    expect(batches.length).toBeGreaterThan(1);
+    expect(batches.flatMap((batch) => batch.candidates)).toEqual([...candidates].reverse());
+    for (const batch of batches) {
+      const bytes = jevInputBytes(batch.request);
+      expect(bytes.longest).toBeLessThanOrEqual(JEV_MAX_INPUT_BYTES);
+      expect(bytes.total).toBeLessThanOrEqual(JEV_MAX_TOTAL_INPUT_BYTES);
+    }
+  });
+
+  it('対象Issue本文の重複を参照化し、長い要求でも原文全体をモデルへ渡す', () => {
+    const body = '要求'.repeat(3000);
+    const candidates = [
+      {
+        ...input.candidates[0],
+        kind: 'issue' as const,
+        text: `${input.title}\n${body}`,
+        url: input.url,
+      },
+    ];
+    const batch = contextRequests({ ...input, body, candidates })[0];
+    expect(jevInputBytes(batch.request).longest).toBeLessThanOrEqual(JEV_MAX_INPUT_BYTES);
+    expect(batch.request.state).toMatchObject({
+      target: { body },
+      candidates: [{ textRef: 'target.title + "\\n" + target.body' }],
+    });
+    expect(batch.candidates[0].text).toBe(candidates[0].text);
+  });
+
+  it('単独でも上限を超える資料を隣の小さい資料から隔離し、切り詰めない', () => {
+    const candidates = [
+      { ...input.candidates[1], text: '大'.repeat(12000), updatedAt: '2026-09-30' },
+      { ...input.candidates[0], text: '小さい資料', updatedAt: '2026-09-29' },
+    ];
+    const batches = contextRequests({ ...input, candidates });
+    expect(batches).toHaveLength(2);
+    expect(batches[0].candidates[0].text).toBe(candidates[0].text);
+    expect(jevInputBytes(batches[0].request).longest).toBeGreaterThan(JEV_MAX_INPUT_BYTES);
+    expect(jevInputBytes(batches[1].request).longest).toBeLessThanOrEqual(JEV_MAX_INPUT_BYTES);
   });
 
   it('原文付きの古い制約を進捗より上に出し、未評価を低関連と扱わない', async () => {

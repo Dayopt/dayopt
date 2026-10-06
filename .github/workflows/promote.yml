@@ -9,8 +9,7 @@ name: Production Release
 # 2026-08-20（#2268）: push:main を廃止し手動 dispatch のみにした。
 # 2026-09-03: **merge 連動の自動 promote へ戻した**。ただし #2268 以前の
 # 「merge したら即 promote」ではなく、`impact →（影響のある層 3）→ release` の
-# 3 段にして、層 3 が green の時だけ promote する。手動 dispatch は break-glass
-# （force）と drill 専用に残る。
+# 3 段にして、層 3 が green の時だけ promote する。手動 dispatch も同一 gate を通す。
 #
 # 層 3（E2E / Web Build & E2E）は nightly.yml からこの workflow へ移設した。
 # #2382 が per-merge の層 3 を廃止した根拠は「promote が手動だから赤い main は
@@ -33,22 +32,15 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      force:
-        description: 'Break-glass Force Promote: skip layer 3, smoke, and Production Config Audit'
-        type: boolean
-        default: false
-      reason:
-        description: 'Required when force is enabled. Recorded in the commit status.'
-        required: false
       simulate_failure:
         description: 'Drill only: smoke:<p> | promote:<p> | production-smoke:<p> (p = web | product)'
         required: false
       # 同一 commit の再配備（#2735）。env だけを更新して build し直した deployment は
       # source SHA が live と同じなので、通常 dispatch では `already serving` で終わる。
       # 名指しの deployment だけを、層 3・smoke・Production Config Audit を維持したまま
-      # promote する。force とは併用できない（script が拒否する）。
+      # promote する。通常の検証を維持する。
       redeploy:
-        description: 'Same-commit redeploy: <web|product>:<dpl_ id>. Keeps every gate. Not with force.'
+        description: 'Same-commit redeploy: <web|product>:<dpl_ id>. Keeps every gate.'
         required: false
 
 # statuses: write は release job にだけ置く（層 3 job へ commit status 発行権限を
@@ -75,6 +67,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
+      pull-requests: read
     outputs:
       product_affected: ${{ steps.run.outputs.product_affected }}
       web_affected: ${{ steps.run.outputs.web_affected }}
@@ -94,6 +88,13 @@ jobs:
 
       # pnpm install は行わない。release-impact.mjs と production-release.mjs は
       # node 標準ライブラリしか使わない（ci.yml の impact job と同じ判断）。
+      - name: Verify tested candidate before release work
+        if: vars.RELEASE_CANDIDATE_ENABLED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
+        run: node scripts/ci/release-candidate-gate.mjs production
+
       - name: Resolve release impact
         id: run
         env:
@@ -122,7 +123,7 @@ jobs:
   e2e:
     name: "\U0001F3AD E2E Tests"
     needs: impact
-    if: ${{ needs.impact.outputs.product_affected == 'true' && github.event.inputs.force != 'true' }}
+    if: ${{ needs.impact.outputs.product_affected == 'true' }}
     # repo variable `PROMOTE_E2E_RUNNER`（JSON。例: ["self-hosted","linux","dayopt-e2e"]）で
     # self-hosted runner へ寄せられる。未設定なら ubuntu-latest（従来どおり）。private repo の
     # Actions 分課金で最大の main push job を runner 側へ逃がすための切替で、戻す時は変数を
@@ -227,7 +228,7 @@ jobs:
   storybook:
     name: Storybook light / dark
     needs: impact
-    if: ${{ needs.impact.outputs.storybook_affected == 'true' && github.event.inputs.force != 'true' }}
+    if: ${{ needs.impact.outputs.storybook_affected == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -259,7 +260,7 @@ jobs:
   web:
     name: "\U0001F310 Web Build & E2E"
     needs: impact
-    if: ${{ needs.impact.outputs.web_affected == 'true' && github.event.inputs.force != 'true' }}
+    if: ${{ needs.impact.outputs.web_affected == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -422,16 +423,13 @@ jobs:
     # 永久に promote されなくなる）。`always()` は使わない —— run 全体が cancel
     # された時にまで promote を走らせない。
     #
-    # **force は `needs.impact.result` の外側に置く。** break-glass が要るのは
-    # impact job（フル clone + Vercel API）自体が壊れている時でもあるため、
-    # impact の成功を前提にすると最後の手段が使えない。
+    # Emergency dispatch passes the same gates as every main merge.
     if: >-
       ${{ !cancelled()
-          && ( github.event.inputs.force == 'true'
-               || ( needs.impact.result == 'success'
-                    && (needs.impact.outputs.product_affected == 'false' || needs.e2e.result == 'success')
-                    && (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success')
-                    && (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') ) ) }}
+          && needs.impact.result == 'success'
+          && (needs.impact.outputs.product_affected == 'false' || needs.e2e.result == 'success')
+          && (needs.impact.outputs.web_affected == 'false' || needs.web.result == 'success')
+          && (needs.impact.outputs.storybook_affected == 'false' || needs.storybook.result == 'success') }}
     runs-on: ubuntu-latest
     # この environment には deployment branch policy（main のみ）が設定済みで、
     # main 以外の ref からの dispatch は job 開始前に GitHub 側で拒否される
@@ -452,6 +450,8 @@ jobs:
     permissions:
       contents: read
       statuses: write
+      actions: read
+      pull-requests: read
     # scripts/ci/production-release.mjs の WORST_CASE_RELEASE_MS を必ず上回ること。
     # 下回ると rollback の途中で job が kill され、片方だけ promote された
     # production が手動 rollback の手掛かりごと失われる。
@@ -476,16 +476,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-
-      - name: Require a reason for Force Promote
-        if: inputs.force
-        env:
-          REASON: ${{ inputs.reason }}
-        run: |
-          if [ -z "$REASON" ]; then
-            echo "::error::Force Promote requires a reason. Record it here and in the ops log."
-            exit 1
-          fi
 
       - name: Resolve and validate release SHA
         id: target
@@ -522,10 +512,19 @@ jobs:
       # read-only token を `production-release` environment へ置く決定（secret の境界変更、
       # User 裁可）と、`docs/operations/secrets.md` の台帳・environment 同期 script・
       # `ci-secret-ledger.test.ts` の同時更新が要る。有効化後は欠落が promote を止める。
-      # force（break-glass）では飛ばす。
+      # Candidate mode makes missing migration evidence a hard failure.
       - name: Verify candidate migrations are applied in Production
-        if: ${{ inputs.force != true }}
+        env:
+          MIGRATION_READINESS_REQUIRED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}
+          SUPABASE_MIGRATION_READINESS_TOKEN: ${{ vars.RELEASE_CANDIDATE_ENABLED == 'true' && secrets.SUPABASE_MIGRATION_READINESS_TOKEN || '' }}
         run: node scripts/ci/production-migration-readiness.mjs
+
+      - name: Verify tested candidate immediately before promotion
+        if: vars.RELEASE_CANDIDATE_ENABLED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
+        run: node scripts/ci/release-candidate-gate.mjs production
 
       - name: Wait, smoke, and promote Production
         id: release
@@ -539,7 +538,6 @@ jobs:
           VERCEL_BYPASS_PRODUCT: ${{ secrets.VERCEL_AUTOMATION_BYPASS_PRODUCT }}
           VERCEL_BYPASS_WEB: ${{ secrets.VERCEL_AUTOMATION_BYPASS_WEB }}
           RELEASE_SHA: ${{ steps.target.outputs.sha }}
-          RELEASE_FORCE: ${{ inputs.force }}
           # impact job（T0）の判定を release（T1）へ渡す（#2574）。この 2 つは **別時刻の
           # live production SHA** を基準に独立して判定するため食い違いうる。live が前進する
           # だけなら T1 の affected は T0 の subset で安全側だが、Vercel Instant Rollback で
@@ -570,8 +568,6 @@ jobs:
           set -e
           echo "exit_code=$release_exit" >> "$GITHUB_OUTPUT"
 
-      # SHA が解決できていない場合は publish しない。空の SHA へ POST すると
-      # 404 で step が落ちるだけで、何の情報も残らない。
       - name: Publish Production Release status
         if: always() && steps.target.outputs.sha != ''
         env:
@@ -579,8 +575,6 @@ jobs:
           RELEASE_EXIT: ${{ steps.release.outputs.exit_code || '1' }}
           RELEASE_STATUS: ${{ steps.release.outputs.release_status || 'failed' }}
           RELEASE_SHA: ${{ steps.target.outputs.sha }}
-          FORCED: ${{ inputs.force }}
-          REASON: ${{ inputs.reason }}
         run: |
           if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Refusing to publish status for an invalid commit SHA"
@@ -590,9 +584,6 @@ jobs:
           if [ "$RELEASE_EXIT" != "0" ]; then
             state=failure
             description="Release gate stopped before or during promote; see the run summary"
-            if [ "$FORCED" = "true" ]; then
-              description="Force Promote failed: $REASON"
-            fi
           elif [ "$RELEASE_STATUS" = "superseded" ]; then
             # promote は 1 件も行われていない。この commit は live ではないので
             # success を出すと create-release.yml の gate を素通りしてしまう。
@@ -606,9 +597,6 @@ jobs:
           else
             state=success
             description="Production serves this commit"
-            if [ "$FORCED" = "true" ]; then
-              description="Force Promote: $REASON"
-            fi
           fi
 
           gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$RELEASE_SHA" \

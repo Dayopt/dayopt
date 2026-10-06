@@ -29,7 +29,7 @@
  * ## 着地先が `/auth/confirmed` である理由
  *
  * login ページに案内を出す案は、**認証済みの browser で確認リンクを開いた場合に成立しない**。
- * `proxy.ts` は認証済みユーザーが auth 系 path に来ると `/calendar` へ送り、`/auth/login` は
+ * `proxy.ts` は認証済みユーザーが auth 系 path に来るとホームへ送り、`/auth/login` は
  * `authPathsAllowedWhileAuthenticated`（`lib/auth/domain/access-policy.ts`）に無いため、
  * メッセージを表示する前に弾かれる。バウンス先が変わるだけで本件の混乱は残る。
  * `/auth/confirmed` は同 allowlist に登録してあり、認証済み・未認証のどちらでも表示できる。
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       if (data.session?.access_token) {
         // recovery だけ next を無視して固定 path へ送る（#1928）。実際の発生原因は
         // production の Redirect URLs allowlist に `/auth/reset-password` が未登録で、
-        // GoTrue が `redirect_to` を拒否して `next` が付かないまま fallback の `/calendar` へ
+        // GoTrue が `redirect_to` を拒否して `next` が付かないまま fallback のホームへ
         // 落ちていたこと（allowlist は User が追加済み）。recovery の着地先は固定で問題
         // ないため、allowlist が再びドリフトしても壊れない形にしておく（防御層）。
         const target = type === 'recovery' ? '/auth/reset-password' : next;

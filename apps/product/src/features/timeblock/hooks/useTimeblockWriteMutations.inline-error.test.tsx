@@ -822,7 +822,7 @@ describe('useTimeblockWriteMutations 楽観更新の巻き戻し', () => {
       queryKey: unknown;
     }) => boolean;
     expect(predicate({ queryKey: [['statistics', 'summary'], {}] })).toBe(true);
-    expect(predicate({ queryKey: [['review', 'segments'], {}] })).toBe(true);
+    expect(predicate({ queryKey: [['activities', 'getActivitySummary'], {}] })).toBe(true);
     expect(predicate({ queryKey: [['activities', 'list'], {}] })).toBe(false);
   });
 });

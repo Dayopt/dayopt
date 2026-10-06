@@ -425,6 +425,22 @@ function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] 
 }
 
 export const ciSecretSchema: EnvSchemaEntry[] = [
+  // #3009: planned activation only. No master or replica is provisioned by code.
+  ...[
+    ['SUPABASE_MIGRATION_READINESS_TOKEN', 'supabase-migration-readiness'],
+    ['RELEASE_CANDIDATE_TOKEN', 'github-release-candidate'],
+  ].map(([envName, item]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'production',
+      ci,
+      item,
+      '#3009 release activation is not approved; master and replica remain unprovisioned',
+      'credential',
+    ),
+    githubEnvironments: ['production-release'],
+  })),
   // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
   // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
   // Production master は既存team token。project tokenも同じProduct内のProduction/Previewを分離しない。
@@ -465,6 +481,39 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     ),
     githubSecret,
     githubEnvironments: ['Preview – product'],
+  })),
+  // Trusted provisioning uses distinct Integration and Preview login items. The Integration
+  // fields were verified through the owner-provided vault locator; the owner designated the
+  // separate Preview item. Neither GitHub replica has been synchronized in this work.
+  ...[
+    ['NONPROD_LOGIN_EMAIL', ci, 's3tems3afbzvvguakggydcgxni', 'username'],
+    ['NONPROD_LOGIN_PASSWORD', ci, 's3tems3afbzvvguakggydcgxni', 'password'],
+    [
+      'NONPROD_PREVIEW_LOGIN_EMAIL',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'username',
+    ],
+    [
+      'NONPROD_PREVIEW_LOGIN_PASSWORD',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'password',
+    ],
+    ['SUPABASE_PREVIEW_PROVISION_TOKEN', ci, 'supabase-preview-provision', 'credential'],
+  ].map(([envName, vault, item, field]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'staging',
+      vault,
+      item,
+      'GitHub Environment replica has not been initialized by the controlled setup run',
+      field,
+    ),
+    field,
+    githubSecret: envName,
+    githubEnvironments: ['Nonproduction login'],
   })),
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),

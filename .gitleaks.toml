@@ -47,6 +47,14 @@ regexes = [
 ]
 
 [[allowlists]]
+description = "PR共通ログインに指定された1Password item ID（credentialではなくitem locator。実値は取得・保存しない）"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+  '''^s3tems3afbzvvguakggydcgxni$''',
+]
+
+[[allowlists]]
 description = "apps/product/src/lib/supabase/__tests__/oauth.test.ts の truncated JWT fixture（末尾が literal '...' で終わる非機能文字列。実際にデコード可能な値ではない）"
 targetRules = ["generic-api-key"]
 regexTarget = "secret"

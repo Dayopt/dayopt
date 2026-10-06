@@ -49,7 +49,7 @@ export function ProStartEmail({
               <Text style={{ ...styles.paragraph, margin: '0' }}>- {t('proStart.featureApi')}</Text>
             </Section>
             <Text style={styles.paragraph}>{t('proStart.manageHint')}</Text>
-            <Button style={styles.button} href={`${appUrl}/calendar`}>
+            <Button style={styles.button} href={`${appUrl}/`}>
               {t('proStart.ctaButton')}
             </Button>
             <Text style={styles.footer}>{t('emailCommon.teamSignature')}</Text>

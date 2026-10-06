@@ -1,0 +1,94 @@
+name: Nonproduction login
+
+on:
+  pull_request_target:
+    branches: [main, integration]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Provision the fixed Integration branch or a pinned internal Preview PR
+        type: choice
+        options: [integration, preview]
+        required: true
+      preview_pr:
+        description: Current open internal PR number (Preview only)
+        type: string
+        required: false
+      preview_sha:
+        description: Exact current 40-character PR head SHA (Preview only)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: nonproduction-login-${{ github.event.pull_request.number || inputs.preview_pr || inputs.target || 'integration' }}
+  cancel-in-progress: false
+
+jobs:
+  trust:
+    name: Validate nonproduction target
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.draft != true) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/integration')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      target: ${{ steps.validate.outputs.target }}
+      pr_number: ${{ steps.validate.outputs.pr_number }}
+      sha: ${{ steps.validate.outputs.sha }}
+      branch_name: ${{ steps.validate.outputs.branch_name }}
+      base_branch: ${{ steps.validate.outputs.base_branch }}
+    steps:
+      # pull_request_target runs workflow code from the trusted base ref.
+      # No candidate checkout, install, or code execution occurs in this job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - id: validate
+        name: Verify the live internal PR and explicit database binding
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+        run: node scripts/ci/nonproduction-login-trust.mjs
+
+  provision:
+    name: Prepare target-specific nonproduction login
+    needs: trust
+    if: ${{ always() && needs.trust.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: Nonproduction login
+    steps:
+      # This checks out only the already trusted base/Integration ref. The PR head
+      # is used as validated identifiers and is never checked out or executed.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Wait for the exact nonproduction Supabase branch and provision login
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NONPROD_LOGIN_TARGET: ${{ needs.trust.outputs.target }}
+          NONPROD_LOGIN_PR: ${{ needs.trust.outputs.pr_number }}
+          NONPROD_LOGIN_SHA: ${{ needs.trust.outputs.sha }}
+          NONPROD_LOGIN_BRANCH: ${{ needs.trust.outputs.branch_name }}
+          NONPROD_LOGIN_BASE_BRANCH: ${{ needs.trust.outputs.base_branch }}
+          NONPROD_LOGIN_EMAIL: ${{ needs.trust.outputs.target == 'integration' && secrets.NONPROD_LOGIN_EMAIL || '' }}
+          NONPROD_LOGIN_PASSWORD: ${{ needs.trust.outputs.target == 'integration' && secrets.NONPROD_LOGIN_PASSWORD || '' }}
+          NONPROD_PREVIEW_LOGIN_EMAIL: ${{ needs.trust.outputs.target == 'preview' && secrets.NONPROD_PREVIEW_LOGIN_EMAIL || '' }}
+          NONPROD_PREVIEW_LOGIN_PASSWORD: ${{ needs.trust.outputs.target == 'preview' && secrets.NONPROD_PREVIEW_LOGIN_PASSWORD || '' }}
+          SUPABASE_PREVIEW_PROVISION_TOKEN: ${{ secrets.SUPABASE_PREVIEW_PROVISION_TOKEN }}
+        run: node scripts/ci/nonproduction-login-provision.mjs

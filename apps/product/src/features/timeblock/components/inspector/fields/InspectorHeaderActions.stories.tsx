@@ -29,7 +29,7 @@ type Story = StoryObj;
 
 const fullPlannedMenu = getTimeblockMenuItems({
   activityId: 'activity-1',
-  onViewStats: fn(),
+  onViewActivityDetails: fn(),
   onDuplicate: fn(),
   onDelete: fn(),
 });
@@ -37,7 +37,7 @@ const fullPlannedMenu = getTimeblockMenuItems({
 /** Record のメニュー。 */
 const recordMenu = getTimeblockMenuItems({
   activityId: 'activity-1',
-  onViewStats: fn(),
+  onViewActivityDetails: fn(),
   onDuplicate: fn(),
   onDelete: fn(),
 });

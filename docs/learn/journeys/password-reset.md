@@ -135,7 +135,7 @@ Edge Function send-auth-email が hook の署名を検証し、PasswordResetEmai
 
 verifyOtp で token_hash を検証する。access_token 付きの session が立てば、type が recovery の時だけ next を無視して /auth/reset-password へ固定で送る。session が立たなければ /auth/confirmed の結果ページへ送る。
 
-- **なぜ必要か**: 以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま /calendar へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。
+- **なぜ必要か**: 以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま / へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。
 - **入力 → 出力**: token_hash、type=recovery、next → recovery session の cookie と、/auth/reset-password への redirect
 - **ここを変えると**: signup・email_change も同じ route を通る。分岐を変える時は type ごとの着地先をテストで確かめる。/auth/confirm と /auth/reset-password はサインイン中でも通れる path に登録してある（access-policy.ts）。
 - **コード**:
@@ -284,7 +284,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
 
 - **なぜ必要か**: アカウントを乗っ取られた人が最初にやるのがパスワードの再設定。その操作で攻撃者の refresh token も道連れにする。
 - **入力 → 出力**: updateUser の成功 → 他端末の session の失効と、成功画面
-- **ここを変えると**: 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- **ここを変えると**: 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 - **コード**:
   - [`apps/product/src/features/auth/stores/useAuthStore.ts`](../../../apps/product/src/features/auth/stores/useAuthStore.ts) で `() => supabase.auth.signOut({ scope: 'others' }),` を探す
   - [`apps/product/src/features/auth/components/ResetPasswordForm.tsx`](../../../apps/product/src/features/auth/components/ResetPasswordForm.tsx) で ``router.push(`/${locale}/auth/login`);`` を探す
@@ -648,7 +648,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
       "via": "メールのリンク",
       "title": "/auth/confirm で token を検証して session を作る",
       "what": "verifyOtp で token_hash を検証する。access_token 付きの session が立てば、type が recovery の時だけ next を無視して /auth/reset-password へ固定で送る。session が立たなければ /auth/confirmed の結果ページへ送る。",
-      "why": "以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま /calendar へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。",
+      "why": "以前、Supabase 側の Redirect URLs に /auth/reset-password が無く next が付かないまま / へ落ちた（#1928）。recovery の行き先は 1 つしかないので固定にし、設定がずれても壊れない形にした。",
       "io": {
         "in": "token_hash、type=recovery、next",
         "out": "recovery session の cookie と、/auth/reset-password への redirect"
@@ -1050,7 +1050,7 @@ updateUser が成功したら signOut({ scope: 'others' }) で、この端末以
         "in": "updateUser の成功",
         "out": "他端末の session の失効と、成功画面"
       },
-      "change": "今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。",
+      "change": "今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。",
       "refs": [
         {
           "path": "apps/product/src/features/auth/stores/useAuthStore.ts",

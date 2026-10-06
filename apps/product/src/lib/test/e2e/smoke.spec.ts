@@ -12,14 +12,9 @@ import { expect, test } from '@playwright/test';
 test.describe('Smoke: ルーティング', () => {
   test('未認証ユーザーは認証ページにリダイレクトされる', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // 認証ページにリダイレクトされることを確認
-    await page.waitForURL(/\/(login|auth|signin)/i, { timeout: 10000 }).catch(() => {
-      // 既にログイン済みの場合もOK
-    });
-
-    // ページタイトルが存在する
+    await expect(page).toHaveURL(/\/auth\/login(?:\?|$)/);
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page).toHaveTitle(/Dayopt/);
   });
 });
@@ -50,6 +45,57 @@ test.describe('Smoke: 認証フロー', () => {
       await page.getByRole('link', { name: scenario.signupLink }).click();
 
       await expect(page).toHaveURL(new RegExp(`${scenario.signupPath}/?$`));
+      await expect(page.locator('input[type="password"]').first()).toBeVisible();
     });
+
+    const prefix = scenario.locale === 'ja' ? '/ja' : '';
+    test(`${scenario.locale}: password reset から login へ locale を保って戻る`, async ({
+      page,
+    }) => {
+      await page.goto(scenario.loginPath);
+      await page.locator(`a[href="${prefix}/auth/password"]`).click();
+      await expect(page).toHaveURL(new RegExp(`${prefix}/auth/password/?$`));
+      await expect(page.locator('input[type="email"]')).toBeVisible();
+      await page.locator(`a[href="${scenario.loginPath}"]`).click();
+      await expect(page).toHaveURL(new RegExp(`${scenario.loginPath}/?$`));
+      await expect(page.locator('input[type="password"]')).toBeVisible();
+    });
+
+    for (const route of [
+      '/calendar',
+      '/report',
+      '/settings',
+      '/settings/account',
+      '/settings/display',
+      '/settings/data',
+      '/settings/integrations',
+      '/settings/billing',
+    ]) {
+      test(`${scenario.locale}: 未認証の ${route} は login へ戻る`, async ({ page }) => {
+        await page.goto(`${prefix}${route}`);
+        await expect(page).toHaveURL(new RegExp(`${scenario.loginPath}\\?`));
+        expect(new URL(page.url()).searchParams.get('redirect')).toBe(route);
+        await expect(page.locator('input[type="email"]')).toBeVisible();
+        await expect(page.locator('input[type="password"]')).toBeVisible();
+      });
+    }
+
+    test(
+      `${scenario.locale}: mobile signup と reset のタップ導線が locale を保つ`,
+      { tag: '@mobile' },
+      async ({ page }) => {
+        await page.goto(scenario.loginPath);
+        await page.getByRole('link', { name: scenario.signupLink }).tap();
+        await expect(page).toHaveURL(new RegExp(`${scenario.signupPath}/?$`));
+        await expect(page.locator('input[type="password"]').first()).toBeVisible();
+        await page.locator(`a[href="${scenario.loginPath}"]`).tap();
+        await expect(page).toHaveURL(new RegExp(`${scenario.loginPath}/?$`));
+        await page.locator(`a[href="${prefix}/auth/password"]`).tap();
+        await expect(page).toHaveURL(new RegExp(`${prefix}/auth/password/?$`));
+        await page.locator(`a[href="${scenario.loginPath}"]`).tap();
+        await expect(page).toHaveURL(new RegExp(`${scenario.loginPath}/?$`));
+        await expect(page.locator('input[type="password"]')).toBeVisible();
+      },
+    );
   }
 });

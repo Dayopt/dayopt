@@ -94,6 +94,12 @@ describe('ContactForm retry contract', () => {
     vi.restoreAllMocks();
   });
 
+  it('uses the translated required badge for every mandatory field', () => {
+    render(<ContactForm />);
+    expect(screen.getAllByText('form.requiredBadge')).toHaveLength(4);
+    expect(screen.queryByText('※必須')).toBeNull();
+  });
+
   it('retains fields, refreshes Turnstile, and reuses the submission ID after failure', async () => {
     mocks.submitContactRequest
       .mockRejectedValueOnce(new TypeError('fetch failed'))

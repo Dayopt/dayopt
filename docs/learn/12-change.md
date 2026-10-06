@@ -46,7 +46,7 @@ last_verified: 2026-09-21
 - [merge → 本番公開](journeys/deploy.md) の 2. migration 適用 — ここから promote が終わるまで、新しい schema の上で旧コードが動く時間がある（E2E が完走するまで）。migration は旧コードでも壊れない形で書く。
 - [merge → 本番公開](journeys/deploy.md) の 4. 影響判定 — 影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。
 - [merge → 本番公開](journeys/deploy.md) の 5. E2E などで検証 — ここが merge 後の本番を守る唯一の実行検証。遅くすると、migration と旧コードが共存する時間も伸びる。
-- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
+- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
 
 #### `AGENTS.md`
 
@@ -64,25 +64,9 @@ last_verified: 2026-09-21
 
 - [問い合わせを送る](journeys/contact.md) の 5. Resend へ送る — 件名は [Dayopt Contact][Product][カテゴリ] の固定形、tags の source は contact-product。後段の Resend webhook はこの source と宛先で問い合わせの配送だと判定するので、変えると配送失敗が Sentry に出なくなる。LP（apps/web）のフォームは別実装で、Idempotency-Key の名前空間を contact-web- に分けてある。
 
-#### `apps/product/src/app/[locale]/(app)/(workspace)/_composition/ReportViewClient.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/_server/CalendarError.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
 #### `apps/product/src/app/[locale]/(app)/(workspace)/_server/calendar-prefetch.ts`
 
 - [Google Calendar 連携](journeys/google-calendar.md) の 12. カレンダーに薄く表示 — 変換した Plan には source: external_calendar と元の予定の ID が付く。Google の予定を消しても、変換済みの Plan は残る。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/report/error.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
-#### `apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
 
 #### `apps/product/src/app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`
 
@@ -250,7 +234,7 @@ last_verified: 2026-09-21
 
 - [パスワードを再設定する](journeys/password-reset.md) の 6. 新しいパスワードを送る — エラー code の読み分けは ResetPasswordForm の RECOVERY_UPDATE_BLOCKED_CODES と isMfaBlocked。message の文字列で判定しない方針。
 - [パスワードを再設定する](journeys/password-reset.md) の 7. MFA で昇格（有効時だけ） — リカバリーコードで通すと MFA は無効になる（recovery-service.ts の既存の副作用）。成功画面に警告を出すのはそのため。MFA 画面の部品は dynamic import で、MFA の無い大多数の訪問者には読み込まない。
-- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
 #### `apps/product/src/features/auth/components/SignupForm.tsx`
 
@@ -291,7 +275,7 @@ last_verified: 2026-09-21
 - [パスワードを再設定する](journeys/password-reset.md) の 1. リセットを依頼 — 画面の出し分けを足すと列挙防止が崩れる。保証境界は docs/product/specs/auth.md のパスワードリセットの節。失敗の観測は画面ではなく store 側の Sentry が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 3. リセットメール送信 — この Function は Vercel ではなく Supabase にデプロイする（supabase functions deploy --use-api）。アプリの deploy では変わらない。メールには期限切れ後の再リクエストを案内し、Hook payload に無い有効期限の数値は記載しない。期限設定そのものは Supabase Auth が持つ。
 - [パスワードを再設定する](journeys/password-reset.md) の 6. 新しいパスワードを送る — エラー code の読み分けは ResetPasswordForm の RECOVERY_UPDATE_BLOCKED_CODES と isMfaBlocked。message の文字列で判定しない方針。
-- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
 #### `apps/product/src/features/calendar/components/controller/hooks/useCalendarData.ts`
 
@@ -415,49 +399,6 @@ last_verified: 2026-09-21
 
 - [Google Calendar 連携](journeys/google-calendar.md) の 10. 予定を差分で取得 — refresh token の回転（新しい token の保存）はこの同期の中で行う。別の cron ではない。
 
-#### `apps/product/src/features/review/components/detail/ReportDetailBody.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/components/report/ReportBody.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
-#### `apps/product/src/features/review/domain/report/report-view-model.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 2. 集計を問い合わせる — 集計の項目を足す時は、保存済みの古い形が復元されても落ちないよう normalizeReportPeriodPayload に既定値を足す。タブごとに別の query を作ると、仕様（review.md §5）の「1 期間 1 往復」が崩れる。
-- [レポートを開く（集計）](journeys/report.md) の 8. 派生して描く — computeDenominators の allActivities にフィルタを掛けてはいけない（仕様の 13-2）。予定比や鏡の閾値（EXECUTION_MIN_PLAN_MINUTES 等）は report-view-model.ts の定数。モバイル専用の集計を作らない。
-
-#### `apps/product/src/features/review/hooks/useReportActivityDetail.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/hooks/useReportPeriod.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
-- [レポートを開く（集計）](journeys/report.md) の 2. 集計を問い合わせる — 集計の項目を足す時は、保存済みの古い形が復元されても落ちないよう normalizeReportPeriodPayload に既定値を足す。タブごとに別の query を作ると、仕様（review.md §5）の「1 期間 1 往復」が崩れる。
-
-#### `apps/product/src/features/review/lib/report-period.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 5. 期間の境界を出す — 日付境界の組み方を変えるなら timezone.md の禁止パターン（ブラウザ TZ の 0 時を UTC 変換する等）を先に読む。ここの規則は詳細パネルの集計と共有している。
-
-#### `apps/product/src/features/review/server/report-aggregation-service.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
-
-#### `apps/product/src/features/review/server/report-detail-service.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/server/report-fetchers.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [レポートを開く（集計）](journeys/report.md) の 9. 詳細を開いた時だけ取る — 明細から代表値を計算し直さない。期間を移すとパネルは閉じ、タブの切替では閉じない。モバイルは推移を出さないので includeTrend: false で呼ぶ。
-
-#### `apps/product/src/features/review/server/router.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 4. Router で検証 — timezone の正当性は長さしか見ておらず、実在しない名前は日付計算の側で失敗する（その時の挙動は未確認）。検証を足すなら ANCHOR_DATE / TIMEZONE の定義を変える。
-
 #### `apps/product/src/features/settings/components/AccountDeletionDialog.tsx`
 
 - [アカウントを削除する（不可逆）](journeys/account-deletion.md) の 1. 確認ダイアログ — どの再認証手段を出すかは画面の推定（hasPasswordIdentity）。実際に何を求めるかはサーバーが user の identity から決め直すので、画面だけ変えても再認証は緩まない。
@@ -479,10 +420,6 @@ last_verified: 2026-09-21
 #### `apps/product/src/features/settings/components/PasswordChangeDialog.tsx`
 
 - [パスワードを再設定する](journeys/password-reset.md) の 10. （別入口）設定から変更 — production の require_current_password が off になると、current_password は黙って無視され、現在のパスワードを知らなくても変えられる。Auth config audit がこの値を固定している。他端末のサインアウトに失敗した時は、こちらは画面に警告を出す（リセット経路とは違う）。
-
-#### `apps/product/src/features/settings/components/UserSettingsInitializer.tsx`
-
-- [レポートを開く（集計）](journeys/report.md) の 1. 期間を決める — date を server component の prop で受けると、期間の ‹ › 移動が画面に反映されなくなる（移動は history.replaceState で URL を書くだけで、server component は再描画されない）。page.tsx と ReportViewClient のコメントが理由を持つ。
 
 #### `apps/product/src/features/settings/lib/billing-operation.ts`
 
@@ -647,14 +584,11 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/billing/operation-access.ts`
 
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [問い合わせを送る](journeys/contact.md) の 3. 関門と回数制限 — Production のビルドは Upstash の env を必須にしているので、Production で回数制限が素通りになることはない。Preview では Upstash が無いと回数制限を飛ばすが、そもそも配送しない。
 
 #### `apps/product/src/lib/database/collect-query-pages.ts`
 
-- [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
-- [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
 - [データを書き出す](journeys/data-export.md) の 5. 行を読む — ページ途中の失敗は部分結果を返さずEXPORT_FAILEDにする。単一DB snapshotではないため取得中の同時編集に対する整合性保証は別。repoのmax_rowsは1000で、ページサイズ500以上の上限を前提とする。クラウドの現在値は未確認。
 
 #### `apps/product/src/lib/database/public-projections.ts`
@@ -749,10 +683,6 @@ last_verified: 2026-09-21
 - [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
 
-#### `apps/product/src/lib/time/derived-model.ts`
-
-- [レポートを開く（集計）](journeys/report.md) の 7. TS で集計 — 集計の数え方は lib/time の aggregate を詳細パネルと共有している。中央値の母集団（期間へ切り取った長さ、auto_migrated を除く）を片方だけ変えると、一覧と詳細パネルで同じアクティビティの中央値が食い違う。現在時刻（nowAt）はサーバーの値を返して、ブラウザの時計とのずれで数字が揺れないようにしている。
-
 #### `apps/product/src/lib/toast.ts`
 
 - [削除と取り消し](journeys/delete-undo.md) の 6. 取り消しを出す — 取り消しの出し方はカレンダーと Inspector で 1 つにする意図（useTimeblockDeleteUndo）だが、Inspector は自前で同じトーストを組んでいる。変える時は両方を見る。「元に戻す」付きのトーストが出ている間、action の無い成功トーストは出さない（lib/toast）ので、「復元しました」が出ないこともある。
@@ -773,7 +703,6 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/trpc/context.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける — ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 
 #### `apps/product/src/lib/trpc/error-code-map.ts`
@@ -789,7 +718,6 @@ last_verified: 2026-09-21
 #### `apps/product/src/lib/trpc/procedures.ts`
 
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
 - [ログイン（MFA 含む）](journeys/login.md) の 4. 6 桁のコード入力 — リカバリーコードの tRPC だけは、まだ aal1 のままでも protectedProcedure を通れるよう例外にしてある。MFA の関門を変える時はこの例外を壊さない。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [Pro を契約する（課金）](journeys/billing.md) の 8. 利用権を判定 — BILLING_ENFORCED は既定 false で、公開手順の文書は本番を false のまま保つと書く（本番の実値はこの教材では未確認）。つまり今の利用者は、画面では契約してもしなくても全機能を使え、45 日体験も始まらない。ただし MCP からの書き込みは DB 側の mcp_mutation_control.billing_enforced（既定 false）の判定で契約中だけに限られ、未契約者は DM005 になる。契約すれば Stripe での課金は実際に走る。true へ切り替える時は DB 側と MCP の切り替えを先に行う順序がある（rollout §公開順序 6）。env だけ変えると MCP と書き込みの判定がずれる。
@@ -800,8 +728,6 @@ last_verified: 2026-09-21
 - [Plan を保存](journeys/save-plan.md) の 4. tRPC で送る — link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける — ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門 — requiresProductAccess を変えると、レポートを含む全 query の見え方が課金状態で変わる。ここは全 tRPC 共通なので、変更の影響は保存経路（Plan を保存）と同じ範囲に及ぶ。
-- [レポートを開く（集計）](journeys/report.md) の 6. 行を取る — RLS（利用者の権限の client）に加えて user_id でも絞っている。PostgREST の 1 回あたりの行数上限に黙って切られないよう collectQueryPages で読み切るので、ここを単発の select に戻すと多い期間で数字が欠ける。
 - [データを書き出す](journeys/data-export.md) の 2. 押した時に問い合わせる — refetchは失敗しても前回のdataを返すため、isErrorも確認して失敗時はファイルを作らない。dataの有無だけに戻すと古い結果を成功扱いする。
 - [データを書き出す](journeys/data-export.md) の 3. /api/trpc と関門 — requiresProductAccess を query にも掛けると、課金が切れた利用者がエクスポートできなくなる。operation-access.ts の一覧に user.exportData があるのは mutation 向けの例外表で、query のこの経路には効いていない。
 - [データを書き出す](journeys/data-export.md) の 6. 応答を受け取る — 全データを端末に残したくないなら、useQuery に meta: { persist: false } を付ける。応答の大きさは件数に比例する。Vercel の応答サイズの上限に当たるかは未確認。
@@ -822,7 +748,7 @@ last_verified: 2026-09-21
 #### `apps/product/src/proxy.ts`
 
 - [ログイン（MFA 含む）](journeys/login.md) の 6. proxy がセッションを確認 — 保護する画面を足す時は access-policy の protectedProductPaths に入れる。入れ忘れると未ログインでも開ける。
-- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て /calendar へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
+- [パスワードを再設定する](journeys/password-reset.md) の 8. 他の端末を切る — 今の端末の session は残る。そのため 3 秒後の /auth/login への移動は、proxy が「サインイン済みで auth 系 path へ来た」と見て / へ送り直すはず（コードから読んだ挙動。ブラウザでは未確認）。文言は「まもなくサインインページに移動します」。
 
 #### `apps/product/vercel.json`
 
@@ -858,7 +784,7 @@ last_verified: 2026-09-21
 
 #### `scripts/ci/production-release.mjs`
 
-- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急時の Force Promote は理由の入力が必須。層 3・smoke・Production Config Audit・migration の確認をすべて飛ばすので、使ったら記録を残す。
+- [merge → 本番公開](journeys/deploy.md) の 6. smoke → 公開 — 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
 
 #### `scripts/ci/release-impact.mjs`
 

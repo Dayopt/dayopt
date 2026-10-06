@@ -1,7 +1,12 @@
 /** Candidate ids and source text come from code, never from Jev. */
 import { z } from 'zod';
 
-import type { JevRequest } from './jev-adapter.ts';
+import {
+  JEV_MAX_INPUT_BYTES,
+  JEV_MAX_TOTAL_INPUT_BYTES,
+  jevInputBytes,
+  type JevRequest,
+} from './jev-adapter.ts';
 import type { AssistEvaluation } from './jev-assist-store.ts';
 
 export const ASSIST_PACKS = {
@@ -136,8 +141,7 @@ export function contextRequests(
 ): Array<{ candidates: ContextCandidate[]; request: JevRequest }> {
   const { selected } = selectContextCandidates(input);
   const batches: Array<{ candidates: ContextCandidate[]; request: JevRequest }> = [];
-  for (let start = 0; start < selected.length; start += 6) {
-    const candidates = selected.slice(start, start + 6);
+  const buildBatch = (candidates: ContextCandidate[]) => {
     const questions: JevRequest['questions'] = {};
     candidates.forEach((candidate, index) => {
       questions[`relevant_${index}`] = {
@@ -151,18 +155,46 @@ export function contextRequests(
         criteria: CONTEXT_KINDS,
       };
     });
-    batches.push({
+    return {
       candidates,
       request: {
         questionSetId: 'context-relevance-v1',
         state: {
           target: { number: input.number, sha: input.sha, title: input.title, body: input.body },
-          candidates,
+          candidates: candidates.map((candidate) => {
+            if (
+              candidate.kind === 'issue' &&
+              candidate.url === input.url &&
+              candidate.text === `${input.title}\n${input.body}`
+            ) {
+              const { text: _text, ...source } = candidate;
+              return { ...source, textRef: 'target.title + "\\n" + target.body' };
+            }
+            return candidate;
+          }),
         },
         questions,
       },
-    });
+    };
+  };
+  // Measure the actual UTF-8 payload, preserving complete source text and order.
+  // An oversized singleton remains explicit unavailable input; it cannot poison its neighbours.
+  let pending: ContextCandidate[] = [];
+  for (const candidate of selected) {
+    const proposed = buildBatch([...pending, candidate]);
+    const bytes = jevInputBytes(proposed.request);
+    if (
+      pending.length &&
+      (pending.length === 6 ||
+        bytes.longest > JEV_MAX_INPUT_BYTES ||
+        bytes.total > JEV_MAX_TOTAL_INPUT_BYTES)
+    ) {
+      batches.push(buildBatch(pending));
+      pending = [];
+    }
+    pending.push(candidate);
   }
+  if (pending.length) batches.push(buildBatch(pending));
   return batches;
 }
 

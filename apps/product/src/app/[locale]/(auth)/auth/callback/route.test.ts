@@ -55,4 +55,22 @@ describe('OAuth registration analytics redirect', () => {
     ).toBeNull();
     expect(deliverWelcomeEmailOnce).not.toHaveBeenCalled();
   });
+
+  it('returns to the requested safe path after authentication', async () => {
+    const response = await GET(
+      new Request('https://app.dayopt.app/auth/callback?code=valid&next=%2Fja%2Fsettings'),
+    );
+
+    expect(response.headers.get('location')).toBe('https://app.dayopt.app/ja/settings');
+  });
+
+  it('falls back to the calendar for an external return URL', async () => {
+    const response = await GET(
+      new Request(
+        'https://app.dayopt.app/auth/callback?code=valid&next=https%3A%2F%2Fevil.example',
+      ),
+    );
+
+    expect(response.headers.get('location')).toBe('https://app.dayopt.app/');
+  });
 });

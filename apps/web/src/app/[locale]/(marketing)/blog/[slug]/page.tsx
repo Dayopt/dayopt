@@ -302,7 +302,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   <h3 className="text-foreground mb-4 text-lg font-medium">{t('share.title')}</h3>
                   <ShareButton
                     title={post.frontMatter.title}
-                    url={`${siteConfig.url}/${locale}/blog/${slug}`}
+                    url={`${siteConfig.url}${locale === routing.defaultLocale ? '' : `/${locale}`}/blog/${slug}`}
                   />
                 </div>
               </div>

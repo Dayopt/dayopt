@@ -43,18 +43,6 @@ export const FACT_DOCUMENT_SOURCES: Readonly<Record<string, readonly Source[]>> 
       ],
     },
   ],
-  'docs/product/specs/review.md': [
-    {
-      path: 'apps/product/src/features/review/domain/report/report-view-model.ts',
-      symbols: [
-        'EXECUTION_MIN_PLAN_MINUTES',
-        'MIRROR_MIN_PLAN_MINUTES',
-        'MIRROR_MIN_PLAN_BOXES',
-        'COMPASS_MIN_FULFILLMENT',
-        'MIRROR_MAX_ROWS',
-      ],
-    },
-  ],
 };
 
 function read(root: string, path: string): string {

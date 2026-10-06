@@ -44,7 +44,7 @@ interface TimeModelInspectorProps {
   /** 予定 / 記録の内容末尾に表示する操作。PC / モバイルで共通。 */
   actionsSlot?: React.ReactNode;
   /** 振り返り panel を開くコールバック（Composition Layer から注入） */
-  onViewStats?: ((tagId: string) => void) | undefined;
+  onViewActivityDetails?: ((tagId: string, activityName: string) => void) | undefined;
   /**
    * ドラッグ作成モード（store.createMode）で描く内容。calendar 側が組み立てて
    * Composition Layer から注入する（timeblock は calendar を import できないため）。
@@ -110,7 +110,7 @@ function toInspectorDerivedBlock(
 /** plans / records 対応 Inspector のトップレベル（モバイル=Drawer / PC=DockedInspectorPanel） */
 export function TimeblockInspector({
   actionsSlot,
-  onViewStats,
+  onViewActivityDetails,
   createContent,
 }: TimeModelInspectorProps) {
   const t = useTranslations();
@@ -286,7 +286,7 @@ export function TimeblockInspector({
         record={record}
         relationships={relationships}
         onOpenRelationship={handleOpenRelationship}
-        onViewStats={onViewStats}
+        onViewActivityDetails={onViewActivityDetails}
         onStartDuplicate={openDuplicate}
         onCloseInspector={handleClose}
         onDeleted={handleClose}

@@ -31,7 +31,7 @@ export function FilteredBlogClient({
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const currentPage = Number(searchParams?.get('page')) || 1;
+  const requestedPage = Number(searchParams?.get('page')) || 1;
 
   // カテゴリ（タブ＝URL）+ 検索で絞り込み、日付降順
   const filteredPosts = useMemo(() => {
@@ -66,6 +66,7 @@ export function FilteredBlogClient({
   }, [initialPosts, activeCategory, searchQuery]);
 
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const currentPage = Math.min(Math.max(1, Math.floor(requestedPage)), Math.max(1, totalPages));
   const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
   const currentPosts = filteredPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 

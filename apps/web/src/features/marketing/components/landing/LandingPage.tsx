@@ -143,7 +143,7 @@ export async function LandingPage({ locale }: LandingPageProps) {
             }}
           />
           <div className={styles.sectionLinks}>
-            <Link href="/docs/plan/calendar">
+            <Link href="/docs/calendar">
               {t('landing.calendar.guide')} <span aria-hidden="true">↗</span>
             </Link>
             <a href="#google-calendar">
@@ -200,7 +200,7 @@ export async function LandingPage({ locale }: LandingPageProps) {
             <p>
               {t('landing.activities.foot1')}
               <br />
-              <Link href="/docs/organize/activities">
+              <Link href="/docs/activities">
                 {t('landing.activities.guide')} <span aria-hidden="true">↗</span>
               </Link>
             </p>
