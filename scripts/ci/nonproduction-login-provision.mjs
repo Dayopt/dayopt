@@ -90,6 +90,12 @@ async function wait(milliseconds, sleepImpl) {
   await sleepImpl(milliseconds);
 }
 
+function previewBranchWaitReason(target, branch) {
+  const identity = `pr_number=${target.prNumber}, git_branch=${target.branchName}`;
+  if (!branch) return `Preview branch not found (${identity}, exact_match_count=0)`;
+  return `Preview branch is not ready (${identity}, exact_match_count=1, status=${branch.status ?? 'unknown'}, preview_project_status=${branch.preview_project_status ?? 'unknown'})`;
+}
+
 async function findReadyBranch({ target, supabaseToken, fetchImpl, sleepImpl, now }) {
   const timeoutAt = now() + 12 * 60_000;
   let lastReason = 'branch is not ready';
@@ -109,6 +115,7 @@ async function findReadyBranch({ target, supabaseToken, fetchImpl, sleepImpl, no
         ? branches.filter((branch) => branch.id === INTEGRATION_BRANCH_ID)
         : previewMatches;
     requireCondition(matches.length <= 1, 'branch identity is ambiguous');
+    if (target.kind === 'preview') lastReason = previewBranchWaitReason(target, matches[0]);
     if (matches.length === 1) {
       try {
         validateBranch(matches[0], target);
@@ -116,7 +123,8 @@ async function findReadyBranch({ target, supabaseToken, fetchImpl, sleepImpl, no
       } catch (error) {
         if (!(error instanceof ProvisionError) || !error.message.endsWith('branch is not ready'))
           throw error;
-        lastReason = error.message;
+        lastReason =
+          target.kind === 'preview' ? previewBranchWaitReason(target, matches[0]) : error.message;
       }
     }
     await wait(5_000, sleepImpl);

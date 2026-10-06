@@ -200,9 +200,36 @@ describe('nonproduction login provisioning', () => {
           time += milliseconds;
         },
       }),
-    ).rejects.toThrow('branch is not ready');
+    ).rejects.toThrow(
+      'Nonproduction login: Preview branch not found (pr_number=3024, git_branch=codex/nonprod-login, exact_match_count=0)',
+    );
     expect(world.calls.some(({ url }) => url.includes(INTEGRATION_PROJECT_REF))).toBe(false);
     expect(world.calls.some(({ url }) => url.includes('/api-keys?'))).toBe(false);
+  });
+
+  it('reports status metadata when the exact Preview branch is still provisioning', async () => {
+    let time = 0;
+    const world = buildFetch({
+      branch: {
+        ...previewBranch,
+        status: 'RUNNING_MIGRATIONS',
+        preview_project_status: 'COMING_UP',
+      },
+    });
+    await expect(
+      provisionNonproductionLogin({
+        target,
+        ...testCredentials,
+        githubToken: 'github-token',
+        fetchImpl: world.fetchImpl,
+        now: () => time,
+        sleepImpl: async (milliseconds) => {
+          time += milliseconds;
+        },
+      }),
+    ).rejects.toThrow(
+      'Nonproduction login: Preview branch is not ready (pr_number=3024, git_branch=codex/nonprod-login, exact_match_count=1, status=RUNNING_MIGRATIONS, preview_project_status=COMING_UP)',
+    );
   });
 
   it('rejects production before requesting any branch API key', async () => {
