@@ -22,6 +22,8 @@ code: scripts/tasks/env/schema.ts
 
 PR ごとの Supabase Preview Branch credentials は例外。Supabase / Vercel integration が作る ephemeral replica であり、1Password には保存しない。
 
+Preview E2E のログイン用アカウント資格情報は branch API credentials と別管理し、専用の Preview 1Password item を使う。同じログイン資格情報を全 Preview PR で共通利用する方針で、固定 Integration 用 item とは分ける。各 Preview branch には同じアカウントを個別に作成・検証するため、Auth user とアプリデータは branch ごとに独立するが、Preview 間でログイン資格情報自体は共有される。
+
 `.env.local` に実値を置く運用は廃止。Vercel CLI などで一時生成された `.env.local` は unsafe / temporary として扱い、作業後に削除する。
 
 ---
@@ -266,7 +268,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 ### Persistent Product Integration（#2910）
 
-Integration は既存 `product` Vercel projectの `integration` branchと、非本番Supabase projectの `integration` branchを使う。新しいVercel projectや独自domainは作らない。共通Product Previewでは非本番persistent Supabaseを共有し、branch-scoped environment marker / OAuth originは固定Integration branchにだけ設定する。Supabase secret keyはserver-onlyで、Production credentialsをコピーしない。
+Integration は既存 `product` Vercel projectの `integration` branchと、非本番Supabase projectの `integration` branchを使う。新しいVercel projectや独自domainは作らない。共通Product Previewでは非本番persistent Supabaseを共有し、branch-scoped environment marker / OAuth originは固定Integration branchにだけ設定する。Supabase secret keyはserver-onlyで、Production credentialsをコピーしない。Preview E2E のログイン資格情報は別の Preview item から読み、Preview 全体で共通利用する。
 
 固定originは `https://product-git-integration-dayopt.vercel.app`、Supabase refは `tilwaprottpyhlfoggbb`。Vercel project ID、Git branch、Preview target、branch alias、app URL、Supabase ref、OAuth issuer/resourceの一致をbuildとruntimeで検査する。Vercel system variablesは手入力せず、実secretやdeployment-specific URLをrepo・Issue・会話へ記録しない。
 

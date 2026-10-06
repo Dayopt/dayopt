@@ -134,6 +134,11 @@ describe('nonproduction login provisioning', () => {
     expect(world.calls[4].init?.body).toBe(
       JSON.stringify({ email: testCredentials.email, password: testCredentials.password }),
     );
+    expect(new Headers(world.calls[3].init?.headers).get('apikey')).toBe('branch-secret');
+    expect(new Headers(world.calls[3].init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(world.calls[4].init?.headers).get('apikey')).toBe('branch-publishable');
+    expect(new Headers(world.calls[4].init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(world.calls[5].init?.headers).get('apikey')).toBe('branch-publishable');
     expect(new Headers(world.calls[5].init?.headers).get('Authorization')).toBe(
       'Bearer verification-session',
     );
@@ -170,7 +175,11 @@ describe('nonproduction login provisioning', () => {
       target: 'integration',
     });
     expect(new Headers(world.calls[2].init?.headers).get('apikey')).toBe('legacy-service-role');
+    expect(new Headers(world.calls[2].init?.headers).get('Authorization')).toBe(
+      'Bearer legacy-service-role',
+    );
     expect(world.calls[3].url).toContain('grant_type=password');
+    expect(new Headers(world.calls[3].init?.headers).get('Authorization')).toBeNull();
     expect(world.calls[4].url).toContain('scope=local');
     expect(new Headers(world.calls[4].init?.headers).get('Authorization')).toBe(
       'Bearer verification-session',

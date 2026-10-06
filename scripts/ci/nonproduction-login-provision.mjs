@@ -139,10 +139,10 @@ function getApiKey(keys, type) {
   const legacyName = type === 'secret' ? 'service_role' : 'anon';
   const matches = modern.length > 0 ? modern : active.filter((key) => key.name === legacyName);
   requireCondition(matches.length === 1, `branch ${type} API key is unavailable or ambiguous`);
-  return matches[0].api_key;
+  return matches[0];
 }
 
-async function apiJson(url, { method = 'GET', key, body, fetchImpl }) {
+async function apiJson(url, { method = 'GET', key, authorizationToken, body, fetchImpl }) {
   try {
     const response = await fetchImpl(url, {
       method,
@@ -150,7 +150,7 @@ async function apiJson(url, { method = 'GET', key, body, fetchImpl }) {
       signal: AbortSignal.timeout(15_000),
       headers: {
         apikey: key,
-        Authorization: `Bearer ${key}`,
+        ...(authorizationToken ? { Authorization: `Bearer ${authorizationToken}` } : {}),
         ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
@@ -240,7 +240,7 @@ async function verifyPasswordAndCloseLocalSession({
 }) {
   const signIn = await apiJson(`${origin}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    key: publishableKey,
+    key: publishableKey.api_key,
     body: { email, password },
     fetchImpl,
   });
@@ -254,12 +254,9 @@ async function verifyPasswordAndCloseLocalSession({
   );
   const signOut = await apiJson(`${origin}/auth/v1/logout?scope=local`, {
     method: 'POST',
-    key: publishableKey,
-    fetchImpl: (url, options) =>
-      fetchImpl(url, {
-        ...options,
-        headers: { ...options.headers, Authorization: `Bearer ${accessToken}` },
-      }),
+    key: publishableKey.api_key,
+    authorizationToken: accessToken,
+    fetchImpl,
   });
   requireCondition(signOut.ok, 'verification session could not be closed locally');
   requireCondition(!mfaRequired, 'MFA enrollment requires interactive verification');
@@ -311,9 +308,13 @@ export async function provisionNonproductionLogin({
   const publishableKey = getApiKey(keys, 'publishable');
   const origin = apiOrigin(branch.project_ref);
   await revalidatePreviewTarget({ target, githubToken, fetchImpl });
+  const legacyServiceRole =
+    secretKey.type === 'legacy' ||
+    (secretKey.type === undefined && secretKey.name === 'service_role');
   const created = await apiJson(`${origin}/auth/v1/admin/users`, {
     method: 'POST',
-    key: secretKey,
+    key: secretKey.api_key,
+    ...(legacyServiceRole ? { authorizationToken: secretKey.api_key } : {}),
     body: { email, password, email_confirm: true },
     fetchImpl,
   });
