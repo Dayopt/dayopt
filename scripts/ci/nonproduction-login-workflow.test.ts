@@ -32,7 +32,9 @@ describe('nonproduction-login workflow trust boundary', () => {
     expect(trust).not.toContain('secrets.');
     expect(trust).not.toContain('github.event.pull_request.head.sha }}');
     expect(provision).toContain('needs: trust');
-    expect(provision).toContain('environment: Nonproduction login');
+    expect(provision).toContain(
+      'environment:\n      name: Nonproduction login\n      deployment: false',
+    );
     expect(provision).toContain('ref: ${{ github.sha }}');
     expect(provision).toContain('run: node scripts/ci/nonproduction-login-provision.mjs');
     expect(provision).toContain(
