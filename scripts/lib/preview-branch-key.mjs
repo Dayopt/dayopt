@@ -50,3 +50,11 @@ export async function resolvePreviewSecretKey({ projectRef, provisionToken, fetc
     throw new Error('Preview target secret key is unavailable or ambiguous');
   return matches[0].api_key;
 }
+
+/** Modern Supabase secret keys are accepted through apikey only; legacy JWT keys also need Bearer. */
+export function previewServiceKeyHeaders(serviceKey) {
+  return {
+    apikey: serviceKey,
+    ...(!serviceKey.startsWith('sb_secret_') ? { Authorization: `Bearer ${serviceKey}` } : {}),
+  };
+}

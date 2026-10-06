@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
-import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
+import { previewServiceKeyHeaders, resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import {
   isPassingPreviewReport,
@@ -134,7 +134,7 @@ export async function assertCloudFixtureKey({
         method: 'GET',
         redirect: 'error',
         signal: AbortSignal.timeout(15000),
-        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        headers: previewServiceKeyHeaders(serviceKey),
       },
     );
     if (!response.ok || (await response.json())?.id !== '00000000-0000-0000-0000-000000000001')
@@ -154,7 +154,7 @@ export async function assertCloudFixtureKey({
             method: 'GET',
             redirect: 'error',
             signal: AbortSignal.timeout(15000),
-            headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+            headers: previewServiceKeyHeaders(serviceKey),
           },
         );
         if (planned.status !== 404) throw new Error();

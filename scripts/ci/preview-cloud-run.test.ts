@@ -603,6 +603,14 @@ describe('Cloud Preview evidence and cleanup', () => {
       'https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/admin/users/00000000-0000-0000-0000-000000000001',
     );
     expect(fetchImpl.mock.calls[0][1].method).toBe('GET');
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('apikey')).toBe(
+      'sb_secret_safe-dummy',
+    );
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('Authorization')).toBeNull();
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('apikey')).toBe(
+      'sb_secret_safe-dummy',
+    );
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('Authorization')).toBeNull();
     fetchImpl.mockResolvedValueOnce(new Response('PRIVATE_PROVIDER_ERROR', { status: 401 }));
     await expect(
       assertCloudFixtureKey({ request, serviceKey: 'sb_secret_wrong', fetchImpl }),
