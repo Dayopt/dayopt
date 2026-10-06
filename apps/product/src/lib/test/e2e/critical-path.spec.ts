@@ -84,13 +84,17 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
     );
   await settleDragFrame();
   const preview = page.locator('[data-drag-selection-preview]');
-  // useDragSelection は 1 描画フレームにつき最初の mousemove だけを処理する。
-  // Playwright の steps をまとめて送ると最後の座標が捨てられるため、各移動を
-  // プレビューで確認してから次の座標を送る。
+  // MOUSE_DOWN 後のReact effectがlistenerを設定するまで、最初の移動が落ちることがある。
+  // また、useDragSelection は1描画フレームにつき最初の mousemove だけを処理するため、
+  // Playwright の steps をまとめず、各座標を描画フレームを挟んで順に送る。
   const halfHourPreview = `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourFrom).padStart(2, '0')}:30`;
-  await page.mouse.move(x, yFrom + hourHeight * 0.5);
+  for (const progress of [0.2, 0.35, 0.5]) {
+    await page.mouse.move(x, yFrom + hourHeight * progress);
+    await settleDragFrame();
+  }
   await expect(preview).toContainText(halfHourPreview);
   // 終端へ移動し、未反映の selection を mouseup で確定して短い Record を保存するのを防ぐ。
+  await settleDragFrame();
   await page.mouse.move(x, yTo);
   await expect(preview).toContainText(
     `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourTo).padStart(2, '0')}:00`,
