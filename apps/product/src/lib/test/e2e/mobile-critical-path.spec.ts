@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { expectIndependentPersistedHour } from '../critical-path-persistence';
 import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
@@ -128,6 +129,13 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
     await page.reload();
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
     await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(
+      adminSupabase,
+      IDENTITY.userId,
+      'plan',
+      offsetDateParam(1),
+      9,
+    );
   });
 
   test('昨日の枠を長押しして Record を記録し、リロード後も残る', MOBILE_TAG, async ({ page }) => {
@@ -143,5 +151,34 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → 振り返り', () =
     await page.reload();
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
     await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(
+      adminSupabase,
+      IDENTITY.userId,
+      'record',
+      offsetDateParam(-1),
+      9,
+    );
+  });
+
+  test('過去の枠でも明示選択すれば Plan として保存される', MOBILE_TAG, async ({ page }) => {
+    const yesterday = offsetDateParam(-1);
+    await openDay(page, yesterday);
+
+    await longPressHour(page, 14);
+    const drawer = page.getByRole('dialog', { name: 'アクティビティを選択' });
+    await expect(drawer).toBeVisible({ timeout: 10_000 });
+    await drawer.getByRole('tab', { name: '予定', exact: true }).click();
+    await clickAndAwaitCreate(
+      page,
+      drawer.getByRole('button', { name: IDENTITY.activityName }),
+      'plan',
+    );
+
+    const planCard = page.locator('[data-plan-lane-card]', { hasText: IDENTITY.activityName });
+    await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', yesterday, 14);
   });
 });
