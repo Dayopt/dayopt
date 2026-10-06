@@ -1396,6 +1396,44 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
       l1ShadowPreview: { status: 'complete', source: 'trusted_brief' },
     });
   });
+  it('Brief欠落時はAPIを呼ばずL0へ戻り、dispatchの更新手順を表示する', () => {
+    const runAssist = vi.fn();
+    const pack = buildContextPackWithL1(resolveContextL1Mode(parseArgs(['23'])), {
+      getHeadSha: () => 'a'.repeat(40),
+      getAuthLogin: () => 'tomoya',
+      runAssist,
+      buildPack: (() => ({
+        number: 23,
+        snapshotId: 'b'.repeat(64),
+        header: { title: 'title', url: 'https://github.com/Dayopt/dayopt/issues/23' },
+        assistSource: {
+          title: 'title',
+          body: 'body',
+          url: 'https://github.com/Dayopt/dayopt/issues/23',
+          comments: [],
+          related: [],
+          decisions: [],
+          updatedAt: null,
+        },
+        trustedBriefComments: [],
+        comments: [],
+        related: {},
+        files: [],
+        decisionLines: [],
+        skills: [],
+        judgmentRecords: {},
+      })) as unknown as typeof buildContextPack,
+    }) as ReturnType<typeof buildContextPack> & {
+      l1ShadowPreview: { status: string; reason: string; candidates: unknown[] };
+    };
+    expect(runAssist).not.toHaveBeenCalled();
+    expect(pack.l1ShadowPreview).toMatchObject({
+      status: 'unavailable',
+      reason: 'trusted_brief_missing_or_stale',
+      candidates: [],
+    });
+    expect(renderMarkdown(pack)).toContain('dispatch担当');
+  });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
     const calls: string[][] = [];
     const execFileImpl = vi.fn((_cmd: string, args: string[]) => {

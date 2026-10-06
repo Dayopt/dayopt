@@ -32,3 +32,52 @@ The two Service Worker/offline tests remain outside this remote suite because th
 Real email confirmation, MFA/recovery codes, OAuth Calendar consent/sync/writeback and real Stripe checkout/webhooks are not exercised by these flows. Auth tests use the synthetic account and billing routes are intercepted, so those results do not prove provider behavior. OAuth and billing need their dedicated nonproduction provider fixtures before those external contracts can be run safely.
 
 Local unit tests, typechecking and Playwright `--list` validate contracts and collection only. Integration completion requires the post-merge workflow to verify the closed PR, merge commit, exact Preview deployment SHA, nonproduction database identity, migration inventory, health before and after, all 59 first-attempt results and cleanup. A timeout, incomplete reporter artifact or unconfirmed cleanup is a failed run.
+
+## Authentication acceptance boundaries
+
+The separate `auth-lifecycle.manual.ts` case changes only its owned synthetic account's
+password. It requires `E2E_AUTH_LIFECYCLE_APPROVED=1`,
+`E2E_AUTH_NOTIFICATION_SINK_READY=1`, an explicit running loopback app origin
+and a loopback Supabase target; unmet
+prerequisites fail before account creation. It is outside the mandatory Preview
+critical-path selection and cannot execute against a remote target. It checks server rejection of an incorrect current password, then the
+real update, logout, rejection of the old credential, success with the new one,
+and a protected-route redirect after final logout. It requires GoTrue's
+`security_update_password_require_current_password` policy, a nonproduction
+password-change notification sink, and reviewed network access to HIBP
+`https://api.pwnedpasswords.com/range/<five-hex-prefix>`. The current Preview
+network fence excludes HIBP, so this separate local case is authored and cannot be presented as
+validated by the existing trusted harness. Do not bypass the fence or substitute
+an accepted password-update mock. Cookie/session revocation on another device
+remains a distinct acceptance gap.
+
+Email change needs secure confirmation enabled, a sink that exposes links for
+both the old and new scoped addresses, and approved callback origins. Password
+recovery needs the real sink-delivered recovery link, recovery-session callback,
+new password entry and rejection of the former credential. Signup verification
+needs the real confirmation link and resulting confirmed session. Form rendering
+or a "sent" success message proves none of these delivery/confirmation paths.
+
+The current `auth.spec.ts` deliberately leaves TOTP/recovery-code login out of
+browser E2E under decision #1873. Keep that boundary until a new product decision:
+real enrollment, factor verification, AAL2 cookie transfer, one-use recovery-code
+consumption and regeneration/disable remain acceptance checks requiring a scoped
+authenticator/recovery fixture and clock alignment. Existing unit/integration
+coverage is not real-browser acceptance evidence. OAuth consent with an external
+client and offline/PWA recovery also remain separate unexecuted boundaries.
+
+The manual filename deliberately stays outside the default Playwright discovery,
+so the normal suite neither runs nor reports it as skipped. Its dedicated config
+extends the existing desktop project, starts no services and accepts loopback
+only. After the prerequisites are independently confirmed, use:
+
+```bash
+E2E_AUTH_LIFECYCLE_ORIGIN=http://127.0.0.1:3100 \
+E2E_AUTH_LIFECYCLE_APPROVED=1 E2E_AUTH_NOTIFICATION_SINK_READY=1 \
+  pnpm --filter @dayopt/product exec playwright test --config playwright.auth-lifecycle.config.ts
+```
+
+This command additionally needs the approved local Supabase URL/key through the
+existing secret boundary. Do not use it as a remote Preview harness or proof of
+email delivery/HIBP operation; the currently authored assertions verify credential
+state and session navigation only.

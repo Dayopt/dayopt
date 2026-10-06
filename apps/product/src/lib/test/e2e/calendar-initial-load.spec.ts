@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import type { createClient } from '@supabase/supabase-js';
 import { test } from './preview-access-fixture';
 
 import type { Database } from '@/lib/database';
@@ -9,6 +9,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
@@ -73,9 +74,7 @@ for (const { timezone, offset } of CASES) {
         testInfo.project.name,
       );
       ({ email, userId } = user);
-      adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+      adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
       const { error: settingsError } = await adminSupabase.from('user_settings').upsert({
         user_id: userId,
         timezone,

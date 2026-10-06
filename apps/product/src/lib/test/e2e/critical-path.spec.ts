@@ -53,6 +53,40 @@ const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe
 const IDENTITY = createCriticalPathIdentity('critical-path');
 const ACTIVITY_NAME = IDENTITY.activityName;
 
+async function waitForTimeblockMutation(
+  page: Page,
+  procedure: string,
+  action: () => Promise<void>,
+) {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.startsWith('/api/trpc/') &&
+      new URL(response.url()).pathname.includes(procedure),
+    { timeout: 15_000 },
+  );
+  await action();
+  const response = await responsePromise;
+  expect(response.ok(), `${procedure} が保存に失敗した（HTTP ${response.status()}）`).toBe(true);
+}
+
+async function editInspectorNote(page: Page, kind: 'plan' | 'record', note: string) {
+  const inspector = page.getByRole('region', { name: ACTIVITY_NAME });
+  const noteField = inspector.getByRole('textbox', { name: 'メモ' });
+  await waitForTimeblockMutation(page, `${kind}Commands.update`, async () => {
+    await noteField.fill(note);
+    await noteField.blur();
+  });
+}
+
+async function deleteInspectorTimeblock(page: Page, kind: 'plan' | 'record') {
+  const inspector = page.getByRole('region', { name: ACTIVITY_NAME });
+  await inspector.getByRole('button', { name: 'その他の操作' }).click();
+  await waitForTimeblockMutation(page, `${kind}Commands.delete`, async () => {
+    await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+  });
+}
+
 function previewFlowTag(flowId: string) {
   return { tag: `@preview-e2e/${flowId}` };
 }
@@ -1295,4 +1329,87 @@ describeWithEnv('Critical Path: 計画 → 実績 → アクティビティ詳�
       await expect(panel.getByText('過去30日の記録はありません', { exact: true })).toBeVisible();
     },
   );
+  // Preserve main-side CRUD regressions outside the tagged Cloud acceptance matrix.
+  test('別日の Plan を作成・編集・削除し、変更が永続化される', async ({ page }) => {
+    const tomorrow = offsetDateParam(7);
+    await openDay(page, tomorrow);
+
+    await dragSelect(page, 9, 10);
+
+    // ドラッグ確定 → 編集と同じ右パネルが作成モードで開く
+    const createPanel = page.getByRole('region', { name: 'アクティビティを選択' });
+    await expect(createPanel).toBeVisible({ timeout: 10_000 });
+    await clickAndAwaitCreate(
+      page,
+      createPanel.getByRole('button', { name: ACTIVITY_NAME }),
+      'plan',
+    );
+
+    // Plan lane にカードが現れる（lane カードはアクティビティ名を表示する）
+    const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
+    await expect(planCard).toBeVisible({ timeout: 10_000 });
+
+    await planCard.click();
+    await editInspectorNote(page, 'plan', 'Preview E2E edited plan');
+
+    // Full navigation clears the client cache; opening the block again confirms the DB value.
+    await openDay(page, tomorrow);
+    const persistedPlan = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
+    await expect(persistedPlan).toBeVisible({ timeout: 10_000 });
+    await persistedPlan.click();
+    await expect(
+      page.getByRole('region', { name: ACTIVITY_NAME }).getByRole('textbox', { name: 'メモ' }),
+    ).toHaveValue('Preview E2E edited plan');
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', tomorrow, 9);
+
+    await deleteInspectorTimeblock(page, 'plan');
+    await expect(planCard).toHaveCount(0, { timeout: 10_000 });
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(planCard).toHaveCount(0);
+  });
+
+  test('Record を作成・編集・削除し、変更が永続化される', async ({ page }) => {
+    const twoDaysAgo = offsetDateParam(-2);
+    await openDay(page, twoDaysAgo);
+    await dragSelect(page, 9, 10);
+
+    const createPanel = page.getByRole('region', { name: 'アクティビティを選択' });
+    await expect(createPanel).toBeVisible({ timeout: 10_000 });
+    await clickAndAwaitCreate(
+      page,
+      createPanel.getByRole('button', { name: ACTIVITY_NAME }),
+      'record',
+    );
+
+    const recordCard = page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME });
+    await expect(recordCard).toHaveCount(1, { timeout: 10_000 });
+    await recordCard.first().click();
+    await editInspectorNote(page, 'record', 'Preview E2E edited record');
+
+    // Reloading before reading checks the saved value rather than the optimistic UI state.
+    await openDay(page, twoDaysAgo);
+    const persistedRecord = page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME });
+    await expect(persistedRecord).toHaveCount(1, { timeout: 10_000 });
+    await persistedRecord.first().click();
+    await expect(
+      page.getByRole('region', { name: ACTIVITY_NAME }).getByRole('textbox', { name: 'メモ' }),
+    ).toHaveValue('Preview E2E edited record');
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'record', twoDaysAgo, 9);
+
+    await deleteInspectorTimeblock(page, 'record');
+    await expect(recordCard).toHaveCount(0, { timeout: 10_000 });
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(recordCard).toHaveCount(0);
+    const deletedStart = new Date(`${twoDaysAgo}T09:00:00+09:00`).toISOString();
+    const deletedRecord = await adminSupabase
+      .from('records')
+      .select('id,deleted_at')
+      .eq('user_id', IDENTITY.userId)
+      .eq('start_at', deletedStart);
+    expect(deletedRecord.error === null).toBe(true);
+    expect(deletedRecord.data).toHaveLength(1);
+    expect(deletedRecord.data?.[0]?.deleted_at).not.toBeNull();
+  });
 });

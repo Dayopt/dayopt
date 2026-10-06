@@ -1,12 +1,16 @@
 import { expect } from '@playwright/test';
 import { test } from './preview-access-fixture';
 
-import { resolveServiceRoleTarget } from '../service-role-target-guard';
+import {
+  assertServiceRoleSuiteRunnable,
+  resolveServiceRoleTarget,
+} from '../service-role-target-guard';
 import {
   createScopedTestUser,
   deleteScopedTestUser,
   type ScopedTestUser,
 } from './create-scoped-test-user';
+import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
  * Mobile Navigation E2E
@@ -18,10 +22,12 @@ import {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY;
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SERVICE_ROLE_KEY);
+assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Mobile Navigation');
 
 let testUser: ScopedTestUser | undefined;
 
 async function loginAndNavigate(page: import('@playwright/test').Page) {
+  await suppressConsentBanner(page);
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
@@ -127,6 +133,33 @@ test.describe('Mobile Navigation', () => {
 
       await page.goBack();
       await expect(page).toHaveURL(/\/ja\/?\?view=day&date=2026-03-25$/);
+    },
+  );
+
+  test(
+    'touch settings categories open the matching page and return to the account list',
+    { tag: '@mobile' },
+    async ({ page }) => {
+      await loginAndNavigate(page);
+      for (const [category, title] of [
+        ['account', 'アカウント'],
+        ['display', '表示'],
+        ['data', 'データ'],
+        ['integrations', '連携'],
+        ['billing', '請求'],
+      ] as const) {
+        await page.goto('/ja/settings');
+        await page.getByRole('link', { name: title, exact: true }).tap();
+        await expect(page).toHaveURL(new RegExp(`/ja/settings/${category}(?:\\?|$)`));
+        await expect(
+          page.getByRole('heading', { level: 1, name: title, exact: true }),
+        ).toBeVisible();
+        await page.getByRole('link', { name: '戻る', exact: true }).tap();
+        await expect(page).toHaveURL(/\/ja\/settings$/);
+        await expect(
+          page.getByRole('heading', { level: 1, name: 'アカウント', exact: true }),
+        ).toBeVisible();
+      }
     },
   );
 });

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ciSecretSchema } from '../tasks/env/schema';
 
-// GitHub Actions Secrets は 1Password `ci` vault の replica（docs/operations/secrets.md
+// GitHub Actions Secrets は 1Password master の replica（docs/operations/secrets.md
 // §Replica 台帳）。基本方針 7「値がどこにあっても 1Password にもある」を、名前の対応で
 // 機械検査する。GitHub の Secret 一覧 API は admin 権限が要り CI からも agent からも
 // 読めないため、workflow が参照する名前を「実在する replica」の代理として使う。
@@ -73,7 +73,7 @@ const ledgerByName = new Map(
   ciSecretSchema.map((entry) => [entry.githubSecret ?? entry.envName, entry]),
 );
 
-describe('CI secret ledger（workflow の secrets.* ⇔ 1Password ci vault）', () => {
+describe('CI secret ledger（workflow の secrets.* ⇔ 1Password master）', () => {
   it('workflow が参照する GitHub Secret はすべて ci 台帳に master 参照を持つ（実在は別確認）', () => {
     const missing = allSecretUses()
       .filter((use) => !ledgerByName.has(use.secret))
@@ -128,8 +128,13 @@ describe('CI secret ledger（workflow の secrets.* ⇔ 1Password ci vault）', 
     expect(scripted).toEqual(ledger);
   });
 
-  it('ci 台帳は ci vault だけを指し、Secret 名は重複しない', () => {
-    expect(ciSecretSchema.every((entry) => entry.vault === 'ci')).toBe(true);
+  it('owner指定Preview itemだけを専用vaultから読み、Secret 名は重複しない', () => {
+    const nonCiEntries = ciSecretSchema.filter((entry) => entry.vault !== 'ci');
+    expect(nonCiEntries.map((entry) => entry.envName).sort()).toEqual([
+      'NONPROD_PREVIEW_LOGIN_EMAIL',
+      'NONPROD_PREVIEW_LOGIN_PASSWORD',
+    ]);
+    expect(nonCiEntries.every((entry) => entry.vault === 'dlmo7yfs5buvd3j3sbikjjqypa')).toBe(true);
     expect(ledgerByName.size).toBe(ciSecretSchema.length);
   });
 

@@ -463,42 +463,70 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
   ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
     field: 'credential',
   }),
-  // Planned masters remain pending independently of replicas saved directly in the Environment.
+  // Planned Preview readiness/bypass masters remain pending independently of Environment replicas.
   // GitHub's short-lived read token observes Vercel; never add a Production-capable Vercel PAT here.
   ...[
-    [
-      'SUPABASE_PREVIEW_READINESS_TOKEN',
-      'PREVIEW_E2E_SUPABASE_READINESS_TOKEN',
-      'preview-e2e',
-      'PREVIEW_E2E_SUPABASE_READINESS_TOKEN',
-    ],
-    [
-      'VERCEL_AUTOMATION_BYPASS_SECRET',
-      'PREVIEW_E2E_BYPASS_SECRET',
-      'preview-e2e',
-      'PREVIEW_E2E_BYPASS_SECRET',
-    ],
-    [
-      'SUPABASE_PREVIEW_PROVISION_TOKEN',
-      'SUPABASE_PREVIEW_PROVISION_TOKEN',
-      'supabase-preview-provision',
-      'credential',
-    ],
-  ].map(([envName, githubSecret, item, field]) => ({
+    ['SUPABASE_PREVIEW_READINESS_TOKEN', 'PREVIEW_E2E_SUPABASE_READINESS_TOKEN'],
+    ['VERCEL_AUTOMATION_BYPASS_SECRET', 'PREVIEW_E2E_BYPASS_SECRET'],
+  ].map(([envName, githubSecret]) => ({
     ...pendingEnvEntry(
       envName,
       'secret',
       'staging',
       ci,
-      item,
-      envName === 'SUPABASE_PREVIEW_PROVISION_TOKEN'
-        ? 'Scoped read-only token fetches the exact Preview branch key only after readiness validation'
-        : 'Cloud Preview master is not initialized; direct Environment replicas do not prove a master exists or resolve the remaining bypass boundary',
-      field,
+      'preview-e2e',
+      'Cloud Preview master is not initialized; direct Environment replicas do not prove a master exists or resolve the remaining bypass boundary',
+      githubSecret,
     ),
     githubSecret,
     githubEnvironments: ['Preview – product'],
   })),
+  // Trusted provisioning uses distinct Integration and Preview login items. The Integration
+  // fields were verified through the owner-provided vault locator; the owner designated the
+  // separate Preview item. Neither GitHub replica has been synchronized in this work.
+  ...[
+    ['NONPROD_LOGIN_EMAIL', ci, 's3tems3afbzvvguakggydcgxni', 'username'],
+    ['NONPROD_LOGIN_PASSWORD', ci, 's3tems3afbzvvguakggydcgxni', 'password'],
+    [
+      'NONPROD_PREVIEW_LOGIN_EMAIL',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'username',
+    ],
+    [
+      'NONPROD_PREVIEW_LOGIN_PASSWORD',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'password',
+    ],
+  ].map(([envName, vault, item, field]) => ({
+    ...pendingEnvEntry(
+      envName,
+      'secret',
+      'staging',
+      vault,
+      item,
+      'GitHub Environment replica has not been initialized by the controlled setup run',
+      field,
+    ),
+    field,
+    githubSecret: envName,
+    githubEnvironments: ['Nonproduction login'],
+  })),
+  {
+    ...pendingEnvEntry(
+      'SUPABASE_PREVIEW_PROVISION_TOKEN',
+      'secret',
+      'staging',
+      ci,
+      'supabase-preview-provision',
+      'GitHub Environment replicas have not been initialized by the controlled setup run',
+      'credential',
+    ),
+    field: 'credential',
+    githubSecret: 'SUPABASE_PREVIEW_PROVISION_TOKEN',
+    githubEnvironments: ['Nonproduction login', 'Preview – product'],
+  },
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),

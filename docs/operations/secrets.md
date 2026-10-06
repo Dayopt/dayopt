@@ -22,6 +22,8 @@ code: scripts/tasks/env/schema.ts
 
 PR ごとの Supabase Preview Branch credentials は例外。Supabase / Vercel integration が作る ephemeral replica であり、1Password には保存しない。
 
+Preview E2E のログイン用アカウント資格情報は branch API credentials と別管理し、専用の Preview 1Password item を使う。同じログイン資格情報を全 Preview PR で共通利用する方針で、固定 Integration 用 item とは分ける。各 Preview branch には同じアカウントを個別に作成・検証するため、Auth user とアプリデータは branch ごとに独立するが、Preview 間でログイン資格情報自体は共有される。
+
 `.env.local` に実値を置く運用は廃止。Vercel CLI などで一時生成された `.env.local` は unsafe / temporary として扱い、作業後に削除する。
 
 ---
@@ -266,7 +268,7 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 ### Persistent Product Integration（#2910）
 
-Integration は既存 `product` Vercel projectの `integration` branchと、非本番Supabase projectの `integration` branchを使う。新しいVercel projectや独自domainは作らない。共通Product Previewでは非本番persistent Supabaseを共有し、branch-scoped environment marker / OAuth originは固定Integration branchにだけ設定する。Supabase secret keyはserver-onlyで、Production credentialsをコピーしない。
+Integration は既存 `product` Vercel projectの `integration` branchと、非本番Supabase projectの `integration` branchを使う。新しいVercel projectや独自domainは作らない。共通Product Previewでは非本番persistent Supabaseを共有し、branch-scoped environment marker / OAuth originは固定Integration branchにだけ設定する。Supabase secret keyはserver-onlyで、Production credentialsをコピーしない。Preview E2E のログイン資格情報は別の Preview item から読み、Preview 全体で共通利用する。
 
 固定originは `https://product-git-integration-dayopt.vercel.app`、Supabase refは `tilwaprottpyhlfoggbb`。Vercel project ID、Git branch、Preview target、branch alias、app URL、Supabase ref、OAuth issuer/resourceの一致をbuildとruntimeで検査する。Vercel system variablesは手入力せず、実secretやdeployment-specific URLをrepo・Issue・会話へ記録しない。
 
@@ -586,6 +588,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 | Vercel Production Env（product / web）                                        | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
 | Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                  | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
 | GitHub Actions environment secrets（`production-release` / `production-ops`） | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
+| GitHub Actions environment secrets（`Nonproduction login`）                   | Integration用・Preview用の別1Password login items と owner-managed `supabase-preview-provision` item                | `scripts/runbook/setup-nonproduction-login.sh`（専用Environmentへの同期。値はstdin経由）                                                                           |
 | Supabase Dashboard Secrets                                                    | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
 | PR Preview Branch credentials                                                 | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
 | `~/.config/gh-agent/hosts.yml`（開発機、0600）                                | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
@@ -643,6 +646,16 @@ GitHub Actions Secrets は CI/CD 用の replica。build / e2e 用 public env な
 - **同期の手順**: `scripts/runbook/sync-ci-environment-secrets.sh` を User の terminal で実行する（既定 dry-run、`--execute` で反映、`--only <Secret 名>` で 1 つだけ）。値は `op read` から `gh secret set --env` へ pipe で渡し、表示しない。一覧は `ciSecretSchema` の `githubEnvironments` と 1:1 で、`scripts/__tests__/ci-secret-ledger.test.ts` が workflow の宣言・script の一覧と照合する
 - **rotation 時**: 1Password master を更新したら、この script の `--only` で該当 Secret を environment へ同期する。`VERCEL_TOKEN` / `VERCEL_ORG_ID` は 2 つの environment に複製しているので、両方が更新される
 - **Team プランの private repo でも使える**: environment secret と deployment branch policy は GitHub Team の private repo で使える。required reviewers は Enterprise が要るので使わない
+
+#### 非本番ログイン準備（#2910）
+
+`Nonproduction login` はIntegrationとPRごとの専用Preview branchにAuthユーザーを準備する専用Environment。許可branchは `main` と `integration`。Integration用の `NONPROD_LOGIN_EMAIL` / `NONPROD_LOGIN_PASSWORD` は既存のIntegration項目から、Preview用の `NONPROD_PREVIEW_LOGIN_EMAIL` / `NONPROD_PREVIEW_LOGIN_PASSWORD` はowner指定の専用Preview項目から同期する。Provisionerは検証済みtargetに対応する組だけを使う。候補コードにはどちらのsecretも渡さない。`SUPABASE_PREVIEW_PROVISION_TOKEN` は `Nonproduction login` と `Preview – product` の両Environmentに登録する。このtokenにはSupabase `Development Branches: Read`、`API Keys: Read`、`API Key Secrets: Read` が必要。Preview E2Eはreadinessで検証した対象project refからkeyを取得し、候補workerへManagement tokenを渡さない。Productionでは使わない。Supabase GitHub/Vercel integrationが全PR用branchを作成し、Previewへbranch-specific credentialsを渡す設定は現在未確認であり、先にクラウド側で有効化が必要。
+
+1Passwordを正本としてGitHub Environmentの暗号化secretsへ必要分だけ同期する。最初にGitHub Settingsで空の `Nonproduction login` Environmentを作り、deployment branch policyを `main` と `integration` のみにする。次にSupabase Dashboard `/account/tokens` でScoped Management PATを発行し、`Development Branches: Read`、`API Keys: Read`、`API Key Secrets: Read` だけを付与する。resource scopeはまず親dayopt projectを指定する。動的Preview branchのAPI keyまで取得できるかは公式資料で確認できていないため、実行時に権限エラーとなった場合だけ必要なbranch scopeへ広げる。Classic full-access tokenは使わない。発行したPATは1Password item `supabase-preview-provision` の `credential` fieldへ保存する。このitemはまだ作成されていない。通常は `ci` vaultを使い、別vaultに保存する場合はownerがそのVault IDを `NONPROD_LOGIN_PROVISION_VAULT_ID` で指定する。値やVault IDを会話・ログへ貼らない。Integration login sourceは1Password item ID `s3tems3afbzvvguakggydcgxni` の `username` / `password` fieldsで、指定Vaultから両fieldが非空であることを確認済み。Preview loginはownerが専用1Password itemを指定済みだが、fieldsの非空確認とGitHub replicaへの同期は未実施。
+
+1Password startup checkが通る環境で、ownerが管理するログインVault IDを `NONPROD_LOGIN_VAULT_ID` に設定して `scripts/runbook/setup-nonproduction-login.sh --execute` を実行する。PAT itemを `ci` 以外へ保存した場合は `NONPROD_LOGIN_PROVISION_VAULT_ID` も設定する。Vault IDはログへ出さない。既定はdry-run。scriptはIntegration用とPreview用のitemを分けて読み、Management PATも含む全5値をGitHubへ書く前に空でないことを確認する。Integration側のVault IDは明示し、Preview側はowner指定itemのlocatorを使う。branch policyに `main` / `integration` 以外があれば停止する。値はprocess memoryとstdinだけを通り、一時ファイル、argv、ログへ保存しない。1Password read失敗時は固定メッセージで停止し、GitHub secretsを書かない。同期は5つのsecret更新なので、GitHub側の途中失敗は手動で再実行する。PAT itemまたはEnvironment設定が不足する場合は同期完了と扱わない。Codex workspace外から実行する場合もstartup checkは必須で、owner端末上の承認済みchecker pathを `OP_STARTUP_CHECK` で指定する。checkerが見つからない／失敗した場合は処理を中断する。
+
+`pull_request_target`はworkflowがdefault branchに入るまで自動実行されない。merge後は新規・更新・ready化したinternal PRで自動準備される。Integrationはtrusted Integration refから手動dispatchできる。候補PRのコードはcredentials付きjobでcheckout/実行しない。workflow導入とEnvironment/secret同期の後、Integrationをdispatchし、PR PreviewでAuth password grantを確認する。いずれもアプリUIの実ログイン、redirect、CRUDを別途確認する。
 
 ### Supabase Dashboard Secrets
 
@@ -757,10 +770,12 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 
 ### Cloud Preview の未初期化台帳（#2910）
 
-`ci/preview-e2e` のreadiness tokenとbypass secretは **planned master** としてoptional/pendingを維持する。Preview branch keyは固定keyをmaster化せず、`supabase-preview-provision/credential` のread-only Management tokenからreadiness後に対象branchごと取得する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。値は会話へ出さない。
+過去の登録記録（master同期やcleanup成功の証明ではない）: `ci/preview-e2e` のreadiness tokenとbypass secretは **planned master** としてoptional/pendingを維持する。Preview branch keyは固定keyをmaster化せず、`supabase-preview-provision/credential` のread-only Management tokenからreadiness後に対象branchごと取得する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。値は会話へ出さない。
+
+`ci/preview-e2e` のreadiness tokenとVercel bypass secretは **planned master** としてoptional/pendingを維持する。Preview E2Eの固定DB key replicaは使わず、`SUPABASE_PREVIEW_PROVISION_TOKEN` でreadinessが検証したPreview projectのkeyを動的に取得する。1Password master値やEnvironment間の値一致は、専用同期手順とrun結果で別途確認する。値は会話へ出さない。
 
 `PREVIEW_E2E_VERCEL_TOKEN` のplanned参照は廃止する。短寿命 `GITHUB_TOKEN` のdeployments/statuses read権限で、GitHubが認証したVercel botのProduct Preview記録を確認する。Production用 `VERCEL_TOKEN` のmaster・replica・release経路は変更しない。project-scoped Vercel tokenもProductのProductionを含むread/write権限を持つため、Preview用tokenとして新規発行しない。
 
-Protection bypassは未保存・権限境界の判断待ち。project単位keyはProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは呼ばない。専用project keyと対象Previewだけのshare方式のどちらを採用するか、所有者の判断後に対応する。既存Production bypassを複製しない。既存 `sync-ci-environment-secrets.sh` のProduction同期は実行しない。readiness/bypass参照は同scriptでplanned masterとの対応をpendingコメントに残し、実行対象に加えていない。branch key用tokenの同期はPreview E2E専用で、Production同期へ追加しない。
+Protection bypassは未保存・権限境界の判断待ち。project単位keyはProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは呼ばない。専用project keyと対象Previewだけのshare方式のどちらを採用するか、所有者の判断後に対応する。既存Production bypassを複製しない。既存 `sync-ci-environment-secrets.sh` のProduction同期は実行しない。残る3参照は同scriptでplanned masterとの対応をpendingコメントに残し、実行対象に加えていない。masterを初期化済みにする判断は別途行う。
 
 `PREVIEW_E2E_SUPABASE_READINESS_TOKEN` は **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを持つfine-grained tokenとする。branch一覧と `GET /v1/projects/{ref}/database/migrations` のversion metadataを確認し、Database Data Read・SQL実行・write権限を与えない。project選択が親projectしか提供しない場合は親を選ぶため、親のbranch/migration metadataも読める境界になる。Productionのユーザーデータを読めるtokenではなく、非本番projectだけに限定したtokenとも呼ばない。親projectで選んだtokenが対象子projectのmigration一覧を読めることは別途実測し、401/403ではProduction credentialやSQLへのfallbackをせず停止する。[migration一覧の公式契約](https://supabase.com/docs/reference/api/v1-list-migration-history)に従い、versionの欠落・追加・重複・不正応答はreadiness失敗とする。

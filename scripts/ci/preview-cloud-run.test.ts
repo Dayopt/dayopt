@@ -248,6 +248,7 @@ describe('Cloud Preview evidence and cleanup', () => {
       'apps/product/src/lib/test/e2e/trpc-budget-fixture.ts',
       'apps/product/src/lib/test/preview-user-lifecycle.ts',
       'apps/product/src/lib/test/preview-access.ts',
+      'apps/product/src/lib/test/preview-service-key-fetch.mjs',
     ];
     for (const path of paths) {
       const file = join(root, path);
@@ -255,6 +256,10 @@ describe('Cloud Preview evidence and cleanup', () => {
       writeFileSync(file, readFileSync(path));
     }
     expect(() => verifyCloudFixtureContract(root)).not.toThrow();
+    const helper = 'apps/product/src/lib/test/preview-service-key-fetch.mjs';
+    writeFileSync(join(root, helper), 'export const unsafe = true');
+    expect(() => verifyCloudFixtureContract(root)).toThrow('fixture contract differs');
+    writeFileSync(join(root, helper), readFileSync(helper));
     writeFileSync(
       join(root, paths[1]),
       'export function createCriticalPathIdentity(){return {userId:crypto.randomUUID()}}',

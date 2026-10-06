@@ -385,6 +385,10 @@ function renderL1ShadowPreview(preview) {
       `Jevのshadow結果を取得できません（${preview.reason ?? 'assist_unavailable'}）。L0の結果はそのまま利用できます。`,
     );
   }
+  if (preview.reason === 'trusted_brief_missing_or_stale')
+    lines.push(
+      'dispatch担当が同じ公開HEADで `pnpm ctx <Issue番号> --post` を更新し、workerは `pnpm ctx <Issue番号> --reuse-brief-l1` で再取得してください。旧形式・入力snapshot・HEAD・投稿者の不一致では再利用できません。workerへGateway keyを渡す必要はありません。',
+    );
   for (const row of preview.candidates ?? [])
     lines.push(`- [${row.id}](${row.url}) | ${row.categoryLabel} | 読む候補（shadow）`);
   if (preview.status === 'complete' && preview.evaluatedCount === 0)
@@ -2252,6 +2256,7 @@ function main() {
     process.stdout.write(
       `${result.mode === 'update' ? '更新' : result.mode === 'unchanged' ? '変更なし' : '作成'}: ${result.url ?? '（URL 未取得）'}\n`,
     );
+    process.stdout.write(`${renderL1ShadowPreview(pack.l1ShadowPreview).join('\n')}\n`);
     return;
   }
   if (options.json) {

@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { previewServiceKeyFetch } from '../../apps/product/src/lib/test/preview-service-key-fetch.mjs';
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
@@ -283,11 +284,12 @@ export async function runPreviewE2E({
   return result;
 }
 
-function createPreviewAdmin(projectRef, secretKey) {
+export function createPreviewAdmin(projectRef, secretKey) {
   const requireFromProduct = createRequire(join(ROOT, 'apps/product/package.json'));
   const { createClient } = requireFromProduct('@supabase/supabase-js');
   return createClient(`https://${projectRef}.supabase.co`, secretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: previewServiceKeyFetch(secretKey) },
   });
 }
 
