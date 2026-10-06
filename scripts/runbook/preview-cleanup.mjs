@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { previewServiceKeyHeaders } from '../lib/preview-branch-key.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const SEED_USER = '00000000-0000-0000-0000-000000000001';
@@ -17,7 +18,8 @@ const STATUSES = new Set([
   'cleanup-failed',
   'deleted',
 ]);
-const SYNTHETIC_EMAIL = /^(?:mobile-)?critical-path-[a-f0-9-]{36}@example\.com$/;
+const SYNTHETIC_EMAIL =
+  /^(?:(?:mobile-)?critical-path|account-deletion)-[a-f0-9-]{36}@example\.com$/;
 
 /** Recover only journaled synthetic users whose server-side ownership matches. */
 export async function recoverPreviewUsers({
@@ -90,7 +92,7 @@ export async function recoverPreviewUsers({
       method,
       redirect: 'error',
       signal: AbortSignal.timeout(Math.min(15_000, remaining)),
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      headers: previewServiceKeyHeaders(serviceKey),
     });
   }
   let recovered = 0;

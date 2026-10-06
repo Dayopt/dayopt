@@ -312,6 +312,8 @@ export interface CallGraphInput {
   mcpToolFiles: Map<string, string>;
   /** route id → page.tsx の repo-relative path */
   pageFiles: Map<string, string>;
+  /** layout がマウントする共有 hook の明示的な route 帰属 */
+  sharedPageHookFiles?: Map<string, string[]>;
 }
 
 export function buildCallGraph(input: CallGraphInput): CallGraph {
@@ -354,7 +356,16 @@ export function buildCallGraph(input: CallGraphInput): CallGraph {
   for (const [route, path] of input.pageFiles) {
     const file = context.program.getSourceFile(resolve(input.root, path));
     if (file === undefined) continue;
-    const found = collectPageProcedures(context, file, input.procedureIds);
+    const found = [
+      ...new Set([
+        ...collectPageProcedures(context, file, input.procedureIds),
+        ...(input.sharedPageHookFiles?.get(route) ?? []).flatMap((hookPath) => {
+          const hook = context.program.getSourceFile(resolve(input.root, hookPath));
+          if (hook === undefined) throw new Error(`共有 hook が見つかりません: ${hookPath}`);
+          return collectPageProcedures(context, hook, input.procedureIds);
+        }),
+      ]),
+    ].sort();
     if (found.length > 0) pages.push({ route, procedures: found });
   }
 

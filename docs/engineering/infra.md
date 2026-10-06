@@ -15,6 +15,10 @@ last_verified: 2026-10-05
 
 Dayopt の標準リリース経路は `PR Preview → production`。Local は任意で、固定IntegrationはProduction Supabase DBを使わない非本番確認先。
 
+Auth CAPTCHA は Local と ephemeral PR Preview で無効化し、自動の nonproduction login を可能にする（`supabase/config.toml` の `[auth.captcha]`）。Local は既定で無効のため設定による挙動変更はない。Supabase GitHub integration の config sync は ephemeral Preview branchに適用する（[Supabase configuration docs](https://supabase.com/docs/guides/deployment/branching/configuration)）。固定 Integration の Dashboard 設定は変更せず、Production は Dashboard を正本として CAPTCHA を有効のまま保つ。Production の設定は `scripts/ci/production-auth-config-audit.mjs` が検査する。
+
+Auth CAPTCHA は Local と ephemeral PR Preview で無効化し、自動の nonproduction login を可能にする（`supabase/config.toml` の `[auth.captcha]`）。Local は既定で無効のため設定による挙動変更はない。Supabase GitHub integration の config sync は ephemeral Preview branchに適用する（[Supabase configuration docs](https://supabase.com/docs/guides/deployment/branching/configuration)）。固定 Integration の Dashboard 設定は変更せず、Production は Dashboard を正本として CAPTCHA を有効のまま保つ。Production の設定は `scripts/ci/production-auth-config-audit.mjs` が検査する。
+
 ### 環境一覧
 
 | 環境               | Supabase                                     | Vercel                                     | URL                                         |

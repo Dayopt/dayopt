@@ -418,6 +418,60 @@ describe.skipIf(!RUN_LOCAL)('MCP environment identity integration', () => {
         '${previewRef}'
       );
 
+      -- The Preview allowlist accepts either exact email only when all Auth
+      -- email fields agree; it never accepts a mixed legacy/current tuple.
+      ALTER TABLE public.mcp_environment_identity
+        DISABLE TRIGGER trigger_prevent_mcp_environment_identity_change;
+      DELETE FROM public.mcp_environment_identity;
+      ALTER TABLE public.mcp_environment_identity
+        ENABLE TRIGGER trigger_prevent_mcp_environment_identity_change;
+
+      UPDATE auth.users
+      SET email = 'test-seed@dayopt.dev'
+      WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+      SELECT pg_temp.assert_preview_provision_rejected('DI005');
+      UPDATE auth.users
+      SET email = 'test@dayopt.dev'
+      WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+
+      UPDATE auth.identities
+      SET provider_id = 'test-seed@dayopt.dev'
+      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+      SELECT pg_temp.assert_preview_provision_rejected('DI005');
+      UPDATE auth.identities
+      SET provider_id = 'test@dayopt.dev'
+      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+
+      UPDATE auth.identities
+      SET identity_data = pg_catalog.jsonb_build_object(
+        'sub', '00000000-0000-0000-0000-000000000001',
+        'email', 'test-seed@dayopt.dev'
+      )
+      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+      SELECT pg_temp.assert_preview_provision_rejected('DI005');
+
+      UPDATE auth.users
+      SET email = 'test-seed@dayopt.dev'
+      WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+      UPDATE auth.identities
+      SET provider_id = 'test-seed@dayopt.dev'
+      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+      UPDATE auth.identities
+      SET identity_data = pg_catalog.jsonb_build_object(
+        'sub', '00000000-0000-0000-0000-000000000001',
+        'email', 'test-seed@dayopt.dev'
+      )
+      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+      DO $provision$
+      BEGIN
+        PERFORM * FROM public.provision_mcp_preview_environment_identity_v1(
+          '${previewUrl}',
+          '${previewUrl}',
+          '${previewRef}'
+        );
+      END;
+      $provision$;
+
       DO $$
       DECLARE
         v_replacement_rejected BOOLEAN := false;

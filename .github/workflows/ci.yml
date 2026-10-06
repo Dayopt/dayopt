@@ -41,8 +41,12 @@ on:
         description: Run Preview E2E or recover a completed Preview run
         type: boolean
         default: false
+      preview_merged_validation:
+        description: Allow only a merged Integration PR whose merge is in this workflow SHA
+        type: boolean
+        default: false
       preview_pr:
-        description: Open internal PR number
+        description: Internal PR number for the selected open or merged policy
         type: string
       preview_sha:
         description: Reviewed 40-character candidate SHA
@@ -418,6 +422,26 @@ jobs:
           CI: true
         run: node scripts/ci/check.mjs integration
 
+      - name: Export disposable DB metadata for drift diagnosis
+        if: ${{ failure() && steps.supabase.outcome == 'success' }}
+        env:
+          DATABASE_URL: ${{ steps.supabase.outputs.db_url }}
+        run: |
+          mkdir -p db-metadata-diagnostics
+          pnpm types:generate:local
+          pnpm rls:snapshot
+          cp apps/product/src/lib/database/generated/database.types.ts db-metadata-diagnostics/
+          cp docs/engineering/data/db/rls-snapshot.md db-metadata-diagnostics/
+          node -e 'require("node:fs").writeFileSync("db-metadata-diagnostics/identity.json", JSON.stringify({sha: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT, source: "disposable-ci-db"}))'
+      - name: Upload disposable DB metadata diagnostics
+        if: ${{ failure() && steps.supabase.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: db-metadata-diagnostics-${{ github.run_attempt }}
+          path: db-metadata-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Stop Supabase
         if: always()
         run: supabase stop
@@ -566,12 +590,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           SUPABASE_PREVIEW_READINESS_TOKEN: ${{ secrets.PREVIEW_E2E_SUPABASE_READINESS_TOKEN }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.PREVIEW_E2E_BYPASS_SECRET }}
-          SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}
+          SUPABASE_PREVIEW_PROVISION_TOKEN: ${{ secrets.SUPABASE_PREVIEW_PROVISION_TOKEN }}
         run: node scripts/ci/preview-cloud-run.mjs execute "$RUNNER_TEMP/preview-request.json" "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/preview-run" "$RUNNER_TEMP/preview-public" "$RUNNER_TEMP/preview-intent/intent.json"
       - name: Recover owned users on a surviving worker after failure or cancellation
         if: always() && steps.execute.outcome != 'skipped'
         env:
-          SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}
+          SUPABASE_PREVIEW_PROVISION_TOKEN: ${{ secrets.SUPABASE_PREVIEW_PROVISION_TOKEN }}
         run: node scripts/ci/preview-cloud-run.mjs cleanup "$RUNNER_TEMP/preview-request.json" "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/preview-run" "$RUNNER_TEMP/preview-public" "$RUNNER_TEMP/preview-intent/intent.json"
       - name: Reconstruct JSON-only public evidence
         if: always() && steps.execute.outcome != 'skipped'
@@ -603,6 +627,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
           PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
+          PREVIEW_MERGED_VALIDATION: ${{ inputs.preview_merged_validation }}
         run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
 
   preview-recovery:
@@ -628,12 +653,13 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_RECOVER_RUN: ${{ inputs.preview_recover_run }}
           PREVIEW_RECOVER_ATTEMPT: ${{ inputs.preview_recover_attempt }}
+          PREVIEW_MERGED_VALIDATION: ${{ inputs.preview_merged_validation }}
         run: node scripts/ci/preview-cloud-recovery.mjs prepare "$RUNNER_TEMP/preview-recovery"
       - id: recover
         name: Revalidate the completed source and recover only its planned synthetic users
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SUPABASE_SECRET_KEY: ${{ secrets.PREVIEW_E2E_SUPABASE_KEY }}
+          SUPABASE_PREVIEW_PROVISION_TOKEN: ${{ secrets.SUPABASE_PREVIEW_PROVISION_TOKEN }}
         run: node scripts/ci/preview-cloud-recovery.mjs execute "$RUNNER_TEMP/preview-recovery"
       - name: Save public recovery confirmation
         if: always() && steps.recover.outcome != 'skipped'

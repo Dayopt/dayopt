@@ -1,5 +1,6 @@
 import { dayoptProductUrls } from '@dayopt/config';
-import { expect, test } from '@playwright/test';
+import { publicRequestGet } from './public-get';
+import { expect, test } from './public-test';
 
 test('footer の言語切替で locale prefix と hero copy が切り替わる @mobile', async ({ page }) => {
   await page.goto('/');
@@ -37,7 +38,7 @@ test('登録 CTA が product signup に統一されている', async ({ page }) 
   expect(signupHrefs.every((href) => href === dayoptProductUrls.signup)).toBe(true);
 });
 
-test('LP metadata と OG image が新コピーに整合する', async ({ page }) => {
+test('LP metadata と OG image が新コピーに整合する', async ({ page, baseURL }) => {
   const ogTitle = 'Dayopt';
   const description =
     "Your plans and records, together in one calendar. What you learn today makes tomorrow's plan a little better.";
@@ -57,7 +58,11 @@ test('LP metadata と OG image が新コピーに整合する', async ({ page })
   expect(ogUrl.searchParams.get('description')).toBe(description);
   expect(ogUrl.searchParams.get('locale')).toBe('en');
 
-  const response = await page.request.get(`/api/og?${ogUrl.searchParams.toString()}`);
+  const response = await publicRequestGet(
+    page.request,
+    `/api/og?${ogUrl.searchParams.toString()}`,
+    baseURL!,
+  );
   expect(response.ok()).toBe(true);
   expect(response.headers()['content-type']).toContain('image/png');
 });

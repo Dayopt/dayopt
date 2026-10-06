@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import type { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
 
@@ -7,6 +7,8 @@ import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
+import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 import { test } from './trpc-budget-fixture';
 
@@ -22,10 +24,9 @@ const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe
 
 const TIMEZONE = 'Asia/Tokyo';
 const TEST_DATE = '2026-04-20';
-const TEST_RUN_ID = crypto.randomUUID();
-const TEST_USER_ID = crypto.randomUUID();
-const TEST_EMAIL = `calendar-navigation-${TEST_RUN_ID}@example.com`;
-const TEST_PASSWORD = 'test-password-123';
+let TEST_USER_ID: string;
+let TEST_EMAIL: string;
+let TEST_PASSWORD: string;
 
 type SupabaseClient = ReturnType<typeof createClient<Database>>;
 
@@ -65,28 +66,17 @@ describeWithEnv('Calendar navigation', () => {
 
   let adminSupabase: SupabaseClient;
 
-  test.beforeAll(async () => {
-    adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+  test.beforeAll(async ({}, testInfo) => {
+    adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
 
-    const { error: authError } = await adminSupabase.auth.admin.createUser({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-      email_confirm: true,
-      user_metadata: { full_name: 'calendar navigation e2e' },
-    });
-    if (authError && !authError.message.includes('already exists')) {
-      throw new Error(authError.message);
-    }
+    const user = await createScopedTestUser(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY!,
+      'calendar-navigation',
+      testInfo.project.name,
+    );
+    ({ userId: TEST_USER_ID, email: TEST_EMAIL, password: TEST_PASSWORD } = user);
 
-    await adminSupabase.from('profiles').upsert({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
     await adminSupabase.from('user_settings').upsert({
       user_id: TEST_USER_ID,
       timezone: TIMEZONE,
@@ -99,52 +89,73 @@ describeWithEnv('Calendar navigation', () => {
   });
 
   test.afterAll(async () => {
-    if (!adminSupabase) return;
-    await adminSupabase.from('user_settings').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('profiles').delete().eq('id', TEST_USER_ID);
-    await adminSupabase.auth.admin.deleteUser(TEST_USER_ID);
+    if (!TEST_USER_ID) return;
+    await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, TEST_USER_ID);
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.beforeEach(async ({ page, context, baseURL }, testInfo) => {
     test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+    if (process.env.E2E_ISOLATED_RUN === '1') {
+      const origins = [new URL(baseURL!), new URL(SUPABASE_URL!)];
+      if (
+        process.env.E2E_PREVIEW_ORIGIN ||
+        origins.some((origin) => !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))
+      ) {
+        throw new Error('Isolated calendar navigation requires loopback origins');
+      }
+      const allowed = new Set(origins.map((origin) => origin.origin));
+      await context.route('**/*', (route) =>
+        allowed.has(new URL(route.request().url()).origin)
+          ? route.continue()
+          : route.abort('blockedbyclient'),
+      );
+    }
     await login(page);
     await page.goto(`/ja?view=day&date=${TEST_DATE}`);
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('viewを実UI操作・reload・browser backで復元する', async ({ page }) => {
-    await page.getByRole('button', { name: '日', exact: true }).click();
-    await page.getByRole('menuitem', { name: /^3日\s*3$/ }).click();
-    await expectCalendarUrl(page, { pathname: '/ja/', date: TEST_DATE, view: '3day' });
-    await expect(page.locator('[data-calendar-grid]')).toHaveCount(3);
+  test(
+    'viewを実UI操作・reload・browser backで復元する',
+    { tag: '@preview-e2e/product-calendar-view-navigation' },
+    async ({ page }) => {
+      await page.getByRole('button', { name: '日', exact: true }).click();
+      await page.getByRole('menuitem', { name: /^3日\s*3$/ }).click();
+      await expectCalendarUrl(page, { pathname: '/ja/', date: TEST_DATE, view: '3day' });
+      await expect(page.locator('[data-calendar-grid]')).toHaveCount(3);
 
-    await page.goBack();
-    await expectCalendarUrl(page, { pathname: '/ja', date: TEST_DATE, view: 'day' });
-    await expect(page.locator('[data-calendar-grid]')).toHaveCount(1);
-    await expect(page.getByRole('button', { name: '日', exact: true })).toBeVisible();
-  });
+      await page.goBack();
+      await expectCalendarUrl(page, { pathname: '/ja', date: TEST_DATE, view: 'day' });
+      await expect(page.locator('[data-calendar-grid]')).toHaveCount(1);
+      await expect(page.getByRole('button', { name: '日', exact: true })).toBeVisible();
+    },
+  );
 
-  test('sidebarのclose/open状態をreload後も復元する', async ({ page }) => {
-    await expect(page.getByRole('complementary').first()).toBeVisible();
+  test(
+    'sidebarのclose/open状態をreload後も復元する',
+    { tag: '@preview-e2e/product-calendar-sidebar-navigation' },
+    async ({ page }) => {
+      await expect(page.getByRole('complementary').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'サイドバーを閉じる' }).click();
-    await expect(page.getByRole('complementary')).toHaveCount(0);
-    const openSidebar = page.getByRole('button', {
-      name: /^(Open sidebar|サイドバーを開く)$/,
-    });
-    await expect(openSidebar).toBeVisible();
+      await page.getByRole('button', { name: 'サイドバーを閉じる' }).click();
+      await expect(page.getByRole('complementary')).toHaveCount(0);
+      const openSidebar = page.getByRole('button', {
+        name: /^(Open sidebar|サイドバーを開く)$/,
+      });
+      await expect(openSidebar).toBeVisible();
 
-    await page.reload();
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('complementary')).toHaveCount(0);
-    await expect(openSidebar).toBeVisible();
-    await openSidebar.click();
-    await expect(page.getByRole('complementary').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'サイドバーを閉じる' })).toBeVisible();
+      await page.reload();
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('complementary')).toHaveCount(0);
+      await expect(openSidebar).toBeVisible();
+      await openSidebar.click();
+      await expect(page.getByRole('complementary').first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'サイドバーを閉じる' })).toBeVisible();
 
-    await page.reload();
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('complementary').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'サイドバーを閉じる' })).toBeVisible();
-  });
+      await page.reload();
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('complementary').first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'サイドバーを閉じる' })).toBeVisible();
+    },
+  );
 });

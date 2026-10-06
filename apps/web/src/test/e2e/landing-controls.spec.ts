@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './public-test';
 
 for (const locale of ['', '/ja']) {
   test(`${locale || 'en'} login controls navigate to the matching Product login @mobile`, async ({

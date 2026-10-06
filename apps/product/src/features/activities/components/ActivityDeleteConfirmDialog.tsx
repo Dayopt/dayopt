@@ -15,7 +15,7 @@ interface ActivityDeleteConfirmDialogProps {
   kind: 'activity' | 'category';
   name: string;
   /** kind='activity' なら関連する予定・記録の件数、kind='category' なら所属アクティビティの件数 */
-  affectedCount: number;
+  affectedCount: number | null;
 }
 
 /**
@@ -46,14 +46,18 @@ export function ActivityDeleteConfirmDialog({
       onConfirm={onConfirm}
       title={t('delete.confirmTitle', { name })}
       description={t(
-        affectedCount === 0
+        affectedCount === null
           ? kind === 'activity'
-            ? 'delete.activityDescriptionEmpty'
-            : 'delete.categoryDescriptionEmpty'
-          : kind === 'activity'
-            ? 'delete.activityDescription'
-            : 'delete.categoryDescription',
-        { count: affectedCount },
+            ? 'delete.activityDescriptionUnknown'
+            : 'delete.categoryDescriptionUnknown'
+          : affectedCount === 0
+            ? kind === 'activity'
+              ? 'delete.activityDescriptionEmpty'
+              : 'delete.categoryDescriptionEmpty'
+            : kind === 'activity'
+              ? 'delete.activityDescription'
+              : 'delete.categoryDescription',
+        { count: affectedCount ?? 0 },
       )}
       variant="destructive"
       confirmLabel={t('delete.confirmButton')}

@@ -1,12 +1,20 @@
 import { defineConfig } from '@playwright/test';
 import base from './playwright.config';
-import { validatePreviewOrigin } from './src/lib/test/preview-access';
-
+// Protected remote Preview acceptance uses playwright.preview.config.ts and its trusted runner.
 const requested = process.env.E2E_PUBLIC_ORIGIN;
-const origin =
-  requested && /^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/.test(requested)
-    ? requested
-    : validatePreviewOrigin(requested);
+if (!requested) throw new Error('Public checks require an explicit running loopback app origin');
+const url = new URL(requested);
+if (
+  url.protocol !== 'http:' ||
+  !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
+  url.username ||
+  url.password ||
+  url.pathname !== '/' ||
+  url.search ||
+  url.hash
+)
+  throw new Error('Public checks app origin must be an HTTP loopback origin');
+const origin = url.origin;
 
 const config = defineConfig(base, {
   testMatch: 'smoke.spec.ts',

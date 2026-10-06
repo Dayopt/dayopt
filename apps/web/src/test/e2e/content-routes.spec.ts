@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { publicFetchGet } from './public-get';
+import { expect, test } from './public-test';
 
 test('sitemap content routes and their internal content links resolve', async ({
   page,
@@ -66,9 +67,7 @@ test('sitemap content routes and their internal content links resolve', async ({
   const collected = new Set(audit.collectedPaths);
   let recoveredContentCount = 0;
   const recover = async (failure: { path: string; status: number }) => {
-    const response = await fetch(new URL(failure.path, testInfo.project.use.baseURL!), {
-      signal: AbortSignal.timeout(15_000),
-    });
+    const response = await publicFetchGet(failure.path, testInfo.project.use.baseURL!);
     failure.status = response.status;
     if (response.ok && audit.contentPaths.includes(failure.path)) {
       const discovered = await page.evaluate(
@@ -96,9 +95,7 @@ test('sitemap content routes and their internal content links resolve', async ({
   for (let start = 0; start < unchecked.length; start += 4) {
     await Promise.all(
       unchecked.slice(start, start + 4).map(async (path) => {
-        const response = await fetch(new URL(path, testInfo.project.use.baseURL!), {
-          signal: AbortSignal.timeout(15_000),
-        });
+        const response = await publicFetchGet(path, testInfo.project.use.baseURL!);
         if (!response.ok) audit.failures.push({ path, status: response.status });
       }),
     );

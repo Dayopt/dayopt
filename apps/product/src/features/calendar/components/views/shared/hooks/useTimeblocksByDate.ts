@@ -43,9 +43,9 @@ export function useTimeblocksByDate({
   const timeblocksByDate = useMemo(() => {
     const grouped: Record<string, CalendarDisplayEvent[]> = {};
 
-    // Step 1: 各日付のキーを初期化
+    // 表示日付は暦日の値。TZ変換するのは予定・記録の実時刻だけ。
     dates.forEach((date) => {
-      const dateKey = getDateKey(date, timezone);
+      const dateKey = getDateKey(date);
       grouped[dateKey] = [];
     });
 
@@ -79,7 +79,7 @@ export function useTimeblocksByDate({
           const endKey = getDateKey(timeblockEnd, timezone);
           // 期間内の日付のみ処理
           dates.forEach((date) => {
-            const dateKey = getDateKey(date, timezone);
+            const dateKey = getDateKey(date);
             if (dateKey >= startKey && dateKey <= endKey) {
               if (grouped[dateKey]) {
                 grouped[dateKey].push(timeblock);
@@ -93,7 +93,7 @@ export function useTimeblocksByDate({
       // 単日タイムブロックの場合
       const timeblockDateKey = getDateKey(timeblockStart, timezone);
       dates.forEach((date) => {
-        const dateKey = getDateKey(date, timezone);
+        const dateKey = getDateKey(date);
         if (timeblockDateKey === dateKey) {
           if (grouped[dateKey]) {
             grouped[dateKey].push(timeblock);

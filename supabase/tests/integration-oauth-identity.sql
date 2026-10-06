@@ -18,11 +18,38 @@ INSERT INTO public.mcp_mutation_control (
 ON CONFLICT (singleton_key) DO UPDATE
 SET writes_enabled = false, enabled_client_ids = '{}'::TEXT[];
 
+-- Keep the fresh seed untouched. The provisioning contract accepts either the
+-- historical Integration tuple or the current sample tuple only when all Auth
+-- email fields agree with the user row.
+DO $fixture$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM auth.users AS app_user
+    JOIN auth.identities AS identity ON identity.user_id = app_user.id
+    WHERE app_user.id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND app_user.email IN ('test@dayopt.dev', 'test-seed@dayopt.dev')
+      AND identity.id = app_user.id
+      AND identity.provider = 'email'
+      AND identity.provider_id = app_user.email
+      AND identity.email = app_user.email
+      AND identity.identity_data = jsonb_build_object(
+        'sub', app_user.id::TEXT,
+        'email', app_user.email
+      )
+  ) THEN
+    RAISE EXCEPTION 'Expected exact deterministic seed Auth tuple';
+  END IF;
+END
+$fixture$;
+
 DO $test$
 DECLARE
   v_identity RECORD;
   v_repeated RECORD;
   v_extra_user UUID := gen_random_uuid();
+  v_alternate_email TEXT;
+  v_mixed_email TEXT;
   v_failures TEXT[] := '{}'::TEXT[];
 BEGIN
   IF has_function_privilege('anon', 'public.ensure_mcp_integration_environment_identity_v1()', 'EXECUTE')
@@ -147,6 +174,56 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'DI005' THEN
     -- The subtransaction also rolls back the additional synthetic user.
     NULL;
+  END;
+
+  -- Test the alternate coherent tuple in a rollback-only subtransaction.
+  -- A sentinel rollback keeps the immutable singleton empty for the next case.
+  v_alternate_email := CASE
+    WHEN (SELECT email FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000001'::UUID)
+      = 'test-seed@dayopt.dev' THEN 'test@dayopt.dev'
+    ELSE 'test-seed@dayopt.dev'
+  END;
+  BEGIN
+    UPDATE auth.users
+    SET email = v_alternate_email
+    WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+    UPDATE auth.identities
+    SET provider_id = v_alternate_email,
+        identity_data = jsonb_build_object(
+          'sub', '00000000-0000-0000-0000-000000000001',
+          'email', v_alternate_email
+        )
+    WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+    SELECT * INTO STRICT v_identity
+    FROM public.ensure_mcp_integration_environment_identity_v1();
+    IF v_identity.environment <> 'integration' THEN
+      RAISE EXCEPTION 'Alternate coherent sample email tuple was rejected';
+    END IF;
+    RAISE EXCEPTION 'Rollback alternate tuple test' USING ERRCODE = 'PT002';
+  EXCEPTION WHEN SQLSTATE 'PT002' THEN NULL;
+  END;
+
+  -- A mixed tuple must stay rejected even though each email is individually
+  -- in the old/new allowlist. This case also rolls back to the original seed.
+  v_mixed_email := v_alternate_email;
+  BEGIN
+    UPDATE auth.identities
+    SET identity_data = jsonb_build_object(
+      'sub', '00000000-0000-0000-0000-000000000001',
+      'email', v_mixed_email
+    )
+    WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+    BEGIN
+      PERFORM public.ensure_mcp_integration_environment_identity_v1();
+      RAISE EXCEPTION 'Mixed old/new Auth tuple unexpectedly provisioned' USING ERRCODE = 'PT001';
+    EXCEPTION
+      WHEN SQLSTATE 'DI005' THEN NULL;
+      WHEN SQLSTATE 'PT001' THEN RAISE;
+    END;
+    RAISE EXCEPTION 'Rollback mixed tuple test' USING ERRCODE = 'PT002';
+  EXCEPTION WHEN SQLSTATE 'PT002' THEN NULL;
   END;
 
   SELECT * INTO STRICT v_identity

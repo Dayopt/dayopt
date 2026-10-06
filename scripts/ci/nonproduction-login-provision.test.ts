@@ -55,7 +55,7 @@ function buildFetch({
   },
 }: {
   branch?: (typeof previewBranch & { pr_number?: number }) | null;
-  keys?: Array<{ type?: string; name?: string; api_key: string }>;
+  keys?: Array<{ type?: string; name?: string; api_key: string; disabled?: boolean }>;
   createResponse?: Response;
   loginResponse?: Response;
   logoutResponse?: Response;
@@ -144,6 +144,65 @@ describe('nonproduction login provisioning', () => {
     );
   });
 
+  it('uses the unique active default for each modern key type during rotation', async () => {
+    const world = buildFetch({
+      keys: [
+        { name: 'service_role', api_key: 'legacy-service-role' },
+        { name: 'anon', api_key: 'legacy-anon' },
+        ...['secret', 'publishable'].flatMap((type) => [
+          { type, name: 'rotation', api_key: `rotation-${type}` },
+          { type, name: 'default', api_key: `disabled-${type}`, disabled: true },
+          { type, name: 'default', api_key: `default-${type}`, disabled: false },
+        ]),
+      ],
+    });
+    await provisionNonproductionLogin({
+      target,
+      ...testCredentials,
+      githubToken: 'github-token',
+      fetchImpl: world.fetchImpl,
+      now: () => 0,
+    });
+    const authCalls = world.calls.filter(({ url }) => url.includes('/auth/v1/'));
+    expect(authCalls).toHaveLength(3);
+    expect(new Headers(authCalls[0].init?.headers).get('apikey')).toBe('default-secret');
+    expect(new Headers(authCalls[0].init?.headers).get('Authorization')).toBeNull();
+    for (const call of authCalls.slice(1)) {
+      expect(new Headers(call.init?.headers).get('apikey')).toBe('default-publishable');
+    }
+    expect(new Headers(authCalls[1].init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(authCalls[2].init?.headers).get('Authorization')).toBe(
+      'Bearer verification-session',
+    );
+  });
+
+  it.each([
+    ['secret', 'default', 'default'],
+    ['publishable', 'default', 'default'],
+    ['secret', 'rotation-a', 'rotation-b'],
+    ['publishable', 'rotation-a', 'rotation-b'],
+  ])('rejects ambiguous %s keys (%s / %s) before Auth calls', async (type, first, second) => {
+    const world = buildFetch({
+      keys: [
+        { type: type === 'secret' ? 'publishable' : 'secret', api_key: 'other-key' },
+        { type, name: first, api_key: 'first-key' },
+        { type, name: second, api_key: 'second-key' },
+        { name: 'service_role', api_key: 'legacy-service-role' },
+        { name: 'anon', api_key: 'legacy-anon' },
+      ],
+    });
+    await expect(
+      provisionNonproductionLogin({
+        target,
+        ...testCredentials,
+        githubToken: 'github-token',
+        fetchImpl: world.fetchImpl,
+        now: () => 0,
+      }),
+    ).rejects.toThrow(`branch ${type} API key is unavailable or ambiguous`);
+    expect(world.calls.some(({ url }) => url.includes('/auth/v1/'))).toBe(false);
+  });
+
   it('keeps an existing password and closes only the verification session', async () => {
     const world = buildFetch({
       createResponse: Response.json(
@@ -179,9 +238,49 @@ describe('nonproduction login provisioning', () => {
       'Bearer legacy-service-role',
     );
     expect(world.calls[3].url).toContain('grant_type=password');
-    expect(new Headers(world.calls[3].init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(world.calls[3].init?.headers).get('apikey')).toBe('legacy-service-role');
+    expect(new Headers(world.calls[3].init?.headers).get('Authorization')).toBe(
+      'Bearer legacy-service-role',
+    );
     expect(world.calls[4].url).toContain('scope=local');
     expect(new Headers(world.calls[4].init?.headers).get('Authorization')).toBe(
+      'Bearer verification-session',
+    );
+  });
+
+  it('verifies Integration with its modern admin key while retaining user-token logout', async () => {
+    const world = buildFetch({
+      branch: {
+        ...previewBranch,
+        id: INTEGRATION_BRANCH_ID,
+        project_ref: INTEGRATION_PROJECT_REF,
+        persistent: true,
+        git_branch: 'integration',
+        pr_number: 0,
+      },
+      keys: [
+        { type: 'secret', api_key: 'sb_secret_SYNTHETIC_ADMIN' },
+        { type: 'publishable', api_key: 'sb_publishable_SYNTHETIC_PUBLIC' },
+      ],
+    });
+    await provisionNonproductionLogin({
+      target: { kind: 'integration' },
+      ...testCredentials,
+      fetchImpl: world.fetchImpl,
+      now: () => 0,
+    });
+    const login = world.calls.find(({ url }) =>
+      url.endsWith('/auth/v1/token?grant_type=password'),
+    )!;
+    const logout = world.calls.find(({ url }) => url.endsWith('/auth/v1/logout?scope=local'))!;
+    expect(new Headers(login.init?.headers).get('apikey')).toBe('sb_secret_SYNTHETIC_ADMIN');
+    expect(new Headers(login.init?.headers).get('Authorization')).toBeNull();
+    expect(JSON.parse(String(login.init?.body))).toEqual({
+      email: testCredentials.email,
+      password: testCredentials.password,
+    });
+    expect(new Headers(logout.init?.headers).get('apikey')).toBe('sb_publishable_SYNTHETIC_PUBLIC');
+    expect(new Headers(logout.init?.headers).get('Authorization')).toBe(
       'Bearer verification-session',
     );
   });
@@ -200,9 +299,36 @@ describe('nonproduction login provisioning', () => {
           time += milliseconds;
         },
       }),
-    ).rejects.toThrow('branch is not ready');
+    ).rejects.toThrow(
+      'Nonproduction login: Preview branch not found (pr_number=3024, git_branch=codex/nonprod-login, exact_match_count=0)',
+    );
     expect(world.calls.some(({ url }) => url.includes(INTEGRATION_PROJECT_REF))).toBe(false);
     expect(world.calls.some(({ url }) => url.includes('/api-keys?'))).toBe(false);
+  });
+
+  it('reports status metadata when the exact Preview branch is still provisioning', async () => {
+    let time = 0;
+    const world = buildFetch({
+      branch: {
+        ...previewBranch,
+        status: 'RUNNING_MIGRATIONS',
+        preview_project_status: 'COMING_UP',
+      },
+    });
+    await expect(
+      provisionNonproductionLogin({
+        target,
+        ...testCredentials,
+        githubToken: 'github-token',
+        fetchImpl: world.fetchImpl,
+        now: () => time,
+        sleepImpl: async (milliseconds) => {
+          time += milliseconds;
+        },
+      }),
+    ).rejects.toThrow(
+      'Nonproduction login: Preview branch is not ready (pr_number=3024, git_branch=codex/nonprod-login, exact_match_count=1, status=RUNNING_MIGRATIONS, preview_project_status=COMING_UP)',
+    );
   });
 
   it('rejects production before requesting any branch API key', async () => {

@@ -5,6 +5,7 @@ const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const CLOUD_PREFIXES = {
   'critical-path': 'E2E_PREVIEW_DESKTOP_USER_ID',
   'mobile-critical-path': 'E2E_PREVIEW_MOBILE_USER_ID',
+  'account-deletion': 'E2E_PREVIEW_DELETION_USER_ID',
 } as const;
 
 type PreviewCloudIdentityEnvironment = Readonly<Record<string, string | undefined>>;
@@ -20,7 +21,7 @@ function isUsableUserId(value: string | undefined): value is string {
 }
 
 /**
- * Resolve the predeclared Auth user ID for the two Cloud critical-path fixtures.
+ * Resolve the predeclared Auth user ID for the reviewed Cloud fixtures.
  * Local runs return undefined so the existing random-ID behavior remains unchanged.
  */
 export function resolvePreviewCloudUserId(
@@ -37,13 +38,18 @@ export function resolvePreviewCloudUserId(
   const runId = env.E2E_PREVIEW_RUN_ID;
   const desktopId = env.E2E_PREVIEW_DESKTOP_USER_ID;
   const mobileId = env.E2E_PREVIEW_MOBILE_USER_ID;
+  const deletionId = env.E2E_PREVIEW_DELETION_USER_ID;
   if (
     !selectedIdName ||
     !runId ||
     !UUID.test(runId) ||
     !isUsableUserId(desktopId) ||
     !isUsableUserId(mobileId) ||
-    desktopId.toLowerCase() === mobileId.toLowerCase()
+    desktopId.toLowerCase() === mobileId.toLowerCase() ||
+    ((prefix === 'account-deletion' || deletionId !== undefined) &&
+      (!isUsableUserId(deletionId) ||
+        deletionId.toLowerCase() === desktopId.toLowerCase() ||
+        deletionId.toLowerCase() === mobileId.toLowerCase()))
   ) {
     return invalidCloudIdentity();
   }

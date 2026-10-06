@@ -889,6 +889,10 @@ last_verified: 2026-09-21
 
 - [AI クライアントから Plan を作る（MCP）](journeys/mcp.md) の 9. 画面と同じ関数で書く — create_plan_command_v1 の規則を変えると、画面と MCP の両方が同時に変わる。MCP のエラーコード対応表（EXPECTED_ERROR_CODES）は画面側の表とは別にあるので、新しい SQLSTATE を足したら両方に足さないと MCP だけ MUTATION_FAILED になる。
 
+#### `supabase/migrations/20260930014002_prevent_duplicate_external_calendar_conversion.sql`
+
+- [削除と取り消し](journeys/delete-undo.md) の 7. deleted_at を外す — Record の復元は DT005（未来に終われない）の対象外（時刻を変えないため trigger が見ない）。
+
 <!-- learn:generated:end -->
 
 ## 正本

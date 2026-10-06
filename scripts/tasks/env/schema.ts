@@ -463,12 +463,11 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
   ciEntry('SUPABASE_STORAGE_RLS_AUDIT_TOKEN', 'secret', 'supabase-storage-rls-audit', OPS, {
     field: 'credential',
   }),
-  // Planned masters remain pending independently of replicas saved directly in the Environment.
+  // Planned Preview readiness/bypass masters remain pending independently of Environment replicas.
   // GitHub's short-lived read token observes Vercel; never add a Production-capable Vercel PAT here.
   ...[
     ['SUPABASE_PREVIEW_READINESS_TOKEN', 'PREVIEW_E2E_SUPABASE_READINESS_TOKEN'],
     ['VERCEL_AUTOMATION_BYPASS_SECRET', 'PREVIEW_E2E_BYPASS_SECRET'],
-    ['SUPABASE_SECRET_KEY', 'PREVIEW_E2E_SUPABASE_KEY'],
   ].map(([envName, githubSecret]) => ({
     ...pendingEnvEntry(
       envName,
@@ -500,7 +499,6 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
       'cvac4atl7qjmjfjvottffgndae',
       'password',
     ],
-    ['SUPABASE_PREVIEW_PROVISION_TOKEN', ci, 'supabase-preview-provision', 'credential'],
   ].map(([envName, vault, item, field]) => ({
     ...pendingEnvEntry(
       envName,
@@ -515,6 +513,20 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     githubSecret: envName,
     githubEnvironments: ['Nonproduction login'],
   })),
+  {
+    ...pendingEnvEntry(
+      'SUPABASE_PREVIEW_PROVISION_TOKEN',
+      'secret',
+      'staging',
+      ci,
+      'supabase-preview-provision',
+      'GitHub Environment replicas have not been initialized by the controlled setup run',
+      'credential',
+    ),
+    field: 'credential',
+    githubSecret: 'SUPABASE_PREVIEW_PROVISION_TOKEN',
+    githubEnvironments: ['Nonproduction login', 'Preview – product'],
+  },
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),

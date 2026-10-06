@@ -1,10 +1,27 @@
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const REF = /^[a-z]{20}$/;
 const SHA = /^[a-f0-9]{40}$/;
+const LEGACY_KEYS = [
+  'sha',
+  'deploymentId',
+  'prNumber',
+  'branchName',
+  'supabaseProjectRef',
+  'supabaseBranchId',
+  'databaseMode',
+];
+const MERGED_KEYS = [...LEGACY_KEYS, 'mergedValidation', 'mergeCommitSha'];
+
+function hasExactKeys(request, keys) {
+  const actual = Object.keys(request).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
 
 export function validateCloudRequest(request) {
   if (
     !request ||
+    (!hasExactKeys(request, LEGACY_KEYS) && !hasExactKeys(request, MERGED_KEYS)) ||
     !SHA.test(request.sha ?? '') ||
     !/^dpl_[a-zA-Z0-9]+$/.test(request.deploymentId ?? '') ||
     !Number.isSafeInteger(request.prNumber) ||
@@ -27,15 +44,21 @@ export function validateCloudRequest(request) {
   ) {
     throw new Error('Cloud Preview database mode does not match its binding');
   }
-  return Object.fromEntries(
-    [
-      'sha',
-      'deploymentId',
-      'prNumber',
-      'branchName',
-      'supabaseProjectRef',
-      'supabaseBranchId',
-      'databaseMode',
-    ].map((key) => [key, request[key]]),
-  );
+  const result = Object.fromEntries(LEGACY_KEYS.map((key) => [key, request[key]]));
+  if (hasExactKeys(request, MERGED_KEYS)) {
+    if (
+      typeof request.mergedValidation !== 'boolean' ||
+      (request.mergedValidation
+        ? !SHA.test(request.mergeCommitSha ?? '')
+        : request.mergeCommitSha !== null)
+    ) {
+      throw new Error('Invalid Cloud Preview merge binding');
+    }
+    return {
+      ...result,
+      mergedValidation: request.mergedValidation,
+      mergeCommitSha: request.mergeCommitSha,
+    };
+  }
+  return result;
 }

@@ -150,6 +150,60 @@ const jobById = (id: string) => {
 };
 
 describe('calendar-navigation-e2e.yml の token 分離', () => {
+  it('同じ local DB job で初回 hydration と表示・作成・検索の procedure 予算を検証する', () => {
+    const command = CALENDAR_E2E_YML.match(
+      /- name: Run E2E tests[\s\S]*?run: ([\s\S]*?)\n        env:/,
+    )?.[1];
+    expect(command).toBeDefined();
+    const filters = [...(command?.matchAll(/'([^']+)'/g) ?? [])]
+      .map((match) => match[1]!)
+      .filter((filter) => filter.endsWith('.spec\\.ts$'));
+    const files = [
+      'calendar-initial-load.spec.ts',
+      'critical-path.spec.ts',
+      'calendar-navigation.spec.ts',
+      'block-search.spec.ts',
+    ];
+    expect(filters).toHaveLength(files.length);
+    for (const file of [...files, 'mobile-critical-path.spec.ts']) {
+      const selected = filters.some((filter) => new RegExp(filter).test(`/repo/e2e/${file}`));
+      expect(selected, file).toBe(files.includes(file));
+    }
+    const grep = command?.match(/--grep='([^']+)'/)?.[1];
+    expect(grep).toBe(
+      '@preview-e2e/(product-initial-(desktop|mobile)-(tokyo|la)|desktop-(plan|record|past-plan)-create|product-calendar-(view|sidebar)-navigation|product-search-(desktop|mobile))',
+    );
+    const selectedFlows = [
+      'product-initial-desktop-tokyo',
+      'product-initial-desktop-la',
+      'product-initial-mobile-tokyo',
+      'product-initial-mobile-la',
+      'desktop-plan-create',
+      'desktop-record-create',
+      'desktop-past-plan-create',
+      'product-calendar-view-navigation',
+      'product-calendar-sidebar-navigation',
+      'product-search-desktop',
+      'product-search-mobile',
+    ];
+    for (const flow of selectedFlows)
+      expect(new RegExp(grep!).test(`@preview-e2e/${flow}`)).toBe(true);
+    for (const flow of [
+      'desktop-summary-record-deep-link',
+      'desktop-data-export',
+      'desktop-template-lifecycle',
+    ]) {
+      expect(new RegExp(grep!).test(`@preview-e2e/${flow}`)).toBe(false);
+    }
+    expect(command?.match(/--project="[^"]+"/g)).toEqual([
+      '--project="chromium"',
+      '--project="Mobile Chrome"',
+    ]);
+    expect(CALENDAR_E2E_YML).toContain('run: supabase start');
+    expect(CALENDAR_E2E_YML).toContain('run: supabase stop');
+    expect(CALENDAR_E2E_YML).toContain("E2E_REQUIRE_SERVICE_ROLE_SUITES: '1'");
+  });
+
   it('PR コードは read-only token で実行し、外部秘密値を渡さない', () => {
     expect(jobsOf(CALENDAR_E2E_YML)).toHaveLength(1);
     expect(writeTokenOffenders(CALENDAR_E2E_YML)).toEqual([]);

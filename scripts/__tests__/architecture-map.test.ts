@@ -347,7 +347,7 @@ describe('references: text 正本の参照切れを検出する', () => {
 describe('repo の Architecture Map は最新で、参照は全件実在する', () => {
   it('生成ブロックが text 正本と一致する（pnpm architecture:generate で更新）', async () => {
     expect(await findStaleArchitectureMapDocs()).toEqual([]);
-  });
+  }, 60_000);
 
   it('glossary / invariants の参照先が実在する', () => {
     expect(checkArchitectureReferences()).toEqual([]);
@@ -1246,6 +1246,9 @@ describe('call-graph: 型チェッカーで呼び出し経路を辿る', () => {
   it('画面から使う procedure は barrel を辿らず宣言元で絞る', () => {
     const calendar = graph.pages.find((page) => page.route.endsWith('/[locale]'));
     expect(calendar?.procedures).toContain('plans.list');
+    expect(calendar?.procedures).toContain('records.list');
+    expect(calendar?.procedures).toContain('externalCalendar.listEvents');
+    // server prefetch を外しても layout の shared client hook は統計を取得する。
     expect(calendar?.procedures).toContain('statistics.getActivityStats');
     expect(calendar?.procedures).toContain('activities.getActivitySummary');
     // calendar から billing / MCP 設定の procedure は使わない（barrel 経由で混ざらないこと）

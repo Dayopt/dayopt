@@ -52,6 +52,7 @@ import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
 import type { Database } from '@/lib/database';
+import { resolveDayoptEnvironment } from '@/lib/dayopt-environment';
 
 import {
   applySessionContinuity,
@@ -72,6 +73,22 @@ import {
  * @returns { response, supabase } - 更新されたレスポンスとSupabaseクライアント
  */
 export async function updateSession(request: NextRequest) {
+  const environment = resolveDayoptEnvironment({
+    dayoptEnvironment: process.env.DAYOPT_ENVIRONMENT,
+    publicDayoptEnvironment: process.env.NEXT_PUBLIC_DAYOPT_ENVIRONMENT,
+    vercelEnvironment: process.env.VERCEL_ENV,
+    vercelTargetEnvironment: process.env.VERCEL_TARGET_ENV,
+    vercelGitCommitRef: process.env.VERCEL_GIT_COMMIT_REF,
+    vercelProjectId: process.env.VERCEL_PROJECT_ID,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    vercelUrl: process.env.VERCEL_URL,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
+  if (environment === 'unknown') {
+    throw new Error('Supabase project does not match the configured Dayopt environment.');
+  }
+
   // レスポンスオブジェクトを作成（後でCookieを書き込む）
   let response = NextResponse.next({
     request,

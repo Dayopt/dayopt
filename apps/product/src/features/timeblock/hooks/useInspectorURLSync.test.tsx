@@ -27,6 +27,16 @@ describe('useInspectorURLSync', () => {
     expect(window.location.search).toBe('?timeblock=record%3Asame-id');
   });
 
+  it('Inspector handler の読み込み前に開いた既存 Record も初期状態からURLへ同期する', () => {
+    act(() =>
+      useTimeblockInspectorStore.getState().openInspector('record-before-handler', 'record'),
+    );
+
+    renderHook(() => useInspectorURLSync());
+
+    expect(window.location.search).toBe('?timeblock=record%3Arecord-before-handler');
+  });
+
   it('開く時は client navigation を起こさず履歴だけ積む（パネルをまたたかせない）', () => {
     const lengthBefore = window.history.length;
     renderHook(() => useInspectorURLSync());

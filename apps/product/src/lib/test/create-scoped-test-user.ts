@@ -27,7 +27,7 @@ function safeOrigin(url: string, key: string) {
  * （`supabase-js` の `auth.admin.createUser` + `profiles` upsert）を使う。
  * plan/record 等の重い fixture が要る spec は呼び出し元で追加で作る。
  */
-export interface ScopedTestUser {
+interface ScopedTestUser {
   email: string;
   password: string;
   userId: string;

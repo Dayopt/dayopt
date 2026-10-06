@@ -40,7 +40,9 @@ export function LanguageSwitcher({ variant = 'short', className }: LanguageSwitc
   }, []);
 
   const handleLocaleChange = (newLocale: Locale) => {
-    router.replace(pathname, { locale: newLocale });
+    router.replace(`${pathname}${window.location.search}${window.location.hash}`, {
+      locale: newLocale,
+    });
   };
 
   const currentLabel = variant === 'full' ? localeNames[locale] : localeLabels[locale];

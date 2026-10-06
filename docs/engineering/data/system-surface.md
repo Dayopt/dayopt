@@ -130,7 +130,7 @@ job 名を変数で渡す schedule と、jobid で消す unschedule は追えな
 | `cronHeartbeatHealthRateLimit` | 30   | `1 m`  | `apps/product/src/app/api/health/cron/route.ts`                                                                                                   |
 | `icalFeedGlobalRateLimit`      | 600  | `1 m`  | `apps/product/src/app/api/v1/calendar/[token]/route.ts`                                                                                           |
 | `calendarConnectRateLimit`     | 10   | `1 h`  | `apps/product/src/app/api/integrations/google-calendar/callback/route.ts`, `apps/product/src/app/api/integrations/google-calendar/start/route.ts` |
-| `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/router.ts`                                                                                    |
+| `calendarSyncNowRateLimit`     | 6    | `1 h`  | `apps/product/src/features/external-calendar/server/sync-rate-limit.ts`                                                                           |
 | `cspReportRateLimit`           | 20   | `1 m`  | `apps/product/src/app/api/csp-report/route.ts`                                                                                                    |
 | `cspReportGlobalRateLimit`     | 120  | `1 m`  | `apps/product/src/app/api/csp-report/route.ts`                                                                                                    |
 
@@ -241,7 +241,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `SUPABASE_MIGRATION_READINESS_TOKEN`     | no   | secret     | production          | supabase-migration-readiness    | —                          |
 | `SUPABASE_PREVIEW_PROVISION_TOKEN`       | no   | secret     | staging             | supabase-preview-provision      | —                          |
 | `SUPABASE_PREVIEW_READINESS_TOKEN`       | no   | secret     | staging             | preview-e2e                     | —                          |
-| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production, staging | supabase, preview-e2e           | —                          |
+| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production          | supabase                        | —                          |
 | `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`       | yes  | secret     | production          | supabase-storage-rls-audit      | —                          |
 | `TURNSTILE_SECRET_KEY`                   | no   | secret     | shared              | turnstile                       | —                          |
 | `UPSTASH_REDIS_REST_TOKEN`               | no   | secret     | staging, production | upstash                         | —                          |
@@ -340,7 +340,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `records.getById`                            | 3                   | 1                   |
 | `records.list`                               | 8                   | 2                   |
 | `statistics.getActivityEstimationFactors`    | 1                   | 0                   |
-| `statistics.getActivityStats`                | 3                   | 0                   |
+| `statistics.getActivityStats`                | 2                   | 0                   |
 | `statistics.getMcpReview`                    | 0                   | 1                   |
 | `statistics.getTagEstimationFactors`         | 0                   | 0                   |
 | `timeblockContext.getConstraints`            | 0                   | 1                   |
@@ -397,6 +397,7 @@ docs の frontmatter `code:` が指す実装から引く。
 | `docs/operations/contact-email.md`                  | `contact`                               |
 | `docs/operations/google-oauth-verification.md`      | `external-calendar`                     |
 | `docs/operations/posthog-analytics.md`              | `settings`, `timeblock`                 |
+| `docs/operations/supabase-rate-limit-poc.md`        | `external-calendar`                     |
 | `docs/product/specs/activities.md`                  | `activities`                            |
 | `docs/product/specs/auth.md`                        | `auth`, `external-calendar`, `settings` |
 | `docs/product/specs/calendar.md`                    | `calendar`                              |
@@ -414,7 +415,7 @@ docs の frontmatter `code:` が指す実装から引く。
 | `/[locale]`                     | 14      | `a11y.spec.ts`, `account-deletion.spec.ts`, `calendar-initial-load.spec.ts`, `calendar-navigation.spec.ts`, `deep-link.spec.ts`, `derived-plan-record-flow.spec.ts`, `http-csrf.spec.ts`, `mobile-navigation.spec.ts`, `plan-record-timeblock.spec.ts`, `pwa/pwa.spec.ts`, `smoke.spec.ts`, `timeblock-conflict.spec.ts`, `timeblock-drag-move.spec.ts`, `timeblock-inspector-toggle.spec.ts` |
 | `/[locale]/auth`                | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
 | `/[locale]/auth/confirmed`      | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
-| `/[locale]/auth/login`          | 11      | `account-deletion.spec.ts`, `auth.spec.ts`, `billing.spec.ts`, `block-search.spec.ts`, `calendar-navigation.spec.ts`, `derived-plan-record-flow.spec.ts`, `http-csrf.spec.ts`, `plan-record-timeblock.spec.ts`, `pwa/pwa.spec.ts`, `timeblock-conflict.spec.ts`, `timeblock-drag-move.spec.ts`                                                                                                |
+| `/[locale]/auth/login`          | 13      | `account-deletion.spec.ts`, `auth.spec.ts`, `billing.spec.ts`, `block-search.spec.ts`, `calendar-navigation.spec.ts`, `consent-ical.spec.ts`, `derived-plan-record-flow.spec.ts`, `http-csrf.spec.ts`, `plan-record-timeblock.spec.ts`, `pwa/pwa.spec.ts`, `record-lifecycle.spec.ts`, `timeblock-conflict.spec.ts`, `timeblock-drag-move.spec.ts`                                            |
 | `/[locale]/auth/mfa-verify`     | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
 | `/[locale]/auth/password`       | 1       | `auth.spec.ts`                                                                                                                                                                                                                                                                                                                                                                                |
 | `/[locale]/auth/reset-password` | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -422,8 +423,8 @@ docs の frontmatter `code:` が指す実装から引く。
 | `/[locale]/auth/signup`         | 1       | `auth.spec.ts`                                                                                                                                                                                                                                                                                                                                                                                |
 | `/[locale]/oauth/authorize`     | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
 | `/[locale]/oauth/consent`       | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
-| `/[locale]/settings`            | 1       | `mobile-navigation.spec.ts`                                                                                                                                                                                                                                                                                                                                                                   |
-| `/[locale]/settings/[category]` | 4       | `a11y.spec.ts`, `account-deletion.spec.ts`, `billing.spec.ts`, `critical-path.spec.ts`                                                                                                                                                                                                                                                                                                        |
+| `/[locale]/settings`            | 2       | `mobile-critical-path.spec.ts`, `mobile-navigation.spec.ts`                                                                                                                                                                                                                                                                                                                                   |
+| `/[locale]/settings/[category]` | 5       | `a11y.spec.ts`, `account-deletion.spec.ts`, `billing.spec.ts`, `consent-ical.spec.ts`, `critical-path.spec.ts`                                                                                                                                                                                                                                                                                |
 | `/offline`                      | 0       | E2E なし                                                                                                                                                                                                                                                                                                                                                                                      |
 
 **route に一致しなかった URL**: `/auth/confirm`（legacy redirect の入口など）
@@ -552,8 +553,8 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 39     | 9         | 14        | 3 / 14                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
-| `calendar`          | 190    | 96        | 60        | 31 / 60                |
+| `calendar`          | 190    | 101       | 60        | 31 / 60                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
-| `external-calendar` | 26     | 19        | 2         | 1 / 2                  |
-| `settings`          | 49     | 42        | 22        | 18 / 22                |
-| `timeblock`         | 99     | 58        | 20        | 14 / 20                |
+| `external-calendar` | 27     | 20        | 2         | 1 / 2                  |
+| `settings`          | 49     | 43        | 22        | 18 / 22                |
+| `timeblock`         | 99     | 59        | 20        | 14 / 20                |
