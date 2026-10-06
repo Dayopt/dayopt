@@ -47,6 +47,7 @@ source_contracts:
     - apps/product/src/features/external-calendar/server/authority-config.ts
   backup:
     - scripts/ci/storage-backup.sh
+    - docs/operations/disaster-recovery-drill.md
   privacy:
     - packages/observability/src/posthog-browser.ts
     - apps/product/sentry.server.config.ts
@@ -262,6 +263,7 @@ services:
       backup_retention_days: 35
       rclone_sync_default_max_delete: 1000
       turnstile:
+        widget_strategy: shared_across_environments
         production_domains:
           - app.dayopt.app
           - dayopt.app
@@ -1635,7 +1637,7 @@ ui_only:
           'R2 locks / lifecycle / token scope',
           'Email Routing destination',
         ],
-      'reason': '管理APIは存在するがDoctorの現ci token / agent境界で取得できない。2026-10-06のDashboardでDNSSEC・Email Routing・Turnstile・R2 lock / lifecycle・既存backup tokenのscope metadataを補完済み。replica一致・token期限・復元成功は別確認',
+      'reason': '管理APIは存在するがDoctorの現ci token / agent境界で取得できない。2026-10-06のDashboardでDNSSEC・Email Routing・Turnstile・R2 lock / lifecycle・既存backup tokenのscope metadataを補完済み。replica一致・token期限・現在のbackupからの復元成功は別確認。過去の演習記録はbackup正本を参照',
       'next_step': 'inventory-2026-10-06.mdの補足証拠を参照し、token期限・ci replicaとの対応・復旧担当を確認する。R2 objectやtoken値を読まず、scopeを自動変更しない',
       'check_ids':
         [
@@ -1768,8 +1770,8 @@ ui_only:
       'service': 'cloudflare',
       'category': 'collector_unavailable',
       'items': [registrar auto-renewal / account recovery],
-      'reason': '公開RDAPは期限・registrar・NSのみ。登録アカウントの資格情報 / readerは未確認',
-      'next_step': 公開RDAPのregistrarと販売/管理画面を区別し、既存domain管理画面で自動更新・担当・回復方式を確認。管理先の現状は独立確認し、支払情報・個人連絡先は記録しない。,
+      'reason': '公開RDAPは期限・registrar・NSのみ。2026-10-06のVercel MCPでdayopt.appの購入metadata・renew:true・期限・Cloudflare委譲を補完したが、支払い有効性とアカウント復旧担当 / 回復方式は未確認',
+      'next_step': 公開RDAPのName.comとVercelの管理metadataを区別し、既存Vercel管理画面で担当・回復方式・支払い状態を確認。支払情報・個人連絡先は記録しない。,
       'check_ids': ['cloudflare.registrar_metadata', 'cloudflare.registrar_operations'],
       'documentation_urls': ['https://data.iana.org/rdap/dns.json'],
     }
@@ -1799,7 +1801,7 @@ ui_only:
       category: behavior_not_metadata,
       items: [dated restore evidence, recovery owner],
       reason: backup jobやlocksだけでは復元可能性を証明しない。,
-      next_step: 既存の復元証跡と手順を確認。今回のdoctorは復元しない。,
+      next_step: backup正本の2026-08-20演習記録を参照し、現在のbackupに対する証跡・revision・担当の不足を確認。今回のdoctorは復元しない。,
       check_ids: [cloudflare.restore_readiness],
       documentation_urls: [],
     }

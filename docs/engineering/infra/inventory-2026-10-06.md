@@ -115,6 +115,31 @@ Resendのendpointは10/5の早い時刻にも確認記録があり、後のMCP�
 
 今回、Cloudflareの管理metadataを補完できたため、ログイン待ちは解消。DoctorのAPI取得不能件数はこのUI確認では変更しない。Cloudflareで残るのは、DNSSEC / 追加Turnstileホスト / 追加token scopeの運用意図、token期限と実配布先の対応、管理・復旧担当、registrar更新設定、復元証跡。期待値を観測値に自動で合わせず、設定変更はしていない。
 
+### 12:04–12:10 JST 残る判断・復元証跡・registrarの照合
+
+直前の追補で残した項目を正本と既存Dashboard / MCPに照合した。外部設定・token・支払設定は変更していない。
+
+| 項目                         | 取得元と確認結果                                                                                                                                                                                                                                                            | 解消した範囲 / 残る範囲                                                                                                                                                                                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Turnstileの環境共用意図      | `pnpm --silent docs:read docs/engineering/infra.md`のBot対策節に、widgetは1つ、複数hostnameをカバーし、環境別site keyは分けないと明記。                                                                                                                                     | 共用意図は確認済み。前節の「共用意図未確認」を解消し、台帳に`widget_strategy: shared_across_environments`を明示した。秘密の配布値との対応や検証動作は別確認。                                                                                                    |
+| R2 token権限・IP制限・期限   | Cloudflare R2の既存`storage-backup-rclone`編集画面を変更せず読取。Object Read & Writeのみ、特定bucketのみが選択。対象は`attachments` / `avatars` / `storage-backup`。IP include / exclude欄は空。TTL見出しはあるが値・選択controlが表示されず、キャンセルで退出。           | bucket作成・削除・設定変更が可能なAdmin権限ではないことを確認。IP制限なし。期限は未確認で、無期限とは断定しない。ci master / replicaとの同一性は未確認。                                                                                                         |
+| 旧`storage-backup` scope     | 現R2一覧は検索なしで`avatars` / `attachments`の2行、前 / 次ページ操作ともdisabled。9/30記録では旧`storage-backup` HEADが404。現在のtoken scopeは旧名を含む。                                                                                                                | 旧名のscopeが残ることは確認。単なる追加bucketの必要性ではなく、旧構成の残存候補として扱う。scope変更や新規bucket作成はしない。過去404を現在のAPI応答とは扱わない。                                                                                               |
+| 既存のStorage復元演習記録    | `pnpm --silent docs:read docs/operations/disaster-recovery-drill.md`のStorage節。2026-08-20にR2からローカルへの復元、2 object・85.150 KiB、初回搬出と件数・サイズ一致、認証込みRTO約2分との記録。Production書き戻しなし。                                                   | 「復元記録が未発見」は解消。これは過去の文書証跡であり、現在のbackup内容・実行revision・checksum・復旧担当を今日独立検証した証拠ではない。backup正本の参照にこのrunbookを追加し、日々のfingerprint対象にした。復元は実行していない。                             |
+| Cloudflare Registrar管理先   | DashboardのDomains → Registrationsは「まだCloudflareに登録されたdomainはありません」。Domains概要には`dayopt.app` active。                                                                                                                                                  | DNS zoneの存在とRegistrar登録を区別できた。Cloudflare画面を自動更新設定の確認先として要求しない。                                                                                                                                                                |
+| Vercel側のdomain登録metadata | 12:09 JST、既存Dayopt team限定のVercel MCP `list_domains`で`dayopt.app`を取得。`renew:true`、購入2026-01-05、期限2027-01-05 01:10:42 UTC（10:10:42 JST）、verified、`serviceType: external`。実nameservers / customNameserversはCloudflareの2台。応答paginationのnextなし。 | 自動更新onという設定metadataと期限は確認済み。11:30 JSTのDoctor公開RDAP結果はregistrar `Name.com, Inc.` / ID625、同日期限、delegation_signed:falseで整合。Vercelの管理metadataとregistry registrar名を混同しない。課金手段の有効性・回復方式・復旧担当は未確認。 |
+
+Vercel応答の`intendedNameservers`はVercelの2台だが、実`nameservers`と`customNameservers`はCloudflareで、Cloudflare Dashboard・公開DNSとも一致する。未使用の意図metadataだけで委譲差異と判定しない。creator / memberの個人情報、token値、支払情報、object内容は記録していない。
+
+この追補後の残りは、DNSSEC方針、旧bucket scopeの整理判断、token期限・実配布先一致、domain管理アカウントの支払い状態・回復担当、現在のbackupに対する復元証跡。Turnstile共用意図、自動更新metadata、過去の復元記録を再度「未確認」に戻さない。Doctorの自動判定件数は補足確認では更新していない。
+
+### 12:12 JST Production cron配線・既存requestの追補
+
+Vercel Product → Settings → Cron Jobsを読み取り確認。CronはEnabledで、billing reconciliationは02:15 UTCの日次、account deletion settleは毎時5分、calendar sync / external connection maintenanceは15分ごと。checkoutの`apps/product/vercel.json`と一致する。Run操作はしていない。
+
+既存View Logsのpath filterを`/api/cron/billing-reconciliation`、期間をLast dayに限定し、一覧metadataのみ確認した。**2026-10-06 11:15:14 JST、GET、HTTP 200**の1行があり、その期間の一覧末尾は「No more logs to show」。直近30分では空だったため、その空一覧を呼び出し不存在とは扱わない。ログ本文、request header / response body、認証付きURLは読んでいない。
+
+requestのdeployment hostnameをVercel MCP `get_deployment`で照合すると、Production `READY`、`dpl_hpdetJQXMNgMLhvAQutTSzDky3CK`、SHA `47f5d7c414317192bcd173255c092a29cdee0035`。現在の公開Production versionと一致する。これにより定期呼び出しの到達と配信revisionは確認できたが、HTTP 200は`configured:false`のskipにも処理完了にも使われるため、heartbeat欠測の原因確定・reconciliation成功とは扱わない。残るのは配信deploymentの実設定 / 実行分岐と、activation pending中のheartbeat要求の整合。
+
 ### 11:31 JSTの再取得と所在情報のCLI対応
 
 - 所在情報のtext/JSON表示を`--coverage`に追加し、`--service onepassword`でhuman・ciの所在と確認状態を表示できる。個別serviceではそのhuman項目を表示する。
