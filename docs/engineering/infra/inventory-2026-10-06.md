@@ -59,6 +59,14 @@ last_verified: 2026-10-06
 
 公開前には保護対象変更の独立レビュー、本番適用の明示手順、自然な定期呼出しの証拠が必要。スキップの到達を手動挿入して監視を通さない。
 
+### レビュー準備と旧Preview管理元の再確認
+
+- 2026-10-06、GitHub APIでmainのSHA `e9db16edad2cf1dfd47cdfb54232f0737def0f17`を確認し、この作業branchだけを追従した。他worktreeは操作していない。
+- 判断ログの競合は両方の決定を保持し、mainに存在するエントリの後ろへ本branchの追記を配置した。判断内容は変更していない。
+- Vercel MCPの`get_configuration`で`icfg_ZZhIJpCa3ksZJLqBXjg257gb`を照会。既定scopeと`slug: dayopt`の両方で404 `not_found`。削除済み・権限不足・scope不一致のどれかは確定できず、共有連携や16行を削除する根拠にしない。
+- 統合後のNode 24 `pnpm check`は終了コード0。Product 4597 / Web 377 / scripts 3437テスト成功。型・lint・静的検査・docsも成功。`pnpm run doctor --offline`は108定義が有効。過去の実環境結果を書き換える証拠にはしない。
+- 保護対象判定は`apps/product/src/app/api/cron/**`に一致。独立レビューはCI成功後のGitHubレビュー経路を使い、未実施のまま完了としない。
+
 ### 残る44結果と、すでにある補足証拠
 
 次表の件数は今回のdrift 1 / blocked 19 / manual 24を全件対応付けたもの。UIやMCPの補足でAPI結果をpassへ置き換えず、「何をもう聞かなくてよいか」と「何が残るか」を分ける。各サービスのcheck ID・取得時刻は保存されたDoctor結果、補足の取得元は本書の各時刻の節にある。
