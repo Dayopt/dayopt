@@ -176,6 +176,56 @@ BEGIN
     NULL;
   END;
 
+  -- Test the alternate coherent tuple in a rollback-only subtransaction.
+  -- A sentinel rollback keeps the immutable singleton empty for the next case.
+  v_alternate_email := CASE
+    WHEN (SELECT email FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000001'::UUID)
+      = 'test-seed@dayopt.dev' THEN 'test@dayopt.dev'
+    ELSE 'test-seed@dayopt.dev'
+  END;
+  BEGIN
+    UPDATE auth.users
+    SET email = v_alternate_email
+    WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+    UPDATE auth.identities
+    SET provider_id = v_alternate_email,
+        identity_data = jsonb_build_object(
+          'sub', '00000000-0000-0000-0000-000000000001',
+          'email', v_alternate_email
+        )
+    WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+    SELECT * INTO STRICT v_identity
+    FROM public.ensure_mcp_integration_environment_identity_v1();
+    IF v_identity.environment <> 'integration' THEN
+      RAISE EXCEPTION 'Alternate coherent sample email tuple was rejected';
+    END IF;
+    RAISE EXCEPTION 'Rollback alternate tuple test' USING ERRCODE = 'PT002';
+  EXCEPTION WHEN SQLSTATE 'PT002' THEN NULL;
+  END;
+
+  -- A mixed tuple must stay rejected even though each email is individually
+  -- in the old/new allowlist. This case also rolls back to the original seed.
+  v_mixed_email := v_alternate_email;
+  BEGIN
+    UPDATE auth.identities
+    SET identity_data = jsonb_build_object(
+      'sub', '00000000-0000-0000-0000-000000000001',
+      'email', v_mixed_email
+    )
+    WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+    BEGIN
+      PERFORM public.ensure_mcp_integration_environment_identity_v1();
+      RAISE EXCEPTION 'Mixed old/new Auth tuple unexpectedly provisioned' USING ERRCODE = 'PT001';
+    EXCEPTION
+      WHEN SQLSTATE 'DI005' THEN NULL;
+      WHEN SQLSTATE 'PT001' THEN RAISE;
+    END;
+    RAISE EXCEPTION 'Rollback mixed tuple test' USING ERRCODE = 'PT002';
+  EXCEPTION WHEN SQLSTATE 'PT002' THEN NULL;
+  END;
+
   SELECT * INTO STRICT v_identity
   FROM public.ensure_mcp_integration_environment_identity_v1();
   IF v_identity.environment <> 'integration'
@@ -191,53 +241,6 @@ BEGIN
     OR (SELECT count(*) FROM public.mcp_environment_identity) <> 1 THEN
     RAISE EXCEPTION 'Provisioning is not idempotent';
   END IF;
-
-  -- Rebuild the singleton inside this rollback-only test and prove the other
-  -- exact historical/current email tuple is accepted without normalizing seed.
-  DELETE FROM public.mcp_environment_identity;
-  v_alternate_email := CASE
-    WHEN (SELECT email FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000001'::UUID)
-      = 'test-seed@dayopt.dev' THEN 'test@dayopt.dev'
-    ELSE 'test-seed@dayopt.dev'
-  END;
-  UPDATE auth.users
-  SET email = v_alternate_email
-  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
-  UPDATE auth.identities
-  SET provider_id = v_alternate_email,
-      identity_data = jsonb_build_object(
-        'sub', '00000000-0000-0000-0000-000000000001',
-        'email', v_alternate_email
-      )
-  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
-    AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
-  SELECT * INTO STRICT v_identity
-  FROM public.ensure_mcp_integration_environment_identity_v1();
-  IF v_identity.environment <> 'integration' THEN
-    RAISE EXCEPTION 'Alternate coherent sample email tuple was rejected';
-  END IF;
-
-  -- A mixed tuple must stay rejected even though each email is individually
-  -- in the old/new allowlist.
-  DELETE FROM public.mcp_environment_identity;
-  v_mixed_email := CASE
-    WHEN v_alternate_email = 'test-seed@dayopt.dev' THEN 'test@dayopt.dev'
-    ELSE 'test-seed@dayopt.dev'
-  END;
-  UPDATE auth.identities
-  SET identity_data = jsonb_build_object(
-    'sub', '00000000-0000-0000-0000-000000000001',
-    'email', v_mixed_email
-  )
-  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
-    AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
-  BEGIN
-    PERFORM public.ensure_mcp_integration_environment_identity_v1();
-    RAISE EXCEPTION 'Mixed old/new Auth tuple unexpectedly provisioned' USING ERRCODE = 'PT001';
-  EXCEPTION
-    WHEN SQLSTATE 'DI005' THEN NULL;
-    WHEN SQLSTATE 'PT001' THEN RAISE;
-  END;
 
 END
 $test$;
