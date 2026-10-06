@@ -63,6 +63,8 @@ Vercel接続設定、Resend設定、Cloudflare非公開metadataなどは今回�
 
 今回の確認は上記のAPI実行結果を更新しない。1Passwordのitem存在だけでDoctorのprovider確認・復旧確認をpassへ変えない。
 
+ciの一覧も6件すべてを観測した。`vercel-production`、`supabase-auth-audit`、`supabase-storage-rls-audit`、`Supabase-StorageS3-backupsource`、`Cloudflare-R2-storagebackup`、`sentry-release-token`。正本のci item一覧と名前が一致し、`resources.ci_onepassword_items`に所在・確認日・確認主体を記録した。用途・fieldの期待値は`source_contracts.secrets`を参照し、複製しない。fieldの存在、現在のprovider権限・期限、GitHub/Vercel等のreplica一致は今回確認していない。
+
 追記後にNode 24で`pnpm run doctor --offline`を実行し、108検査定義と正本参照の整合を確認した（認証・通信なし、終了コード0）。`pnpm docs:check`も成功。今回の変更は所在metadataのみで、readerや判定処理の変更・実環境APIの再実行はない。
 
 ## 検証とレビュー

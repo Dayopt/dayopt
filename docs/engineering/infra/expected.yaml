@@ -590,6 +590,25 @@ resources:
       provider_configuration_and_replica_match: separate_verification
       inaccessible_means: unverified_not_absent
       secret_values_in_inventory: forbidden
+  ci_onepassword_items:
+    vault: ci
+    source: 1password_app_item_list_and_user_confirmation_2026-10-06
+    presence_status: user_confirmed
+    confirmed_by: user
+    verified_at: '2026-10-06'
+    confirmation_scope: item_names_and_presence_only
+    contract_refs: [secrets, operations]
+    field_presence: unverified
+    provider_permissions: unverified
+    expiry: unverified
+    replica_match: unverified
+    items:
+      - vercel-production
+      - supabase-auth-audit
+      - supabase-storage-rls-audit
+      - Supabase-StorageS3-backupsource
+      - Cloudflare-R2-storagebackup
+      - sentry-release-token
   human_onepassword_items:
     confirmation_scope: item_presence_and_service_use_only_not_provider_settings_or_replica_match
     source: 1password_app_item_list_and_user_confirmation_2026-10-06
