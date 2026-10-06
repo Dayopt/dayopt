@@ -61,6 +61,7 @@ describe('Cloud Preview evidence and cleanup', () => {
     const paths = [
       'apps/product/src/lib/test/preview-cloud-identity.ts',
       'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
+      'apps/product/src/lib/test/preview-service-key-fetch.mjs',
     ];
     for (const path of paths) {
       const file = join(root, path);
@@ -68,6 +69,9 @@ describe('Cloud Preview evidence and cleanup', () => {
       writeFileSync(file, readFileSync(path));
     }
     expect(() => verifyCloudFixtureContract(root)).not.toThrow();
+    writeFileSync(join(root, paths[2]), 'export const previewServiceKeyFetch = () => fetch;');
+    expect(() => verifyCloudFixtureContract(root)).toThrow('fixture contract differs');
+    writeFileSync(join(root, paths[2]), readFileSync(paths[2]));
     writeFileSync(
       join(root, paths[1]),
       'export function createCriticalPathIdentity(){return {userId:crypto.randomUUID()}}',
