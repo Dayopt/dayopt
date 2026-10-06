@@ -78,6 +78,8 @@ Integrationの接続・有効化設定は共通Preview設定に`integration` bra
 
 各サービスの子プロセスを既存`op://`参照付きの`op run`で起動する。無関係な環境変数は渡さず、既存ログインや`.env`へfallbackしない。既存agent専用op wrapperが必要とする非秘密のCODEX_THREAD_ID / CODEX_SESSION_IDだけは維持する。OP_SERVICE_ACCOUNT_TOKEN / OP_CONFIG_DIRなどの認証overrideを親から継承しない。1Passwordの永続設定や権限は変更しない。ダイアログが出る場合は今回のみ許可する。
 
+`agent` Vault専用のService Accountでは、現在ciを参照するVercel / Cloudflare、humanを参照するStripe Live / Resendを取得できない。GUIでitemを確認済みでも、この制約は解消しない。人間用Terminalでの既存`op run`実行とagentの実行を区別し、agentはwrapperや認証識別子を外して迂回しない。自動取得範囲を増やす場合はサービス側の読取専用権限を確定し、既存の強いcredentialのコピーやVault範囲拡大を解決策にしない。
+
 通常API timeoutは10秒。認証と収集全体はサービスごと120秒。429と一時的5xxだけ最大2回再試行。一つの認証・API失敗が他サービスの結果を消さない。StripeのallはLive/Testを別々の子プロセスで取得し、Live失敗でもTest結果を残す。サービス全体の120秒上限は共通。
 
 通信は固定のoperationとDayoptリソースに限定する。GETとmetadata用の固定read POSTのみ。Supabase SQLには`read_only:true`を付け、顧客行・Vault値・pg_cron commandを読まない。PostHogは直近7日のenvironment/count集計だけ。UptimeRobotは`getMonitors`だけ。RedisはPINGだけ。domain registrationはdayopt.app固定の公開registry RDAP GETだけで、registrant連絡先を出力しない。

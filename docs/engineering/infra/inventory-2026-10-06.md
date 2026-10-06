@@ -7,6 +7,47 @@ last_verified: 2026-10-06
 
 目的は、重要なサービス設計を人とagentが見失わず、日常の実態・変更・未観測を追えるようにすること。全検査を正常にすることは完了条件にしない。期待値は[expected.yaml](./expected.yaml)、実行方法は[doctor.md](./doctor.md)、前回の観測は[10/5の記録](./inventory-2026-10-05.md)を参照する。
 
+## 最新結果と既存証拠の突き合わせ（13:16 JSTの実行後）
+
+ユーザーがTerminalで既存1Passwordアカウントを認証し、`OP_BIOMETRIC_UNLOCK_ENABLED=true PATH=/opt/homebrew/opt/node@24/bin:$PATH pnpm run doctor --record`を実行した。13:16:55 JST、113結果は **pass 68 / drift 1 / blocked 19 / manual 24 / not_applicable 1、終了コード1**。ローカル履歴 `1791260215402-dca2a471-2bd0-40ed-8ed4-7020e82d3606.json` を読み取って確認した。生応答や秘密値は転記していない。
+
+直前12:54:42 JSTのpass 20 / blocked 79はユーザー側CLIの認証失敗を含む実行であり、差異0を正常としない。CLIは2.30.3から2.40.0へ更新され、アプリ連携と`op signin`の後に今回の取得が成功した。どの一操作が原因を解消したかは独立には確定していない。agent専用Vault境界や1Passwordの永続設定は変更していない。
+
+### 今回新たに確定できたこと
+
+- Vercel Productのenv metadata 129行を取得。先のUIでConfigと表示された4branch×7項目の28行は、API上すべて`type: encrypted`、`configuration_id: icfg_ZZhIJpCa3ksZJLqBXjg257gb`。既存Supabase Integrationの管理IDと一致した。平文・漏洩や手動設定の置き忘れとは判定しない。`sensitive`型への変更可否と再注入挙動は別検討で、値の取得・設定変更はしていない。
+- Stripe Production accountを取得できた。`charges_enabled:false`、active price / webhook / Portal configurationの取得一覧は空。VercelのProduction bindingにもStripeの設定を確認できず、台帳の`production_activation: pending`と整合する。課金開始の指示とは扱わず、配信済みdeploymentの内部env・cronの分岐結果まで証明したとはしない。
+- Stripe IntegrationのVercel account / Test mode / 選択priceと、Stripe APIのaccount / priceが対応。Test webhookはIntegration URLへ向く。active priceは2件あり、選択されないpriceの用途・削除可否は未確定。Portal等のmetadata取得成功は実Checkout成功とは別。
+- 最新Vercelの公開Supabase URLを、今回改めて取得した親project限定のSupabase MCP `list_branches`（5件）と比較。Production main、Integration、および`codex/cloud-first-preview-2910`、`codex/integration-reconcile-3009`、`codex/poc-retirement-3022`のrefが対応し、一覧上はACTIVE_HEALTHY / FUNCTIONS_DEPLOYED。`codex/integration-calendar-poc-port`のVercel overrideが指す`vszahucqgipeqtnnwzkv`はこの一覧にない。古い参照の整理候補であり、別project全体の不存在・実アクセス失敗と断定しない。MCP補足をDoctorのblocked結果へ混ぜて書き換えない。
+- PostHog settingsと集計の2検査は今回もpass。Project Read追加後の設定取得不能は解消した。データ削除credentialの配布と実削除は未確認のまま。
+
+### 残る44結果と、すでにある補足証拠
+
+次表の件数は今回のdrift 1 / blocked 19 / manual 24を全件対応付けたもの。UIやMCPの補足でAPI結果をpassへ置き換えず、「何をもう聞かなくてよいか」と「何が残るか」を分ける。各サービスのcheck ID・取得時刻は保存されたDoctor結果、補足の取得元は本書の各時刻の節にある。
+
+| 対象             | 件数（D/B/M） | 既存証拠で確認済みの範囲                                                                                              | 次に必要な証拠・作業                                                                                                         |
+| ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| GitHub           | 0/3/1         | 10/5にenvironment secret名・branch policy・repository hookの補足あり                                                  | 現tokenには権限がない。Appの対象repo・権限・pending状態は別途管理画面確認。secret値を要求しない                              |
+| Vercel           | 0/2/1         | Project / env / GitHub連携を今回API取得。Preview DBは上記MCP比較で補完                                                | Integration公開healthは認証保護で取得不能。対象Previewを明示して配信先とDBを確認。古いoverrideの所有者は解消済み             |
+| Supabase         | 1/4/3         | branch状態はMCPで補完、過去のbackup metadata・Storage/RLS証拠あり                                                     | heartbeat差異、Integration Auth契約、配信cron schedule。project detail 404を不存在としない。backup API権限と最新metadataは別 |
+| Stripe           | 0/0/2         | 今回Live/Test account、price、webhook、Portal取得。Integration設定のaccount / mode / priceは対応                      | 配信済みdeploymentのbilling gate・trial動作、追加Test priceの用途。Production有効化は別作業                                  |
+| Resend           | 0/3/1         | 11:49以降のMCPでdomain・tracking・両webhook、12:15以降UIでSending accessとdomain scopeを確認                          | Sending tokenで管理APIが読めない制約。Auth Edge送信元・署名replica・consumerとkeyの対応、Onboarding用途                      |
+| Cloudflare       | 0/5/5         | UIでDNS、Email Routing、Turnstile、R2 lock/lifecycle、token scope。Vercelでrenew:trueと支払方法登録。過去復元記録あり | API tokenの取得範囲、期限・配布先一致、旧bucket scopeの意図、DNSSEC方針、回復手段・現在backupの復元証拠                      |
+| Sentry           | 0/2/2         | legacy webhook 0件、Product/Webの配信SHAに対応するsource map upload、両通知ruleをUI確認                               | 新Integration hookとtoken scope、runtime symbolication・実通知。通知ruleやuploadを再び未発見としない                         |
+| PostHog          | 0/0/1         | project設定と集計取得は解消済み                                                                                       | consent・配信flagと削除keyの配布。計測停止だけで過去データ削除要件は解消しない                                               |
+| Upstash          | 0/0/1         | agent masterへのPING成功                                                                                              | 配信Production/Integration/Previewの接続・local制限との対応。PINGだけで環境分離を証明しない                                  |
+| Google           | 0/0/1         | Auth/Calendarの別契約と1Password所在あり                                                                              | 別セッションでのConsole/OAuth結果を参照。作業を重複実行しない                                                                |
+| MCP OAuth        | 0/0/1         | 公開discovery・source契約あり                                                                                         | 配信issuer/resource・登録callback・対象Previewとの対応                                                                       |
+| Telemetry        | 0/0/1         | source契約あり                                                                                                        | 実consent・replay masking、Vercel Analytics/Speed Insightsの現在設定                                                         |
+| Pwned Passwords  | 0/0/1         | source契約あり                                                                                                        | 配信password flowとprovider利用の証拠。実ユーザーpasswordを送らない                                                          |
+| Support SMTP     | 0/0/1         | human項目所在、専用Resend keyのdomain scope、Cloudflare転送設定あり                                                   | Gmail Send mail asとSMTP replicaの対応。受信転送を返信配送成功としない                                                       |
+| 任意開発サービス | 0/0/1         | Jev/Gatewayのsource契約あり                                                                                           | 現projectのbudget・key scope。モデル呼出しはしない                                                                           |
+| 1Password        | 0/0/1         | human/ci所在の人間確認、agent Vault境界、今回のユーザーCLI認証                                                        | field/replicaの対応と回復手段。主担当の引受は今回ユーザーが確認し台帳へ反映。コード・秘密値の再提出は不要                    |
+
+D=drift、B=blocked、M=manual。回復判断・障害通知確認の主担当は`expected.yaml`の`resources.operations_responsibility`を正とする。担当確認を実通知・復旧成功へ読み替えない。
+
+この整理で追加の設定変更・課金・メール/通知送信・復元・cron実行はしていない。残りの調査は、管理metadataの補完、配信設定との照合、明示的な実動作検証、運用方針の判断に分けて進める。過去に確認済みの1Password項目をすべて再入力してもらう必要はない。
+
 ## 台帳と運用の追加
 
 - 17サービスに役割、停止時の影響、再確認のきっかけ、設計の正本参照を追加。108検査定義、62接続、28取得制約を登録した。
@@ -99,6 +140,19 @@ Resendのendpointは10/5の早い時刻にも確認記録があり、後のMCP�
 `blocked`はDoctorの自動取得経路の状態、上表は補足証拠を含む棚卸しの状態。両者を混同して未確認件数や完了率を算出しない。日々の自動追跡を広げるためのreader権限整備と、設計を把握するための確認も別に管理する。
 
 ## 検証とレビュー
+
+### 12:47–12:51 JST 自動取得の認証境界とPostHog権限の特定
+
+- このセッションの`op vault list --format=json`をprocess内で名前だけに射影すると、可視Vaultは`agent`の1件。1Passwordアプリでhuman / ci itemが確認済みでも、agent CLIがそれを読めることにはならない。doctorのVercelはci、Stripe LiveとResendはhuman、Cloudflareはciを参照するため、このCLI経路では解決できない。Vault自体やitemの不存在とは判定しない。wrapper・SA設定・Vault権限は変更していない。
+- PostHogのDayopt Analytics（625917）でPersonal API keys一覧を確認。現在のログイン利用者の一覧に`Dayopt analytics AI read only`が1件、Active、対象projectはDayopt Analytics、scopeは`query:read user:read insight:read`。`Project: Read`はNo access。編集画面まで確認し、読取scope追加の具体的な承認を依頼した。保存は未実施。別ユーザー・project secret key・1Password内の削除用keyまで不存在と推測しない。
+- PostHogの公式[Personal API keys](https://posthog.com/docs/api/personal-api-keys)と[Persons API](https://posthog.com/docs/api/persons)を接続済みMCPのdocs-searchで確認。読取用keyに削除権限をまとめず、削除用keyの既存正本とconsumerを別に照合する。
+- `pnpm ctx 2864 --reuse-brief-l1`でheartbeatの要求を確認。#2864はopen、関連#3005はmerged。要求は照合実行の完了を記録することであり、未構成skipを照合成功として埋めるものではない。trusted L1 briefは取得できず、Issue本文と配信コードを根拠にした。op子processではNode 26のengine警告が出たが、この呼出しはIssue読取だけで、実装検証の成功には使わない。
+
+自動取得を全件可能にするには、人間用Terminalで既存資格情報を使ってdoctorを実行するか、agent用のサービス別読取資格情報を別途整備する必要がある。ci / humanの強い資格情報をagentへコピーしたり、既存SAのVault範囲を広げることで解決しない。既存キーのscope不足と、Vaultの到達不能を分けて扱う。
+
+#### 12:53 JST PostHog設定取得の解消
+
+Userから「Project: Readの追加を許可する」と明示承認を受け、既存keyのproject限定を維持して`project:read`のみ追加。保存時の再認証は既存GitHubログインで完了し、一覧で`query:read user:read insight:read project:read`を読み戻した。key値・key数・write/delete scopeは変更していない。12:53:20 JSTの`pnpm exec tsx scripts/doctor/cli.ts --service posthog --format json`は**pass 2 / blocked 0 / manual 1、終了コード2**。`posthog.settings`の取得不能は解消済み。集計結果の空配列を過去データ不存在とは扱わず、残りのmanualは配信中privacy / deletion確認。全サービスrunの件数はこの対象実行で上書きしない。
 
 ### 12:38–12:44 JST 削除経路・Preview変数の追加照合
 

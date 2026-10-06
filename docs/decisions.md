@@ -125,3 +125,5 @@
 - 2026-10-01: [auth] Google OAuthは本番・非本番でCloud projectを分離し、非本番でもAuth用とCalendar用clientを分ける（理由: 同一project内の認可取消が全clientへ及ぶため、非本番の切断を本番のGoogle tokenから隔離する）（参照: [Google OAuthの本番・非本番分離](operations/secrets.md#google-oauth-の本番非本番分離)、2026-10-01 のUser承認）
 - 2026-10-06: [infra] 人間用1Password itemはagent vaultへ複製せず、台帳にはVault・item locatorと人による確認状況を秘密値なしで残し、open-item URLは人の導線に限る（理由: human / agent の権限境界を保ち、項目の所在・存在確認と外部設定・replica一致を分離する）（参照: [人間用項目の台帳参照](operations/secrets.md#人間用項目の台帳参照)）
 - 2026-10-06: [infra] サービス台帳とDoctorは重要設計を保持し日々の実態・観測状況を追うために運用し、全検査passや差異ゼロを完了条件にしない（理由: 合意済みの設計と現状の変化・取得限界を人とagentが区別して把握するため）（参照: [Doctorの目的と完了条件](engineering/infra/doctor.md#目的と完了条件)）
+
+- 2026-10-06: [infra] 障害通知の確認と1Password・ドメイン・バックアップの復旧判断の主担当をDayopt運営者（ユーザー）とする（理由: ユーザーが主担当としての記録を明示承認）（参照: [サービス設定台帳](engineering/infra/expected.yaml) resources.operations_responsibility）

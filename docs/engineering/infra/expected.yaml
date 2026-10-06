@@ -573,6 +573,17 @@ advisories:
     migration_status: pending
     enforcement: advisory
 resources:
+  operations_responsibility:
+    primary_owner: Dayopt運営者（このセッションのユーザー）
+    confirmed_by: user
+    confirmed_at: '2026-10-06'
+    responsibilities:
+      - 障害通知の確認
+      - 1Password・ドメイン・バックアップの復旧判断
+    evidence: このセッションで「私を主担当として記録する」と明示確認
+    recovery_method_verified: false
+    deputy: 未確認
+    verification_boundary: 担当の引受のみ。回復手段・実通知・復元成功の証明ではない
   repository: Dayopt/dayopt
   vercel:
     product: prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa
@@ -1673,11 +1684,11 @@ ui_only:
   - {
       'id': 'posthog.project.permissions',
       'service': 'posthog',
-      'category': 'current_permission',
-      'items': ['Doctor API reader scope; deployed privacy switches / deletion key replica'],
-      'reason': 'Doctor用op://agent/potshog-readonly/credentialのproject APIは403 insufficient_access。PostHog MCP project-getはmetadataを返すが、personal API credential scopeとdeployed secret replicaは証明しない',
-      'next_step': 'MCPで得たproject settingsを棚卸し記録へ反映する。Doctor自動化のscope・deletion replicaは既存read-only credentialとVercel metadataで確認し、credential発行・権限変更をしない',
-      'check_ids': ['posthog.settings', 'posthog.deployed_privacy_and_deletion'],
+      'category': 'behavior_not_metadata',
+      'items': ['deployed privacy switches / deletion key replica'],
+      'reason': '2026-10-06にUser承認で既存Dayopt Analytics限定keyへproject:readのみを追加し、12:53:20 JSTのDoctorでsettings / aggregateはpass、blocked 0を確認。runtime同意・削除用keyの配布と実削除は別の証拠が必要',
+      'next_step': '設定読取の403は解消済み。既存posthog_deleteの正本と実deploymentへの配布・対象環境を照合し、削除機能の検証は合成データに限定して別途準備する',
+      'check_ids': ['posthog.deployed_privacy_and_deletion'],
       'documentation_urls': [],
     }
   - {
