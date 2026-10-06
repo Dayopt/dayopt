@@ -84,6 +84,12 @@ Story・mock test・CI・health はそれぞれの範囲の証拠であり、Goo
 
 再開時は Chrome の「ともや」で、メールログイン済みの専用 Dayopt ユーザーから Calendar 接続を開始する。管理用 Chrome で止まっている Google 同意画面を、そのまま本レーンの接続に流用しない。
 
+### Integration の報告・read-only確認（2026-10-03）
+
+- ユーザーは専用 Dayopt アカウントのログイン、Google Calendar 一覧の表示、取り込み成功と、手動同期の失敗を報告した。画面・deployment SHA・同期結果はその時点で独立確認されていない。
+- 当時の read-only schema 集計では、`plans` と `records` の有効な `external_calendar_event_id` 重複グループは各 0 件だった。一方、二重確定防止 migration `20260930014002_prevent_duplicate_external_calendar_conversion` は共有 Integration DB に未適用で、DB 制約による保護は有効と確認できていない。
+- これらは記録時点の報告・読取結果であり、現在の配備・DB状態を証明しない。固定 Integration の接続・同期・migration・配備を行う前に、冒頭の保留解除とその時点のSHA・DB ref・migration状態を確認する。
+
 ### ローカル確認記録（2026-09-29）
 
 対象 HEAD は `7e6fb801d8f3f7a6056509702cdb6e53b58917fd`。現在の Integration 配備との一致は主張しない。

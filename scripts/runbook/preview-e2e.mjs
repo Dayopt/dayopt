@@ -6,8 +6,10 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { previewServiceKeyFetch } from '../../apps/product/src/lib/test/preview-service-key-fetch.mjs';
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from './preview-cleanup.mjs';
 import {
@@ -19,7 +21,11 @@ import {
   requireTrustedRecoverySource,
   writePreviewRunManifest,
 } from './preview-e2e-recovery.mjs';
-import { observePreviewReadiness, parsePreviewReadinessArgs } from './preview-readiness.mjs';
+import {
+  observePreviewCleanupReadiness,
+  observePreviewReadiness,
+  parsePreviewReadinessArgs,
+} from './preview-readiness.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -29,7 +35,9 @@ export function previewWorkerEnvironment(
   privateDir,
   evidenceDir,
   runId,
-  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  cloudUserIds = /** @type {{desktop: string, mobile: string, accountDeletion?: string} | undefined} */ (
+    undefined
+  ),
 ) {
   const result = { NODE_ENV: 'test', CI: '1' };
   for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'PNPM_HOME', 'PLAYWRIGHT_BROWSERS_PATH']) {
@@ -52,6 +60,9 @@ export function previewWorkerEnvironment(
           E2E_PREVIEW_CLOUD_INTENT: '1',
           E2E_PREVIEW_DESKTOP_USER_ID: cloudUserIds.desktop,
           E2E_PREVIEW_MOBILE_USER_ID: cloudUserIds.mobile,
+          ...(cloudUserIds.accountDeletion
+            ? { E2E_PREVIEW_DELETION_USER_ID: cloudUserIds.accountDeletion }
+            : {}),
         }
       : {}),
   };
@@ -147,7 +158,8 @@ function executePlaywright(env) {
  *   onStarted?: (started: { runId: string; evidenceDirectory: string }) => void,
  *   runDirectory?: string,
  *   runId?: string,
- *   cloudUserIds?: { desktop: string, mobile: string },
+ *   cloudUserIds?: { desktop: string, mobile: string, accountDeletion?: string },
+ *   resolveServiceKey?: (input: {ready: any, request: any, env: NodeJS.ProcessEnv}) => Promise<string>,
  * }} options
  */
 export async function runPreviewE2E({
@@ -160,18 +172,28 @@ export async function runPreviewE2E({
   onStarted = () => {},
   runDirectory = undefined,
   runId = randomUUID(),
-  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  cloudUserIds = /** @type {{desktop: string, mobile: string, accountDeletion?: string} | undefined} */ (
+    undefined
+  ),
+  resolveServiceKey = ({ ready }) =>
+    resolvePreviewSecretKey({
+      projectRef: ready.supabaseProjectRef,
+      provisionToken: env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+    }),
 }) {
-  if (!env.SUPABASE_SECRET_KEY?.trim())
-    throw new Error('Nonproduction test credentials are required');
   const credentials = {
     githubToken: env.GITHUB_TOKEN,
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    workflowSha: env.GITHUB_SHA,
   };
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(runId))
     throw new Error('Preview run identity is invalid');
   const before = await observe({ ...request, ...credentials });
+  const serviceKey = await resolveServiceKey({ ready: before, request, env });
+  if (typeof serviceKey !== 'string' || !serviceKey.trim())
+    throw new Error('Preview target service key is unavailable');
+  const runEnv = { ...env, SUPABASE_SECRET_KEY: serviceKey };
   const directory = runDirectory
     ? resolve(runDirectory)
     : join(ensurePreviewE2EStateRoot(tempRoot), runId);
@@ -202,7 +224,7 @@ export async function runPreviewE2E({
   let failure = 'execution-failed';
   try {
     exitCode = await execute(
-      previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId, cloudUserIds),
+      previewWorkerEnvironment(runEnv, before, privateDir, evidenceDir, runId, cloudUserIds),
     );
   } catch {
     // A raw process error can contain env, command output, or request details.
@@ -216,7 +238,7 @@ export async function runPreviewE2E({
       evidenceDirectory: evidenceDir,
       runId,
       supabaseProjectRef: before.supabaseProjectRef,
-      serviceKey: env.SUPABASE_SECRET_KEY,
+      serviceKey,
     });
   } catch {
     // Invalid journal or raw provider errors cannot be disclosed.
@@ -232,13 +254,15 @@ export async function runPreviewE2E({
   } catch {
     failure = 'e2e-evidence-missing';
   }
-  if (cleanup.status !== 'clean' || cleanup.checked < 2) failure = 'cleanup-unconfirmed';
+  const expectedCleanupCount = cloudUserIds?.accountDeletion ? 3 : 2;
+  if (cleanup.status !== 'clean' || cleanup.checked < expectedCleanupCount)
+    failure = 'cleanup-unconfirmed';
   const passed =
     exitCode === 0 &&
     after !== null &&
     isPassingPreviewReport(report) &&
     cleanup.status === 'clean' &&
-    cleanup.checked >= 2;
+    cleanup.checked >= expectedCleanupCount;
   const result = {
     runId,
     status: passed ? 'passed' : 'failed',
@@ -260,11 +284,12 @@ export async function runPreviewE2E({
   return result;
 }
 
-function createPreviewAdmin(projectRef, secretKey) {
+export function createPreviewAdmin(projectRef, secretKey) {
   const requireFromProduct = createRequire(join(ROOT, 'apps/product/package.json'));
   const { createClient } = requireFromProduct('@supabase/supabase-js');
   return createClient(`https://${projectRef}.supabase.co`, secretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: previewServiceKeyFetch(secretKey) },
   });
 }
 
@@ -305,7 +330,7 @@ if (isDirectExecution(import.meta.url)) {
       const result = await recoverPreviewE2ERun({
         runId: args[1],
         stateRoot,
-        observe: observePreviewReadiness,
+        observe: observePreviewCleanupReadiness,
         createAdmin: createPreviewAdmin,
       });
       console.log(JSON.stringify(result, null, 2));

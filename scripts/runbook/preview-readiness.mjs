@@ -47,27 +47,62 @@ function observationTime(now) {
 }
 
 /**
+ * @typedef {{ sha: string, deploymentId: string, branchName: string, prNumber: number, supabaseProjectRef: string, supabaseBranchId: string, databaseMode: string, expectedMigrations: string[], githubToken: string, supabaseToken: string, bypassSecret: string, mergedValidation?: boolean, mergeCommitSha?: string | null, workflowSha?: string, pullRequestPolicy?: 'open' | 'merged', fetchImpl?: typeof fetch, now?: () => Date }} PreviewReadinessOptions
+ */
+
+/**
  * Observe a pinned Product Preview and its explicitly selected DB. This is an
  * E2E precondition, not a merge decision or an atomic snapshot. The caller must
  * obtain expected migrations from the same clean source SHA as the deployment.
  * Recheck after the run to detect shared-DB changes during the observation window.
+ * @param {PreviewReadinessOptions} options
+ * @returns {ReturnType<typeof observePinnedPreviewReadiness>}
  */
-export async function observePreviewReadiness({
-  sha,
-  deploymentId,
-  branchName,
-  prNumber,
-  supabaseProjectRef,
-  supabaseBranchId,
-  databaseMode,
-  expectedMigrations,
-  githubToken,
-  supabaseToken,
-  bypassSecret,
-  requireRunnablePullRequest = true,
-  fetchImpl = fetch,
-  now = () => new Date(),
-}) {
+export async function observePreviewReadiness(options) {
+  return observePinnedPreviewReadiness(options);
+}
+
+/**
+ * Reconfirm an already-owned run's pinned deployment and database before cleanup.
+ * Closing or advancing its PR cannot prevent recovery; all target checks remain.
+ * @param {Omit<PreviewReadinessOptions, 'pullRequestPolicy' | 'mergedValidation' | 'mergeCommitSha' | 'workflowSha'> & { pullRequestPolicy?: 'cleanup' }} options
+ * @returns {ReturnType<typeof observePinnedPreviewReadiness>}
+ */
+export async function observePreviewCleanupReadiness(options) {
+  requireCondition(
+    options.pullRequestPolicy === undefined || options.pullRequestPolicy === 'cleanup',
+    'candidate PR policy is invalid',
+  );
+  return observePinnedPreviewReadiness({ ...options, pullRequestPolicy: 'cleanup' }, true);
+}
+
+/**
+ * @param {Omit<PreviewReadinessOptions, 'pullRequestPolicy'> & { pullRequestPolicy?: 'open' | 'merged' | 'cleanup' }} options
+ * @param {boolean} cleanup
+ * @returns {Promise<{ status: string, sha: string, deploymentId: string, origin: string, prNumber: number, branchName: string, mergedValidation: boolean, mergeCommitSha: string | null, databaseMode: string, supabaseProjectRef: string, supabaseBranchId: string, migrationVersions: string[], providerEvidence: Record<string, string | number>, startedAt: string, observedAt: string }>}
+ */
+async function observePinnedPreviewReadiness(
+  {
+    sha,
+    deploymentId,
+    branchName,
+    prNumber,
+    supabaseProjectRef,
+    supabaseBranchId,
+    databaseMode,
+    expectedMigrations,
+    githubToken,
+    supabaseToken,
+    bypassSecret,
+    mergedValidation = false,
+    mergeCommitSha = null,
+    workflowSha,
+    pullRequestPolicy = mergedValidation ? 'merged' : 'open',
+    fetchImpl = fetch,
+    now = () => new Date(),
+  },
+  cleanup = false,
+) {
   requireCondition(
     /^[a-f0-9]{40}$/.test(sha ?? '') &&
       /^dpl_[a-zA-Z0-9]+$/.test(deploymentId ?? '') &&
@@ -84,6 +119,19 @@ export async function observePreviewReadiness({
       UUID.test(supabaseBranchId ?? '') &&
       ['shared', 'ephemeral'].includes(databaseMode),
     'invalid nonproduction database identity',
+  );
+  requireCondition(
+    typeof mergedValidation === 'boolean' &&
+      (mergedValidation
+        ? typeof mergeCommitSha === 'string' &&
+          /^[a-f0-9]{40}$/.test(mergeCommitSha) &&
+          typeof workflowSha === 'string' &&
+          /^[a-f0-9]{40}$/.test(workflowSha)
+        : mergeCommitSha === null) &&
+      (cleanup
+        ? !mergedValidation && pullRequestPolicy === 'cleanup'
+        : pullRequestPolicy === (mergedValidation ? 'merged' : 'open')),
+    'candidate PR policy is invalid',
   );
   requireCondition(
     Array.isArray(expectedMigrations) &&
@@ -112,7 +160,8 @@ export async function observePreviewReadiness({
     githubToken,
     fetchImpl,
     now,
-    requireRunnablePullRequest,
+    pullRequestPolicy,
+    ...(pullRequestPolicy === 'merged' ? { mergeCommitSha, workflowSha } : {}),
   });
   const branches = await readJson(
     `https://api.supabase.com/v1/projects/${SUPABASE_PRODUCTION_PROJECT_REF}/branches`,
@@ -187,6 +236,8 @@ export async function observePreviewReadiness({
     origin,
     prNumber,
     branchName,
+    mergedValidation,
+    mergeCommitSha,
     databaseMode,
     supabaseProjectRef,
     supabaseBranchId,
@@ -249,6 +300,7 @@ if (isDirectExecution(import.meta.url)) {
       githubToken: process.env.GITHUB_TOKEN,
       supabaseToken: process.env.SUPABASE_PREVIEW_READINESS_TOKEN,
       bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+      workflowSha: process.env.GITHUB_SHA,
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {

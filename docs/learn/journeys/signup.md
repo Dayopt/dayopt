@@ -38,7 +38,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('サインアップページがフォームと規約・ログイン導線を配信する'` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
+- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-signup-page` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
 
 ### 1. 登録フォーム（Turnstile と漏洩パスワード確認）（ブラウザ）
 
@@ -903,7 +903,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
-      "find": "test('サインアップページがフォームと規約・ログイン導線を配信する'",
+      "find": "@preview-e2e/product-auth-signup-page",
       "why": "画面が出るところまで。登録からメールまでを通しで守る E2E は無い"
     }
   ]

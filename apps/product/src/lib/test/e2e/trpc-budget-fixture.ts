@@ -42,16 +42,22 @@ export const test = base.extend<{
       page.off('response', onResponse);
       if (testInfo.status === 'skipped') return;
       const procedures = Object.values(counts).reduce((total, count) => total + count, 0);
-      await testInfo.attach('trpc-procedure-budget', {
-        body: JSON.stringify({
-          procedures,
-          budget: trpcProcedureBudget,
-          rateLimitedResponses,
-          mixedBatchResponses,
-          counts,
-        }),
-        contentType: 'application/json',
-      });
+      const budgetEvidence = {
+        procedures,
+        budget: trpcProcedureBudget,
+        rateLimitedResponses,
+        mixedBatchResponses,
+      };
+      // Unbounded local suites retain their assertions but publish no Infinity/null budget.
+      // Names are used only to count procedures above; they never enter the attachment.
+      if (
+        Object.values(budgetEvidence).every((value) => Number.isSafeInteger(value) && value >= 0)
+      ) {
+        await testInfo.attach('trpc-procedure-budget', {
+          body: JSON.stringify(budgetEvidence),
+          contentType: 'application/json',
+        });
+      }
       expect(procedures, '実際の tRPC 通信を観測できていること').toBeGreaterThan(0);
       expect(procedures, 'tRPC procedure 数の回帰').toBeLessThanOrEqual(trpcProcedureBudget);
       expect(rateLimitedResponses, 'tRPC rate limit').toBe(0);

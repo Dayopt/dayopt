@@ -34,6 +34,7 @@ type Exchange = {
  * It is not evidence of database RLS / FK enforcement, which belongs to integration tests.
  */
 function databaseBoundary() {
+  const now = Date.now();
   const rows: Record<string, DbRow[]> = {
     categories: [
       category(CATEGORY, OWNER),
@@ -50,8 +51,8 @@ function databaseBoundary() {
         activity_id: ACTIVITY,
         deleted_at: null,
         title: 'Owned record',
-        start_at: new Date(Date.now() - 30 * 60_000).toISOString(),
-        end_at: new Date(Date.now() - 15 * 60_000).toISOString(),
+        start_at: new Date(now - 30 * 60_000).toISOString(),
+        end_at: new Date(now - 15 * 60_000).toISOString(),
         source: 'manual',
       },
       {
@@ -60,8 +61,8 @@ function databaseBoundary() {
         activity_id: ACTIVITY,
         deleted_at: null,
         title: 'Other user record',
-        start_at: new Date(Date.now() - 30 * 60_000).toISOString(),
-        end_at: new Date(Date.now() - 15 * 60_000).toISOString(),
+        start_at: new Date(now - 30 * 60_000).toISOString(),
+        end_at: new Date(now - 15 * 60_000).toISOString(),
         source: 'manual',
       },
     ],

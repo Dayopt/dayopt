@@ -56,6 +56,10 @@ describe('Preview orphan recovery', () => {
     expect(s.fetchImpl.mock.calls[1][0]).toBe(
       `https://${ref}.supabase.co/auth/v1/admin/users/${userId}`,
     );
+    expect(new Headers(s.fetchImpl.mock.calls[0][1].headers).get('apikey')).toBe(
+      'sb_secret_private_test_key',
+    );
+    expect(new Headers(s.fetchImpl.mock.calls[0][1].headers).get('Authorization')).toBeNull();
     expect(JSON.parse(readFileSync(s.path, 'utf8')).status).toBe('deleted');
     expect(readFileSync(s.path, 'utf8')).not.toContain('sb_secret_private_test_key');
   });
@@ -104,6 +108,24 @@ describe('Preview orphan recovery', () => {
       .mockResolvedValueOnce(response(200))
       .mockResolvedValueOnce(response(200, ownedUser()));
     expect(await recoverPreviewUsers(s.options)).toMatchObject({ status: 'failed', recovered: 0 });
+  });
+  it('run marker付きの専用account-deletion namespaceだけをcleanupできる', async () => {
+    const s = fixture();
+    s.fetchImpl
+      .mockResolvedValueOnce(
+        response(200, {
+          ...ownedUser(),
+          email: `account-deletion-${userId}@example.com`,
+        }),
+      )
+      .mockResolvedValueOnce(response(200))
+      .mockResolvedValueOnce(response(404));
+    expect(await recoverPreviewUsers(s.options)).toEqual({
+      status: 'clean',
+      checked: 1,
+      recovered: 1,
+    });
+    expect(s.fetchImpl.mock.calls.filter((call) => call[1].method === 'DELETE')).toHaveLength(1);
   });
   it('private provider例外や本文をjournalへ残さない', async () => {
     const s = fixture();

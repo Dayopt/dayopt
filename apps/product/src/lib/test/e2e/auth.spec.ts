@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 import { resolveServiceRoleTarget } from '../service-role-target-guard';
 import {
@@ -6,6 +6,7 @@ import {
   deleteScopedTestUser,
   type ScopedTestUser,
 } from './create-scoped-test-user';
+import { test } from './preview-access-fixture';
 
 /**
  * 認証フロー E2E テスト
@@ -40,43 +41,55 @@ let testUser: ScopedTestUser | undefined;
 // ─────────────────────────────────────────────────────────
 
 test.describe('Auth: ページ配信', () => {
-  test('サインアップページがフォームと規約・ログイン導線を配信する', async ({ page }) => {
-    await page.goto('/auth/signup');
+  test(
+    'サインアップページがフォームと規約・ログイン導線を配信する',
+    { tag: '@preview-e2e/product-auth-signup-page' },
+    async ({ page }) => {
+      await page.goto('/auth/signup');
 
-    await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.locator('input[type="password"]').first()).toBeVisible();
-    await expect(page.locator('button[type="submit"]').first()).toBeVisible();
-    await expect(
-      page.locator('[role="checkbox"], a[href*="terms"], [data-testid="terms"]').first(),
-    ).toBeVisible();
-    await expect(page.locator('a[href*="login"]').first()).toBeVisible();
-  });
+      await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible({
+        timeout: 10000,
+      });
+      await expect(page.locator('input[type="password"]').first()).toBeVisible();
+      await expect(page.locator('button[type="submit"]').first()).toBeVisible();
+      await expect(
+        page.locator('[role="checkbox"], a[href*="terms"], [data-testid="terms"]').first(),
+      ).toBeVisible();
+      await expect(page.locator('a[href*="login"]').first()).toBeVisible();
+    },
+  );
 
-  test('ログインページがフォームとリセット・サインアップ導線を配信する', async ({ page }) => {
-    await page.goto('/auth/login');
+  test(
+    'ログインページがフォームとリセット・サインアップ導線を配信する',
+    { tag: '@preview-e2e/product-auth-login-page' },
+    async ({ page }) => {
+      await page.goto('/auth/login');
 
-    await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.locator('input[type="password"]').first()).toBeVisible();
-    await expect(page.locator('button[type="submit"]').first()).toBeVisible();
-    await expect(
-      page.locator('a[href*="password"], a[href*="reset"], a[href*="forgot"]').first(),
-    ).toBeVisible();
-    await expect(page.locator('a[href*="signup"]').first()).toBeVisible();
-  });
+      await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible({
+        timeout: 10000,
+      });
+      await expect(page.locator('input[type="password"]').first()).toBeVisible();
+      await expect(page.locator('button[type="submit"]').first()).toBeVisible();
+      await expect(
+        page.locator('a[href*="password"], a[href*="reset"], a[href*="forgot"]').first(),
+      ).toBeVisible();
+      await expect(page.locator('a[href*="signup"]').first()).toBeVisible();
+    },
+  );
 
-  test('パスワードリセットページがフォームと戻る導線を配信する', async ({ page }) => {
-    await page.goto('/auth/password');
+  test(
+    'パスワードリセットページがフォームと戻る導線を配信する',
+    { tag: '@preview-e2e/product-auth-password-page' },
+    async ({ page }) => {
+      await page.goto('/auth/password');
 
-    await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.locator('button[type="submit"]').first()).toBeVisible();
-    await expect(page.locator('a[href*="login"]').first()).toBeVisible();
-  });
+      await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible({
+        timeout: 10000,
+      });
+      await expect(page.locator('button[type="submit"]').first()).toBeVisible();
+      await expect(page.locator('a[href*="login"]').first()).toBeVisible();
+    },
+  );
 });
 
 // ─────────────────────────────────────────────────────────
@@ -86,9 +99,14 @@ test.describe('Auth: ページ配信', () => {
 test.describe('Auth: 認証フロー', () => {
   test.skip(!SERVICE_ROLE_TARGET.safe, SERVICE_ROLE_TARGET.safe ? '' : SERVICE_ROLE_TARGET.reason);
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     if (!SERVICE_ROLE_TARGET.safe) return;
-    testUser = await createScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, 'auth');
+    testUser = await createScopedTestUser(
+      SUPABASE_URL!,
+      SERVICE_ROLE_KEY!,
+      'auth',
+      testInfo.project.name,
+    );
   });
 
   test.afterAll(async () => {
@@ -96,42 +114,48 @@ test.describe('Auth: 認証フロー', () => {
     await deleteScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, testUser.userId);
   });
 
-  test('正しい認証情報でログインしカレンダーへ遷移する', async ({ page }) => {
-    await page.goto('/auth/login');
+  test(
+    '正しい認証情報でログインしカレンダーへ遷移する',
+    { tag: '@preview-e2e/product-auth-login-valid' },
+    async ({ page }) => {
+      await page.goto('/auth/login');
 
-    await page.locator('input[type="email"], input[name="email"]').first().fill(testUser!.email);
-    await page.locator('input[type="password"]').first().fill(testUser!.password);
-    await page.locator('button[type="submit"]').first().click();
+      await page.locator('input[type="email"], input[name="email"]').first().fill(testUser!.email);
+      await page.locator('input[type="password"]').first().fill(testUser!.password);
+      await page.locator('button[type="submit"]').first().click();
 
-    await page.waitForURL(/\/(?:ja\/?)?(?:\?.*)?$/i, { timeout: 15000 });
-    await expect(page).toHaveTitle(/Dayopt/);
-  });
+      await page.waitForURL(/\/(?:ja\/?)?(?:\?.*)?$/i, { timeout: 15000 });
+      await expect(page).toHaveTitle(/Dayopt/);
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    },
+  );
 
-  test('誤った認証情報でエラー表示', async ({ page }) => {
-    await page.goto('/ja/auth/login');
+  test(
+    '誤った認証情報でエラー表示',
+    { tag: '@preview-e2e/product-auth-login-invalid' },
+    async ({ page }) => {
+      await page.goto('/ja/auth/login');
 
-    await page
-      .locator('input[type="email"], input[name="email"]')
-      .first()
-      .fill('wrong@example.com');
-    await page.locator('input[type="password"]').first().fill('WrongPassword123');
-    await page.locator('button[type="submit"]').first().click();
+      await page.locator('input[type="email"], input[name="email"]').first().fill(testUser!.email);
+      await page.locator('input[type="password"]').first().fill('WrongPassword123');
+      await page.locator('button[type="submit"]').first().click();
 
-    // エラーメッセージが表示される（ユーザー列挙を防ぐ汎用メッセージ）。
-    //
-    // 待つ対象はサーバーエラーの FieldError と invalidCredentials の文言に限定する。
-    // `.text-destructive` を含む複合 locator では、必須ラベルの「＊」マーカー
-    // （field.tsx が required に付ける）が送信前から可視なため即座に一致してしまい、
-    // 認証エラーが実際には出ていない regression でもテストが green になる
-    // （account-deletion.spec.ts の再ログイン検証と同型の偽陽性、#1883）。
-    // role="alert" が付くのは announceImmediately の FieldError（= サーバーエラー）
-    // だけだが、Next.js の route announcer も role="alert" を持つため
-    // data-slot でさらに絞る。
-    await expect(page.locator('[role="alert"][data-slot="field-error"]')).toContainText(
-      'メールアドレスまたはパスワードが正しくありません',
-      { timeout: 10000 },
-    );
-    // 認証が通っていないこと自体も確認する（成功していればホームのカレンダーへ抜ける）
-    await expect(page).toHaveURL(/\/auth\/login/);
-  });
+      // エラーメッセージが表示される（ユーザー列挙を防ぐ汎用メッセージ）。
+      //
+      // 待つ対象はサーバーエラーの FieldError と invalidCredentials の文言に限定する。
+      // `.text-destructive` を含む複合 locator では、必須ラベルの「＊」マーカー
+      // （field.tsx が required に付ける）が送信前から可視なため即座に一致してしまい、
+      // 認証エラーが実際には出ていない regression でもテストが green になる
+      // （account-deletion.spec.ts の再ログイン検証と同型の偽陽性、#1883）。
+      // role="alert" が付くのは announceImmediately の FieldError（= サーバーエラー）
+      // だけだが、Next.js の route announcer も role="alert" を持つため
+      // data-slot でさらに絞る。
+      await expect(page.locator('[role="alert"][data-slot="field-error"]')).toContainText(
+        'メールアドレスまたはパスワードが正しくありません',
+        { timeout: 10000 },
+      );
+      // 認証が通っていないこと自体も確認する（成功していればホームのカレンダーへ抜ける）
+      await expect(page).toHaveURL(/\/auth\/login/);
+    },
+  );
 });

@@ -1,10 +1,10 @@
-# Release と同じ local Supabase / production build で #2933 を配備前に検証する。
+# Release と同じ local Supabase / production build で Calendar の取得・操作を配備前に検証する。
 # 外部環境・provider secrets・Production Release workflow は使用しない。
 name: Calendar Navigation E2E
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, integration]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/calendar-navigation-e2e.yml'
@@ -69,13 +69,34 @@ jobs:
 
       - name: Run E2E tests
         id: e2e
-        run: pnpm --dir apps/product exec playwright test calendar-navigation.spec.ts --project="chromium"
+        # initial-load: SSR hydration と browser の範囲再取得ゼロ。
+        # critical-path: 作成・reload の3ケースと procedure 予算26。navigation: 既存の予算28。
+        # block-search: 表示データの検索操作と予算48（#2678）。
+        # grep は予算対象の flow tag に限定する。Mobile Chrome は @mobile の初回URL・検索だけ。
+        run: >-
+          pnpm --dir apps/product exec playwright test
+          --config=playwright.isolated.config.ts
+          '/calendar-initial-load\.spec\.ts$' '/critical-path\.spec\.ts$'
+          '/calendar-navigation\.spec\.ts$' '/block-search\.spec\.ts$'
+          --grep='@preview-e2e/(product-initial-(desktop|mobile)-(tokyo|la)|desktop-(plan|record|past-plan)-create|product-calendar-(view|sidebar)-navigation|product-search-(desktop|mobile))'
+          --project="chromium" --project="Mobile Chrome"
+          --reporter=line,json --output="$RUNNER_TEMP/product-isolated-e2e"
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}
           SUPABASE_SECRET_KEY: ${{ steps.supabase.outputs.service_role_key }}
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_e2e_dummy
+          # next start runs in production mode and validates this key at request time.
+          # This disposable local-Supabase lane uses no production recovery codes.
+          RECOVERY_CODE_PEPPER: test-e2e-only-local-recovery-code-pepper
+          CI: '1'
+          POSTHOG_SERVER_ENABLED: 'false'
+          NEXT_PUBLIC_POSTHOG_PROJECT_KEY: ''
+          E2E_PREVIEW_CLOUD_INTENT: '0'
+          E2E_ALLOW_NONLOCAL_SUPABASE: '0'
+          E2E_ISOLATED_ARTIFACT_DIR: ${{ runner.temp }}/product-isolated-e2e
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/product-isolated-e2e-results.json
           # service role suite が env の欠落で丸ごと skip されても「0 failed」で緑に
           # なるのを防ぐ（skip ではなく即 fail させる）。
           E2E_REQUIRE_SERVICE_ROLE_SUITES: '1'
@@ -90,16 +111,16 @@ jobs:
         if: always()
         env:
           E2E_TEST_OUTCOME: ${{ steps.e2e.outcome }}
-        run: node scripts/ci/e2e-retry-report.mjs apps/product/test-results/e2e-results.json --label product --file-prefix apps/product/src/lib/test/e2e/
+        run: node scripts/ci/e2e-retry-report.mjs "$RUNNER_TEMP/product-isolated-e2e-results.json" --label product --file-prefix apps/product/src/lib/test/e2e/
 
       - name: Upload report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: playwright-report
+          name: product-isolated-e2e
           path: |
-            apps/product/playwright-report/
-            apps/product/test-results/e2e-results.json
+            ${{ runner.temp }}/product-isolated-e2e/
+            ${{ runner.temp }}/product-isolated-e2e-results.json
           retention-days: 7
 
       - name: Upload screenshots on failure
@@ -107,5 +128,5 @@ jobs:
         if: failure()
         with:
           name: screenshots
-          path: apps/product/test-results/
+          path: ${{ runner.temp }}/product-isolated-e2e/
           retention-days: 7

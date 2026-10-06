@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './public-test';
 
 test('theme menu changes dark and light appearance and persists on reload', async ({ page }) => {
   await page.goto('/');

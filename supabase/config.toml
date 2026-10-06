@@ -142,8 +142,8 @@ site_url = "http://127.0.0.1:3000"
 # 旧 `app-*` パターンは project 改名前の残骸で、どの preview URL にも一致しなかった。
 additional_redirect_urls = [
   "https://127.0.0.1:3000",
-  "https://product-*-dayopt.vercel.app/**",
-  "https://product-git-*-dayopt.vercel.app/**"
+  "https://product-*-dayopt.vercel.app",
+  "https://product-git-*-dayopt.vercel.app"
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -186,11 +186,11 @@ token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
-# Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# [auth.captcha]
-# enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# PR Preview の自動ログイン検証では CAPTCHA challenge を解けないため、ephemeral branch だけ無効化する。
+# Local も既定で無効のため挙動は変わらない。Supabase GitHub integration の config sync はPR Preview branchへ適用する。
+# 固定 Integration と Production の CAPTCHA 設定はこのファイルから変更しない。
+[auth.captcha]
+enabled = false
 
 [auth.email]
 enable_signup = true
@@ -239,6 +239,38 @@ enable_confirmations = false
 template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
 max_frequency = "5s"
+
+# Persistent Integration is an existing non-production Supabase branch. Remote
+# configuration applies only when the `integration` Git branch is merged; the
+# production remote remains Supabase `main` above.
+[remotes.integration]
+project_id = "tilwaprottpyhlfoggbb"
+
+[remotes.integration.db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[remotes.integration.auth]
+site_url = "https://product-git-integration-dayopt.vercel.app"
+additional_redirect_urls = [
+  "https://product-git-integration-dayopt.vercel.app",
+  "https://product-git-integration-dayopt.vercel.app/**",
+  # Supabase Auth sign-in redirects only; these do not grant MCP OAuth authority.
+  # Restrict generated Preview hosts to the existing Product project/team naming.
+  "https://product-*-dayopt.vercel.app/**",
+  "http://localhost:3000/**"
+]
+# The fixed synthetic test account from seed.sql is used for sign-in. Prevent
+# arbitrary account creation from turning this shared test database into a
+# place for real personal data.
+enable_signup = false
+
+# Cloudflare's public always-pass test pair, matching the Preview site key.
+# Declare it only for Integration so GitHub Configure preserves CAPTCHA.
+[remotes.integration.auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "1x0000000000000000000000000000000AA"
 
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]

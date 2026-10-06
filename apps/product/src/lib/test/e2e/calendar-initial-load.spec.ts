@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import { expect } from '@playwright/test';
+import type { createClient } from '@supabase/supabase-js';
+import { test } from './preview-access-fixture';
 
 import type { Database } from '@/lib/database';
 
@@ -8,6 +9,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
@@ -64,12 +66,15 @@ for (const { timezone, offset } of CASES) {
     let email: string;
     let activityId: string;
 
-    test.beforeAll(async () => {
-      const user = await createScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, 'initial-load');
+    test.beforeAll(async ({}, testInfo) => {
+      const user = await createScopedTestUser(
+        SUPABASE_URL!,
+        SUPABASE_SERVICE_KEY!,
+        'initial-load',
+        testInfo.project.name,
+      );
       ({ email, userId } = user);
-      adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+      adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
       const { error: settingsError } = await adminSupabase.from('user_settings').upsert({
         user_id: userId,
         timezone,
@@ -106,115 +111,141 @@ for (const { timezone, offset } of CASES) {
 
     test.afterAll(async () => {
       if (!adminSupabase) return;
-      await adminSupabase.from('plans').delete().eq('user_id', userId);
-      await adminSupabase.from('activities').delete().eq('user_id', userId);
-      await adminSupabase.from('categories').delete().eq('user_id', userId);
-      await adminSupabase.from('user_settings').delete().eq('user_id', userId);
-      await adminSupabase.from('profiles').delete().eq('id', userId);
       await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, userId);
     });
 
-    test('server で先読みした範囲を browser から取り直さない', async ({ page }, testInfo) => {
-      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
-      const hydrationErrors: string[] = [];
-      page.on('pageerror', (error) => {
-        if (/hydration|hydrating|#418|#425/i.test(error.message))
-          hydrationErrors.push(`${new URL(page.url()).pathname}: ${error.message}`);
-      });
-      page.on('console', (message) => {
-        if (message.type() === 'error' && /hydration|hydrating|#418|#425/i.test(message.text()))
-          hydrationErrors.push(`${new URL(page.url()).pathname}: ${message.text()}`);
-      });
-      await suppressConsentBanner(page);
-      const { data, error } = await adminSupabase.auth.admin.generateLink({
-        type: 'magiclink',
-        email,
-      });
-      if (error || !data.properties?.hashed_token) {
-        throw new Error(`magic link 発行に失敗: ${error?.message ?? 'no hashed_token'}`);
-      }
-      await page.goto(
-        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/ja/')}`,
-      );
-      await page.waitForURL(/\/ja\/?(?:\?.*)?$/, { timeout: 15_000 });
-      await page.waitForLoadState('networkidle');
-
-      // ここから数える。ログイン直後の「今日」の週とは別の範囲なので、先に温まった cache は使えない
-      const rangeRequests: string[] = [];
-      page.on('request', (request) => {
-        const { pathname } = new URL(request.url());
-        if (!pathname.startsWith('/api/trpc/')) return;
-        for (const procedure of decodeURIComponent(pathname.slice('/api/trpc/'.length)).split(
-          ',',
-        )) {
-          if ((RANGE_PROCEDURES as readonly string[]).includes(procedure)) {
-            rangeRequests.push(procedure);
-          }
+    test(
+      'server で先読みした範囲を browser から取り直さない',
+      { tag: `@preview-e2e/product-initial-desktop-${timezone === 'Asia/Tokyo' ? 'tokyo' : 'la'}` },
+      async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+        const hydrationErrors: string[] = [];
+        page.on('pageerror', (error) => {
+          if (/hydration|hydrating|#418|#425/i.test(error.message))
+            hydrationErrors.push(`${new URL(page.url()).pathname}: ${error.message}`);
+        });
+        page.on('console', (message) => {
+          if (message.type() === 'error' && /hydration|hydrating|#418|#425/i.test(message.text()))
+            hydrationErrors.push(`${new URL(page.url()).pathname}: ${message.text()}`);
+        });
+        await suppressConsentBanner(page);
+        const { data, error } = await adminSupabase.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+        });
+        if (error || !data.properties?.hashed_token) {
+          throw new Error(`magic link 発行に失敗: ${error?.message ?? 'no hashed_token'}`);
         }
-      });
-
-      await page.goto(`/ja/?view=week&date=${TARGET_DATE}`);
-      await expect(page.locator('[data-calendar-grid]')).toHaveCount(5, { timeout: 15_000 });
-      // 0 件が「query が撃たれなかった」ではなく「hydrate された data で描画した」ことの証拠
-      const seededCard = page
-        .getByRole('group', { name: 'week view calendar' })
-        .getByRole('button', { name: activityName });
-      await expect(seededCard).toBeVisible({ timeout: 10_000 });
-      await expect(seededCard).toContainText('09:00–10:00');
-      await page.waitForLoadState('networkidle');
-
-      expect(rangeRequests, '初回表示で範囲系 procedure を取り直していないこと').toEqual([]);
-      for (const route of [
-        `/ja/?view=week&date=${TARGET_DATE}`,
-        '/ja/settings',
-        '/ja/',
-        `/?view=week&date=${TARGET_DATE}`,
-      ]) {
-        rangeRequests.length = 0;
-        await page.goto(route);
-        await expect(page.locator('main')).toBeVisible();
-        await page.waitForLoadState('networkidle');
-        expect(
-          rangeRequests.filter(
-            (name) => name === 'userSettings.get' || name === 'billing.getAccess',
-          ),
-          route,
-        ).toEqual([]);
-      }
-      // 保存済みの非表示設定も hydrate 後に復元され、SSR との差で警告を起こさない。
-      await page.evaluate((id) => {
-        localStorage.setItem(
-          'calendar-filter-storage',
-          JSON.stringify({
-            state: { visibleActivityIds: [], knownActivityIds: [id], initialized: true },
-            version: 9,
-          }),
+        await page.goto(
+          `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=${encodeURIComponent('/ja/')}`,
         );
-      }, activityId);
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-      await expect(seededCard).toHaveCount(0);
-      expect(hydrationErrors).toEqual([]);
-    });
+        await page.waitForURL(/\/ja\/?(?:\?.*)?$/, { timeout: 15_000 });
+        await page.waitForLoadState('networkidle');
 
-    test('cookie未設定の初回は表示日とmobile URLが当日で揃う @mobile', async ({ page }) => {
-      const hydrationErrors: string[] = [];
-      page.on('pageerror', (error) => hydrationErrors.push(error.message));
-      await suppressConsentBanner(page);
-      const { data, error } = await adminSupabase.auth.admin.generateLink({
-        type: 'magiclink',
-        email,
-      });
-      if (error || !data.properties?.hashed_token) throw new Error('magic link failed');
-      await page.goto(
-        `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=%2Fja%2F`,
-      );
-      await page.waitForURL(/\/ja\/?(?:\?.*)?$/);
-      await page.waitForLoadState('networkidle');
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
-      expect(new URL(page.url()).searchParams.get('date')).toBe(today);
-      expect(new URL(page.url()).searchParams.get('view')).toBe('day');
-      expect(hydrationErrors).toEqual([]);
-    });
+        // ここから数える。ログイン直後の「今日」の週とは別の範囲なので、先に温まった cache は使えない
+        const rangeRequests: string[] = [];
+        page.on('request', (request) => {
+          const { pathname } = new URL(request.url());
+          if (!pathname.startsWith('/api/trpc/')) return;
+          for (const procedure of decodeURIComponent(pathname.slice('/api/trpc/'.length)).split(
+            ',',
+          )) {
+            if ((RANGE_PROCEDURES as readonly string[]).includes(procedure)) {
+              rangeRequests.push(procedure);
+            }
+          }
+        });
+
+        await page.goto(`/ja/?view=week&date=${TARGET_DATE}`);
+        await expect(page.locator('[data-calendar-grid]')).toHaveCount(5, { timeout: 15_000 });
+        // 0 件が「query が撃たれなかった」ではなく「hydrate された data で描画した」ことの証拠
+        const seededCard = page
+          .getByRole('group', { name: 'week view calendar' })
+          .getByRole('button', { name: activityName });
+        await expect(seededCard).toBeVisible({ timeout: 10_000 });
+        await expect(seededCard).toContainText('09:00–10:00');
+        await page.waitForLoadState('networkidle');
+
+        expect(rangeRequests, '初回表示で範囲系 procedure を取り直していないこと').toEqual([]);
+        for (const route of [
+          `/ja/?view=week&date=${TARGET_DATE}`,
+          '/ja/settings',
+          '/ja/',
+          `/?view=week&date=${TARGET_DATE}`,
+        ]) {
+          rangeRequests.length = 0;
+          await page.goto(route);
+          await expect(page.locator('main')).toBeVisible();
+          await page.waitForLoadState('networkidle');
+          expect(
+            rangeRequests.filter(
+              (name) => name === 'userSettings.get' || name === 'billing.getAccess',
+            ),
+            route,
+          ).toEqual([]);
+        }
+        // 実 UI から隠す。mounted store と食い違う storage の直接書換えは、
+        // sync effect に上書きされ得るため保存済み設定の fixture にならない。
+        await page.goto(`/ja/?view=week&date=${TARGET_DATE}`);
+        await expect(seededCard).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        const activityRow = page.getByRole('listitem').filter({
+          has: page.getByRole('button', { name: activityName, exact: true }),
+        });
+        await activityRow.hover();
+        await activityRow
+          .getByRole('button', { name: 'カレンダーから非表示', exact: true })
+          .click();
+        await expect(seededCard).toHaveCount(0);
+        const persistedVisibility = () =>
+          page.evaluate((id) => {
+            const stored = JSON.parse(localStorage.getItem('calendar-filter-storage') ?? 'null');
+            return {
+              initialized: stored?.state.initialized,
+              known: stored?.state.knownActivityIds.includes(id),
+              visible: stored?.state.visibleActivityIds.includes(id),
+            };
+          }, activityId);
+        await expect
+          .poll(persistedVisibility)
+          .toEqual({ initialized: true, known: true, visible: false });
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await expect(seededCard).toHaveCount(0);
+        await expect
+          .poll(persistedVisibility)
+          .toEqual({ initialized: true, known: true, visible: false });
+        expect(hydrationErrors).toEqual([]);
+      },
+    );
+
+    test(
+      'cookie未設定の初回は表示日とmobile URLが当日で揃う',
+      {
+        tag: [
+          '@mobile',
+          `@preview-e2e/product-initial-mobile-${timezone === 'Asia/Tokyo' ? 'tokyo' : 'la'}`,
+        ],
+      },
+      async ({ page }) => {
+        const hydrationErrors: string[] = [];
+        page.on('pageerror', (error) => hydrationErrors.push(error.message));
+        await suppressConsentBanner(page);
+        const { data, error } = await adminSupabase.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+        });
+        if (error || !data.properties?.hashed_token) throw new Error('magic link failed');
+        await page.goto(
+          `/ja/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink&next=%2Fja%2F`,
+        );
+        await page.waitForURL(/\/ja\/?(?:\?.*)?$/);
+        await page.waitForLoadState('networkidle');
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+        expect(new URL(page.url()).searchParams.get('date')).toBe(today);
+        expect(new URL(page.url()).searchParams.get('view')).toBe('day');
+        expect(hydrationErrors).toEqual([]);
+      },
+    );
   });
 }

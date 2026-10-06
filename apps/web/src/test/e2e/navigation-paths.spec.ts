@@ -1,9 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { publicRequestGet } from './public-get';
+import { expect, test } from './public-test';
 
 for (const locale of ['', '/ja']) {
   const ja = locale === '/ja';
   test(`${locale || 'en'} landing content links resolve to available public pages`, async ({
     page,
+    baseURL,
   }) => {
     await page.goto(locale || '/');
     const paths = await page
@@ -17,7 +19,7 @@ for (const locale of ['', '/ja']) {
       ]);
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) {
-      const response = await page.request.get(path);
+      const response = await publicRequestGet(page.request, path, baseURL!);
       expect(response.ok(), path).toBe(true);
       expect(new URL(response.url()).pathname.startsWith(locale + '/'), path).toBe(true);
     }

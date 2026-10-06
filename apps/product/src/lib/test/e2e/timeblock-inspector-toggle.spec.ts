@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import { expect, type Page } from '@playwright/test';
+import type { createClient } from '@supabase/supabase-js';
+import { test } from './preview-access-fixture';
 
 import type { Database } from '@/lib/database';
 
@@ -8,6 +9,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
@@ -56,12 +58,15 @@ describeWithEnv('Inspector toggle repro', () => {
   let userId: string;
   let email: string;
 
-  test.beforeAll(async () => {
-    const user = await createScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, 'repro');
+  test.beforeAll(async ({}, testInfo) => {
+    const user = await createScopedTestUser(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY!,
+      'repro',
+      testInfo.project.name,
+    );
     ({ email, userId } = user);
-    adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
     await adminSupabase.from('user_settings').upsert({
       user_id: userId,
       timezone: TIMEZONE,
@@ -106,12 +111,6 @@ describeWithEnv('Inspector toggle repro', () => {
 
   test.afterAll(async () => {
     if (!adminSupabase) return;
-    await adminSupabase.from('records').delete().eq('user_id', userId);
-    await adminSupabase.from('plans').delete().eq('user_id', userId);
-    await adminSupabase.from('activities').delete().eq('user_id', userId);
-    await adminSupabase.from('categories').delete().eq('user_id', userId);
-    await adminSupabase.from('user_settings').delete().eq('user_id', userId);
-    await adminSupabase.from('profiles').delete().eq('id', userId);
     await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, userId);
   });
 
@@ -145,41 +144,45 @@ describeWithEnv('Inspector toggle repro', () => {
       .evaluate((el, top) => el.scrollTo({ top, behavior: 'instant' }), (gridHeight / 24) * 8);
   }
 
-  test('クリックで開く / 再クリックで閉じる / 別ブロックで差し替わる', async ({ page }) => {
-    const consoleErrors: string[] = [];
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
-    });
-    page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${err.message}`));
+  test(
+    'クリックで開く / 再クリックで閉じる / 別ブロックで差し替わる',
+    { tag: '@preview-e2e/product-inspector-toggle' },
+    async ({ page }) => {
+      const consoleErrors: string[] = [];
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') consoleErrors.push(msg.text());
+      });
+      page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${err.message}`));
 
-    await openDay(page);
-    const cardA = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_A }).first();
-    const cardB = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_B }).first();
-    await expect(cardA).toBeVisible({ timeout: 10_000 });
-    const panelA = page.getByRole('region', { name: ACTIVITY_A });
-    const panelB = page.getByRole('region', { name: ACTIVITY_B });
+      await openDay(page);
+      const cardA = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_A }).first();
+      const cardB = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_B }).first();
+      await expect(cardA).toBeVisible({ timeout: 10_000 });
+      const panelA = page.getByRole('region', { name: ACTIVITY_A });
+      const panelB = page.getByRole('region', { name: ACTIVITY_B });
 
-    // 1. 開く
-    await cardA.click();
-    await page.waitForTimeout(600);
-    expect(await panelA.count(), 'クリックで開く').toBe(1);
-    expect(page.url(), 'URL にも反映される').toContain('timeblock=plan%3A');
+      // 1. 開く
+      await cardA.click();
+      await page.waitForTimeout(600);
+      expect(await panelA.count(), 'クリックで開く').toBe(1);
+      expect(page.url(), 'URL にも反映される').toContain('timeblock=plan%3A');
 
-    // 2. 同じブロックの再クリックで閉じる
-    await cardA.click();
-    await page.waitForTimeout(600);
-    expect(await panelA.count(), '再クリックで閉じる').toBe(0);
-    expect(page.url(), 'URL からも消える').not.toContain('timeblock=');
+      // 2. 同じブロックの再クリックで閉じる
+      await cardA.click();
+      await page.waitForTimeout(600);
+      expect(await panelA.count(), '再クリックで閉じる').toBe(0);
+      expect(page.url(), 'URL からも消える').not.toContain('timeblock=');
 
-    // 3. 開いてから別のブロックへ
-    await cardA.click();
-    await page.waitForTimeout(600);
-    expect(await panelA.count(), '再度開く').toBe(1);
-    await cardB.click();
-    await page.waitForTimeout(600);
-    expect(await panelB.count(), '別ブロックへ差し替わる').toBe(1);
-    expect(await panelA.count(), '前のブロックのパネルは残らない').toBe(0);
+      // 3. 開いてから別のブロックへ
+      await cardA.click();
+      await page.waitForTimeout(600);
+      expect(await panelA.count(), '再度開く').toBe(1);
+      await cardB.click();
+      await page.waitForTimeout(600);
+      expect(await panelB.count(), '別ブロックへ差し替わる').toBe(1);
+      expect(await panelA.count(), '前のブロックのパネルは残らない').toBe(0);
 
-    expect(consoleErrors, 'ブラウザ側のエラーなし').toEqual([]);
-  });
+      expect(consoleErrors, 'ブラウザ側のエラーなし').toEqual([]);
+    },
+  );
 });

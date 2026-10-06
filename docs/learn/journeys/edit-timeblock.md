@@ -38,8 +38,8 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts`](../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts) で `test('過去 Plan をドラッグ移動すると新しい時刻が保存される'` を探す（E2E。過去 Plan を動かして DB に残ることまで見る）
-- [`apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts`](../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts) で `test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す'` を探す（E2E。Inspector の古い入力が別の場所の値を潰さないこと）
+- [`apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts`](../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts) で `@preview-e2e/product-plan-drag-move` を探す（E2E。過去 Plan を動かして DB に残ることまで見る）
+- [`apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts`](../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts) で `@preview-e2e/product-plan-conflict` を探す（E2E。Inspector の古い入力が別の場所の値を潰さないこと）
 
 ### 1. ドラッグ・リサイズを離す（ブラウザ）
 
@@ -983,12 +983,12 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts",
-      "find": "test('過去 Plan をドラッグ移動すると新しい時刻が保存される'",
+      "find": "@preview-e2e/product-plan-drag-move",
       "why": "E2E。過去 Plan を動かして DB に残ることまで見る"
     },
     {
       "path": "apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts",
-      "find": "test('別 writer が同じ Plan を更新すると、UI は conflict として最新値を読み直す'",
+      "find": "@preview-e2e/product-plan-conflict",
       "why": "E2E。Inspector の古い入力が別の場所の値を潰さないこと"
     }
   ]

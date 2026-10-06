@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './preview-access-fixture';
 
 import {
   assertServiceRoleSuiteRunnable,
@@ -44,9 +45,14 @@ async function loginAndNavigate(page: import('@playwright/test').Page) {
 test.describe('Mobile Navigation', () => {
   test.skip(!SERVICE_ROLE_TARGET.safe, SERVICE_ROLE_TARGET.safe ? '' : SERVICE_ROLE_TARGET.reason);
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     if (!SERVICE_ROLE_TARGET.safe) return;
-    testUser = await createScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, 'mobile-nav');
+    testUser = await createScopedTestUser(
+      SUPABASE_URL!,
+      SERVICE_ROLE_KEY!,
+      'mobile-nav',
+      testInfo.project.name,
+    );
   });
 
   test.afterAll(async () => {
@@ -56,7 +62,7 @@ test.describe('Mobile Navigation', () => {
 
   test(
     'settings route stays on mobile account page',
-    { tag: '@mobile' },
+    { tag: ['@mobile', '@preview-e2e/product-mobile-settings-navigation'] },
     async ({ page }, testInfo) => {
       test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 
@@ -105,7 +111,7 @@ test.describe('Mobile Navigation', () => {
 
   test(
     'account icon opens settings without rendering bottom tabs',
-    { tag: '@mobile' },
+    { tag: ['@mobile', '@preview-e2e/product-mobile-calendar-navigation'] },
     async ({ page }, testInfo) => {
       test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 

@@ -11,6 +11,18 @@ const PRODUCTION_REF = 'yvglwblxrnrenfifsnje';
 const USAGE =
   'Usage: pnpm types:generate --target local|production|preview|integration [--project-ref <ref>]';
 
+/**
+ * Supabase CLI adds the managed PostgREST version to remote type output, while local CI output
+ * omits it. That endpoint metadata is not part of the database schema and otherwise makes
+ * integration-vs-local type drift checks fail when the schema itself matches.
+ */
+export function normalizeDatabaseTypes(source) {
+  return source.replace(
+    /(^|\r?\n)[ \t]*\/\/ Allows to automatically instantiate createClient with right options\r?\n[ \t]*\/\/ instead of createClient<Database, \{ PostgrestVersion: 'XX' \}>\(URL, KEY\)\r?\n[ \t]*__InternalSupabase: \{\r?\n[ \t]*PostgrestVersion: ["'][^"'\r\n]+["'];?\r?\n[ \t]*\};?/,
+    '$1',
+  );
+}
+
 export function parseTarget(args) {
   const values = new Map();
   for (let i = 0; i < args.length; i += 1) {
@@ -51,6 +63,7 @@ export async function generateDatabaseTypes({ args, root = ROOT, run = execFileS
   }
   if (typeof source !== 'string' || !/export\s+(?:type|interface)\s+Database\b/.test(source))
     throw new Error('Database型が取得できませんでした。生成済みファイルは保持します。');
+  source = normalizeDatabaseTypes(source);
 
   const output = join(root, OUTPUT);
   let formatted;

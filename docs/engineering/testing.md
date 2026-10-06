@@ -190,7 +190,7 @@ node scripts/runbook/preview-readiness.mjs \
 
 #### Remote E2E の実行
 
-`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに承認済み非本番の `SUPABASE_SECRET_KEY` が必要。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。既存CIからの明示opt-in経路は下記。実クラウドでの通し確認はまだ未完了。
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに `SUPABASE_PREVIEW_PROVISION_TOKEN` が必要。readinessが確認した非Production branch refに対してManagement APIでキーを取得し、候補keyの照合後にのみworkerへ渡す。同じrefに有効なsecret keyが複数ある時は `name=default` を一意に優先し、defaultが無い場合は唯一の候補だけを使う。default重複または複数の非default候補は fail closed にする。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。既存CIからの明示opt-in経路は下記。実クラウドでの通し確認はまだ未完了。
 
 - 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
 - ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。
@@ -208,12 +208,12 @@ Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head 
 
 既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch integrationのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。現在は `integration` のみ許可する設定を保存・確認済み。ユーザーの明示指示によりagentが設定保存を行えるが、個人Vault・1Passwordを開かず、値を会話へ出さない。
 
-このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` と `PREVIEW_E2E_SUPABASE_KEY` はEnvironmentへの直接保存をUIで確認済みで、1Password masterの初期化・同期を証明するものではない。Protection bypassの権限境界は未決のため、保存・実走完了とは扱わない。
+このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`SUPABASE_PREVIEW_PROVISION_TOKEN` はAPI Keys Read、API Key Secrets Read、Development Branches Readだけを持つ非Production用tokenとし、Preview – productとNonproduction loginの必要stepへ注入する。workerはreadinessが確定したrefのキーだけを取得し、Management tokenを候補プロセスへ渡さない。
 
 - `GITHUB_TOKEN`（`${{ github.token }}`）: trusted workerの短寿命token。`deployments: read` と `statuses: read` でGitHubにVercelが発行したProduct Previewのdeployment/statusを読む。長寿命Vercel PATはPreviewへ保存・注入しない。Playwrightの環境へGitHub tokenを渡さない。
 - `PREVIEW_E2E_SUPABASE_READINESS_TOKEN`（workerでは `SUPABASE_PREVIEW_READINESS_TOKEN`）: branch一覧と選択した非本番DBのmigration metadata確認用。fine-grained tokenは **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを付け、Database Data Readやwrite権限は付けない。migration確認は `GET /v1/projects/{ref}/database/migrations` を使い、SQLへfallbackしない。branch選択UIが子projectを提供しない場合は親projectを選ぶため、親のbranch/migration metadataへ到達できる権限であり非本番projectだけの権限とは呼ばない。選択した子projectへ同tokenでGETできることは初回実走で確認し、403では権限を広げず停止する。
 - `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。現在は方式・保存が未決。project単位bypassは同じProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは扱わない。対象Previewだけのshare方式との選択は所有者判断を待つ。アプリへの正規ログインは省略しない。
-- `PREVIEW_E2E_SUPABASE_KEY`（workerでは `SUPABASE_SECRET_KEY`）: 選択した非本番DBの合成user作成・所有runの回収用。隔離DBを選ぶ場合は対象DBのkeyが必要で、共有DBのkeyへfallbackしない。
+- `SUPABASE_PREVIEW_PROVISION_TOKEN`: 対象Previewのキー取得用。readiness gate通過後に対象refのAPI keys endpointだけを読み、合成user作成・所有run回収に使うkeyをworker内で解決する。固定Integration keyへのfallbackはしない。
 
 Vercel側のreadinessは数値project IDのAPI照合から、GitHubが認証した `vercel[bot]`（ID `35613825`）・Product path `/dayopt/product/`・`Preview – product` 環境・本番flag false・exact SHA・requested deployment ID・immutable originの契約へ置き換える。最新Product commit statusと最新deployment statusの成功を要求し、古い成功へのfallbackや曖昧な再デプロイ対応を拒否する。アプリの自己申告だけで合格にせず、同originのlive SHA/deployment ID/DB refとhealthを前後確認する。これは数値Vercel project IDの直接観測ではない。APIの観測失敗・発行者違い・別Product/環境・候補の変更はuser作成前に停止する。
 

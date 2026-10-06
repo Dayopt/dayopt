@@ -217,7 +217,7 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_mfa_recovery_codes 'mfa_recovery_codes' {
-    metadata { inventoryKind 'table' detail 'used by auth' }
+    metadata { inventoryKind 'table' detail 'used by auth, lib' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_oauth_audit_log 'oauth_audit_log' {
@@ -237,11 +237,11 @@ model {
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plan_template_blocks 'plan_template_blocks' {
-    metadata { inventoryKind 'table' detail 'used by timeblock' }
+    metadata { inventoryKind 'table' detail 'used by lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plan_templates 'plan_templates' {
-    metadata { inventoryKind 'table' detail 'used by timeblock' }
+    metadata { inventoryKind 'table' detail 'used by lib, timeblock' }
     link ../../../../apps/product/src/lib/database/generated/database.types.ts
   }
   table t_plans 'plans' {

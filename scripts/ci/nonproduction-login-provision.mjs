@@ -90,6 +90,12 @@ async function wait(milliseconds, sleepImpl) {
   await sleepImpl(milliseconds);
 }
 
+function previewBranchWaitReason(target, branch) {
+  const identity = `pr_number=${target.prNumber}, git_branch=${target.branchName}`;
+  if (!branch) return `Preview branch not found (${identity}, exact_match_count=0)`;
+  return `Preview branch is not ready (${identity}, exact_match_count=1, status=${branch.status ?? 'unknown'}, preview_project_status=${branch.preview_project_status ?? 'unknown'})`;
+}
+
 async function findReadyBranch({ target, supabaseToken, fetchImpl, sleepImpl, now }) {
   const timeoutAt = now() + 12 * 60_000;
   let lastReason = 'branch is not ready';
@@ -109,6 +115,7 @@ async function findReadyBranch({ target, supabaseToken, fetchImpl, sleepImpl, no
         ? branches.filter((branch) => branch.id === INTEGRATION_BRANCH_ID)
         : previewMatches;
     requireCondition(matches.length <= 1, 'branch identity is ambiguous');
+    if (target.kind === 'preview') lastReason = previewBranchWaitReason(target, matches[0]);
     if (matches.length === 1) {
       try {
         validateBranch(matches[0], target);
@@ -116,7 +123,8 @@ async function findReadyBranch({ target, supabaseToken, fetchImpl, sleepImpl, no
       } catch (error) {
         if (!(error instanceof ProvisionError) || !error.message.endsWith('branch is not ready'))
           throw error;
-        lastReason = error.message;
+        lastReason =
+          target.kind === 'preview' ? previewBranchWaitReason(target, matches[0]) : error.message;
       }
     }
     await wait(5_000, sleepImpl);
@@ -138,7 +146,12 @@ function getApiKey(keys, type) {
   );
   const legacyName = type === 'secret' ? 'service_role' : 'anon';
   const matches = modern.length > 0 ? modern : active.filter((key) => key.name === legacyName);
-  requireCondition(matches.length === 1, `branch ${type} API key is unavailable or ambiguous`);
+  const defaultKeys = matches.filter((key) => key.name === 'default');
+  if (defaultKeys.length === 1) return defaultKeys[0];
+  requireCondition(
+    defaultKeys.length === 0 && matches.length === 1,
+    `branch ${type} API key is unavailable or ambiguous`,
+  );
   return matches[0];
 }
 
@@ -234,13 +247,22 @@ function isDuplicateEmail(result) {
 async function verifyPasswordAndCloseLocalSession({
   origin,
   publishableKey,
+  adminVerificationKey,
   email,
   password,
   fetchImpl,
 }) {
+  // Administrative Integration verification must not disable the public CAPTCHA policy.
+  // Modern keys use apikey; only legacy service-role JWTs belong in Authorization.
+  const verificationKey = adminVerificationKey ?? publishableKey;
+  const legacyAdmin =
+    adminVerificationKey &&
+    (adminVerificationKey.type === 'legacy' ||
+      (adminVerificationKey.type === undefined && adminVerificationKey.name === 'service_role'));
   const signIn = await apiJson(`${origin}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    key: publishableKey.api_key,
+    key: verificationKey.api_key,
+    ...(legacyAdmin ? { authorizationToken: verificationKey.api_key } : {}),
     body: { email, password },
     fetchImpl,
   });
@@ -321,7 +343,14 @@ export async function provisionNonproductionLogin({
   if (!created.ok && !isDuplicateEmail(created))
     throw new ProvisionError('Nonproduction login: Auth user creation failed');
 
-  await verifyPasswordAndCloseLocalSession({ origin, publishableKey, email, password, fetchImpl });
+  await verifyPasswordAndCloseLocalSession({
+    origin,
+    publishableKey,
+    ...(target.kind === 'integration' ? { adminVerificationKey: secretKey } : {}),
+    email,
+    password,
+    fetchImpl,
+  });
   return {
     status: created.ok ? 'created-and-verified' : 'existing-credentials-verified',
     target: target.kind,

@@ -15,7 +15,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import PreviewE2EReporter, {
   isPassingPreviewReport,
+  safePreviewFailedSteps,
   safePreviewNetwork,
+  safePreviewProcedureBudget,
   safePreviewStep,
 } from '../lib/preview-e2e-reporter.mjs';
 import { previewWorkerEnvironment, runPreviewE2E } from './preview-e2e.mjs';
@@ -28,6 +30,8 @@ const ready = {
   deploymentId: 'dpl_test',
   prNumber: 2910,
   branchName: 'codex/test',
+  mergedValidation: false,
+  mergeCommitSha: null,
   databaseMode: 'ephemeral',
   supabaseBranchId: '11111111-1111-1111-1111-111111111111',
   migrationVersions: ['20260901000000'],
@@ -54,7 +58,7 @@ const ready = {
   },
 };
 const env = {
-  SUPABASE_SECRET_KEY: 'synthetic-admin',
+  SUPABASE_PREVIEW_PROVISION_TOKEN: 'management-private',
   GITHUB_TOKEN: 'github-private',
   VERCEL_TOKEN: 'production-vercel-private',
   SUPABASE_PREVIEW_READINESS_TOKEN: 'management-private',
@@ -65,35 +69,129 @@ const env = {
 };
 
 function reviewedReport() {
+  const desktopFlowIds = [
+    'desktop-plan-create',
+    'desktop-record-create',
+    'desktop-past-plan-create',
+    'desktop-summary-known-records',
+    'desktop-summary-record-deep-link',
+    'desktop-summary-empty',
+    'desktop-settings-display',
+    'desktop-data-export',
+    'desktop-activity-lifecycle',
+    'desktop-theme',
+    'desktop-timezone',
+    'desktop-locale',
+    'desktop-category-lifecycle',
+    'desktop-inspector-search',
+    'desktop-plan-move',
+    'desktop-conflict-merge',
+    'desktop-template-lifecycle',
+  ];
+  const mobileFlowIds = [
+    'mobile-plan-create',
+    'mobile-record-create',
+    'mobile-summary-to-inspector',
+    'mobile-settings-display',
+  ];
+  const publicFlowIds = [
+    ['smoke.spec.ts', 'product-smoke-unauth-redirect'],
+    ['smoke.spec.ts', 'product-smoke-en-signup-locale'],
+    ['smoke.spec.ts', 'product-smoke-ja-signup-locale'],
+    ['a11y.spec.ts', 'product-a11y-login'],
+    ['auth.spec.ts', 'product-auth-signup-page'],
+    ['auth.spec.ts', 'product-auth-login-page'],
+    ['auth.spec.ts', 'product-auth-password-page'],
+    ['pwa.spec.ts', 'product-pwa-manifest'],
+  ] as const;
+  const authenticatedFlows = [
+    ['account-deletion.spec.ts', 'chromium', 'product-account-deletion'],
+    ['auth.spec.ts', 'chromium', 'product-auth-login-valid'],
+    ['auth.spec.ts', 'chromium', 'product-auth-login-invalid'],
+    ['a11y.spec.ts', 'chromium', 'product-a11y-calendar'],
+    ['a11y.spec.ts', 'chromium', 'product-a11y-settings'],
+    ['calendar-navigation.spec.ts', 'chromium', 'product-calendar-view-navigation'],
+    ['calendar-navigation.spec.ts', 'chromium', 'product-calendar-sidebar-navigation'],
+    ['block-search.spec.ts', 'chromium', 'product-search-desktop'],
+    ['block-search.spec.ts', 'Mobile Chrome', 'product-search-mobile'],
+    ['plan-record-timeblock.spec.ts', 'chromium', 'product-plan-record-calendar'],
+    ['plan-record-timeblock.spec.ts', 'chromium', 'product-record-inspector-url'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-week'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-prefixless'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-default-week'],
+    ['deep-link.spec.ts', 'chromium', 'product-deep-link-invalid-view'],
+    ['derived-plan-record-flow.spec.ts', 'chromium', 'product-derived-plan-record'],
+    ['timeblock-conflict.spec.ts', 'chromium', 'product-plan-conflict'],
+    ['timeblock-drag-move.spec.ts', 'chromium', 'product-plan-drag-move'],
+    ['timeblock-inspector-toggle.spec.ts', 'chromium', 'product-inspector-toggle'],
+    ['mobile-navigation.spec.ts', 'Mobile Chrome', 'product-mobile-settings-navigation'],
+    ['mobile-navigation.spec.ts', 'Mobile Chrome', 'product-mobile-calendar-navigation'],
+    ['billing.spec.ts', 'chromium', 'product-billing-checkout-mocked'],
+    ['billing.spec.ts', 'chromium', 'product-billing-portal-mocked'],
+    ['billing.spec.ts', 'chromium', 'product-billing-checkout-success-return'],
+    ['billing.spec.ts', 'chromium', 'product-billing-checkout-cancel-return'],
+    ['billing.spec.ts', 'chromium', 'product-billing-portal-return'],
+    ['calendar-initial-load.spec.ts', 'chromium', 'product-initial-desktop-tokyo'],
+    ['calendar-initial-load.spec.ts', 'chromium', 'product-initial-desktop-la'],
+    ['calendar-initial-load.spec.ts', 'Mobile Chrome', 'product-initial-mobile-tokyo'],
+    ['calendar-initial-load.spec.ts', 'Mobile Chrome', 'product-initial-mobile-la'],
+  ] as const;
   const tests = [
-    ...Array.from({ length: 9 }, (_, index) => ({
+    ...desktopFlowIds.map((flowId, index) => ({
       file: 'critical-path.spec.ts',
       project: 'chromium',
+      flowId,
       line: index + 1,
     })),
-    ...Array.from({ length: 3 }, (_, index) => ({
+    ...mobileFlowIds.map((flowId, index) => ({
       file: 'mobile-critical-path.spec.ts',
       project: 'Mobile Chrome',
+      flowId,
+      line: index + 1,
+    })),
+    ...publicFlowIds.map(([file, flowId], index) => ({
+      file,
+      project: 'chromium',
+      flowId,
+      line: index + 1,
+    })),
+    ...authenticatedFlows.map(([file, project, flowId], index) => ({
+      file,
+      project,
+      flowId,
       line: index + 1,
     })),
   ].map((row) => ({ ...row, status: 'passed', expectedPassed: true, retry: 0 }));
-  return { status: 'passed', expected: 12, tests };
+  return { status: 'passed', expected: 59, tests };
 }
 
 describe('Reviewed Preview declaration matrix', () => {
-  it('accepts exactly the reviewed nine desktop and three mobile declarations', () => {
+  it('accepts exactly fifty desktop and nine mobile declarations', () => {
     expect(isPassingPreviewReport(reviewedReport())).toBe(true);
+  });
+  it('rejects the previous twenty-one authenticated-only contract', () => {
+    const report = reviewedReport();
+    report.tests.splice(17, 8);
+    report.expected = 21;
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
+  it('rejects the previous nine desktop and three mobile contract', () => {
+    const report = reviewedReport();
+    report.tests.splice(9, 8);
+    report.tests.pop();
+    report.expected = 12;
+    expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects the old seven declarations even if their dynamic expected count agrees', () => {
     const report = reviewedReport();
-    report.tests.splice(4, 5);
+    report.tests = [...report.tests.slice(0, 4), ...report.tests.slice(17, 20)];
     report.expected = 7;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects missing added coverage despite a matching dynamic count', () => {
     const report = reviewedReport();
     report.tests.splice(8, 1);
-    report.expected = 11;
+    report.expected = report.tests.length;
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it('rejects duplicate declaration locations that replace a new case', () => {
@@ -101,14 +199,19 @@ describe('Reviewed Preview declaration matrix', () => {
     report.tests[8] = { ...report.tests[0]! };
     expect(isPassingPreviewReport(report)).toBe(false);
   });
+  it('rejects a different declaration that keeps the reviewed file and count', () => {
+    const report = reviewedReport();
+    report.tests[3]!.flowId = 'desktop-unreviewed-flow';
+    expect(isPassingPreviewReport(report)).toBe(false);
+  });
   it('rejects the right counts under the wrong file/project pairing', () => {
     const report = reviewedReport();
     report.tests[0]!.file = 'mobile-critical-path.spec.ts';
     expect(isPassingPreviewReport(report)).toBe(false);
   });
-  it('rejects twelve distinct declarations split as eight desktop and four mobile', () => {
+  it('rejects twenty-one distinct declarations split as sixteen desktop and five mobile', () => {
     const report = reviewedReport();
-    report.tests[8] = { ...report.tests[9]!, line: 4 };
+    report.tests[8] = { ...report.tests[17]!, line: 5 };
     expect(isPassingPreviewReport(report)).toBe(false);
   });
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
@@ -134,7 +237,10 @@ function scenario() {
     return 0;
   });
   const recover = vi.fn(async () => ({ status: 'clean', checked: 2, recovered: 0 }));
-  return { root, observe, execute, recover };
+  const resolveServiceKey = vi.fn(
+    async (_input: { ready: any; request: any; env: NodeJS.ProcessEnv }) => 'synthetic-target-key',
+  );
+  return { root, observe, execute, recover, resolveServiceKey };
 }
 
 describe('Preview E2E runner', () => {
@@ -144,6 +250,7 @@ describe('Preview E2E runner', () => {
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -156,6 +263,11 @@ describe('Preview E2E runner', () => {
     });
     expect(result.status).toBe('passed');
     expect(s.observe).toHaveBeenCalledTimes(2);
+    expect(s.resolveServiceKey).toHaveBeenCalledWith(
+      expect.objectContaining({ ready, request: {} }),
+    );
+    expect(s.execute.mock.calls[0]?.[0].SUPABASE_SECRET_KEY).toBe('synthetic-target-key');
+    expect(JSON.stringify(result)).not.toContain('synthetic-target-key');
     expect(s.observe).toHaveBeenCalledWith(
       expect.objectContaining({ githubToken: 'github-private' }),
     );
@@ -176,7 +288,32 @@ describe('Preview E2E runner', () => {
       'private',
     );
   });
-  it('runs the credentialed harness only from the trusted checkout, ignoring a candidate root', async () => {
+  it('revalidates a merged candidate against the trusted Integration workflow SHA at readiness', async () => {
+    const s = scenario();
+    const mergeCommitSha = 'c'.repeat(40);
+    const workflowSha = 'd'.repeat(40);
+    const mergedReady = { ...ready, mergedValidation: true, mergeCommitSha };
+    const observe = vi.fn(async () => mergedReady);
+    const result = await runPreviewE2E({
+      request: { mergedValidation: true, mergeCommitSha },
+      env: { ...env, GITHUB_SHA: workflowSha },
+      observe,
+      execute: s.execute,
+      recover: s.recover,
+      resolveServiceKey: s.resolveServiceKey,
+      tempRoot: s.root,
+    });
+    expect(result.status).toBe('passed');
+    expect(observe).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ mergedValidation: true, mergeCommitSha, workflowSha }),
+    );
+    expect(observe).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ mergedValidation: true, mergeCommitSha, workflowSha }),
+    );
+  });
+  it('trusted supervisor keeps Playwright in its own checkout without management tokens', async () => {
     const s = scenario();
     const candidateRoot = join(s.root, 'candidate');
     const bin = join(s.root, 'bin');
@@ -188,7 +325,7 @@ describe('Preview E2E runner', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
-fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.SUPABASE_PREVIEW_PROVISION_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID, accountDeletion:process.env.E2E_PREVIEW_DELETION_USER_ID}));
 fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify(${JSON.stringify(reviewedReport())}));
 `,
     );
@@ -198,7 +335,9 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const cloudUserIds = {
       desktop: '22222222-2222-4222-8222-222222222222',
       mobile: '33333333-3333-4333-8333-333333333333',
+      accountDeletion: '44444444-4444-4444-8444-444444444444',
     };
+    s.recover.mockResolvedValueOnce({ status: 'clean', checked: 3, recovered: 0 });
     const result = await runPreviewE2E({
       request: {},
       env: { ...env, PATH: `${bin}:${process.env.PATH}` },
@@ -206,6 +345,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       runDirectory,
       runId,
       cloudUserIds,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       recover: s.recover,
     });
@@ -229,6 +369,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       runPreviewE2E({
         request: {},
         env,
+        resolveServiceKey: s.resolveServiceKey,
         observe: s.observe,
         execute: s.execute,
         recover: s.recover,
@@ -236,6 +377,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       }),
     ).rejects.toThrow();
     expect(s.execute).not.toHaveBeenCalled();
+    expect(s.resolveServiceKey).not.toHaveBeenCalled();
   });
   it('後段のDB等の不一致はE2E成功でも失敗', async () => {
     const s = scenario();
@@ -243,6 +385,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -256,6 +399,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -282,6 +426,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -297,7 +442,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
   });
   it('子プロセスには管理tokenと本番secretを渡さない', () => {
     const worker = previewWorkerEnvironment(
-      env,
+      { ...env, SUPABASE_SECRET_KEY: 'synthetic-target-key' },
       ready,
       '/private',
       '/evidence',
@@ -308,10 +453,71 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     expect(worker).not.toHaveProperty('SUPABASE_PREVIEW_READINESS_TOKEN');
     expect(worker).not.toHaveProperty('STRIPE_SECRET_KEY');
     expect(worker.NEXT_PUBLIC_SUPABASE_URL).toBe('https://abcdefghijklmnopqrst.supabase.co');
+    expect(worker).not.toHaveProperty('SUPABASE_PREVIEW_PROVISION_TOKEN');
+    expect(worker.SUPABASE_SECRET_KEY).toBe('synthetic-target-key');
   });
 });
 
 describe('Safe failure evidence', () => {
+  it('retains only finite nonnegative safe integer procedure-budget fields', () => {
+    expect(
+      safePreviewProcedureBudget({
+        procedures: 31,
+        budget: 26,
+        rateLimitedResponses: 0,
+        mixedBatchResponses: 0,
+        counts: { PRIVATE_PROCEDURE: 31 },
+        title: 'PRIVATE_TITLE',
+        error: 'PRIVATE_ERROR',
+      }),
+    ).toEqual({ procedures: 31, budget: 26, rateLimitedResponses: 0, mixedBatchResponses: 0 });
+  });
+  it.each([
+    -1,
+    1.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+    '26',
+    undefined,
+  ])('rejects unsafe budget numbers in every public numeric field: %s', (value) => {
+    for (const field of ['procedures', 'budget', 'rateLimitedResponses', 'mixedBatchResponses']) {
+      expect(
+        safePreviewProcedureBudget({
+          procedures: 31,
+          budget: 26,
+          rateLimitedResponses: 0,
+          mixedBatchResponses: 0,
+          [field]: value,
+        }),
+      ).toBeNull();
+    }
+  });
+  it('caps failed steps and hides source lines from files outside the spec allowlist', () => {
+    const steps = [
+      { category: 'expect', file: 'trpc-budget-fixture.ts', line: 56, duration: -1, failed: true },
+      ...Array.from({ length: 45 }, () => ({
+        category: 'test.step',
+        file: 'critical-path.spec.ts',
+        line: 482,
+        duration: Number.MAX_SAFE_INTEGER,
+        failed: true,
+        title: 'PRIVATE_TITLE',
+      })),
+    ];
+    const result = safePreviewFailedSteps({ status: 'failed', steps });
+    expect(result).toHaveLength(40);
+    expect(result[0]).toEqual({ category: 'expect', file: null, line: null, duration: 0 });
+    expect(result[1]).toEqual({
+      category: 'test.step',
+      file: 'critical-path.spec.ts',
+      line: 482,
+      duration: 420000,
+    });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_');
+    expect(safePreviewFailedSteps({ status: 'passed', steps })).toEqual([]);
+    expect(safePreviewFailedSteps({ status: 'skipped', steps })).toEqual([]);
+  });
   it('stepのtitle/引数/error本文を捨てて位置と結果だけ残す', () => {
     const result = safePreviewStep({
       category: 'pw:api',
@@ -350,6 +556,91 @@ describe('Safe failure evidence', () => {
 });
 
 describe('Preview reporter completeness', () => {
+  it.each(['not-json', '{"procedures":null}', 'x'.repeat(2049)])(
+    'omits malformed or oversized budget attachments without publishing raw contents',
+    (body) => {
+      const root = mkdtempSync(join(tmpdir(), 'preview-reporter-invalid-budget-'));
+      roots.push(root);
+      const reporter = new PreviewE2EReporter({ directory: root });
+      reporter.onTestEnd(
+        {
+          id: 'invalid-budget',
+          expectedStatus: 'passed',
+          location: { file: '/repo/critical-path.spec.ts', line: 471 },
+          parent: { project: () => ({ name: 'chromium' }) },
+        },
+        {
+          status: 'failed',
+          duration: 1,
+          retry: 0,
+          attachments: [{ name: 'trpc-procedure-budget', body: Buffer.from(body) }],
+        },
+      );
+      reporter.onEnd({ status: 'failed' });
+      expect(JSON.parse(readFileSync(join(root, 'e2e.json'), 'utf8')).tests[0]).not.toHaveProperty(
+        'procedureBudget',
+      );
+    },
+  );
+  it('preserves sanitized failed steps and numeric budget evidence without procedure names', () => {
+    const root = mkdtempSync(join(tmpdir(), 'preview-reporter-diagnosis-'));
+    roots.push(root);
+    const reporter = new PreviewE2EReporter({ directory: root });
+    const test = {
+      id: 'diagnosis',
+      expectedStatus: 'passed',
+      location: { file: '/repo/critical-path.spec.ts', line: 471 },
+      parent: { project: () => ({ name: 'chromium' }) },
+    };
+    reporter.onStepEnd(
+      test,
+      {},
+      {
+        category: 'test.step',
+        location: { file: '/repo/critical-path.spec.ts', line: 482 },
+        duration: 5000,
+        error: { message: 'PRIVATE_ERROR' },
+        title: 'PRIVATE_TITLE',
+      },
+    );
+    reporter.onTestEnd(test, {
+      status: 'failed',
+      duration: 5000,
+      retry: 0,
+      attachments: [
+        {
+          name: 'preview-network',
+          body: Buffer.from('[{"at":1,"target":"preview","status":200}]'),
+        },
+        {
+          name: 'trpc-procedure-budget',
+          body: Buffer.from(
+            JSON.stringify({
+              procedures: 31,
+              budget: 26,
+              rateLimitedResponses: 0,
+              mixedBatchResponses: 0,
+              counts: { PRIVATE_PROCEDURE: 31 },
+              error: 'PRIVATE_ERROR',
+            }),
+          ),
+        },
+      ],
+    });
+    reporter.onEnd({ status: 'failed' });
+    const source = readFileSync(join(root, 'e2e.json'), 'utf8');
+    const row = JSON.parse(source).tests[0];
+    expect(row.failedSteps).toEqual([
+      { category: 'test.step', file: 'critical-path.spec.ts', line: 482, duration: 5000 },
+    ]);
+    expect(row.procedureBudget).toEqual({
+      procedures: 31,
+      budget: 26,
+      rateLimitedResponses: 0,
+      mixedBatchResponses: 0,
+    });
+    expect(source).not.toContain('PRIVATE_');
+  });
   it.each(['passed', 'skipped', 'failed'])(
     '全件の結果を判定し、生の例外を保存しない: %s',
     (status) => {
@@ -360,6 +651,7 @@ describe('Preview reporter completeness', () => {
       for (const [index, declaration] of reviewedReport().tests.entries()) {
         const test = {
           id: String(index),
+          tags: [`preview-e2e/${declaration.flowId}`],
           expectedStatus: 'passed',
           location: { file: `/repo/${declaration.file}`, line: declaration.line },
           parent: { project: () => ({ name: declaration.project }) },

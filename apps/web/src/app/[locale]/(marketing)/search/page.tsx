@@ -16,10 +16,13 @@ function SearchResults() {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations('search');
+  const [interactive, setInteractive] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'docs' | 'blog'>('all');
+
+  useEffect(() => setInteractive(true), []);
 
   useEffect(() => {
     const q = searchParams.get('q') || '';
@@ -124,6 +127,7 @@ function SearchResults() {
               </svg>
               <Input
                 type="text"
+                disabled={!interactive}
                 placeholder={t('page.inputPlaceholder')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -131,7 +135,11 @@ function SearchResults() {
                 className="py-4 pr-4 pl-12 text-base"
               />
             </div>
-            <Button onClick={() => handleSearch(query)} className="px-6 py-4">
+            <Button
+              disabled={!interactive}
+              onClick={() => handleSearch(query)}
+              className="px-6 py-4"
+            >
               {t('page.submit')}
             </Button>
           </div>

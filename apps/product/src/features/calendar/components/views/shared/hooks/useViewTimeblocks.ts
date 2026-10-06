@@ -54,7 +54,8 @@ export function useViewTimeblocks({
     if (!timeblocks || !Array.isArray(timeblocks)) {
       return [];
     }
-    const dateKey = getDateKey(date, timezone);
+    // 表示日付は暦日の値。TZ変換するのは予定・記録の実時刻だけ。
+    const dateKey = getDateKey(date);
     const result = timeblocks.filter((timeblock) => {
       if (
         !timeblock.startDate ||

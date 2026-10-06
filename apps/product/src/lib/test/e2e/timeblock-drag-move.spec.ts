@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import { expect, type Page } from '@playwright/test';
+import type { createClient } from '@supabase/supabase-js';
+import { test } from './preview-access-fixture';
 
 import type { Database } from '@/lib/database';
 
@@ -8,6 +9,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
@@ -69,13 +71,16 @@ describeWithEnv('Timeblock drag move', () => {
   let password: string;
   let planId: string;
 
-  test.beforeAll(async () => {
-    const user = await createScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, 'drag-move');
+  test.beforeAll(async ({}, testInfo) => {
+    const user = await createScopedTestUser(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY!,
+      'drag-move',
+      testInfo.project.name,
+    );
     ({ email, password, userId } = user);
 
-    adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
 
     await adminSupabase.from('user_settings').upsert({
       user_id: userId,
@@ -118,12 +123,6 @@ describeWithEnv('Timeblock drag move', () => {
 
   test.afterAll(async () => {
     if (!adminSupabase) return;
-    await adminSupabase.from('records').delete().eq('user_id', userId);
-    await adminSupabase.from('plans').delete().eq('user_id', userId);
-    await adminSupabase.from('activities').delete().eq('user_id', userId);
-    await adminSupabase.from('categories').delete().eq('user_id', userId);
-    await adminSupabase.from('user_settings').delete().eq('user_id', userId);
-    await adminSupabase.from('profiles').delete().eq('id', userId);
     await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, userId);
   });
 
@@ -146,68 +145,72 @@ describeWithEnv('Timeblock drag move', () => {
    * 移動先も過去に留める（09:00 → 10:00）。Plan は時間軸のどこにでも置けるが、
    * 「過去の予定を過去の範囲内で動かせない」という報告そのものを踏むのが目的。
    */
-  test('過去 Plan をドラッグ移動すると新しい時刻が保存される', async ({ page }) => {
-    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
-    await page.waitForLoadState('networkidle');
+  test(
+    '過去 Plan をドラッグ移動すると新しい時刻が保存される',
+    { tag: '@preview-e2e/product-plan-drag-move' },
+    async ({ page }) => {
+      await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
+      await page.waitForLoadState('networkidle');
 
-    const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
-    await expect(grid).toBeVisible({ timeout: 10_000 });
-    const gridHeight = await grid.evaluate((el) => el.getBoundingClientRect().height);
-    const hourHeight = gridHeight / 24;
+      const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
+      await expect(grid).toBeVisible({ timeout: 10_000 });
+      const gridHeight = await grid.evaluate((el) => el.getBoundingClientRect().height);
+      const hourHeight = gridHeight / 24;
 
-    // 09:00 を viewport へ出す（1 時間分の余白を上に残す）。html の scroll-behavior:
-    // smooth でアニメーションすると直後の boundingBox が確定しないため instant。
-    await page
-      .locator('[data-calendar-scroll]')
-      .first()
-      .evaluate((el, top) => el.scrollTo({ top, behavior: 'instant' }), hourHeight * 8);
+      // 09:00 を viewport へ出す（1 時間分の余白を上に残す）。html の scroll-behavior:
+      // smooth でアニメーションすると直後の boundingBox が確定しないため instant。
+      await page
+        .locator('[data-calendar-scroll]')
+        .first()
+        .evaluate((el, top) => el.scrollTo({ top, behavior: 'instant' }), hourHeight * 8);
 
-    const card = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
-    await expect(card).toBeVisible({ timeout: 10_000 });
-    const box = await card.boundingBox();
-    if (!box) throw new Error('past plan card is not visible');
+      const card = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
+      await expect(card).toBeVisible({ timeout: 10_000 });
+      const box = await card.boundingBox();
+      if (!box) throw new Error('past plan card is not visible');
 
-    // x は動かさない。Record レーン側へ寄せると Plan → Record 変換の判定に入るため、
-    // ここで見たい「同一レーンの時間移動」にならない。
-    const x = box.x + box.width / 2;
-    const yFrom = box.y + box.height / 2;
+      // x は動かさない。Record レーン側へ寄せると Plan → Record 変換の判定に入るため、
+      // ここで見たい「同一レーンの時間移動」にならない。
+      const x = box.x + box.width / 2;
+      const yFrom = box.y + box.height / 2;
 
-    await page.mouse.move(x, yFrom);
-    await page.mouse.down();
-    // mousemove は rAF スロットルされるため、中間 move を挟んで drag を確定させる
-    await page.mouse.move(x, yFrom + 24, { steps: 4 });
-    // drag が成立しないまま mouse.up すると「掴めなかった」と「動かせなかった」が
-    // 区別できない。dragging 中だけ body へ載るカーソルで前者を先に潰す。
-    await expect
-      .poll(() => page.evaluate(() => document.body.style.cursor), { timeout: 5_000 })
-      .toBe('grabbing');
-    await page.mouse.move(x, yFrom + hourHeight, { steps: 8 });
-    await page.mouse.up();
+      await page.mouse.move(x, yFrom);
+      await page.mouse.down();
+      // mousemove は rAF スロットルされるため、中間 move を挟んで drag を確定させる
+      await page.mouse.move(x, yFrom + 24, { steps: 4 });
+      // drag が成立しないまま mouse.up すると「掴めなかった」と「動かせなかった」が
+      // 区別できない。dragging 中だけ body へ載るカーソルで前者を先に潰す。
+      await expect
+        .poll(() => page.evaluate(() => document.body.style.cursor), { timeout: 5_000 })
+        .toBe('grabbing');
+      await page.mouse.move(x, yFrom + hourHeight, { steps: 8 });
+      await page.mouse.up();
 
-    // UI の見た目ではなく永続化された行を見る。楽観的更新だけが動いて mutation が
-    // 飛んでいない、という今回の不具合の形をここで弾く。
-    await expect
-      .poll(
-        async () => {
-          const { data } = await adminSupabase
-            .from('plans')
-            .select('start_at, end_at')
-            .eq('id', planId)
-            .single();
-          // PostgREST は `+00:00` 表記で返すため、比較前に ISO へ正規化する。
-          return data
-            ? `${new Date(data.start_at).toISOString()}/${new Date(data.end_at).toISOString()}`
-            : null;
-        },
-        { timeout: 15_000 },
-      )
-      .toBe(`${isoAt('10:00')}/${isoAt('11:00')}`);
+      // UI の見た目ではなく永続化された行を見る。楽観的更新だけが動いて mutation が
+      // 飛んでいない、という今回の不具合の形をここで弾く。
+      await expect
+        .poll(
+          async () => {
+            const { data } = await adminSupabase
+              .from('plans')
+              .select('start_at, end_at')
+              .eq('id', planId)
+              .single();
+            // PostgREST は `+00:00` 表記で返すため、比較前に ISO へ正規化する。
+            return data
+              ? `${new Date(data.start_at).toISOString()}/${new Date(data.end_at).toISOString()}`
+              : null;
+          },
+          { timeout: 15_000 },
+        )
+        .toBe(`${isoAt('10:00')}/${isoAt('11:00')}`);
 
-    // Plan のまま。編集で Record へ暗黙変換されないこと（plan-record.md）。
-    const { count } = await adminSupabase
-      .from('records')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    expect(count).toBe(0);
-  });
+      // Plan のまま。編集で Record へ暗黙変換されないこと（plan-record.md）。
+      const { count } = await adminSupabase
+        .from('records')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      expect(count).toBe(0);
+    },
+  );
 });

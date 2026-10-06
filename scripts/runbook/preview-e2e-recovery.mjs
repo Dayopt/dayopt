@@ -12,6 +12,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { SUPABASE_PRODUCTION_PROJECT_REF } from '../ci/production-auth-config-audit.mjs';
+import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const USER_STATUSES = new Set([
@@ -228,8 +229,8 @@ function sameCandidate(expected, observed) {
   return JSON.stringify(actual) === JSON.stringify(expected);
 }
 
-function isSyntheticCriticalPathEmail(email) {
-  return /^(critical-path|mobile-critical-path)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@example\.com$/i.test(
+function isSyntheticPreviewEmail(email) {
+  return /^(critical-path|mobile-critical-path|account-deletion)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@example\.com$/i.test(
     email ?? '',
   );
 }
@@ -250,7 +251,7 @@ async function getVerifiedRunUser(admin, evidence, runId) {
     !user ||
     user.id !== evidence.userId ||
     user.app_metadata?.e2e_run_id !== runId ||
-    !isSyntheticCriticalPathEmail(user.email)
+    !isSyntheticPreviewEmail(user.email)
   ) {
     throw new Error('Preview E2E user ownership does not match the recovery run');
   }
@@ -343,6 +344,8 @@ export async function recoverPreviewE2ERun({
   env = process.env,
   observe,
   createAdmin,
+  resolveServiceKey = ({ projectRef, provisionToken }) =>
+    resolvePreviewSecretKey({ projectRef, provisionToken }),
   now = () => new Date(),
 }) {
   if (!UUID.test(runId ?? '')) throw new Error('A valid Preview E2E run ID is required');
@@ -370,7 +373,7 @@ export async function recoverPreviewE2ERun({
     throw new Error('Preview E2E run is still active; recovery is not allowed');
   }
   if (
-    !env.SUPABASE_SECRET_KEY?.trim() ||
+    !env.SUPABASE_PREVIEW_PROVISION_TOKEN?.trim() ||
     !env.GITHUB_TOKEN?.trim() ||
     !env.SUPABASE_PREVIEW_READINESS_TOKEN?.trim() ||
     !env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
@@ -403,7 +406,7 @@ export async function recoverPreviewE2ERun({
       supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
       bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
       // Recover the already-owned pinned run even after its PR closes or advances.
-      requireRunnablePullRequest: false,
+      pullRequestPolicy: 'cleanup',
     });
     if (!sameCandidate(current.candidate, observed)) {
       throw new Error('Preview E2E recovery target does not match the recorded candidate');
@@ -413,7 +416,14 @@ export async function recoverPreviewE2ERun({
     if (activeEvidence.length > 20) {
       throw new Error('Preview E2E recovery exceeds the per-run synthetic-user limit');
     }
-    const admin = createAdmin(current.candidate.supabaseProjectRef, env.SUPABASE_SECRET_KEY);
+    const serviceKey = await resolveServiceKey({
+      projectRef: current.candidate.supabaseProjectRef,
+      provisionToken: env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+    });
+    if (typeof serviceKey !== 'string' || !serviceKey.trim()) {
+      throw new Error('Preview target service key is unavailable');
+    }
+    const admin = createAdmin(current.candidate.supabaseProjectRef, serviceKey);
 
     const recoveredUserIds = [];
     for (const user of activeEvidence) {

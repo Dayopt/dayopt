@@ -4,6 +4,18 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const statsState = vi.hoisted(() => ({
+  data: undefined as
+    | {
+        counts: Record<string, number>;
+        planCounts: Record<string, number>;
+        lastUsed?: Record<string, string>;
+      }
+    | undefined,
+  isError: false,
+  isFetching: false,
+}));
+const sortState = vi.hoisted(() => ({ sortKey: 'name' as 'name' | 'lastUsed' }));
 const empty = vi.hoisted(() => []);
 const remove = vi.hoisted(() => vi.fn());
 const notifyFailure = vi.hoisted(() => vi.fn());
@@ -33,7 +45,12 @@ vi.mock('@/features/activities', async () => {
   };
 });
 vi.mock('@/lib/trpc', () => ({
-  api: { statistics: { getActivityStats: { useQuery: () => ({ data: null, isError: false }) } } },
+  api: { statistics: { getActivityStats: { useQuery: () => statsState } } },
+}));
+vi.mock('@/features/calendar/stores/useActivitySortStore', () => ({
+  useActivitySortStore: (
+    selector: (state: { sortKey: 'name' | 'lastUsed'; setSortKey: () => void }) => unknown,
+  ) => selector({ sortKey: sortState.sortKey, setSortKey: vi.fn() }),
 }));
 vi.mock('@/lib/billing/useProductAccessGate', () => ({
   useProductAccessGate: () => (action: () => void) => action(),
@@ -69,7 +86,60 @@ vi.mock('./components/ActivityRow', () => ({
 import { ActivityFilterList } from './ActivityFilterList';
 
 describe('ActivityFilterList deletion failures', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    statsState.data = undefined;
+    statsState.isError = false;
+    statsState.isFetching = false;
+    sortState.sortKey = 'name';
+  });
+  it('lastUsed の統計取得中は行を操作可能にしない', () => {
+    sortState.sortKey = 'lastUsed';
+    statsState.isFetching = true;
+    const client = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={client}>
+        <ActivityFilterList />
+      </QueryClientProvider>,
+    );
+    try {
+      expect(screen.queryByRole('button', { name: 'delete activity' })).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
+      client.clear();
+    }
+  });
+  it.each([
+    ['loading', undefined, false, 'delete.activityDescriptionUnknown'],
+    ['error', undefined, true, 'delete.activityDescriptionUnknown'],
+    ['zero', { counts: {}, planCounts: {} }, false, 'delete.activityDescriptionEmpty'],
+    [
+      'known',
+      { counts: { 'activity-1': 2 }, planCounts: { 'activity-1': 3 } },
+      false,
+      'delete.activityDescription',
+    ],
+  ] as const)(
+    '%s count keeps confirmation without guessing',
+    async (_state, data, isError, description) => {
+      statsState.data = data;
+      statsState.isError = isError;
+      const client = new QueryClient();
+      const view = render(
+        <QueryClientProvider client={client}>
+          <ActivityFilterList />
+        </QueryClientProvider>,
+      );
+      try {
+        await userEvent.click(screen.getByRole('button', { name: 'delete activity' }));
+        expect(within(screen.getByRole('alertdialog')).getByText(description)).toBeInTheDocument();
+        expect(remove).not.toHaveBeenCalled();
+      } finally {
+        view.unmount();
+        client.clear();
+      }
+    },
+  );
   it.each(['activity', 'category'])(
     '%sの失敗は既存通知に任せ、未処理rejectなしで再操作できる',
     async (kind) => {

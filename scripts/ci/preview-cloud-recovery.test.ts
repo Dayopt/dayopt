@@ -23,7 +23,7 @@ const env = {
   GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration',
   GITHUB_RUN_ID: '36405214644',
   GITHUB_RUN_ATTEMPT: '1',
-  SUPABASE_SECRET_KEY: 'PRIVATE_SUPABASE_KEY',
+  SUPABASE_PREVIEW_PROVISION_TOKEN: 'PRIVATE_PROVISION_TOKEN',
 };
 const request = {
   sha: 'a'.repeat(40),
@@ -154,6 +154,14 @@ describe('Cloud recovery plan intake', () => {
       JSON.stringify(JSON.parse(readFileSync(join(s.directory, 'verified.json'), 'utf8'))),
     ).not.toContain('PRIVATE_');
   });
+  it('does not mix merged-candidate validation with recovery of a prior run', async () => {
+    const s = prepare();
+    await expect(
+      prepareCloudRecovery({ ...s, env: { ...s.env, PREVIEW_MERGED_VALIDATION: 'true' } }),
+    ).rejects.toThrow();
+    expect(s.fetchImpl).not.toHaveBeenCalled();
+    expect(s.download).not.toHaveBeenCalled();
+  });
   it.each(['1;echo TOKEN', '0', '9007199254740992'])(
     'rejects malformed source input before download: %s',
     async (value) => {
@@ -238,13 +246,16 @@ describe('Cloud recovery plan intake', () => {
   });
 });
 describe('Cloud recovery after worker loss', () => {
-  it('recovers partial creation without the lost journal, using only two precommitted IDs', async () => {
+  it('recovers partial creation without the lost journal, using only precommitted IDs', async () => {
     const directory = temp();
     const authenticate = vi.fn(async () => undefined);
     let desktopDeleted = false;
     const fetchImpl = vi.fn<typeof fetch>(async (input, options) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.endsWith(`/users/${intent.userIds.mobile}`))
+      if (
+        url.endsWith(`/users/${intent.userIds.mobile}`) ||
+        url.endsWith(`/users/${intent.userIds.accountDeletion}`)
+      )
         return new Response('{}', { status: 404 });
       if (!url.endsWith(`/users/${intent.userIds.desktop}`)) throw new Error('unexpected user');
       if (options?.method === 'DELETE') {
@@ -268,7 +279,7 @@ describe('Cloud recovery after worker loss', () => {
       authenticate,
       recover: (options) => recoverPreviewUsers({ ...options, fetchImpl }),
     });
-    expect(result).toMatchObject({ status: 'clean', checked: 2, recovered: 1 });
+    expect(result).toMatchObject({ status: 'clean', checked: 3, recovered: 1 });
     expect(result.users.every((user) => user.status === 'deleted')).toBe(true);
     expect(
       fetchImpl.mock.calls.every((call) =>
@@ -293,6 +304,36 @@ describe('Cloud recovery after worker loss', () => {
     ).rejects.toThrow();
     expect(recover).not.toHaveBeenCalled();
   });
+  it('resolves the target key only after recovery source trust and keeps it out of evidence', async () => {
+    const directory = temp();
+    writeFileSync(join(directory, 'verified.json'), JSON.stringify(proof));
+    const verify = vi.fn(async () => proof);
+    const resolveServiceKey = vi.fn(async (input: { intent: typeof intent }) => {
+      expect(input.intent).toEqual(intent);
+      expect(verify).toHaveBeenCalledTimes(1);
+      return 'PRIVATE_SUPABASE_KEY';
+    });
+    const recover = vi.fn(async () => ({
+      status: 'clean',
+      checked: 2,
+      recovered: 2,
+      users: [{ userId: 'u1', status: 'deleted' }],
+    }));
+    const result = await executeCloudRecovery({
+      directory,
+      env,
+      recover,
+      verify,
+      resolveServiceKey,
+    });
+    expect(result).toMatchObject({ status: 'clean', cleanupConfirmed: true });
+    expect(recover).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceKey: 'PRIVATE_SUPABASE_KEY' }),
+    );
+    expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain(
+      'PRIVATE_SUPABASE_KEY',
+    );
+  });
   it('source revalidation failure publishes failure and never calls Auth recovery', async () => {
     const directory = temp();
     writeFileSync(join(directory, 'verified.json'), JSON.stringify(proof));
@@ -300,9 +341,17 @@ describe('Cloud recovery after worker loss', () => {
     const verify = vi.fn(async () => {
       throw new Error('PRIVATE_PROVIDER_BODY');
     });
-    const result = await executeCloudRecovery({ directory, env, recover, verify });
+    const resolveServiceKey = vi.fn(async () => 'PRIVATE_SUPABASE_KEY');
+    const result = await executeCloudRecovery({
+      directory,
+      env,
+      recover,
+      verify,
+      resolveServiceKey,
+    });
     expect(result).toMatchObject({ status: 'failed', cleanupConfirmed: false, users: [] });
     expect(recover).not.toHaveBeenCalled();
+    expect(resolveServiceKey).not.toHaveBeenCalled();
     expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain('PRIVATE_');
   });
 });
