@@ -18,6 +18,51 @@ INSERT INTO public.mcp_mutation_control (
 ON CONFLICT (singleton_key) DO UPDATE
 SET writes_enabled = false, enabled_client_ids = '{}'::TEXT[];
 
+-- This rollback-only Integration contract retains its historical sample email.
+-- Normalize either exact seed revision inside this disposable test transaction.
+DO $fixture$
+DECLARE
+  v_user_count BIGINT;
+  v_identity_count BIGINT;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM auth.users AS app_user
+    JOIN auth.identities AS identity ON identity.user_id = app_user.id
+    WHERE app_user.id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND app_user.email IN ('test@dayopt.dev', 'test-seed@dayopt.dev')
+      AND identity.id = app_user.id
+      AND identity.provider = 'email'
+      AND identity.provider_id = app_user.email
+      AND identity.email = app_user.email
+      AND identity.identity_data = jsonb_build_object(
+        'sub', app_user.id::TEXT,
+        'email', app_user.email
+      )
+  ) THEN
+    RAISE EXCEPTION 'Expected exact deterministic seed Auth tuple';
+  END IF;
+
+  UPDATE auth.users
+  SET email = 'test@dayopt.dev'
+  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+  GET DIAGNOSTICS v_user_count = ROW_COUNT;
+  UPDATE auth.identities
+  SET provider_id = 'test@dayopt.dev',
+      email = 'test@dayopt.dev',
+      identity_data = jsonb_build_object(
+        'sub', '00000000-0000-0000-0000-000000000001',
+        'email', 'test@dayopt.dev'
+      )
+  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+    AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+  GET DIAGNOSTICS v_identity_count = ROW_COUNT;
+  IF v_user_count <> 1 OR v_identity_count <> 1 THEN
+    RAISE EXCEPTION 'Could not normalize exact Integration test seed tuple';
+  END IF;
+END
+$fixture$;
+
 DO $test$
 DECLARE
   v_identity RECORD;

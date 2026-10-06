@@ -224,9 +224,11 @@ docs へ残している。
   connection/token の失効状態を共通writer fence内で再検証する
 - OAuth authorityのresourceは変更不可のDB environment identityへFKで結ぶ。PR Previewは
   空または未使用の既知auth seed fixtureだけのDBでexact Vercel URLとSupabase project
-  ref/JWT refをservice-role RPCから一度だけ設定する。UUID/email/password/provider
-  identityを固定し、未知user、session、MFA、Auth OAuth state、既存OAuth authorityが
-  あれば拒否する。Persistent Staging identityは作らない
+  ref/JWT refをservice-role RPCから一度だけ設定する。seed UUID/password/provider identityは
+  固定し、Previewでは旧・現行sample emailのどちらか一方へAuth userとemail identityが
+  一貫して一致するtupleだけを許可する。未知user、混在tuple、session、MFA、Auth OAuth state、
+  既存OAuth authorityがあれば拒否する。Integrationの固定identityは従来のemailを維持し、
+  Persistent Staging identityは作らない
 - `oauth_connections` / `oauth_authorization_codes` / `oauth_tokens` のstored scopeは、
   write / delete scopeを持つ行が必ず `read:entries` を含む。Candidate 4が `NOT VALID` で
   配置し、Candidate 5がread-only preflightの後にvalidatedへ進めた。grant RPC側の
