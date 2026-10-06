@@ -127,3 +127,5 @@
 - 2026-10-06: [infra] サービス台帳とDoctorは重要設計を保持し日々の実態・観測状況を追うために運用し、全検査passや差異ゼロを完了条件にしない（理由: 合意済みの設計と現状の変化・取得限界を人とagentが区別して把握するため）（参照: [Doctorの目的と完了条件](engineering/infra/doctor.md#目的と完了条件)）
 
 - 2026-10-06: [infra] 障害通知の確認と1Password・ドメイン・バックアップの復旧判断の主担当をDayopt運営者（ユーザー）とする（理由: ユーザーが主担当としての記録を明示承認）（参照: [サービス設定台帳](engineering/infra/expected.yaml) resources.operations_responsibility）
+
+- 2026-10-06: [infra] 課金未開始時の定期到達と照合完了を区別し、稼働開始後の完了要件を維持する。PR #3012の旧Previewは利用終了として整理する（理由: 未開始を恒常的な監視異常や架空の成功にせず、マージ済み環境の残存参照を整理するため。ユーザーが是正方針を委任）（参照: [監視契約](operations/monitoring.md#課金照合の未開始と完了を分ける契約)、[棚卸し](engineering/infra/inventory-2026-10-06.md)）

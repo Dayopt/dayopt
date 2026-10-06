@@ -1,12 +1,20 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { JOB_MAX_AGE_MINUTES } from '../../apps/product/src/lib/ops/cron-heartbeat-policy.mjs';
 import { databaseChecks } from './database.ts';
+const contractFixture = vi.hoisted(() => ({ matches: false }));
+beforeEach(() => {
+  contractFixture.matches = false;
+});
 vi.mock('node:child_process', async (original) => {
   const actual = await original<typeof import('node:child_process')>();
   return {
     ...actual,
+    execFileSync: vi.fn((...args: unknown[]) => {
+      if (contractFixture.matches && Array.isArray(args[1]) && args[1][0] === 'diff') return '';
+      return Reflect.apply(actual.execFileSync, undefined, args);
+    }),
     execFile: vi.fn((...args: unknown[]) => {
       const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
       callback(null, 'mock-secret-body', 'mock-secret-error');
@@ -45,6 +53,8 @@ it('does not use production SQL or snapshot for Integration or Preview', async (
 });
 
 it('reuses migration and heartbeat contracts and invokes only check-only API snapshot', async () => {
+  // Model a served contract matching the working tree independently of local edits.
+  contractFixture.matches = true;
   const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const versions = readdirSync('supabase/migrations')
     .filter((file) => /^\d{14}_.+\.sql$/.test(file))
@@ -68,6 +78,14 @@ it('reuses migration and heartbeat contracts and invokes only check-only API sna
   ];
   const rows = await databaseChecks(ctx, observations);
   expect(rows.every((row) => (row.value as { passed: boolean }).passed === true)).toBe(true);
+  expect(execFileSync).toHaveBeenCalledWith(
+    'git',
+    expect.arrayContaining([
+      'apps/product/src/lib/ops/cron-heartbeat.ts',
+      'apps/product/src/app/api/cron/billing-reconciliation/route.ts',
+    ]),
+    expect.any(Object),
+  );
   expect(execFile).toHaveBeenCalledWith(
     process.execPath,
     expect.arrayContaining(['--check']),

@@ -166,6 +166,29 @@ const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
   'scripts/runbook/preview-e2e-recovery.mjs',
 ]);
 
+// doctor は承認済み設計の CLI・reader・比較処理を同じ unit に保つ。
+// 配置だけの例外。無参照検査は免除せず、入口からの参照が失われたら検出する。
+const DOCTOR_UNIT_PLACEMENT = new Set<string>([
+  'scripts/doctor/auth.ts',
+  'scripts/doctor/cli.ts',
+  'scripts/doctor/compare.ts',
+  'scripts/doctor/config.ts',
+  'scripts/doctor/coverage.ts',
+  'scripts/doctor/database.ts',
+  'scripts/doctor/history.ts',
+  'scripts/doctor/item-locations.ts',
+  'scripts/doctor/preview-policy.ts',
+  'scripts/doctor/provenance.ts',
+  'scripts/doctor/readers/local.ts',
+  'scripts/doctor/readers/platform.ts',
+  'scripts/doctor/readers/services.ts',
+  'scripts/doctor/relations.ts',
+  'scripts/doctor/report.ts',
+  'scripts/doctor/safety.ts',
+  'scripts/doctor/transport.ts',
+  'scripts/doctor/types.ts',
+]);
+
 describe('scripts/ 呼ばれ方別 taxonomy', () => {
   it('無参照 script が存在しない', () => {
     const classified = classifyAllScripts(process.cwd());
@@ -188,6 +211,7 @@ describe('scripts/ 呼ばれ方別 taxonomy', () => {
     const classified = classifyAllScripts(process.cwd());
     const mismatched = classified
       .filter((c) => c.category !== 'unreferenced')
+      .filter((c) => !DOCTOR_UNIT_PLACEMENT.has(c.path))
       .filter((c) => !KNOWN_PLACEMENT_EXCEPTIONS.has(c.path))
       .filter((c) => {
         const expectedDir = CATEGORY_DIR[c.category];

@@ -247,6 +247,7 @@ function supabaseFixture(): Record<string, unknown> {
             last_started_at: 'now',
             last_completed_at: 'now',
             last_summary: { user_email: PII },
+            outcome: SECRET,
           },
         ],
         auth_users: [{ email: PII }],
@@ -556,6 +557,7 @@ describe('platform readers (fixture request only)', () => {
     expect(database[0]).not.toHaveProperty('auth_users');
     expect(database[0].crons[0]).not.toHaveProperty('command');
     expect(database[0].heartbeats[0]).not.toHaveProperty('last_summary');
+    expect(database[0].heartbeats[0].outcome).toBeNull();
     expect(JSON.stringify(observations)).not.toContain(SECRET);
     expect(JSON.stringify(observations)).not.toContain(PII);
   });

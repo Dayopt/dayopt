@@ -25,6 +25,7 @@ describe('cron heartbeat persistence', () => {
     expect(query.upsert).toHaveBeenCalledWith({
       job_name: 'calendar-sync',
       last_started_at: startedAt,
+      last_summary: null,
     });
     await writeCronHeartbeat('calendar-sync', 'completed', startedAt);
     expect(query.eq.mock.calls).toEqual([
@@ -36,6 +37,16 @@ describe('cron heartbeat persistence', () => {
       last_summary: { succeeded: true, duration_ms: expect.any(Number) },
     });
     expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+  it('records a skipped invocation without clearing or fabricating completion', async () => {
+    const startedAt = new Date().toISOString();
+    await writeCronHeartbeat('billing-reconciliation', 'skipped_unconfigured', startedAt);
+    expect(query.upsert).toHaveBeenCalledExactlyOnceWith({
+      job_name: 'billing-reconciliation',
+      last_started_at: startedAt,
+      last_summary: { outcome: 'skipped_unconfigured' },
+    });
+    expect(query.update).not.toHaveBeenCalled();
   });
   it('reports sanitized failure without blocking the scheduled work', async () => {
     abortSignal.mockRejectedValue(new Error('private provider value'));

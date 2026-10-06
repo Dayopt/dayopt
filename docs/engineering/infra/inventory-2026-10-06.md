@@ -27,7 +27,7 @@ last_verified: 2026-10-06
 
 課金未開始時のrouteは`configured:false`を返し、started / completedのどちらも記録しない。一方、現在の共有policyは課金照合を含む全jobに完了を要求する。この契約の組み合わせは未開始時に欠測を生む。現在の設定metadataは未開始と整合するが、11:15の実requestがこの分岐を通ったことはHTTP 200だけでは確定していない。
 
-推奨案は次の通りで、**未実装・未適用**。本番課金の有効化、heartbeatの手動挿入、欠測の正常化は是正手段にしない。
+調査時点の推奨案は次の通り。ローカル実装は次節に記録し、本番は未適用。本番課金の有効化、heartbeatの手動挿入、欠測の正常化は是正手段にしない。
 
 1. 課金照合の運用状態（未開始 / 稼働中）を、実行時の資格情報欠落から推測せず、監査する設計上の期待状態として明示する。既存`production_activation: pending`との正本責任を一本化し、複数の切替値を独立管理しない。
 2. 定期呼出しの到達・意図したスキップ・照合完了を区別して記録する。スキップ時に`last_completed_at`や`succeeded:true`を偽装しない。到達だけで照合成功とはしない。
@@ -39,6 +39,25 @@ last_verified: 2026-10-06
 当該branch限定のSupabase管理envは**16行**。先の28行は4branchのsecret相当名7項目ずつを数えたものであり、整理対象全体の行数とは異なる。default Preview・Integration・Productionの変数は別。ローカルworktreeも同branchに残っているため操作しない。
 
 整理は利用終了の意図を確認した後、Supabase Integrationが保持する当該branchの管理状態を確認し、再注入を防げる手順を先に定める。既存deployment/aliasとproject envのライフサイクルは別なので、env削除だけで過去deploymentの資格情報が消えたと扱わない。値を表示せずに復旧できることを確かめるまでは16行の手動削除をしない。今回は設定・alias・deployment・worktreeを変更していない。
+
+### 是正案のローカル実装（ユーザー委任後）
+
+ユーザーが2点の是正方針を委任したため、旧Previewは台帳の`retired_previews`へ利用終了として記録し、課金監視の修正を実装した。既存JSON記録欄を使い、DB migrationは追加していない。本番への適用は未実施。
+
+- 未開始状態の正本を共有heartbeat policyに置き、台帳は参照へ変更。資格情報の欠落から状態を自動推定しない。
+- 未設定skipは到達と固定理由だけを保存。完了時刻を消去・更新せず、過去に完了があるjobのskipは異常として検出する。稼働開始後の未設定はrouteでも503にする。
+- public cron health、CI監査、Doctorのmetadata取得に固定のoutcome列を追加。summary本文は出力せず、公開応答は従来のstatusのみ。
+- Doctorの配信契約比較へ記録helperとbilling/health routeを追加。未配信の修正を実環境の正常化と扱わない。
+- 旧Previewの外部削除は未実施。Supabase連携管理の16行と既存deployment/aliasの整理は別々に必要で、worktreeは保持。秘密値を保存せず復旧できる管理元の手順確認が残る。
+
+検証（Node 24）:
+
+- 対象のDoctor / operations監査は18ファイル201テスト、Productのheartbeat / billing route / health routeは3ファイル17テスト成功。
+- `pnpm check`では型・lint・静的検査・docs、Product 4939テスト、Web 366テストが成功。scriptsは3208成功 / 2失敗で終了コード1。失敗はDoctor unitの配置未登録と動的importの参照検出漏れだった。
+- 配置の明示一覧を追加し、coverage readerを静的importへ変更。無参照検査の免除は追加していない。修正後にtaxonomy / CLI / coverageの3ファイル18テストが成功。全体の成功済み検査は再実行していないため、`pnpm check`全体の終了コード0とは記録しない。
+- `--offline`は108定義が有効。実サービスの再取得や定期処理の発火はしていない。
+
+公開前には保護対象変更の独立レビュー、本番適用の明示手順、自然な定期呼出しの証拠が必要。スキップの到達を手動挿入して監視を通さない。
 
 ### 残る44結果と、すでにある補足証拠
 

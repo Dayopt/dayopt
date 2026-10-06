@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { collectAuthenticated, CREDENTIALS } from './auth.ts';
 import { compare, RULES } from './compare.ts';
 import { loadConfig } from './config.ts';
+import { renderCoverage } from './coverage.ts';
 import { databaseChecks } from './database.ts';
 import {
   compareResults,
@@ -212,7 +213,6 @@ export async function run(args: string[], root = ROOT): Promise<number> {
     return 0;
   }
   if (options.coverage) {
-    const { renderCoverage } = await import('./coverage.ts');
     process.stdout.write(
       renderCoverage(config, options.format, {
         service: options.service,

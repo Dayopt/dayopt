@@ -218,7 +218,7 @@ services:
       - billing
       - secrets
     expected:
-      production_activation: pending
+      production_activation_contract: apps/product/src/lib/ops/cron-heartbeat-policy.mjs#BILLING_RECONCILIATION_ACTIVATION
       integration: test_only
       portal_and_trial: source_contract_before_activation
       contract_ref: billing
@@ -573,6 +573,14 @@ advisories:
     migration_status: pending
     enforcement: advisory
 resources:
+  retired_previews:
+    - branch: codex/integration-calendar-poc-port
+      retirement_confirmed_by: user
+      retirement_confirmed_at: '2026-10-06'
+      expected_lifecycle: retired
+      cleanup_status: pending_integration_owned_resource_cleanup
+      management: vercel_supabase_integration
+      local_worktree_policy: do_not_modify
   operations_responsibility:
     primary_owner: Dayopt運営者（このセッションのユーザー）
     confirmed_by: user

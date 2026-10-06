@@ -5,6 +5,12 @@ const reconcileBillingWebhookEvents = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
 const writeCronHeartbeat = vi.hoisted(() => vi.fn());
+const activation = vi.hoisted(() => ({ value: 'pending' }));
+vi.mock('@/lib/ops/cron-heartbeat-policy.mjs', () => ({
+  get BILLING_RECONCILIATION_ACTIVATION() {
+    return activation.value;
+  },
+}));
 const envMock = vi.hoisted(
   () =>
     ({
@@ -62,6 +68,7 @@ function request(authorization?: string): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  activation.value = 'pending';
   Object.assign(envMock, {
     CRON_SECRET: 'super-secret-cron',
     STRIPE_ACCOUNT_ID: 'acct_dayopt_test',
@@ -88,7 +95,23 @@ describe('billing reconciliation cron', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, configured: false });
     expect(reconcileBillingWebhookEvents).not.toHaveBeenCalled();
+    expect(writeCronHeartbeat).toHaveBeenCalledExactlyOnceWith(
+      'billing-reconciliation',
+      'skipped_unconfigured',
+      expect.any(String),
+    );
+  });
+
+  it('稼働開始後の資格情報欠落はskipせず503にする', async () => {
+    activation.value = 'active';
+    envMock.STRIPE_SECRET_KEY = undefined;
+    envMock.STRIPE_ACCOUNT_ID = undefined;
+    envMock.STRIPE_LIVEMODE = undefined;
+    const response = await GET(request('Bearer super-secret-cron'));
+    expect(response.status).toBe(503);
+    expect(reconcileBillingWebhookEvents).not.toHaveBeenCalled();
     expect(writeCronHeartbeat).not.toHaveBeenCalled();
+    expect(captureUnexpectedError).toHaveBeenCalledOnce();
   });
 
   it('Stripe設定が一部だけなら503とSentry通知を返す', async () => {

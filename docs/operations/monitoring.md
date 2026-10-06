@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-10-06
 code:
   - packages/observability
   - apps/product/src/instrumentation.ts
@@ -45,7 +45,7 @@ provider plan、sampling rate、SDK versionなどの値は変わるため、pack
 
 GitHub の日次 schedule は実行時刻を保証しないため、heartbeat異常は次の main push または日次監査で検出する（遅延は日次実行より長くなりうる）。`/api/health/cron` は外形監視用に実装済みだが、UptimeRobot 側の設定状況は未確認。記録欠落、無効時刻、資格情報不足、API失敗も監査失敗とする。本番だけにある migration version は履歴差として表示し、schema / ACL の比較は省略しない。baseline は migration から生成し、本番から上書きしない。CI は隔離DBから型を再生成して committed types と比較する。default privileges の方針変更は #1715 で判断する。この監査はmigration履歴・RLS・ACLの比較で、列型・constraint・trigger/function本文すべての同一性を保証するものではない。
 
-完了記録は `public.cron_heartbeats`。利用者ID・入力・資格情報を含めず、job名、開始・完了時刻、成功と所要時間だけを保存する。Vercel側の記録失敗は Sentry に送るが保守処理を止めない（各書込1.5秒、開始・終了合計3秒）。pg_cron は元の schedule / owner / command を保持して同じトランザクションで記録する。処理が失敗すれば開始記録も rollback され、最後の成功が古くなることで検出する。authority identity不足で処理をskipした実行は完了を記録しない。billing-reconciliation は照合処理が完了した時に記録し、差分検出による503・Sentry通知とは独立に扱う。設定不足・未設定skip・照合例外では完了を記録しない。監査対象の全job名が実DBのCHECK制約に含まれることは `cron-heartbeat.integration.test.ts` で検査する。heartbeat は正常終了の証拠であり、処理対象がゼロになった証拠ではない。
+完了記録は `public.cron_heartbeats`。利用者ID・入力・資格情報を含めず、job名、開始・完了時刻、成功と所要時間だけを保存する。Vercel側の記録失敗は Sentry に送るが保守処理を止めない（各書込1.5秒、開始・終了合計3秒）。pg_cron は元の schedule / owner / command を保持して同じトランザクションで記録する。処理が失敗すれば開始記録も rollback され、最後の成功が古くなることで検出する。authority identity不足で処理をskipした実行は完了を記録しない。billing-reconciliation は照合処理が完了した時に記録し、差分検出による503・Sentry通知とは独立に扱う。設定不足・未設定skip・照合例外では完了を記録しない。監査対象の全job名が実DBのCHECK制約に含まれることは `cron-heartbeat.integration.test.ts` で検査する。heartbeatの完了時刻は正常終了の証拠であり、処理対象がゼロになった証拠ではない。未開始時の到達記録との区別は次節に従う。
 
 通知先は既存の `[auto] Production Supabase audit が失敗しました` Issue。異常ごとに同じ未解決Issueへ job の結果、run URL、調査先を追記し、GitHubの購読通知を受けるリポジトリ運用者が一次対応する。監査用 job は `contents: read` のみで、通知 job だけが `issues: write` を持つ。Issue の自動クローズはしない。運用移管時に運用者の購読設定と実通知の受信を確認する。
 
@@ -57,6 +57,14 @@ GitHub の日次 schedule は実行時刻を保証しないため、heartbeat異
 4. 原因を修正後、通常の保守処理が完了し、次の監査が成功した証拠をIssueに残して手動で閉じる。時刻を手で更新して監視だけ緑にしない。
 
 導入直後は各jobの初回完了が揃うまで監査が失敗する。日次jobの初回実行を含めて観測し、8件すべての実行記録と通知受信を確認してから #2681 / #2683 を閉じる。ローカルの異常fixtureは通知スクリプトへの到達を検証するが、本番の通知受信の代わりにはならない。MCP cleanupの滞留は #1908 の件数・遅延測定と合わせて判断する。
+
+### 課金照合の未開始と完了を分ける契約
+
+課金照合の期待する有効化状態は`apps/product/src/lib/ops/cron-heartbeat-policy.mjs`の`BILLING_RECONCILIATION_ACTIVATION`が正本。資格情報の欠落から有効化状態を推測しない。棚卸し台帳はこの正本を参照する。課金開始時には[公開手順](./billing-single-plan-rollout.md)と一体で状態をactiveへ変更する。
+
+未開始でStripe identityがすべて未設定なら、認証済みcronの到達を`last_started_at`と`last_summary.outcome: skipped_unconfigured`で記録する。`last_completed_at`を作成・更新・消去せず、`succeeded:true`も記録しない。監視は明示的な未開始状態、過去完了なし、新しい到達の3条件を要求する。記録欠落・期限超過・一度完了した後のskip・active時の未設定は異常とする。部分設定も従来どおり失敗。通常開始時は古いskip markerを消し、照合完了時だけ従来の完了を残す。
+
+CI audit、公開`/api/health/cron`、Doctorは同じpolicyで判断する。公開healthはhealthy/unhealthyだけを返し、設定や記録本文は返さない。Doctorはpolicyと記録/health routeが配信revisionと一致するまで新契約を適用済みと扱わない。この変更はローカル実装段階で、本番の自然な定期呼出しによる到達証拠は配信後に確認する。
 
 ## Sentry runtime contract
 

@@ -601,9 +601,10 @@ async function supabase(ctx: ReaderContext): Promise<Observation[]> {
             ...fields(bucket, ['id', 'public', 'file_size_limit']),
             allowed_mime_types: strings(bucket.allowed_mime_types),
           })),
-          heartbeats: rows(row.heartbeats ?? []).map((heartbeat) =>
-            fields(heartbeat, ['job_name', 'last_started_at', 'last_completed_at']),
-          ),
+          heartbeats: rows(row.heartbeats ?? []).map((heartbeat) => ({
+            ...fields(heartbeat, ['job_name', 'last_started_at', 'last_completed_at']),
+            outcome: heartbeat.outcome === 'skipped_unconfigured' ? 'skipped_unconfigured' : null,
+          })),
           // No auth.users, storage.objects rows, Vault values, pg_cron commands or provider payloads.
         })),
       params,

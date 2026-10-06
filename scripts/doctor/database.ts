@@ -42,6 +42,9 @@ export async function databaseChecks(
       'supabase/migrations',
       'docs/engineering/data/db/rls-snapshot.md',
       'apps/product/src/lib/ops/cron-heartbeat-policy.mjs',
+      'apps/product/src/lib/ops/cron-heartbeat.ts',
+      'apps/product/src/app/api/cron/billing-reconciliation/route.ts',
+      'apps/product/src/app/api/health/cron/route.ts',
       'scripts/tasks/generate-rls-snapshot.ts',
     ];
     try {

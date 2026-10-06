@@ -8,16 +8,30 @@ type CronJob =
   | 'billing-reconciliation';
 
 /** Telemetry failure must not prevent retention/deletion work. Two calls cost at most 3 seconds. */
-export async function writeCronHeartbeat(
+export function writeCronHeartbeat(
   job: CronJob,
   phase: 'started' | 'completed',
+  startedAt: string,
+): Promise<void>;
+export function writeCronHeartbeat(
+  job: 'billing-reconciliation',
+  phase: 'skipped_unconfigured',
+  startedAt: string,
+): Promise<void>;
+export async function writeCronHeartbeat(
+  job: CronJob,
+  phase: 'started' | 'completed' | 'skipped_unconfigured',
   startedAt: string,
 ) {
   try {
     const client = createServiceRoleClient();
     const query =
-      phase === 'started'
-        ? client.from('cron_heartbeats').upsert({ job_name: job, last_started_at: startedAt })
+      phase !== 'completed'
+        ? client.from('cron_heartbeats').upsert({
+            job_name: job,
+            last_started_at: startedAt,
+            last_summary: phase === 'skipped_unconfigured' ? { outcome: phase } : null,
+          })
         : client
             .from('cron_heartbeats')
             .update({

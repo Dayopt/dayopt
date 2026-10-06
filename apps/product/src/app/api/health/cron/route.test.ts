@@ -11,7 +11,12 @@ const mocks = vi.hoisted(() => ({
   assertIdentity: vi.fn(),
   rateLimit: vi.fn(),
   loggerError: vi.fn(),
-  rows: [] as Array<{ job_name: string; last_completed_at: string | null }>,
+  rows: [] as Array<{
+    job_name: string;
+    last_completed_at: string | null;
+    last_started_at?: string;
+    outcome?: string;
+  }>,
   queryError: null as unknown,
 }));
 
@@ -83,7 +88,9 @@ describe('GET /api/health/cron', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-cache, no-store, must-revalidate');
     expect(mocks.assertIdentity).toHaveBeenCalledOnce();
     expect(mocks.from).toHaveBeenCalledWith('cron_heartbeats');
-    expect(mocks.select).toHaveBeenCalledWith('job_name,last_completed_at');
+    expect(mocks.select).toHaveBeenCalledWith(
+      'job_name,last_started_at,last_completed_at,outcome:last_summary->>outcome',
+    );
     expect(mocks.in).toHaveBeenCalledWith('job_name', Object.keys(JOB_MAX_AGE_MINUTES));
   });
 
@@ -141,5 +148,16 @@ describe('GET /api/health/cron', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ status: 'unhealthy' });
     expect(mocks.createServiceRoleClient).not.toHaveBeenCalled();
+  });
+
+  it('未開始の課金skipも新しい到達証拠があればhealthyを返す', async () => {
+    const row = mocks.rows.find((row) => row.job_name === 'billing-reconciliation')!;
+    row.last_completed_at = null;
+    row.last_started_at = new Date().toISOString();
+    row.outcome = 'skipped_unconfigured';
+    const { GET } = await import('./route');
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'healthy' });
   });
 });

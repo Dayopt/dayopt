@@ -113,7 +113,7 @@ export const METADATA_SQL = `SELECT
  (SELECT row_to_json(m) FROM (SELECT writes_enabled,enabled_client_ids,billing_enforced,revision FROM public.mcp_mutation_control) m LIMIT 1) AS mcp_control,
  (SELECT json_agg(c) FROM (SELECT jobname,schedule,active FROM cron.job ORDER BY jobname) c) AS crons,
  (SELECT json_agg(b) FROM (SELECT id,public,file_size_limit,allowed_mime_types FROM storage.buckets ORDER BY id) b) AS buckets,
- (SELECT json_agg(h) FROM (SELECT job_name,last_started_at,last_completed_at FROM public.cron_heartbeats ORDER BY job_name) h) AS heartbeats`;
+ (SELECT json_agg(h) FROM (SELECT job_name,last_started_at,last_completed_at,CASE WHEN last_summary->>'outcome' = 'skipped_unconfigured' THEN 'skipped_unconfigured' ELSE NULL END AS outcome FROM public.cron_heartbeats ORDER BY job_name) h) AS heartbeats`;
 
 export function createTransport(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch = fetch) {
   const cache = new Map<string, unknown>();
