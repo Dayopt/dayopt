@@ -2934,7 +2934,7 @@
   },
   {
     "name": "source-map-js",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "license": "BSD-3-Clause",
     "repository": "7rulnik/source-map-js",
     "publisher": "Valentin 7rulnik Semirulnik <v7rulnik@gmail.com>"
