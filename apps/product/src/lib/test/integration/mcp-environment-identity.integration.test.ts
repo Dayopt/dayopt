@@ -462,11 +462,15 @@ describe.skipIf(!RUN_LOCAL)('MCP environment identity integration', () => {
         'email', 'test-seed@dayopt.dev'
       )
       WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
-      SELECT * FROM public.provision_mcp_preview_environment_identity_v1(
-        '${previewUrl}',
-        '${previewUrl}',
-        '${previewRef}'
-      );
+      DO $provision$
+      BEGIN
+        PERFORM * FROM public.provision_mcp_preview_environment_identity_v1(
+          '${previewUrl}',
+          '${previewUrl}',
+          '${previewRef}'
+        );
+      END;
+      $provision$;
 
       DO $$
       DECLARE
