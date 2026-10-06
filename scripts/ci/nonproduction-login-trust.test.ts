@@ -64,6 +64,30 @@ describe('nonproduction login trust', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('accepts pull_request_target refs from the default branch or the verified PR base', async () => {
+    for (const ref of ['refs/heads/main', 'refs/heads/integration']) {
+      await expect(
+        resolveNonproductionLoginTarget({
+          eventName: 'pull_request_target',
+          event: { pull_request: pr({ baseBranch: 'integration' }) },
+          ref,
+          token: 'github-token',
+          fetchImpl: githubFetch(pr({ baseBranch: 'integration' })),
+        }),
+      ).resolves.toMatchObject({ target: 'preview', baseBranch: 'integration' });
+    }
+
+    await expect(
+      resolveNonproductionLoginTarget({
+        eventName: 'pull_request_target',
+        event: { pull_request: pr({ baseBranch: 'integration' }) },
+        ref: 'refs/heads/untrusted',
+        token: 'github-token',
+        fetchImpl: githubFetch(pr({ baseBranch: 'integration' })),
+      }),
+    ).rejects.toThrow('PR identifiers are invalid');
+  });
+
   it.each([
     ['fork', pr({ headRepo: 'attacker/dayopt', headRepoId: 7, headFork: true })],
     ['stale SHA', pr({ headSha: 'b'.repeat(40) })],

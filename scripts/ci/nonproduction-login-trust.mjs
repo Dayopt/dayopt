@@ -84,12 +84,13 @@ export async function resolveNonproductionLoginTarget({
     const sha = pullRequest?.head?.sha;
     const headBranch = validateBranch(pullRequest?.head?.ref);
     const baseBranch = pullRequest?.base?.ref;
+    const refMatchesTrustedBranch = ref === 'refs/heads/main' || ref === `refs/heads/${baseBranch}`;
     requireCondition(
       Number.isSafeInteger(number) &&
         number > 0 &&
         SHA.test(sha ?? '') &&
         ['main', 'integration'].includes(baseBranch) &&
-        ref === `refs/heads/${baseBranch}`,
+        refMatchesTrustedBranch,
       'PR identifiers are invalid',
     );
     const live = await readPullRequest({ number, token, fetchImpl });
