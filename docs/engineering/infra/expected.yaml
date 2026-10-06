@@ -1635,8 +1635,8 @@ ui_only:
           'R2 locks / lifecycle / token scope',
           'Email Routing destination',
         ],
-      'reason': '管理APIは存在するが現ci token / agent境界で取得できない',
-      'next_step': '認証済みDayopt Dashboardで設定metadataを読む。R2 objectやtoken値を読まない',
+      'reason': '管理APIは存在するがDoctorの現ci token / agent境界で取得できない。2026-10-06のDashboardでDNSSEC・Email Routing・Turnstile・R2 lock / lifecycle・既存backup tokenのscope metadataを補完済み。replica一致・token期限・復元成功は別確認',
+      'next_step': 'inventory-2026-10-06.mdの補足証拠を参照し、token期限・ci replicaとの対応・復旧担当を確認する。R2 objectやtoken値を読まず、scopeを自動変更しない',
       'check_ids':
         [
           'cloudflare.zone',

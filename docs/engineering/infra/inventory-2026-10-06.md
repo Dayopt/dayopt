@@ -100,6 +100,21 @@ Resendのendpointは10/5の早い時刻にも確認記録があり、後のMCP�
 
 ## 検証とレビュー
 
+### 11:56–12:02 JST Cloudflare Dashboardによる追補
+
+ユーザーが既存Cloudflareアカウントにログインした後、ChromeのDayopt Dashboardを読み取りで確認した。設定保存、token発行・変更、object内容の表示、同期・復元、メール送信はしていない。個人宛先、site key、token値はこの記録に含めない。
+
+| 対応する検査                                                | 観測                                                                                                                                                                                                  | 判定と限界                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudflare.zone` / `cloudflare.zone_operations`            | account表示はDayopt、zoneは`dayopt.app`、DNSセットアップはフル。DNSレコード一覧は1–16 / 16で、全16行がDNSのみ。DNSSECは「DNSSECを有効化」ボタンが表示され、未有効。マルチ署名者DNSSECもoff。          | DNS onlyは契約と一致。DNSSECの有効化を必須とする具体的期待値は台帳にないため、未有効という観測を記録し、driftや設定変更へ自動昇格させない。管理・復旧担当とregistrar更新設定は未確認。                                                                |
+| `cloudflare.email_routing`                                  | routing有効、DNSレコードロック済み、ルール1件・宛先1件。`support@dayopt.app`のルール有効、キャッチオールはdrop / 無効、宛先アドレスは検証済み。                                                       | `contact-email.md`と台帳の設定契約に一致。転送先の個人アドレスは出力しない。実メールの受信・返信は実行していない。                                                                                                                                    |
+| `cloudflare.turnstile`                                      | ウィジェットDayoptは1件、Managed mode、pre-clearance off。許可ホストは`app.dayopt.app`、`dayopt.app`、`localhost`、`vercel.app`。                                                                     | Productionの必須2domainを含む。残る2ホストも同じウィジェットで許可されているという観測であり、Production専用のhost一覧とは扱わない。非本番との共用意図、server secretとの対応、個々のdeployment配布値は未確認。設定画面は値を編集・保存せず退出した。 |
+| `cloudflare.r2_buckets` / `cloudflare.r2_locks.avatars`     | `avatars`はAPAC。custom domainなし、public development URL無効。`avatars-retention-35d`が有効、prefixは`--`、lock期間35日。lifecycleはDefault Multipart Abort Ruleが有効で未完了uploadを7日後に中止。 | 35日lockは台帳と一致。35日経過後の完成object自動削除を示すlifecycleではない。lock期間と自動削除期間を混同しない。実復元可能性は未検証。                                                                                                               |
+| `cloudflare.r2_buckets` / `cloudflare.r2_locks.attachments` | `attachments`もcustom domainなし、public development URL無効。`attachments-retention-35d`が有効、prefixは`--`、lock期間35日。lifecycleは同じ7日multipart abort ruleが有効。                           | 35日lockは台帳と一致。object本文や個別ファイルを開いていない。                                                                                                                                                                                        |
+| `cloudflare.backup_credential_scope`                        | Account API token一覧に`storage-backup-rclone`が1件、active、2026-08-18発行。適用先は`attachments`、`avatars`、`storage-backup`、権限はObject Read & Write。User API tokenはなし。                    | backup scriptの既定対象は`avatars attachments`なので、scopeには追加の`storage-backup`がある。用途・残存scopeの意図は未確認。token値を読んでおらずci master / GitHub replicaがこのtokenと同一とは証明しない。有効期限は一覧に表示されず未確認。        |
+
+今回、Cloudflareの管理metadataを補完できたため、ログイン待ちは解消。DoctorのAPI取得不能件数はこのUI確認では変更しない。Cloudflareで残るのは、DNSSEC / 追加Turnstileホスト / 追加token scopeの運用意図、token期限と実配布先の対応、管理・復旧担当、registrar更新設定、復元証跡。期待値を観測値に自動で合わせず、設定変更はしていない。
+
 ### 11:31 JSTの再取得と所在情報のCLI対応
 
 - 所在情報のtext/JSON表示を`--coverage`に追加し、`--service onepassword`でhuman・ciの所在と確認状態を表示できる。個別serviceではそのhuman項目を表示する。
