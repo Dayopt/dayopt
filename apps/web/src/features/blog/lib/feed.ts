@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { siteConfig } from '@web/platform/seo/metadata';
 
 import { getAllBlogPostMetas } from './blog';
@@ -18,6 +20,7 @@ function escapeXml(text: string): string {
  */
 export async function generateBlogFeed(locale: string): Promise<string> {
   const posts = await getAllBlogPostMetas(locale);
+  const t = await getTranslations({ locale, namespace: 'marketing.landing.hero' });
   const baseUrl = siteConfig.url;
   const localePath = locale === 'en' ? '' : `/${locale}`;
   const blogUrl = `${baseUrl}${localePath}/blog`;
@@ -45,7 +48,7 @@ export async function generateBlogFeed(locale: string): Promise<string> {
   <channel>
     <title>${escapeXml(siteConfig.name)} Blog</title>
     <link>${blogUrl}</link>
-    <description>${escapeXml(siteConfig.description)}</description>
+    <description>${escapeXml(`${t('body1')} ${t('body2')}`)}</description>
     <language>${locale}</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${blogUrl}/feed.xml" rel="self" type="application/rss+xml"/>

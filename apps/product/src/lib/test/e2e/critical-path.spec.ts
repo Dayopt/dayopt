@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { expectIndependentPersistedHour } from '../critical-path-persistence';
 import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
@@ -172,6 +173,7 @@ describeWithEnv('Critical Path: 計画 → 実績', () => {
     await expect(
       page.getByRole('region', { name: ACTIVITY_NAME }).getByRole('textbox', { name: 'メモ' }),
     ).toHaveValue('Preview E2E edited plan');
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', tomorrow, 9);
 
     await deleteInspectorTimeblock(page, 'plan');
     await expect(planCard).toHaveCount(0, { timeout: 10_000 });
@@ -204,6 +206,13 @@ describeWithEnv('Critical Path: 計画 → 実績', () => {
     await expect(
       page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME }).first(),
     ).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(
+      adminSupabase,
+      IDENTITY.userId,
+      'record',
+      offsetDateParam(-1),
+      9,
+    );
   });
 
   test('過去帯でも予定タブを選べば Plan として作成できる', async ({ page }) => {
@@ -230,6 +239,13 @@ describeWithEnv('Critical Path: 計画 → 実績', () => {
     await expect(
       page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first(),
     ).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(
+      adminSupabase,
+      IDENTITY.userId,
+      'plan',
+      offsetDateParam(-1),
+      14,
+    );
   });
   test('Record を作成・編集・削除し、変更が永続化される', async ({ page }) => {
     const twoDaysAgo = offsetDateParam(-2);
@@ -257,11 +273,228 @@ describeWithEnv('Critical Path: 計画 → 実績', () => {
     await expect(
       page.getByRole('region', { name: ACTIVITY_NAME }).getByRole('textbox', { name: 'メモ' }),
     ).toHaveValue('Preview E2E edited record');
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'record', twoDaysAgo, 9);
 
     await deleteInspectorTimeblock(page, 'record');
     await expect(recordCard).toHaveCount(0, { timeout: 10_000 });
     await page.reload();
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
     await expect(recordCard).toHaveCount(0);
+    const deletedStart = new Date(`${twoDaysAgo}T09:00:00+09:00`).toISOString();
+    const deletedRecord = await adminSupabase
+      .from('records')
+      .select('id,deleted_at')
+      .eq('user_id', IDENTITY.userId)
+      .eq('start_at', deletedStart);
+    expect(deletedRecord.error === null).toBe(true);
+    expect(deletedRecord.data).toHaveLength(1);
+    expect(deletedRecord.data?.[0]?.deleted_at).not.toBeNull();
+  });
+
+  test('プロフィールと時間表示形式を変更すると所有者の設定へ保存される', async ({ page }) => {
+    const displayName = `Profile ${IDENTITY.userId.slice(0, 8)}`;
+    await page.goto('/ja/settings/account');
+    await page.getByRole('button', { name: /表示名/ }).click();
+    const dialog = page.getByRole('dialog', { name: '表示名', exact: true });
+    await dialog.getByLabel('表示名', { exact: true }).fill(displayName);
+    await dialog.getByRole('button', { name: '確認', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect
+      .poll(async () => {
+        const profile = await adminSupabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', IDENTITY.userId)
+          .single();
+        expect(profile.error === null).toBe(true);
+        return profile.data?.full_name;
+      })
+      .toBe(displayName);
+
+    await page.goto('/ja/settings/display');
+    const timeFormat = page.getByRole('combobox', { name: '時間表示形式', exact: true });
+    await timeFormat.click();
+    await page.getByRole('option', { name: '12時間表記 (1:00 PM)', exact: true }).click();
+    await expect
+      .poll(async () => {
+        const settings = await adminSupabase
+          .from('user_settings')
+          .select('time_format')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        expect(settings.error === null).toBe(true);
+        return settings.data?.time_format;
+      })
+      .toBe('12h');
+  });
+
+  test('テーマ・タイムゾーン・表示言語を変更して保存する', async ({ page }) => {
+    await page.goto('/ja/settings/display');
+    const theme = page.getByRole('combobox', { name: 'テーマ', exact: true });
+    await theme.click();
+    await page.getByRole('option', { name: 'ダーク', exact: true }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('theme')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        expect(result.error === null).toBe(true);
+        return result.data?.theme;
+      })
+      .toBe('dark');
+    await page.reload();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page.goto('/ja/settings/display');
+    await expect(page.getByRole('combobox', { name: 'テーマ', exact: true })).toContainText(
+      'ダーク',
+    );
+
+    const timezone = page.getByRole('combobox', { name: 'タイムゾーン', exact: true });
+    await timezone.click();
+    await page.getByRole('option', { name: 'シドニー (GMT+10)', exact: true }).click();
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('timezone')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        expect(result.error === null).toBe(true);
+        return result.data?.timezone;
+      })
+      .toBe('Australia/Sydney');
+    await timezone.click();
+    await page.getByRole('option', { name: '東京 (GMT+9)', exact: true }).click();
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('timezone')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        return result.error === null ? result.data?.timezone : null;
+      })
+      .toBe(TIMEZONE);
+
+    await page.getByRole('combobox', { name: '言語', exact: true }).click();
+    await page.getByRole('option', { name: 'English', exact: true }).click();
+    await expect(page).toHaveURL(/\/en\//);
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('preferred_locale')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        return result.error === null ? result.data?.preferred_locale : null;
+      })
+      .toBe('en');
+    await page.getByRole('combobox', { name: 'Language', exact: true }).click();
+    await page.getByRole('option', { name: '日本語', exact: true }).click();
+    await expect(page).toHaveURL(/\/ja\//);
+    await expect
+      .poll(async () => {
+        const result = await adminSupabase
+          .from('user_settings')
+          .select('preferred_locale')
+          .eq('user_id', IDENTITY.userId)
+          .single();
+        return result.error === null ? result.data?.preferred_locale : null;
+      })
+      .toBe('ja');
+  });
+
+  test('JSON と期間指定 CSV の出力が自分の Plan / Record と一致する', async ({ page }) => {
+    await page.goto('/ja/settings/data');
+    const downloadText = async () => {
+      const pending = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'エクスポート', exact: true }).click();
+      const download = await pending;
+      expect(await download.failure()).toBeNull();
+      const stream = await download.createReadStream();
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+      return { name: download.suggestedFilename(), text: Buffer.concat(chunks).toString('utf8') };
+    };
+
+    const json = await downloadText();
+    expect(json.name).toMatch(/\.json$/);
+    const backup = JSON.parse(json.text);
+    expect(backup.userId).toBe(IDENTITY.userId);
+    const plans = await adminSupabase.from('plans').select('id').eq('user_id', IDENTITY.userId);
+    const records = await adminSupabase.from('records').select('id').eq('user_id', IDENTITY.userId);
+    expect(plans.error === null && records.error === null).toBe(true);
+    expect(backup.data.plans.map((row: { id: string }) => row.id).sort()).toEqual(
+      plans.data!.map((row) => row.id).sort(),
+    );
+    expect(backup.data.records.map((row: { id: string }) => row.id).sort()).toEqual(
+      records.data!.map((row) => row.id).sort(),
+    );
+
+    await page.getByRole('combobox', { name: '形式', exact: true }).click();
+    await page.getByRole('option', { name: 'CSV（スプレッドシート用）', exact: true }).click();
+    await page.getByRole('combobox', { name: '範囲', exact: true }).click();
+    await page.getByRole('option', { name: '期間指定', exact: true }).click();
+    const yesterday = offsetDateParam(-1);
+    await page.getByLabel('開始日', { exact: true }).fill(yesterday);
+    await page.getByLabel('終了日', { exact: true }).fill(yesterday);
+    const csv = await downloadText();
+    expect(csv.name).toMatch(/\.csv$/);
+    const rows = csv.text.trim().split('\n');
+    expect(rows[0]).toBe(
+      'kind,id,title,note,activity_id,start_at,end_at,source,fulfillment,created_at,updated_at,deleted_at',
+    );
+    expect(rows.length).toBeGreaterThan(1);
+    for (const row of rows.slice(1)) expect(row).toContain(`${yesterday}T`);
+    const dateKey = (value: string) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date(value));
+    const expectedIds = [...backup.data.plans, ...backup.data.records]
+      .filter((row: { start_at: string }) => dateKey(row.start_at) === yesterday)
+      .map((row: { id: string }) => row.id)
+      .sort();
+    expect(
+      rows
+        .slice(1)
+        .map((row) => row.split(',')[1] ?? '')
+        .sort(),
+    ).toEqual(expectedIds);
+  });
+
+  test('アクティビティメニューから直近の記録詳細を開き記録へ移動できる', async ({ page }) => {
+    await openDay(page, offsetDateParam(-1));
+    const activityRow = page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('button', { name: ACTIVITY_NAME, exact: true }) });
+    await expect(activityRow).toHaveCount(1);
+    await activityRow.hover();
+    const menu = activityRow.getByRole('button', { name: 'アクティビティメニュー', exact: true });
+    await menu.click();
+    await page.getByRole('menuitem', { name: 'アクティビティの詳細', exact: true }).click();
+
+    const summary = page.getByRole('region', { name: 'アクティビティの詳細' });
+    await expect(summary).toBeVisible({ timeout: 10_000 });
+    await expect(summary.getByRole('heading', { name: ACTIVITY_NAME })).toBeVisible();
+    const records = await adminSupabase
+      .from('records')
+      .select('id')
+      .eq('user_id', IDENTITY.userId)
+      .is('deleted_at', null);
+    expect(records.error === null).toBe(true);
+    expect(records.data).toHaveLength(1);
+    await expect(summary.getByRole('heading', { name: '記録（1件）', exact: true })).toBeVisible();
+    const record = summary.getByRole('listitem').first().getByRole('button');
+    await expect(record).toBeEnabled();
+    await record.click();
+    await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

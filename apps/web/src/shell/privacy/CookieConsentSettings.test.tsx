@@ -204,6 +204,40 @@ describe('CookieConsentSettings', () => {
     }
   });
 
+  it('initial consent stays visible and reports failure when its write is rejected', () => {
+    vi.useFakeTimers();
+    const idleDescriptor = Object.getOwnPropertyDescriptor(window, 'requestIdleCallback');
+    Reflect.deleteProperty(window, 'requestIdleCallback');
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    const realStorage = window.localStorage;
+    const write = vi.fn(() => {
+      throw new DOMException('Storage denied', 'QuotaExceededError');
+    });
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get: () => ({ getItem: (key: string) => realStorage.getItem(key), setItem: write }),
+    });
+    try {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <CookieConsentBanner />
+        </NextIntlClientProvider>,
+      );
+      act(() => vi.advanceTimersByTime(1100));
+      fireEvent.click(screen.getByRole('button', { name: ALLOW }));
+      expect(screen.getByRole('alert').textContent).toContain(
+        messages.common.cookies.settings.saveFailed,
+      );
+      expect(screen.getByRole('button', { name: NECESSARY_ONLY })).toBeTruthy();
+      expect(readConsent()).toBeNull();
+      expect(write).toHaveBeenCalledTimes(1);
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'localStorage', descriptor);
+      vi.useRealTimers();
+      if (idleDescriptor) Object.defineProperty(window, 'requestIdleCallback', idleDescriptor);
+    }
+  });
+
   it('拒否済みからの再許可では marketing を true にしない', async () => {
     const user = userEvent.setup();
     storeConsent(false);

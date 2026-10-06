@@ -1,11 +1,12 @@
 'use client';
 
 import { Badge, Button, Container, Heading, Input, Text } from '@dayopt/components';
+import { useRouter } from '@dayopt/i18n/navigation';
 import { Highlight } from '@web/lib/highlight';
 import type { SearchResultItem } from '@web/types/api';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
 import { fetchSearchResults } from '@web/features/search/search-client';
@@ -14,6 +15,7 @@ function SearchResults() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const locale = useLocale();
+  const t = useTranslations('search');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -101,7 +103,7 @@ function SearchResults() {
         {/* 検索ヘッダー */}
         <div className="mb-8">
           <Heading as="h1" size="3xl" className="mb-6">
-            Search Results
+            {t('page.title')}
           </Heading>
 
           {/* 検索ボックス */}
@@ -122,7 +124,7 @@ function SearchResults() {
               </svg>
               <Input
                 type="text"
-                placeholder="Enter search keywords..."
+                placeholder={t('page.inputPlaceholder')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
@@ -130,25 +132,25 @@ function SearchResults() {
               />
             </div>
             <Button onClick={() => handleSearch(query)} className="px-6 py-4">
-              Search
+              {t('page.submit')}
             </Button>
           </div>
 
           {/* フィルター */}
           {query && (
             <div className="mb-6 flex items-center gap-4">
-              <Text className="text-muted-foreground mr-2 text-sm">フィルター:</Text>
+              <Text className="text-muted-foreground mr-2 text-sm">{t('page.filterLabel')}</Text>
               <div className="flex gap-2">
                 {[
-                  { key: 'all', label: 'すべて', count: results.length },
+                  { key: 'all', label: t('page.all'), count: results.length },
                   {
                     key: 'docs',
-                    label: 'ドキュメント',
+                    label: t('docs'),
                     count: results.filter((r) => r.type === 'docs').length,
                   },
                   {
                     key: 'blog',
-                    label: 'ブログ',
+                    label: t('blog'),
                     count: results.filter((r) => r.type === 'blog').length,
                   },
                 ].map((filter) => (
@@ -174,13 +176,12 @@ function SearchResults() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <Text className="text-muted-foreground">
-                「<span className="font-medium">{query}</span>」の検索結果: {filteredResults.length}
-                件
+                {t('page.resultCount', { query, count: filteredResults.length })}
               </Text>
               {isLoading && (
                 <div className="flex items-center gap-2">
                   <div className="border-primary size-4 animate-spin rounded-full border-b-2 motion-reduce:animate-none"></div>
-                  <Text className="text-muted-foreground text-sm">検索中...</Text>
+                  <Text className="text-muted-foreground text-sm">{t('page.loading')}</Text>
                 </div>
               )}
             </div>
@@ -219,7 +220,7 @@ function SearchResults() {
                             variant={getTypeBadgeVariant(result.type)}
                             className="px-2 py-1 text-xs"
                           >
-                            {result.type === 'docs' ? 'ドキュメント' : 'ブログ'}
+                            {t(result.type === 'docs' ? 'docs' : 'blog')}
                           </Badge>
                           <span className="text-muted-foreground text-xs">
                             {result.breadcrumbs?.join(' › ')}
@@ -232,13 +233,13 @@ function SearchResults() {
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground text-xs">
-                        最終更新: {result.lastModified}
+                        {t('page.updated', { date: result.lastModified })}
                       </span>
                       <Link
                         href={result.url}
                         className="text-primary hover:text-primary-hover text-xs font-medium"
                       >
-                        詳細を見る →
+                        {t('page.details')}
                       </Link>
                     </div>
                   </div>
@@ -260,10 +261,10 @@ function SearchResults() {
                   />
                 </svg>
                 <Heading as="h3" size="lg" className="mb-2">
-                  検索結果が見つかりませんでした
+                  {t('page.emptyTitle')}
                 </Heading>
                 <Text variant="muted" className="mb-4">
-                  別のキーワードで検索してみてください
+                  {t('page.emptyDescription')}
                 </Text>
                 <Button
                   variant="outline"
@@ -272,7 +273,7 @@ function SearchResults() {
                     router.push('/search');
                   }}
                 >
-                  検索をクリア
+                  {t('page.clear')}
                 </Button>
               </div>
             )}
@@ -293,17 +294,17 @@ function SearchResults() {
               />
             </svg>
             <Heading as="h3" size="lg" className="mb-2">
-              検索を開始してください
+              {t('page.startTitle')}
             </Heading>
             <Text variant="muted" className="mb-6">
-              ドキュメントとブログ記事を横断検索できます。
+              {t('page.startDescription')}
             </Text>
             <div className="flex justify-center gap-2">
               <Badge variant="outline" className="px-4 py-1 text-sm">
-                ドキュメント
+                {t('docs')}
               </Badge>
               <Badge variant="outline" className="px-4 py-1 text-sm">
-                ブログ
+                {t('blog')}
               </Badge>
             </div>
           </div>

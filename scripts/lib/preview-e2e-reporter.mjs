@@ -3,6 +3,13 @@ import { basename, join } from 'node:path';
 
 const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
+// Reviewed browser acceptance scope. Changes require a reviewed trusted harness rollout.
+const COVERAGE = [
+  { file: 'critical-path.spec.ts', project: 'chromium', count: 9 },
+  { file: 'mobile-critical-path.spec.ts', project: 'Mobile Chrome', count: 3 },
+];
+const EXPECTED_COUNT = COVERAGE.reduce((sum, row) => sum + row.count, 0);
+
 const CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook']);
 
 /** Do not serialize titles, parameters, error messages, stdout, headers, cookies, or bodies. */
@@ -39,22 +46,33 @@ export function safePreviewNetwork(buffer) {
 
 /** Shared by the reporter and runner; exit 0 cannot replace complete evidence. */
 export function isPassingPreviewReport(report) {
-  return (
-    report?.status === 'passed' &&
-    Number.isSafeInteger(report.expected) &&
-    report.expected > 0 &&
-    Array.isArray(report.tests) &&
-    report.tests.length === report.expected &&
-    report.tests.every(
-      (test) =>
-        test &&
-        test.status === 'passed' &&
-        test.expectedPassed === true &&
-        test.retry === 0 &&
-        PROJECTS.has(test.project) &&
-        FILES.has(test.file),
-    ) &&
-    [...PROJECTS].every((project) => report.tests.some((test) => test.project === project))
+  if (
+    report?.status !== 'passed' ||
+    report.expected !== EXPECTED_COUNT ||
+    !Array.isArray(report.tests) ||
+    report.tests.length !== EXPECTED_COUNT
+  )
+    return false;
+  const declarations = new Set();
+  for (const test of report.tests) {
+    if (
+      !test ||
+      test.status !== 'passed' ||
+      test.expectedPassed !== true ||
+      test.retry !== 0 ||
+      !Number.isSafeInteger(test.line) ||
+      test.line <= 0 ||
+      !COVERAGE.some((row) => row.file === test.file && row.project === test.project)
+    )
+      return false;
+    const identity = `${test.file}:${test.project}:${test.line}`;
+    if (declarations.has(identity)) return false;
+    declarations.add(identity);
+  }
+  return COVERAGE.every(
+    (row) =>
+      report.tests.filter((test) => test.file === row.file && test.project === row.project)
+        .length === row.count,
   );
 }
 

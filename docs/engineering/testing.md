@@ -29,6 +29,12 @@ code:
 
 E2E は万能にしない。小さい問題は小さい層で守り、E2E は中核ループに絞る。mobile は全 spec を二重実行せず、`@mobile` tag を付けた test だけが `Mobile Chrome` project で走る（長押し作成・Drawer・ヘッダーナビのように desktop と操作境界が違うものだけ）。
 
+### 公開画面のフロー検証
+
+ブラウザの操作テストは既存の Playwright に統一する。Node 24 を使い、公開 Web の実行先は `WEB_E2E_BASE_URL` で明示できる。指定した場合は dev server を自動起動せず、その URL を検証する。未ログイン画面、mock を使う contact、実際の認証・保存・外部 provider はそれぞれ別の証拠として扱う。対象フローと前提は各 app の既存 E2E directory の README に記す。結果、trace、画像は既存の無視対象 `test-results` / `playwright-report` に出し、run ごとの出力を commit しない。
+
+認証付き Product のクラウド検証は既存の `scripts/runbook/preview-e2e.mjs` を使う。候補 SHA、deployment、非本番 DB、readiness、合成ユーザーの所有権と回収を検証してから成功と扱う。`playwright test --list` は収集確認だけで、実ブラウザ検証とは区別する。Calendar、Stripe、メール送達などは実際の test account / sandbox / sink で操作を完了するまで未確認とする。
+
 ## いつ回すか
 
 安く速いものほど頻繁に、重いものほど節目で回す。コードが変わらないのに同じ検査を毎日回すことは目的にしない。

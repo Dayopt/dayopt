@@ -378,7 +378,8 @@
           "newMessage": "新しいメッセージを送信"
         },
         "privacyNotice": "フォームを送信することで、",
-        "privacyLink": "プライバシーポリシー"
+        "privacyLink": "プライバシーポリシー",
+        "requiredBadge": "※必須"
       }
     }
   }
