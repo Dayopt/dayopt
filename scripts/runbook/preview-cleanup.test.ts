@@ -56,6 +56,10 @@ describe('Preview orphan recovery', () => {
     expect(s.fetchImpl.mock.calls[1][0]).toBe(
       `https://${ref}.supabase.co/auth/v1/admin/users/${userId}`,
     );
+    expect(new Headers(s.fetchImpl.mock.calls[0][1].headers).get('apikey')).toBe(
+      'sb_secret_private_test_key',
+    );
+    expect(new Headers(s.fetchImpl.mock.calls[0][1].headers).get('Authorization')).toBeNull();
     expect(JSON.parse(readFileSync(s.path, 'utf8')).status).toBe('deleted');
     expect(readFileSync(s.path, 'utf8')).not.toContain('sb_secret_private_test_key');
   });

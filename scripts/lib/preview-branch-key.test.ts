@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SUPABASE_PRODUCTION_PROJECT_REF } from '../ci/production-auth-config-audit.mjs';
-import { resolvePreviewSecretKey } from './preview-branch-key.mjs';
+import { previewServiceKeyHeaders, resolvePreviewSecretKey } from './preview-branch-key.mjs';
 
 const projectRef = 'abcdefghijklmnopqrst';
 const token = 'synthetic-management-token';
@@ -72,5 +72,21 @@ describe('resolvePreviewSecretKey', () => {
     await expect(
       resolvePreviewSecretKey({ projectRef, provisionToken: token, fetchImpl }),
     ).rejects.toThrow('unavailable or ambiguous');
+  });
+});
+
+describe('previewServiceKeyHeaders', () => {
+  it('sends modern secret keys as apikey only', () => {
+    expect(previewServiceKeyHeaders('sb_secret_synthetic')).toEqual({
+      apikey: 'sb_secret_synthetic',
+    });
+  });
+
+  it('keeps Bearer for legacy JWT service role keys', () => {
+    const legacy = 'header.payload.signature';
+    expect(previewServiceKeyHeaders(legacy)).toEqual({
+      apikey: legacy,
+      Authorization: `Bearer ${legacy}`,
+    });
   });
 });
