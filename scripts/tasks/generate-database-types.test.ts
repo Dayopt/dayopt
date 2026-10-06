@@ -69,6 +69,27 @@ describe('explicit database type target', () => {
     },
   );
 
+  it('removes remote PostgREST version metadata while keeping generated schema types', async () => {
+    const { root, output } = fixture();
+    const source = `export type Database = {
+      // Allows to automatically instantiate createClient with right options
+      // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+      __InternalSupabase: {
+        PostgrestVersion: "14.5"
+      }
+      public: { Functions: { check_supabase_rate_limit_poc: { Args: {}; Returns: Json } } };
+    };`;
+    await generateDatabaseTypes({
+      root,
+      args: ['--target', 'integration', '--project-ref', 'aaaaaaaaaaaaaaaaaaaa'],
+      run: vi.fn(() => source),
+    });
+
+    const generated = readFileSync(output, 'utf8');
+    expect(generated).not.toContain('PostgrestVersion');
+    expect(generated).toContain('check_supabase_rate_limit_poc');
+  });
+
   it.each(['cli', 'empty', 'syntax'])(
     'preserves existing types when %s fails, without echoing CLI output',
     async (failure) => {

@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+import { test } from './preview-access-fixture';
 
 /**
  * スモークテスト
@@ -10,18 +12,17 @@ import { expect, test } from '@playwright/test';
  */
 
 test.describe('Smoke: ルーティング', () => {
-  test('未認証ユーザーは認証ページにリダイレクトされる', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+  test(
+    '未認証ユーザーは認証ページにリダイレクトされる',
+    { tag: '@preview-e2e/product-smoke-unauth-redirect' },
+    async ({ page }) => {
+      await page.goto('/');
+      await page.waitForURL(/\/(?:ja\/)?auth\/login(?:\/|\?|$)/i, { timeout: 10_000 });
+      await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible();
 
-    // 認証ページにリダイレクトされることを確認
-    await page.waitForURL(/\/(login|auth|signin)/i, { timeout: 10000 }).catch(() => {
-      // 既にログイン済みの場合もOK
-    });
-
-    // ページタイトルが存在する
-    await expect(page).toHaveTitle(/Dayopt/);
-  });
+      await expect(page).toHaveTitle(/Dayopt/);
+    },
+  );
 });
 
 test.describe('Smoke: 認証フロー', () => {
@@ -41,15 +42,17 @@ test.describe('Smoke: 認証フロー', () => {
       signupPath: '/ja/auth/signup',
     },
   ]) {
-    test(`${scenario.locale}: login から signup へ locale prefix を保って遷移する`, async ({
-      page,
-    }) => {
-      await page.goto(scenario.loginPath);
+    test(
+      `${scenario.locale}: login から signup へ locale prefix を保って遷移する`,
+      { tag: `@preview-e2e/product-smoke-${scenario.locale}-signup-locale` },
+      async ({ page }) => {
+        await page.goto(scenario.loginPath);
 
-      await expect(page.getByRole('heading', { level: 1, name: scenario.heading })).toBeVisible();
-      await page.getByRole('link', { name: scenario.signupLink }).click();
+        await expect(page.getByRole('heading', { level: 1, name: scenario.heading })).toBeVisible();
+        await page.getByRole('link', { name: scenario.signupLink }).click();
 
-      await expect(page).toHaveURL(new RegExp(`${scenario.signupPath}/?$`));
-    });
+        await expect(page).toHaveURL(new RegExp(`${scenario.signupPath}/?$`));
+      },
+    );
   }
 });

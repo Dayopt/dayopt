@@ -1244,12 +1244,13 @@ describe('call-graph: 型チェッカーで呼び出し経路を辿る', () => {
   });
 
   it('画面から使う procedure は barrel を辿らず宣言元で絞る', () => {
-    const calendar = graph.pages.find((page) => page.route.endsWith('/calendar'));
+    const calendar = graph.pages.find((page) => page.route.endsWith('/[locale]'));
     expect(calendar?.procedures).toContain('plans.list');
     expect(calendar?.procedures).toContain('records.list');
     expect(calendar?.procedures).toContain('externalCalendar.listEvents');
     // server prefetch を外しても layout の shared client hook は統計を取得する。
     expect(calendar?.procedures).toContain('statistics.getActivityStats');
+    expect(calendar?.procedures).toContain('activities.getActivitySummary');
     // calendar から billing / MCP 設定の procedure は使わない（barrel 経由で混ざらないこと）
     expect(calendar?.procedures.some((id) => id.startsWith('billing.'))).toBe(false);
     expect(calendar?.procedures.some((id) => id.startsWith('mcpConnections.'))).toBe(false);

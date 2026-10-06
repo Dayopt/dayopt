@@ -34,7 +34,8 @@ import { afterEach, describe, expect, it } from 'vitest';
  *
  * 保証しないこと:
  * - flow style（`{ contents: read }`）の permissions、anchor / alias、reusable workflow
- * - ci.yml / calendar-navigation-e2e.yml 以外の workflow（promote.yml / nightly.yml は push / schedule で main の
+ * - ci.yml / calendar-navigation-e2e.yml 以外の workflow（candidate workflows are checked separately below;
+ *   promote.yml / nightly.yml は push / schedule で main の
  *   信頼済みコードを実行する前提。`pull_request` で PR コードを動かす workflow を足したら
  *   ここへ加えること）
  * - run script が curl 等で外部コードを取得して実行するケース
@@ -43,6 +44,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 const CI_YML = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
 const CALENDAR_E2E_YML = readFileSync(
   join(process.cwd(), '.github/workflows/calendar-navigation-e2e.yml'),
+  'utf8',
+);
+const RELEASE_CANDIDATE_YML = readFileSync(
+  join(process.cwd(), '.github/workflows/release-candidate.yml'),
+  'utf8',
+);
+const CANDIDATE_PROMOTION_YML = readFileSync(
+  join(process.cwd(), '.github/workflows/candidate-promotion.yml'),
   'utf8',
 );
 const FINISH_BRANCH = readFileSync(join(process.cwd(), 'scripts/tasks/finish-branch.sh'), 'utf8');
@@ -177,6 +186,50 @@ describe('calendar-navigation-e2e.yml の token 分離', () => {
   });
 });
 
+describe('candidate workflows の trust role 分離', () => {
+  it('candidate の全検証は write token を持たず、failure writer は checkout/action/code を使わない', () => {
+    expect(writeTokenOffenders(RELEASE_CANDIDATE_YML)).toEqual([]);
+    const candidateJobs = jobsOf(RELEASE_CANDIDATE_YML);
+    const notifier = candidateJobs.find((job) => job.id === 'notify_failure');
+    expect(notifier).toBeDefined();
+    expect(notifier?.text).not.toMatch(/^\s*(-\s+)?uses:/m);
+    expect(repositoryCodeMarkers(notifier!)).toEqual([]);
+    expect(readPermissions(notifier!.lines, 4)?.scopes).toEqual({
+      contents: 'read',
+      issues: 'write',
+    });
+  });
+
+  it('candidate gate runs trusted base code with read-only GitHub permissions', () => {
+    const gate = jobById('candidate_gate');
+    expect(readPermissions(gate.lines, 4)?.scopes).toEqual({
+      contents: 'read',
+      actions: 'read',
+      'pull-requests': 'read',
+    });
+    expect(gate.text).toContain('ref: ${{ github.event.pull_request.base.sha }}');
+    expect(gate.text).toContain('node scripts/ci/release-candidate-gate.mjs pr');
+    expect(repositoryCodeMarkers(gate).sort()).toEqual(['checkout', 'node']);
+  });
+
+  it('promotion write credential is limited to trusted main control code; issue writer executes no repo code', () => {
+    const jobs = jobsOf(CANDIDATE_PROMOTION_YML);
+    const promoter = jobs.find((job) => job.id === 'promote_candidate');
+    const notifier = jobs.find((job) => job.id === 'notify_failure');
+    expect(promoter).toBeDefined();
+    expect(promoter!.text).toContain('ref: main');
+    expect(promoter!.text).toContain('secrets.RELEASE_CANDIDATE_TOKEN');
+    expect(promoter!.text).toContain('node scripts/ci/release-candidate-publish.mjs');
+    expect(notifier).toBeDefined();
+    expect(notifier!.text).not.toMatch(/^\s*(-\s+)?uses:/m);
+    expect(repositoryCodeMarkers(notifier!)).toEqual([]);
+    expect(readPermissions(notifier!.lines, 4)?.scopes).toEqual({
+      contents: 'read',
+      issues: 'write',
+    });
+  });
+});
+
 describe('ci.yml の token 分離（credential audit P2-6）', () => {
   it('repo のコードや依存を実行する job は write 権限の token を持たない', () => {
     expect(writeTokenOffenders(CI_YML)).toEqual([]);
@@ -188,6 +241,7 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
 
     // impact / unit（read-only で PR files を読む）と migration-notice（コードを実行しない）
     expect(tokenJobs.map((job) => job.id)).toEqual([
+      'candidate_gate',
       'impact',
       'unit',
       'migration-notice',
@@ -308,8 +362,9 @@ describe('ci.yml の token 分離（credential audit P2-6）', () => {
       expect(writeTokenOffenders(fine)).toEqual([]);
     });
 
-    it('実ファイルから 10 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
+    it('実ファイルから 11 job を読めている（切り出しの空振りで全 assert が素通りしない）', () => {
       expect(ciJobs.map((job) => job.id)).toEqual([
+        'candidate_gate',
         'impact',
         'static',
         'unit',

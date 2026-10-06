@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './preview-access-fixture';
 
 import { resolveServiceRoleTarget } from '../service-role-target-guard';
 import {
@@ -10,13 +11,10 @@ import {
 /**
  * Deep Link E2E
  *
- * `/calendar`（view はクエリで受ける）への direct access が SSR で正常描画され、
+ * ホーム（view はクエリで受ける）への direct access が SSR で正常描画され、
  * Sidebar が初回レンダリングから表示されることを検証する。
  *
- * 旧 URL（/day, /week, /Nday, `?panel=`）からの redirect 網羅は
- * `legacy-url-redirects.spec.ts` を正とする
- * （旧 docs/projects/_archive/workspace-shell-restructure/overview.md §4-4、
- * docs/projects 全廃に伴い #2473 で削除。git 履歴参照）。
+ * 旧ページ URL は公開前のため redirect せず、ルートを持たない。
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,15 +35,20 @@ async function loginAndNavigate(page: import('@playwright/test').Page) {
   await passwordInput.fill(testUser!.password);
   await submitButton.click();
 
-  await page.waitForURL(/\/calendar/i, { timeout: 15000 });
+  await page.waitForURL(/\/(?:ja\/?)?(?:\?.*)?$/i, { timeout: 15000 });
 }
 
-test.describe('Deep Link: SSR rendering of /calendar', () => {
+test.describe('Deep Link: SSR rendering of calendar home', () => {
   test.skip(!SERVICE_ROLE_TARGET.safe, SERVICE_ROLE_TARGET.safe ? '' : SERVICE_ROLE_TARGET.reason);
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     if (!SERVICE_ROLE_TARGET.safe) return;
-    testUser = await createScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, 'deep-link');
+    testUser = await createScopedTestUser(
+      SUPABASE_URL!,
+      SERVICE_ROLE_KEY!,
+      'deep-link',
+      testInfo.project.name,
+    );
   });
 
   test.afterAll(async () => {
@@ -53,61 +56,75 @@ test.describe('Deep Link: SSR rendering of /calendar', () => {
     await deleteScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, testUser.userId);
   });
 
-  test('calendar week renders with sidebar on direct access', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+  test(
+    'calendar week renders with sidebar on direct access',
+    { tag: '@preview-e2e/product-deep-link-week' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
 
-    await loginAndNavigate(page);
+      await loginAndNavigate(page);
 
-    // 直接 /calendar?view=week に遷移
-    await page.goto('/ja/calendar?view=week&date=2026-04-20');
-    await expect(page).toHaveURL(/\/ja\/calendar\?view=week&date=2026-04-20/);
+      // 直接 /?view=week に遷移
+      await page.goto('/ja/?view=week&date=2026-04-20');
+      await expect(page).toHaveURL(/\/ja\/?\?view=week&date=2026-04-20/);
 
-    // Sidebar が初回レンダリングから表示されている（現 shell は <aside> = complementary landmark）
-    const sidebar = page.getByRole('complementary').first();
-    await expect(sidebar).toBeVisible();
+      // Sidebar が初回レンダリングから表示されている（現 shell は <aside> = complementary landmark）
+      const sidebar = page.getByRole('complementary').first();
+      await expect(sidebar).toBeVisible();
 
-    // Calendar グリッドが deep link 直後から描画される
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      // Calendar グリッドが deep link 直後から描画される
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
 
-    // view 種別の assert: week は複数日カラムを持つ（day view=1 列と区別する）
-    await expect(page.locator('[data-calendar-grid]')).not.toHaveCount(1);
-  });
+      // view 種別の assert: week は複数日カラムを持つ（day view=1 列と区別する）
+      await expect(page.locator('[data-calendar-grid]')).not.toHaveCount(1);
+    },
+  );
 
-  test('prefixless default-locale calendar renders only its own visible header', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+  test(
+    'prefixless default-locale calendar renders only its own visible header',
+    { tag: '@preview-e2e/product-deep-link-prefixless' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
 
-    await loginAndNavigate(page);
+      await loginAndNavigate(page);
 
-    await page.goto('/calendar?view=day&date=2026-04-20');
-    await expect(page).toHaveURL(/\/calendar\?view=day&date=2026-04-20/);
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      await page.goto('/?view=day&date=2026-04-20');
+      await expect(page).toHaveURL(/\/(?:ja\/)?\?view=day&date=2026-04-20/);
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
 
-    // view 種別の assert: day view は単一カラムのみ
-    await expect(page.locator('[data-calendar-grid]')).toHaveCount(1);
+      // view 種別の assert: day view は単一カラムのみ
+      await expect(page.locator('[data-calendar-grid]')).toHaveCount(1);
 
-    // CalendarLayout は responsive header を2つDOMに持つため、実際に表示中のheaderを数える。
-    // shell側のlocale誤判定が再発すると、desktopでvisible headerが2つになる。
-    await expect(page.locator('header:visible')).toHaveCount(1);
-  });
+      // CalendarLayout は responsive header を2つDOMに持つため、実際に表示中のheaderを数える。
+      // shell側のlocale誤判定が再発すると、desktopでvisible headerが2つになる。
+      await expect(page.locator('header:visible')).toHaveCount(1);
+    },
+  );
 
-  test('/calendar without view defaults to week', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+  test(
+    'home without view defaults to week',
+    { tag: '@preview-e2e/product-deep-link-default-week' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
 
-    await loginAndNavigate(page);
+      await loginAndNavigate(page);
 
-    await page.goto('/ja/calendar?date=2026-04-20');
-    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-calendar-grid]')).not.toHaveCount(1);
-  });
+      await page.goto('/ja/?date=2026-04-20');
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('[data-calendar-grid]')).not.toHaveCount(1);
+    },
+  );
 
-  test('out-of-range multi-day view (8day) returns 404', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+  test(
+    'out-of-range multi-day view (8day) returns 404',
+    { tag: '@preview-e2e/product-deep-link-invalid-view' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
 
-    await loginAndNavigate(page);
+      await loginAndNavigate(page);
 
-    const response = await page.goto('/ja/calendar?view=8day&date=2026-04-20');
-    expect(response?.status()).toBe(404);
-  });
+      const response = await page.goto('/ja/?view=8day&date=2026-04-20');
+      expect(response?.status()).toBe(404);
+    },
+  );
 });

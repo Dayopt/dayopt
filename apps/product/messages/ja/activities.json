@@ -38,6 +38,19 @@
       "activityDescriptionUnknown": "この操作は取り消せません。関連する予定・記録は削除されず、アクティビティなしになります。",
       "categoryDescriptionUnknown": "この操作は取り消せません。所属するアクティビティは削除されず、未分類になります。"
     },
+    "activitySummary": {
+      "ariaLabel": "アクティビティの詳細",
+      "close": "閉じる",
+      "error": "詳細を読み込めませんでした",
+      "period": "過去30日 · {start}〜{end}",
+      "periodLoading": "過去30日",
+      "recorded": "記録合計",
+      "median": "1件あたりの中央値",
+      "noMedian": "—",
+      "records": "記録（{count}件）",
+      "empty": "過去30日の記録はありません",
+      "truncated": "古い記録を表示していません（{count}件）"
+    },
     "undo": "元に戻す"
   }
 }

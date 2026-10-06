@@ -38,7 +38,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `test('サインアップページがフォームと規約・ログイン導線を配信する'` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
+- [`apps/product/src/lib/test/e2e/auth.spec.ts`](../../../apps/product/src/lib/test/e2e/auth.spec.ts) で `@preview-e2e/product-auth-signup-page` を探す（画面が出るところまで。登録からメールまでを通しで守る E2E は無い）
 
 ### 1. 登録フォーム（Turnstile と漏洩パスワード確認）（ブラウザ）
 
@@ -122,7 +122,7 @@ Supabase Auth の send_email hook が Edge Function send-auth-email を呼び、
 
 ### 4. 確認リンクで着地する（Vercel（Next.js））
 
-/auth/confirm が verifyOtp で確かめる。成否は verifyOtp の error で分ける。成功した時、session があれば next（既定は /calendar）へ、無ければ /auth/confirmed?status=email_confirmed へ送る。失敗（無効・期限切れ・使用済み）は素のエラーではなく /auth/confirmed?status=failed に着地させる。新規登録の確認が成功した時だけウェルカムメールを依頼する。
+/auth/confirm が verifyOtp で確かめる。成否は verifyOtp の error で分ける。成功した時、session があれば next（既定は /）へ、無ければ /auth/confirmed?status=email_confirmed へ送る。失敗（無効・期限切れ・使用済み）は素のエラーではなく /auth/confirmed?status=failed に着地させる。新規登録の確認が成功した時だけウェルカムメールを依頼する。
 
 - **ここを変えると**: email_change / recovery も同じ route を通る。ウェルカムメールは type が signup の時だけ。
 - **コード**:
@@ -514,7 +514,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
       "id": "confirm-route",
       "svc": "vercel",
       "title": "確認リンクで着地する",
-      "what": "/auth/confirm が verifyOtp で確かめる。成否は verifyOtp の error で分ける。成功した時、session があれば next（既定は /calendar）へ、無ければ /auth/confirmed?status=email_confirmed へ送る。失敗（無効・期限切れ・使用済み）は素のエラーではなく /auth/confirmed?status=failed に着地させる。新規登録の確認が成功した時だけウェルカムメールを依頼する。",
+      "what": "/auth/confirm が verifyOtp で確かめる。成否は verifyOtp の error で分ける。成功した時、session があれば next（既定は /）へ、無ければ /auth/confirmed?status=email_confirmed へ送る。失敗（無効・期限切れ・使用済み）は素のエラーではなく /auth/confirmed?status=failed に着地させる。新規登録の確認が成功した時だけウェルカムメールを依頼する。",
       "change": "email_change / recovery も同じ route を通る。ウェルカムメールは type が signup の時だけ。",
       "refs": [
         {
@@ -656,7 +656,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
       "via": "UPDATE",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [],
         "note": "サインインした状態でカレンダーに着地"
       },
@@ -903,7 +903,7 @@ Resend が /api/webhooks/resend へ bounce / 苦情を送る。svix の署名を
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/auth.spec.ts",
-      "find": "test('サインアップページがフォームと規約・ログイン導線を配信する'",
+      "find": "@preview-e2e/product-auth-signup-page",
       "why": "画面が出るところまで。登録からメールまでを通しで守る E2E は無い"
     }
   ]

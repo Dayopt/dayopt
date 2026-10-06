@@ -12,16 +12,16 @@
 
 | 種別           | 件数 | 概念へ直接 | feature 経由のみ | 語彙を持たない層 | 概念を足す候補 |
 | -------------- | ---- | ---------- | ---------------- | ---------------- | -------------- |
-| feature        | 8    | 8          | 0                | 0                | 0              |
+| feature        | 7    | 7          | 0                | 0                | 0              |
 | DB テーブル    | 30   | 10         | 6                | 14               | 0              |
 | DB 関数        | 141  | 1          | 65               | 75               | 0              |
-| tRPC router    | 15   | 0          | 15               | 0                | 0              |
-| tRPC procedure | 71   | 0          | 71               | 0                | 0              |
+| tRPC router    | 14   | 0          | 14               | 0                | 0              |
+| tRPC procedure | 69   | 0          | 69               | 0                | 0              |
 | MCP tool       | 19   | 19         | 0                | 0                | 0              |
-| Zustand store  | 13   | 0          | 12               | 0                | 1              |
-| Story          | 116  | 0          | 92               | 24               | 0              |
-| route          | 16   | 0          | 6                | 10               | 0              |
-| i18n namespace | 15   | 7          | 0                | 8                | 0              |
+| Zustand store  | 12   | 0          | 10               | 0                | 2              |
+| Story          | 101  | 0          | 78               | 23               | 0              |
+| route          | 14   | 0          | 5                | 9                | 0              |
+| i18n namespace | 14   | 6          | 0                | 8                | 0              |
 
 ## 探索の入口
 
@@ -36,13 +36,14 @@ DB のリンクは migration から生成された型定義です。Production �
 - [Category](#concept-category)
 - [Segment](#concept-segment)
 - [Plan template](#concept-plan-template)
-- [Review](#concept-review)
+- [Activity details](#concept-activity-details)
 - [Inspector](#concept-inspector)
 - [Archive](#concept-archive)
 - [Trash](#concept-trash)
 - [Confirm day](#concept-confirm-day)
 - [Fulfillment](#concept-fulfillment)
 - [External calendar event](#concept-external-event)
+- [MCP review.get](#concept-mcp-review)
 - [Source](#concept-plan-source)
 - [note / description](#concept-note-vs-description)
 - [Subscription status](#concept-subscription-status)
@@ -61,7 +62,7 @@ DB のリンクは migration から生成された型定義です。Production �
 
 カレンダー上の時間ブロック。予定 / 記録の総称
 
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity) / [Activity details](#concept-activity-details)
 
 ```mermaid
 graph LR
@@ -154,7 +155,7 @@ graph LR
 | Story | [Product/Features/Timeblock/TimeblockEditor](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRecordActions](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRelationshipSection](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 | i18n namespace | [timeblock](<../../../apps/product/messages/en/timeblock.json>) | 直接 |
 
 <details>
@@ -187,7 +188,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（82）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -251,17 +252,20 @@ graph LR
 | [apps/product/src/features/timeblock/server/timeblock-review-client.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-review-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts>) | feature: timeblock |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts](<../../../apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts>) | DB 関数: create_plan_command_v1 / DB 関数: record_plan_command_v1 / DB 関数: update_plan_command_v1 |
 | [apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 |
 | [apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 / DB 関数: create_plan_command_v1 / DB 関数: delete_plan_command_v1 |
@@ -294,7 +298,7 @@ graph LR
 
 これからやる時間の宣言。時間軸のどこにでも置ける独立エンティティ
 
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity) / [Activity details](#concept-activity-details)
 
 ```mermaid
 graph LR
@@ -402,7 +406,7 @@ graph LR
 | Story | [Product/Features/Timeblock/TimeblockEditor](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRecordActions](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRelationshipSection](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 
 <details>
 <summary>UI の候補（20）</summary>
@@ -434,7 +438,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（82）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -498,17 +502,20 @@ graph LR
 | [apps/product/src/features/timeblock/server/timeblock-review-client.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-review-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts>) | feature: timeblock |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts](<../../../apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts>) | DB 関数: create_plan_command_v1 / DB 関数: record_plan_command_v1 / DB 関数: update_plan_command_v1 |
 | [apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 |
 | [apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 / DB 関数: create_plan_command_v1 / DB 関数: delete_plan_command_v1 |
@@ -541,7 +548,7 @@ graph LR
 
 実際に使った時間。予定とは独立して保存し、未来には終われない
 
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity) / [Activity details](#concept-activity-details)
 
 ```mermaid
 graph LR
@@ -649,7 +656,7 @@ graph LR
 | Story | [Product/Features/Timeblock/TimeblockEditor](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRecordActions](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRelationshipSection](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 
 <details>
 <summary>UI の候補（20）</summary>
@@ -681,7 +688,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（82）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -745,17 +752,20 @@ graph LR
 | [apps/product/src/features/timeblock/server/timeblock-review-client.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-review-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts>) | feature: timeblock |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts](<../../../apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts>) | DB 関数: create_plan_command_v1 / DB 関数: record_plan_command_v1 / DB 関数: update_plan_command_v1 |
 | [apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 |
 | [apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 / DB 関数: create_plan_command_v1 / DB 関数: delete_plan_command_v1 |
@@ -807,6 +817,7 @@ graph LR
 | feature | [activities](<../../../apps/product/src/features/activities>) | 直接 |
 | DB テーブル | [activities](<../../../apps/product/src/lib/database/generated/database.types.ts>) | 直接 |
 | DB テーブル | [categories](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
+| DB テーブル | [records](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | tRPC router | [activities](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.archiveActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.archiveCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
@@ -814,6 +825,7 @@ graph LR
 | tRPC procedure | [activities.createCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.deleteActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.deleteCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.getActivitySummary](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.listActivities](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.listCategories](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
 | tRPC procedure | [activities.listTree](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
@@ -825,16 +837,18 @@ graph LR
 | Story | [Product/Features/Activities/ActivityCreateModal](<../../../apps/product/src/features/activities/components/ActivityCreateModal.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Activities/ActivityQuickSelector](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Activities/CategoryAppearancePickerRow](<../../../apps/product/src/features/activities/components/CategoryAppearanceMenuItems.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
-| route | [/\[locale\]/report](<../../../apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 | i18n namespace | [activities](<../../../apps/product/messages/en/activities.json>) | 直接 |
 
 <details>
-<summary>UI の候補（11）</summary>
+<summary>UI の候補（14）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummarySheet.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummarySheet.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/activity-summary/ConnectedActivitySummaryPanel.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ConnectedActivitySummaryPanel.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityCategoryPickerRow.tsx](<../../../apps/product/src/features/activities/components/ActivityCategoryPickerRow.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityCreateModal.tsx](<../../../apps/product/src/features/activities/components/ActivityCreateModal.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityDeleteConfirmDialog.tsx](<../../../apps/product/src/features/activities/components/ActivityDeleteConfirmDialog.tsx>) | feature: activities |
@@ -850,30 +864,34 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（19）</summary>
+<summary>test の候補（23）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/components/ActivityRenameModal.test.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.test.tsx>) | feature: activities |
 | [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/hooks/activities-cache.test.ts](<../../../apps/product/src/features/activities/hooks/activities-cache.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/lib/rolling-calendar-range.test.ts](<../../../apps/product/src/features/activities/lib/rolling-calendar-range.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/server/activities-query-service.test.ts](<../../../apps/product/src/features/activities/server/activities-query-service.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/server/activity-summary-service.test.ts](<../../../apps/product/src/features/activities/server/activity-summary-service.test.ts>) | feature: activities |
 | [apps/product/src/features/activities/server/router.test.ts](<../../../apps/product/src/features/activities/server/router.test.ts>) | feature: activities |
-| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 
 </details>
 
@@ -933,15 +951,11 @@ graph LR
 
 ### Segment（`segment`）
 
-旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去し、/report のアクティビティ単位フィルタへ置き換えた。DB テーブルだけが残る
-
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+旧: 分析用の保存されたクエリ。2026-09-15 に UI / tRPC / MCP から撤去。関連する DB テーブルだけが残る
 
 ```mermaid
 graph LR
   concept(["Segment<br/>segment"])
-  feature_review["feature<br/>review"]
-  concept --> feature_review
   table_segment_activities["DB テーブル<br/>segment_activities"]
   concept --> table_segment_activities
   table_segments["DB テーブル<br/>segments"]
@@ -951,104 +965,27 @@ graph LR
 <!-- prettier-ignore -->
 | 種別 | 項目 | 経路 |
 | --- | --- | --- |
-| feature | [review](<../../../apps/product/src/features/review>) | 直接 |
 | DB テーブル | [segment_activities](<../../../apps/product/src/lib/database/generated/database.types.ts>) | 直接 |
 | DB テーブル | [segments](<../../../apps/product/src/lib/database/generated/database.types.ts>) | 直接 |
-| DB テーブル | [activities](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
-| DB テーブル | [categories](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
-| DB テーブル | [plans](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
-| DB テーブル | [records](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
-| tRPC router | [review](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| tRPC procedure | [review.getReportActivityDetail](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| tRPC procedure | [review.getReportPeriod](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| tRPC procedure | [review.trackOpened](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| Zustand store | [useReportDetailStore](<../../../apps/product/src/features/review/stores/useReportDetailStore.ts>) | feature 経由 |
-| Zustand store | [useReportViewStore](<../../../apps/product/src/features/review/stores/useReportViewStore.ts>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/Allocation](<../../../apps/product/src/features/review/components/report/chapters/AllocationChapter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/CompassScatter](<../../../apps/product/src/features/review/components/report/chapters/CompassScatter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/Execution](<../../../apps/product/src/features/review/components/report/chapters/ExecutionChapter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/MirrorRows](<../../../apps/product/src/features/review/components/report/chapters/MirrorRows.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/Quality](<../../../apps/product/src/features/review/components/report/chapters/QualityChapter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/WaitingList](<../../../apps/product/src/features/review/components/report/chapters/WaitingList.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Detail/ReportDetailPanel](<../../../apps/product/src/features/review/components/detail/ReportDetailPanel.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Detail/ReportDetailSheet](<../../../apps/product/src/features/review/components/detail/ReportDetailSheet.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportGranularitySwitcher](<../../../apps/product/src/features/review/components/layout/ReportGranularitySwitcher.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportHeader](<../../../apps/product/src/features/review/components/layout/ReportHeader.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportMobileHeader](<../../../apps/product/src/features/review/components/layout/ReportMobileHeader.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportTabs](<../../../apps/product/src/features/review/components/layout/ReportTabs.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Sidebar/ReportFilterDrawer](<../../../apps/product/src/features/review/components/sidebar/ReportFilterDrawer.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Sidebar/ReportFilterList](<../../../apps/product/src/features/review/components/sidebar/ReportFilterList.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/report](<../../../apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx>) | feature 経由 |
 
 <details>
-<summary>UI の候補（19）</summary>
+<summary>UI の候補（0）</summary>
 
-<!-- prettier-ignore -->
-| ファイル | 対応の根拠 |
-| --- | --- |
-| [apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.tsx](<../../../apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/DurationStrip.tsx](<../../../apps/product/src/features/review/components/detail/DurationStrip.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailBody.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailBody.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailPanel.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailPanel.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailResizeHandle.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailResizeHandle.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailSheet.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailSheet.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportGranularitySwitcher.tsx](<../../../apps/product/src/features/review/components/layout/ReportGranularitySwitcher.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportHeader.tsx](<../../../apps/product/src/features/review/components/layout/ReportHeader.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportMobileHeader.tsx](<../../../apps/product/src/features/review/components/layout/ReportMobileHeader.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportTabs.tsx](<../../../apps/product/src/features/review/components/layout/ReportTabs.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/AllocationChapter.tsx](<../../../apps/product/src/features/review/components/report/chapters/AllocationChapter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/CompassScatter.tsx](<../../../apps/product/src/features/review/components/report/chapters/CompassScatter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/ExecutionChapter.tsx](<../../../apps/product/src/features/review/components/report/chapters/ExecutionChapter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/MirrorRows.tsx](<../../../apps/product/src/features/review/components/report/chapters/MirrorRows.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/QualityChapter.tsx](<../../../apps/product/src/features/review/components/report/chapters/QualityChapter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/WaitingList.tsx](<../../../apps/product/src/features/review/components/report/chapters/WaitingList.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/ReportBody.tsx](<../../../apps/product/src/features/review/components/report/ReportBody.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterDrawer.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterDrawer.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterList.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterList.tsx>) | feature: review |
+既存の対応情報からは候補を発見できませんでした。未使用・検証不要という意味ではありません。
 
 </details>
 
 <details>
-<summary>test の候補（25）</summary>
+<summary>test の候補（0）</summary>
 
-<!-- prettier-ignore -->
-| ファイル | 対応の根拠 |
-| --- | --- |
-| [apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.test.tsx](<../../../apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailPanel.test.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailPanel.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportHeader.test.tsx](<../../../apps/product/src/features/review/components/layout/ReportHeader.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportMobileHeader.test.tsx](<../../../apps/product/src/features/review/components/layout/ReportMobileHeader.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/ExecutionChapter.test.tsx](<../../../apps/product/src/features/review/components/report/chapters/ExecutionChapter.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/QualityChapter.test.tsx](<../../../apps/product/src/features/review/components/report/chapters/QualityChapter.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/ReportBody.test.tsx](<../../../apps/product/src/features/review/components/report/ReportBody.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterDrawer.test.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterDrawer.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterList.test.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterList.test.tsx>) | feature: review |
-| [apps/product/src/features/review/domain/report/duration-distribution.test.ts](<../../../apps/product/src/features/review/domain/report/duration-distribution.test.ts>) | feature: review |
-| [apps/product/src/features/review/domain/report/format-duration.test.ts](<../../../apps/product/src/features/review/domain/report/format-duration.test.ts>) | feature: review |
-| [apps/product/src/features/review/domain/report/report-view-model.test.ts](<../../../apps/product/src/features/review/domain/report/report-view-model.test.ts>) | feature: review |
-| [apps/product/src/features/review/hooks/useReviewOpenedTracking.test.tsx](<../../../apps/product/src/features/review/hooks/useReviewOpenedTracking.test.tsx>) | feature: review |
-| [apps/product/src/features/review/lib/report-mobile-period-label.test.ts](<../../../apps/product/src/features/review/lib/report-mobile-period-label.test.ts>) | feature: review |
-| [apps/product/src/features/review/lib/report-period-time-of-day.test.ts](<../../../apps/product/src/features/review/lib/report-period-time-of-day.test.ts>) | feature: review |
-| [apps/product/src/features/review/lib/report-period.test.ts](<../../../apps/product/src/features/review/lib/report-period.test.ts>) | feature: review |
-| [apps/product/src/features/review/lib/report-tab.test.ts](<../../../apps/product/src/features/review/lib/report-tab.test.ts>) | feature: review |
-| [apps/product/src/features/review/server/report-aggregation-service.test.ts](<../../../apps/product/src/features/review/server/report-aggregation-service.test.ts>) | feature: review |
-| [apps/product/src/features/review/server/report-detail-service.test.ts](<../../../apps/product/src/features/review/server/report-detail-service.test.ts>) | feature: review |
-| [apps/product/src/features/review/server/router.test.ts](<../../../apps/product/src/features/review/server/router.test.ts>) | feature: review |
-| [apps/product/src/features/review/stores/useReportDetailStore.test.ts](<../../../apps/product/src/features/review/stores/useReportDetailStore.test.ts>) | feature: review |
-| [apps/product/src/features/review/stores/useReportViewStore.test.ts](<../../../apps/product/src/features/review/stores/useReportViewStore.test.ts>) | feature: review |
-| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/report |
+既存の対応情報からは候補を発見できませんでした。未使用・検証不要という意味ではありません。
 
 </details>
 
 <details>
-<summary>docs の候補（1）</summary>
+<summary>docs の候補（0）</summary>
 
-<!-- prettier-ignore -->
-| ファイル | 対応の根拠 |
-| --- | --- |
-| [docs/product/specs/review.md](<../../product/specs/review.md>) | frontmatter code: review |
+既存の対応情報からは候補を発見できませんでした。未使用・検証不要という意味ではありません。
 
 </details>
 
@@ -1058,7 +995,7 @@ graph LR
 
 1 日の予定の並びを保存して別の日へ適用する仕組み
 
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity) / [Activity details](#concept-activity-details)
 
 ```mermaid
 graph LR
@@ -1147,7 +1084,7 @@ graph LR
 | Story | [Product/Features/Timeblock/TimeblockEditor](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRecordActions](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRelationshipSection](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 
 <details>
 <summary>UI の候補（20）</summary>
@@ -1179,7 +1116,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（82）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1243,17 +1180,20 @@ graph LR
 | [apps/product/src/features/timeblock/server/timeblock-review-client.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-review-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts>) | feature: timeblock |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts](<../../../apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts>) | DB 関数: create_plan_command_v1 / DB 関数: record_plan_command_v1 / DB 関数: update_plan_command_v1 |
 | [apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 |
 | [apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 / DB 関数: create_plan_command_v1 / DB 関数: delete_plan_command_v1 |
@@ -1280,116 +1220,101 @@ graph LR
 
 </details>
 
-<a id="concept-review"></a>
+<a id="concept-activity-details"></a>
 
-### Review（`review`）
+### Activity details（`activity-details`）
 
-ページ名・機能名。route は /report、i18n namespace も report
-
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+カレンダーから明示的に開く、直近30日の記録時間・中央値・記録一覧
 
 ```mermaid
 graph LR
-  concept(["Review<br/>review"])
-  feature_review["feature<br/>review"]
-  concept --> feature_review
-  mcp_tool_review_get["MCP tool<br/>review.get"]
-  concept --> mcp_tool_review_get
-  i18n_namespace_report["i18n namespace<br/>report"]
-  concept --> i18n_namespace_report
+  concept(["Activity details<br/>activity-details"])
+  feature_activities["feature<br/>activities"]
+  concept --> feature_activities
+  i18n_namespace_activities["i18n namespace<br/>activities"]
+  concept --> i18n_namespace_activities
 ```
 
 <!-- prettier-ignore -->
 | 種別 | 項目 | 経路 |
 | --- | --- | --- |
-| feature | [review](<../../../apps/product/src/features/review>) | 直接 |
+| feature | [activities](<../../../apps/product/src/features/activities>) | 直接 |
 | DB テーブル | [activities](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB テーブル | [categories](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
-| DB テーブル | [plans](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
 | DB テーブル | [records](<../../../apps/product/src/lib/database/generated/database.types.ts>) | feature 経由 |
-| tRPC router | [review](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| tRPC procedure | [review.getReportActivityDetail](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| tRPC procedure | [review.getReportPeriod](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| tRPC procedure | [review.trackOpened](<../../../apps/product/src/features/review/server/router.ts>) | feature 経由 |
-| MCP tool | [review.get](<../../../apps/product/src/app/api/mcp/_tools/registry.ts>) | 直接 |
-| Zustand store | [useReportDetailStore](<../../../apps/product/src/features/review/stores/useReportDetailStore.ts>) | feature 経由 |
-| Zustand store | [useReportViewStore](<../../../apps/product/src/features/review/stores/useReportViewStore.ts>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/Allocation](<../../../apps/product/src/features/review/components/report/chapters/AllocationChapter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/CompassScatter](<../../../apps/product/src/features/review/components/report/chapters/CompassScatter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/Execution](<../../../apps/product/src/features/review/components/report/chapters/ExecutionChapter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/MirrorRows](<../../../apps/product/src/features/review/components/report/chapters/MirrorRows.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/Quality](<../../../apps/product/src/features/review/components/report/chapters/QualityChapter.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Chapters/WaitingList](<../../../apps/product/src/features/review/components/report/chapters/WaitingList.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Detail/ReportDetailPanel](<../../../apps/product/src/features/review/components/detail/ReportDetailPanel.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Detail/ReportDetailSheet](<../../../apps/product/src/features/review/components/detail/ReportDetailSheet.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportGranularitySwitcher](<../../../apps/product/src/features/review/components/layout/ReportGranularitySwitcher.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportHeader](<../../../apps/product/src/features/review/components/layout/ReportHeader.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportMobileHeader](<../../../apps/product/src/features/review/components/layout/ReportMobileHeader.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Layout/ReportTabs](<../../../apps/product/src/features/review/components/layout/ReportTabs.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Sidebar/ReportFilterDrawer](<../../../apps/product/src/features/review/components/sidebar/ReportFilterDrawer.stories.tsx>) | feature 経由 |
-| Story | [Product/Features/Review/Sidebar/ReportFilterList](<../../../apps/product/src/features/review/components/sidebar/ReportFilterList.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/report](<../../../apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx>) | feature 経由 |
-| i18n namespace | [report](<../../../apps/product/messages/en/report.json>) | 直接 |
+| tRPC router | [activities](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.archiveActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.archiveCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.createActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.createCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.deleteActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.deleteCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.getActivitySummary](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.listActivities](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.listCategories](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.listTree](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.restoreActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.restoreCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.updateActivity](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| tRPC procedure | [activities.updateCategory](<../../../apps/product/src/features/activities/server/router.ts>) | feature 経由 |
+| Story | [Product/Features/Activities/ActivityCreateModal](<../../../apps/product/src/features/activities/components/ActivityCreateModal.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Activities/ActivityQuickSelector](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.stories.tsx>) | feature 経由 |
+| Story | [Product/Features/Activities/CategoryAppearancePickerRow](<../../../apps/product/src/features/activities/components/CategoryAppearanceMenuItems.stories.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
+| i18n namespace | [activities](<../../../apps/product/messages/en/activities.json>) | 直接 |
 
 <details>
-<summary>UI の候補（19）</summary>
+<summary>UI の候補（14）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
-| [apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.tsx](<../../../apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/DurationStrip.tsx](<../../../apps/product/src/features/review/components/detail/DurationStrip.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailBody.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailBody.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailPanel.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailPanel.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailResizeHandle.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailResizeHandle.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailSheet.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailSheet.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportGranularitySwitcher.tsx](<../../../apps/product/src/features/review/components/layout/ReportGranularitySwitcher.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportHeader.tsx](<../../../apps/product/src/features/review/components/layout/ReportHeader.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportMobileHeader.tsx](<../../../apps/product/src/features/review/components/layout/ReportMobileHeader.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportTabs.tsx](<../../../apps/product/src/features/review/components/layout/ReportTabs.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/AllocationChapter.tsx](<../../../apps/product/src/features/review/components/report/chapters/AllocationChapter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/CompassScatter.tsx](<../../../apps/product/src/features/review/components/report/chapters/CompassScatter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/ExecutionChapter.tsx](<../../../apps/product/src/features/review/components/report/chapters/ExecutionChapter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/MirrorRows.tsx](<../../../apps/product/src/features/review/components/report/chapters/MirrorRows.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/QualityChapter.tsx](<../../../apps/product/src/features/review/components/report/chapters/QualityChapter.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/WaitingList.tsx](<../../../apps/product/src/features/review/components/report/chapters/WaitingList.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/ReportBody.tsx](<../../../apps/product/src/features/review/components/report/ReportBody.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterDrawer.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterDrawer.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterList.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterList.tsx>) | feature: review |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummarySheet.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummarySheet.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/activity-summary/ConnectedActivitySummaryPanel.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ConnectedActivitySummaryPanel.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityCategoryPickerRow.tsx](<../../../apps/product/src/features/activities/components/ActivityCategoryPickerRow.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityCreateModal.tsx](<../../../apps/product/src/features/activities/components/ActivityCreateModal.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityDeleteConfirmDialog.tsx](<../../../apps/product/src/features/activities/components/ActivityDeleteConfirmDialog.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityIcon.tsx](<../../../apps/product/src/features/activities/components/ActivityIcon.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityQuickSelector.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityRenameModal.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/CategoryAppearanceMenuItems.tsx](<../../../apps/product/src/features/activities/components/CategoryAppearanceMenuItems.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/CategoryRenameModal.tsx](<../../../apps/product/src/features/activities/components/CategoryRenameModal.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/GlobalActivityCreateModal.tsx](<../../../apps/product/src/features/activities/components/GlobalActivityCreateModal.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/GlobalActivityRenameModal.tsx](<../../../apps/product/src/features/activities/components/GlobalActivityRenameModal.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/GlobalCategoryRenameModal.tsx](<../../../apps/product/src/features/activities/components/GlobalCategoryRenameModal.tsx>) | feature: activities |
 
 </details>
 
 <details>
-<summary>test の候補（25）</summary>
+<summary>test の候補（23）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
-| [apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.test.tsx](<../../../apps/product/src/features/review/components/detail/ConnectedReportDetailPanel.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/detail/ReportDetailPanel.test.tsx](<../../../apps/product/src/features/review/components/detail/ReportDetailPanel.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportHeader.test.tsx](<../../../apps/product/src/features/review/components/layout/ReportHeader.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/layout/ReportMobileHeader.test.tsx](<../../../apps/product/src/features/review/components/layout/ReportMobileHeader.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/ExecutionChapter.test.tsx](<../../../apps/product/src/features/review/components/report/chapters/ExecutionChapter.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/chapters/QualityChapter.test.tsx](<../../../apps/product/src/features/review/components/report/chapters/QualityChapter.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/report/ReportBody.test.tsx](<../../../apps/product/src/features/review/components/report/ReportBody.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterDrawer.test.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterDrawer.test.tsx>) | feature: review |
-| [apps/product/src/features/review/components/sidebar/ReportFilterList.test.tsx](<../../../apps/product/src/features/review/components/sidebar/ReportFilterList.test.tsx>) | feature: review |
-| [apps/product/src/features/review/domain/report/duration-distribution.test.ts](<../../../apps/product/src/features/review/domain/report/duration-distribution.test.ts>) | feature: review |
-| [apps/product/src/features/review/domain/report/format-duration.test.ts](<../../../apps/product/src/features/review/domain/report/format-duration.test.ts>) | feature: review |
-| [apps/product/src/features/review/domain/report/report-view-model.test.ts](<../../../apps/product/src/features/review/domain/report/report-view-model.test.ts>) | feature: review |
-| [apps/product/src/features/review/hooks/useReviewOpenedTracking.test.tsx](<../../../apps/product/src/features/review/hooks/useReviewOpenedTracking.test.tsx>) | feature: review |
-| [apps/product/src/features/review/lib/report-mobile-period-label.test.ts](<../../../apps/product/src/features/review/lib/report-mobile-period-label.test.ts>) | feature: review |
-| [apps/product/src/features/review/lib/report-period-time-of-day.test.ts](<../../../apps/product/src/features/review/lib/report-period-time-of-day.test.ts>) | feature: review |
-| [apps/product/src/features/review/lib/report-period.test.ts](<../../../apps/product/src/features/review/lib/report-period.test.ts>) | feature: review |
-| [apps/product/src/features/review/lib/report-tab.test.ts](<../../../apps/product/src/features/review/lib/report-tab.test.ts>) | feature: review |
-| [apps/product/src/features/review/server/report-aggregation-service.test.ts](<../../../apps/product/src/features/review/server/report-aggregation-service.test.ts>) | feature: review |
-| [apps/product/src/features/review/server/report-detail-service.test.ts](<../../../apps/product/src/features/review/server/report-detail-service.test.ts>) | feature: review |
-| [apps/product/src/features/review/server/router.test.ts](<../../../apps/product/src/features/review/server/router.test.ts>) | feature: review |
-| [apps/product/src/features/review/stores/useReportDetailStore.test.ts](<../../../apps/product/src/features/review/stores/useReportDetailStore.test.ts>) | feature: review |
-| [apps/product/src/features/review/stores/useReportViewStore.test.ts](<../../../apps/product/src/features/review/stores/useReportViewStore.test.ts>) | feature: review |
-| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/report |
+| [apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx](<../../../apps/product/src/features/activities/components/activity-summary/ActivitySummaryPanel.test.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx](<../../../apps/product/src/features/activities/components/ActivityQuickSelector.test.tsx>) | feature: activities |
+| [apps/product/src/features/activities/components/ActivityRenameModal.test.tsx](<../../../apps/product/src/features/activities/components/ActivityRenameModal.test.tsx>) | feature: activities |
+| [apps/product/src/features/activities/domain/activity-tree-cache.test.ts](<../../../apps/product/src/features/activities/domain/activity-tree-cache.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/hooks/activities-cache.test.ts](<../../../apps/product/src/features/activities/hooks/activities-cache.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/lib/rolling-calendar-range.test.ts](<../../../apps/product/src/features/activities/lib/rolling-calendar-range.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/server/activities-query-service.test.ts](<../../../apps/product/src/features/activities/server/activities-query-service.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/server/activity-summary-service.test.ts](<../../../apps/product/src/features/activities/server/activity-summary-service.test.ts>) | feature: activities |
+| [apps/product/src/features/activities/server/router.test.ts](<../../../apps/product/src/features/activities/server/router.test.ts>) | feature: activities |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 
 </details>
 
@@ -1399,7 +1324,7 @@ graph LR
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
-| [docs/product/specs/review.md](<../../product/specs/review.md>) | frontmatter code: review |
+| [docs/product/specs/activities.md](<../../product/specs/activities.md>) | frontmatter code: activities |
 
 </details>
 
@@ -1409,7 +1334,7 @@ graph LR
 
 タイムブロックをクリックした時に開く詳細パネル
 
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity)
+依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Activity](#concept-activity) / [Activity details](#concept-activity-details)
 
 ```mermaid
 graph LR
@@ -1494,7 +1419,7 @@ graph LR
 | Story | [Product/Features/Timeblock/TimeblockEditor](<../../../apps/product/src/features/timeblock/components/editor/TimeblockEditor.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRecordActions](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRecordActions.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Timeblock/TimeblockRelationshipSection](<../../../apps/product/src/features/timeblock/components/editor/TimeblockRelationshipSection.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 
 <details>
 <summary>UI の候補（20）</summary>
@@ -1526,7 +1451,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（82）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1590,17 +1515,20 @@ graph LR
 | [apps/product/src/features/timeblock/server/timeblock-review-client.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-review-client.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/server/timeblock-search-query.test.ts](<../../../apps/product/src/features/timeblock/server/timeblock-search-query.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts](<../../../apps/product/src/features/timeblock/stores/useTimeblockInspectorStore.test.ts>) | feature: timeblock |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts](<../../../apps/product/src/lib/test/integration/activity-assignment-guards.integration.test.ts>) | DB 関数: create_plan_command_v1 / DB 関数: record_plan_command_v1 / DB 関数: update_plan_command_v1 |
 | [apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-mutation-foundation.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 |
 | [apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts](<../../../apps/product/src/lib/test/integration/mcp-plan-create-apply.integration.test.ts>) | DB 関数: apply_mcp_plan_create_v1 / DB 関数: create_plan_command_v1 / DB 関数: delete_plan_command_v1 |
@@ -1852,7 +1780,7 @@ graph LR
 | tRPC procedure | [externalCalendar.syncNow](<../../../apps/product/src/features/external-calendar/server/router.ts>) | feature 経由 |
 | tRPC procedure | [externalCalendar.updateSelectedCalendars](<../../../apps/product/src/features/external-calendar/server/router.ts>) | feature 経由 |
 | Story | [Product/Features/ExternalCalendar/GoogleCalendarSettings](<../../../apps/product/src/features/external-calendar/components/GoogleCalendarSettingsView.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 | route | [/\[locale\]/settings/\[category\]](<../../../apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx>) | feature 経由 |
 
 <details>
@@ -1867,7 +1795,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（37）</summary>
+<summary>test の候補（42）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1887,23 +1815,28 @@ graph LR
 | [apps/product/src/features/external-calendar/server/revoke-outbox.test.ts](<../../../apps/product/src/features/external-calendar/server/revoke-outbox.test.ts>) | feature: external-calendar |
 | [apps/product/src/features/external-calendar/server/router.test.ts](<../../../apps/product/src/features/external-calendar/server/router.test.ts>) | feature: external-calendar |
 | [apps/product/src/features/external-calendar/server/sync-dispatcher.test.ts](<../../../apps/product/src/features/external-calendar/server/sync-dispatcher.test.ts>) | feature: external-calendar |
+| [apps/product/src/features/external-calendar/server/sync-rate-limit.test.ts](<../../../apps/product/src/features/external-calendar/server/sync-rate-limit.test.ts>) | feature: external-calendar |
 | [apps/product/src/features/external-calendar/server/sync-schedule.test.ts](<../../../apps/product/src/features/external-calendar/server/sync-schedule.test.ts>) | feature: external-calendar |
 | [apps/product/src/features/external-calendar/server/sync-service.test.ts](<../../../apps/product/src/features/external-calendar/server/sync-service.test.ts>) | feature: external-calendar |
 | [apps/product/src/features/external-calendar/server/token-crypto.test.ts](<../../../apps/product/src/features/external-calendar/server/token-crypto.test.ts>) | feature: external-calendar |
 | [apps/product/src/features/external-calendar/server/token-rotation.test.ts](<../../../apps/product/src/features/external-calendar/server/token-rotation.test.ts>) | feature: external-calendar |
-| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/settings/[category] |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] / 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] / 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/consent-ical.spec.ts](<../../../apps/product/src/lib/test/e2e/consent-ical.spec.ts>) | 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/calendar-revoke-authority.integration.test.ts](<../../../apps/product/src/lib/test/integration/calendar-revoke-authority.integration.test.ts>) | DB 関数: get_calendar_authority_readiness_v1 |
 | [apps/product/src/lib/test/integration/calendar-sync-writer.integration.test.ts](<../../../apps/product/src/lib/test/integration/calendar-sync-writer.integration.test.ts>) | DB 関数: begin_calendar_sync_run_v1 / DB 関数: finish_calendar_sync_run_v1 / DB 関数: persist_calendar_sync_result_command_v1 |
 | [apps/product/src/lib/test/integration/external-authority-maintenance.integration.test.ts](<../../../apps/product/src/lib/test/integration/external-authority-maintenance.integration.test.ts>) | DB 関数: claim_calendar_revoke_outbox_v1 / DB 関数: complete_calendar_revoke_outbox_v1 / DB 関数: expire_calendar_revoke_outbox_v1 / DB 関数: get_external_lifecycle_app_version_v2 / DB 関数: retry_calendar_revoke_outbox_v1 |
@@ -1913,15 +1846,55 @@ graph LR
 </details>
 
 <details>
-<summary>docs の候補（4）</summary>
+<summary>docs の候補（5）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
 | --- | --- |
 | [docs/operations/calendar-integration-rehearsal.md](<../../operations/calendar-integration-rehearsal.md>) | frontmatter code: external-calendar |
 | [docs/operations/google-oauth-verification.md](<../../operations/google-oauth-verification.md>) | frontmatter code: external-calendar |
+| [docs/operations/supabase-rate-limit-poc.md](<../../operations/supabase-rate-limit-poc.md>) | frontmatter code: external-calendar |
 | [docs/product/specs/auth.md](<../../product/specs/auth.md>) | frontmatter code: external-calendar |
 | [docs/product/specs/external-calendar.md](<../../product/specs/external-calendar.md>) | frontmatter code: external-calendar |
+
+</details>
+
+<a id="concept-mcp-review"></a>
+
+### MCP review.get（`mcp-review`）
+
+公開済みの read-only MCP 契約。product のアクティビティ詳細とは独立して維持する
+
+```mermaid
+graph LR
+  concept(["MCP review.get<br/>mcp-review"])
+  mcp_tool_review_get["MCP tool<br/>review.get"]
+  concept --> mcp_tool_review_get
+```
+
+<!-- prettier-ignore -->
+| 種別 | 項目 | 経路 |
+| --- | --- | --- |
+| MCP tool | [review.get](<../../../apps/product/src/app/api/mcp/_tools/registry.ts>) | 直接 |
+
+<details>
+<summary>UI の候補（0）</summary>
+
+既存の対応情報からは候補を発見できませんでした。未使用・検証不要という意味ではありません。
+
+</details>
+
+<details>
+<summary>test の候補（0）</summary>
+
+既存の対応情報からは候補を発見できませんでした。未使用・検証不要という意味ではありません。
+
+</details>
+
+<details>
+<summary>docs の候補（0）</summary>
+
+既存の対応情報からは候補を発見できませんでした。未使用・検証不要という意味ではありません。
 
 </details>
 
@@ -2057,7 +2030,7 @@ graph LR
 
 カレンダー画面そのものを組み立てる区画。表示モード・ナビゲーション・絞り込み・DnD・作成 UI を持ち、時間の中身は timeblock feature が持つ
 
-依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Timeblock](#concept-timeblock) / [Plan](#concept-plan) / [Record](#concept-record) / [Activity](#concept-activity) / [Plan template](#concept-plan-template) / [Inspector](#concept-inspector) / [External calendar event](#concept-external-event)
+依存先の概念（実 import に基づく。DB・API 等は各概念から辿る）: [Timeblock](#concept-timeblock) / [Plan](#concept-plan) / [Record](#concept-record) / [Activity](#concept-activity) / [Plan template](#concept-plan-template) / [Activity details](#concept-activity-details) / [Inspector](#concept-inspector) / [External calendar event](#concept-external-event)
 
 ```mermaid
 graph LR
@@ -2115,7 +2088,7 @@ graph LR
 | i18n namespace | [calendar](<../../../apps/product/messages/en/calendar.json>) | 直接 |
 
 <details>
-<summary>UI の候補（59）</summary>
+<summary>UI の候補（60）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2123,6 +2096,7 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/ActivityDragContext.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityDragContext.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/components/ActivityDetailsMenuItem.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityDetailsMenuItem.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ActivityRow.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRow.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/ArchivedActivityList.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ArchivedActivityList.tsx>) | feature: calendar |
@@ -2183,7 +2157,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（95）</summary>
+<summary>test の候補（100）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2192,6 +2166,8 @@ graph LR
 | [apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drag.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/activity-drop-target.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/ActivityFilterList.deletion.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityChipRow/ActivityChipRow.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/ActivityRowMenu.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx](<../../../apps/product/src/features/calendar/components/activity-filter/components/CategoryCreateDialog.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/hooks/useActivityQuickCreate.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts](<../../../apps/product/src/features/calendar/components/activity-filter/sort-activities.test.ts>) | feature: calendar |
@@ -2224,15 +2200,19 @@ graph LR
 | [apps/product/src/features/calendar/components/views/shared/hooks/useContainerHeight.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useContainerHeight.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTime.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTime.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTimeLine.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useCurrentTimeLine.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/hooks/useMultiDayTimeblockPositions.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useMultiDayTimeblockPositions.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useResponsiveHourHeight.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useResponsiveHourHeight.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useScrollableCalendar.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useScrollableCalendar.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/hooks/useScrollTimeblockIntoView.test.tsx](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useScrollTimeblockIntoView.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/hooks/useTimeblocksByDate.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useTimeblocksByDate.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/hooks/useViewTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/hooks/useViewTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/dateHelpers.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/dateHelpers.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/getTodayIndex.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/getTodayIndex.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/interactionHelpers.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/interactionHelpers.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/utils/timeblockSorting.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/utils/timeblockSorting.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/components/MobileWeekLaneSwitcher.test.tsx](<../../../apps/product/src/features/calendar/components/views/WeekView/components/MobileWeekLaneSwitcher.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.test.tsx](<../../../apps/product/src/features/calendar/components/views/WeekView/components/WeekGrid.test.tsx>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/WeekView/hooks/useWeekTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/hooks/useWeekTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/useWeekTimeblocks.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/useWeekTimeblocks.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/WeekView/utils/weekTimeblockPosition.test.ts](<../../../apps/product/src/features/calendar/components/views/WeekView/utils/weekTimeblockPosition.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/domain/activity-visibility.test.ts](<../../../apps/product/src/features/calendar/domain/activity-visibility.test.ts>) | feature: calendar |
@@ -2268,7 +2248,6 @@ graph LR
 | [apps/product/src/features/calendar/lib/grid.test.ts](<../../../apps/product/src/features/calendar/lib/grid.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/layout.test.ts](<../../../apps/product/src/features/calendar/lib/layout.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/overlap.test.ts](<../../../apps/product/src/features/calendar/lib/overlap.test.ts>) | feature: calendar |
-| [apps/product/src/features/calendar/lib/panel-url.test.ts](<../../../apps/product/src/features/calendar/lib/panel-url.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/plan-data-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/plan-data-adapter.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/record-event-adapter.test.ts](<../../../apps/product/src/features/calendar/lib/record-event-adapter.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts](<../../../apps/product/src/features/calendar/lib/remaining-day-minutes.test.ts>) | feature: calendar |
@@ -2377,8 +2356,7 @@ graph LR
 | Story | [Product/Features/Settings/PasswordChangeDialog](<../../../apps/product/src/features/settings/components/PasswordChangeDialog.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/SettingsDialog](<../../../apps/product/src/features/settings/components/SettingsDialog.stories.tsx>) | feature 経由 |
 | Story | [Product/Features/Settings/SettingsSidebar](<../../../apps/product/src/features/settings/components/SettingsSidebar.stories.tsx>) | feature 経由 |
-| route | [/\[locale\]/calendar](<../../../apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx>) | feature 経由 |
-| route | [/\[locale\]/report](<../../../apps/product/src/app/[locale]/(app)/(workspace)/report/page.tsx>) | feature 経由 |
+| route | [/\[locale\]](<../../../apps/product/src/app/[locale]/(app)/(workspace)/page.tsx>) | feature 経由 |
 | route | [/\[locale\]/settings](<../../../apps/product/src/app/[locale]/(app)/settings/page.tsx>) | feature 経由 |
 | route | [/\[locale\]/settings/\[category\]](<../../../apps/product/src/app/[locale]/(app)/settings/[category]/page.tsx>) | feature 経由 |
 | i18n namespace | [settings](<../../../apps/product/messages/en/settings.json>) | 直接 |
@@ -2415,7 +2393,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（63）</summary>
+<summary>test の候補（68）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2441,6 +2419,7 @@ graph LR
 | [apps/product/src/features/settings/hooks/useDateFormat.test.ts](<../../../apps/product/src/features/settings/hooks/useDateFormat.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useMFA.test.ts](<../../../apps/product/src/features/settings/hooks/useMFA.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts](<../../../apps/product/src/features/settings/hooks/useStableBillingOperation.test.ts>) | feature: settings |
+| [apps/product/src/features/settings/hooks/useTrialEndedDialog.test.ts](<../../../apps/product/src/features/settings/hooks/useTrialEndedDialog.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useTrialEndedDialog.test.tsx](<../../../apps/product/src/features/settings/hooks/useTrialEndedDialog.test.tsx>) | feature: settings |
 | [apps/product/src/features/settings/hooks/useUserSettings.test.ts](<../../../apps/product/src/features/settings/hooks/useUserSettings.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/lib/billing-operation.test.ts](<../../../apps/product/src/features/settings/lib/billing-operation.test.ts>) | feature: settings |
@@ -2462,20 +2441,24 @@ graph LR
 | [apps/product/src/features/settings/server/recovery-code-actions.test.ts](<../../../apps/product/src/features/settings/server/recovery-code-actions.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/settings-service.test.ts](<../../../apps/product/src/features/settings/server/settings-service.test.ts>) | feature: settings |
 | [apps/product/src/features/settings/server/signup-analytics-claim-service.test.ts](<../../../apps/product/src/features/settings/server/signup-analytics-claim-service.test.ts>) | feature: settings |
-| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale]/report / 画面: /[locale]/settings/[category] |
-| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/a11y.spec.ts](<../../../apps/product/src/lib/test/e2e/a11y.spec.ts>) | 画面: /[locale] / 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/account-deletion.spec.ts](<../../../apps/product/src/lib/test/e2e/account-deletion.spec.ts>) | 画面: /[locale] / 画面: /[locale]/settings/[category] |
 | [apps/product/src/lib/test/e2e/billing.spec.ts](<../../../apps/product/src/lib/test/e2e/billing.spec.ts>) | 画面: /[locale]/settings/[category] |
-| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/report |
-| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale]/calendar / 画面: /[locale]/settings |
-| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale]/calendar |
-| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale]/calendar |
+| [apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-initial-load.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/calendar-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/calendar-navigation.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/consent-ical.spec.ts](<../../../apps/product/src/lib/test/e2e/consent-ical.spec.ts>) | 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/critical-path.spec.ts>) | 画面: /[locale]/settings/[category] |
+| [apps/product/src/lib/test/e2e/deep-link.spec.ts](<../../../apps/product/src/lib/test/e2e/deep-link.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts](<../../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/http-csrf.spec.ts](<../../../apps/product/src/lib/test/e2e/http-csrf.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/mobile-critical-path.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-critical-path.spec.ts>) | 画面: /[locale]/settings |
+| [apps/product/src/lib/test/e2e/mobile-navigation.spec.ts](<../../../apps/product/src/lib/test/e2e/mobile-navigation.spec.ts>) | 画面: /[locale] / 画面: /[locale]/settings |
+| [apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts](<../../../apps/product/src/lib/test/e2e/plan-record-timeblock.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/pwa/pwa.spec.ts](<../../../apps/product/src/lib/test/e2e/pwa/pwa.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/smoke.spec.ts](<../../../apps/product/src/lib/test/e2e/smoke.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-conflict.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-drag-move.spec.ts>) | 画面: /[locale] |
+| [apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts](<../../../apps/product/src/lib/test/e2e/timeblock-inspector-toggle.spec.ts>) | 画面: /[locale] |
 | [apps/product/src/lib/test/integration/account-deletion-gate-concurrency.integration.test.ts](<../../../apps/product/src/lib/test/integration/account-deletion-gate-concurrency.integration.test.ts>) | DB 関数: claim_billing_customer_provisioning_v2 / DB 関数: claim_billing_mutation_v3 / DB 関数: cleanup_billing_account_deletion_terminal_receipts_v2 / DB 関数: start_billing_customer_provisioning_v2 |
 | [apps/product/src/lib/test/integration/account-deletion-gate.integration.test.ts](<../../../apps/product/src/lib/test/integration/account-deletion-gate.integration.test.ts>) | DB 関数: abandon_billing_customer_provisioning_v2 / DB 関数: claim_billing_customer_provisioning_v2 / DB 関数: claim_billing_mutation_v3 / DB 関数: cleanup_billing_account_deletion_terminal_receipts_v2 / DB 関数: cleanup_billing_mutation_claims_v2 / DB 関数: complete_billing_customer_provisioning_v2 / DB 関数: get_account_deletion_customer_recovery_v1 / DB 関数: get_account_deletion_readiness_v1 / DB 関数: reconcile_billing_mutation_v4 / DB 関数: start_billing_customer_provisioning_v2 / DB 関数: start_billing_mutation_v2 / DB 関数: sync_billing_subscription_deleted_v1 |
 | [apps/product/src/lib/test/integration/billing-customer-event-classification.integration.test.ts](<../../../apps/product/src/lib/test/integration/billing-customer-event-classification.integration.test.ts>) | DB 関数: classify_billing_customer_event_v1 |
@@ -2664,9 +2647,10 @@ graph LR
 どの概念からも辿れず、かつ「語彙を持たない層」にも当たらない項目。
 用語集へ 1 行足すか、実装を消すかを人間が判断する。
 
-| 種別          | 項目            | 発見元                                         | 補足 |
-| ------------- | --------------- | ---------------------------------------------- | ---- |
-| Zustand store | `useShellStore` | `apps/product/src/lib/stores/useShellStore.ts` | —    |
+| 種別          | 項目                     | 発見元                                                  | 補足 |
+| ------------- | ------------------------ | ------------------------------------------------------- | ---- |
+| Zustand store | `useActivityDetailStore` | `apps/product/src/lib/stores/useActivityDetailStore.ts` | —    |
+| Zustand store | `useShellStore`          | `apps/product/src/lib/stores/useShellStore.ts`          | —    |
 
 ## 語彙を持たない層（意図的）
 
@@ -2682,6 +2666,6 @@ graph LR
 | feature 横断の基盤（lib 層）。特定の概念には属さない                           | DB 関数        | 4    | `claim_posthog_first_paid_invoice_v1`, `exchange_oauth_authorization_code_v2`, `get_external_lifecycle_app_version_v3`, `rotate_oauth_refresh_token_v2`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | SQL 内部でのみ使う（trigger / cron / 他の SQL 関数）。app からの呼び出しが無い | DB 関数        | 58   | `abandon_billing_customer_provisioning_v1`, `apply_undo_receipt_v1`, `assert_active_timeblock_activity_v1`, `assert_timeblock_content_v1`, `assert_timeblock_external_event_v1`, `authorize_owned_storage_read_v1`, `authorize_owned_storage_write_v1`, `cancel_calendar_account_deletion_v1`, `claim_billing_customer_provisioning_v1`, `claim_billing_mutation_v2`, `claim_calendar_revoke_direct_attempt_v1`, `claim_calendar_revoke_outbox_v2`, `cleanup_billing_mutation_claims_v1`, `cleanup_calendar_authority_retention_v1`, `cleanup_calendar_revoke_operations_v1`, `cleanup_integration_security_events_v1`, `cleanup_mcp_mutation_receipts_v1`, `cleanup_oauth_access_tokens_v1`, `cleanup_oauth_authorization_codes_v1`, `cleanup_oauth_connections_v1`, `cleanup_oauth_refresh_tokens_v1`, `complete_billing_customer_provisioning_v1`, `confirm_day_plans_to_records`, `custom_access_token_hook`, `delete_all_user_data_command_v3`, `delete_all_user_data_command_v4`, `disconnect_calendar_connection_command_v1`, `ensure_mcp_integration_environment_identity_v1`, `expire_calendar_revoke_authority_v2`, `expire_calendar_revoke_authority_v3`, `finalize_calendar_revoke_attempt_v2`, `finalize_calendar_revoke_guards_v1`, `get_external_lifecycle_app_version_v1`, `get_user_data_generation_v1`, `get_user_timezone`, `issue_oauth_token_pair`, `list_undoable_receipts_v1`, `lock_recordable_plan_v1`, `mark_calendar_connection_reauth_command_v3`, `prepare_calendar_token_rotation_recovery_command_v2`, `provision_calendar_authority_project_v1`, `provision_mcp_preview_environment_identity_v1`, `reconcile_billing_mutation_v2`, `reconcile_billing_mutation_v3`, `record_undo_receipt_v1`, `restore_plan`, `restore_record`, `rotate_or_enqueue_calendar_refresh_token_command_v3`, `save_calendar_connection_command_v1`, `set_mcp_billing_enforcement_v1`, `set_mcp_client_write_control_v1`, `set_mcp_mutation_control_v1`, `set_plan_skipped_command_v1`, `soft_delete_plan`, `soft_delete_record`, `start_billing_customer_provisioning_v1`, `trunc_week_tz`, `vault_secret_exists` |
 | feature 横断の基盤（app 層）。特定の概念には属さない                           | DB 関数        | 12   | `begin_account_deletion_v1`, `bind_billing_account_deletion_v1`, `bind_calendar_account_deletion_v1`, `claim_account_deletion_step_v1`, `claim_stripe_webhook_event`, `complete_account_deletion_step_v1`, `create_oauth_authorization_grant_v2`, `get_external_authority_maintenance_status_v1`, `list_expired_calendar_account_deletion_intents_v1`, `normalize_calendar_account_deletion_intent_v1`, `seal_account_deletion_v1`, `seal_billing_account_deletion_v1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| feature に属さない共通 UI（`components` / `app` / `emails`）の Story           | Story          | 24   | `Product/Components/Display/LabeledRow`, `Product/Components/Display/SectionCard`, `Product/Components/Feedback/EmptyState`, `Product/Components/Feedback/ErrorBoundary`, `Product/Components/Feedback/ErrorState`, `Product/Components/Feedback/Toast`, `Product/Components/Inputs/AvatarUpload`, `Product/Components/Inputs/MiniCalendar`, `Product/Components/Navigation/DateNavigator`, `Product/Components/Overlays/ConfirmDialog`, `Product/Components/Overlays/DestructiveFormDialog`, `Product/Components/Overlays/ShortcutCheatSheetDialog`, `Product/Components/Shell/AnimatedWidthPanel`, `Product/Components/Shell/AppHeader`, `Product/Components/Shell/CookieConsentBanner`, `Product/Components/Shell/InstallBanner`, `Product/Components/Shell/IOSInstallGuide`, `Product/Components/Shell/MobileAccountButton`, `Product/Components/Shell/Sidebar/Container`, `Product/Components/Shell/Sidebar/IconButton`, `Product/Components/Shell/Sidebar/Section`, `Product/Components/Shell/Sidebar/UserMenu`, `Product/Components/Shell/WorkspaceTabs`, `Product/Emails`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 認証 / OAuth の定型フローと shell。製品語彙ではなく手続きの画面                | route          | 10   | `/[locale]`, `/[locale]/auth`, `/[locale]/auth/confirmed`, `/[locale]/auth/login`, `/[locale]/auth/password`, `/[locale]/auth/session-error`, `/[locale]/auth/signup`, `/[locale]/oauth/authorize`, `/[locale]/oauth/consent`, `/offline`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| feature に属さない共通 UI（`components` / `app` / `emails`）の Story           | Story          | 23   | `Product/Components/Display/LabeledRow`, `Product/Components/Display/SectionCard`, `Product/Components/Feedback/EmptyState`, `Product/Components/Feedback/ErrorBoundary`, `Product/Components/Feedback/ErrorState`, `Product/Components/Feedback/Toast`, `Product/Components/Inputs/AvatarUpload`, `Product/Components/Inputs/MiniCalendar`, `Product/Components/Navigation/DateNavigator`, `Product/Components/Overlays/ConfirmDialog`, `Product/Components/Overlays/DestructiveFormDialog`, `Product/Components/Overlays/ShortcutCheatSheetDialog`, `Product/Components/Shell/AnimatedWidthPanel`, `Product/Components/Shell/AppHeader`, `Product/Components/Shell/CookieConsentBanner`, `Product/Components/Shell/InstallBanner`, `Product/Components/Shell/IOSInstallGuide`, `Product/Components/Shell/MobileAccountButton`, `Product/Components/Shell/Sidebar/Container`, `Product/Components/Shell/Sidebar/IconButton`, `Product/Components/Shell/Sidebar/Section`, `Product/Components/Shell/Sidebar/UserMenu`, `Product/Emails`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 認証 / OAuth の定型フローと shell。製品語彙ではなく手続きの画面                | route          | 9    | `/[locale]/auth`, `/[locale]/auth/confirmed`, `/[locale]/auth/login`, `/[locale]/auth/password`, `/[locale]/auth/session-error`, `/[locale]/auth/signup`, `/[locale]/oauth/authorize`, `/[locale]/oauth/consent`, `/offline`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 画面横断の定型文言。特定の概念には属さない                                     | i18n namespace | 8    | `common`, `email`, `error`, `legal`, `navigation`, `oauth`, `shortcuts`, `sidebar`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |

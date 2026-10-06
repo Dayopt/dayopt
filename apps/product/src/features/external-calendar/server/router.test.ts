@@ -11,7 +11,7 @@ const disconnect = vi.hoisted(() => vi.fn());
 const listGhostEvents = vi.hoisted(() => vi.fn());
 const setEventDismissed = vi.hoisted(() => vi.fn());
 const syncConnection = vi.hoisted(() => vi.fn());
-const rateLimit = vi.hoisted(() => vi.fn());
+const calendarSyncRateLimit = vi.hoisted(() => vi.fn());
 const isBillingEnforced = vi.hoisted(() => vi.fn(() => false));
 const isGoogleCalendarConfigured = vi.hoisted(() => vi.fn());
 const resolveRedirectUri = vi.hoisted(() => vi.fn());
@@ -27,8 +27,10 @@ vi.mock('./sync-service', () => ({ syncConnection }));
 vi.mock('./event-query-service', () => ({ listGhostEvents }));
 vi.mock('./event-command-service', () => ({ setEventDismissed }));
 vi.mock('./google-oauth', () => ({ isGoogleCalendarConfigured, resolveRedirectUri }));
+vi.mock('./sync-rate-limit', () => ({
+  checkCalendarSyncNowRateLimit: calendarSyncRateLimit,
+}));
 vi.mock('@/lib/rate-limit/upstash', () => ({
-  calendarSyncNowRateLimit: { limit: rateLimit },
   // protectedProcedure が毎リクエスト参照する。ここでは常に成功させる。
   trpcUserRateLimit: { limit: vi.fn().mockResolvedValue({ success: true }) },
 }));
@@ -65,7 +67,7 @@ function caller(overrides: { requestStartedAt?: number } = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   isBillingEnforced.mockReturnValue(false);
-  rateLimit.mockResolvedValue({ success: true });
+  calendarSyncRateLimit.mockResolvedValue(true);
   syncConnection.mockResolvedValue({ outcome: 'synced', calendarsSynced: 1, calendarsFailed: 0 });
   listConnections.mockResolvedValue([]);
   getSyncStatus.mockResolvedValue({ connection: {}, calendars: [] });
@@ -143,7 +145,7 @@ describe('externalCalendarRouter — connection availability', () => {
 
 describe('externalCalendarRouter — syncNow rate limit', () => {
   it('超過で TOO_MANY_REQUESTS を返し、sync を呼ばない', async () => {
-    rateLimit.mockResolvedValue({ success: false });
+    calendarSyncRateLimit.mockResolvedValue(false);
 
     await expect(caller().syncNow({ connectionId: CONNECTION_ID })).rejects.toMatchObject({
       code: 'TOO_MANY_REQUESTS',
@@ -152,11 +154,14 @@ describe('externalCalendarRouter — syncNow rate limit', () => {
   });
 
   it('rate-limit サービス障害は SERVICE_UNAVAILABLE', async () => {
-    rateLimit.mockRejectedValue(new Error('upstash down'));
+    calendarSyncRateLimit.mockRejectedValue(
+      new Error('Supabase rate-limit service is unavailable'),
+    );
 
     await expect(caller().syncNow({ connectionId: CONNECTION_ID })).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
     });
+    expect(syncConnection).not.toHaveBeenCalled();
   });
 
   // tRPC route の maxDuration に対する予算を syncConnection へ渡す（#1965）。anchor は

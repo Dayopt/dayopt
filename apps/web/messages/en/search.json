@@ -16,6 +16,22 @@
     "toSelect": "to select",
     "toClose": "to close",
     "close": "Close search",
-    "poweredBy": "Powered by Dayopt Search"
+    "poweredBy": "Powered by Dayopt Search",
+    "page": {
+      "title": "Search Results",
+      "inputPlaceholder": "Enter search keywords...",
+      "submit": "Search",
+      "filterLabel": "Filter:",
+      "all": "All",
+      "resultCount": "Results for “{query}”: {count}",
+      "loading": "Searching...",
+      "updated": "Last updated: {date}",
+      "details": "View details →",
+      "emptyTitle": "No search results found",
+      "emptyDescription": "Try another keyword",
+      "clear": "Clear search",
+      "startTitle": "Start searching",
+      "startDescription": "Search across documentation and blog articles."
+    }
   }
 }

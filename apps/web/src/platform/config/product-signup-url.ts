@@ -20,3 +20,8 @@ export function productSignupUrl(
 
   return `${url.origin}/auth/signup`;
 }
+
+/** Login must use the same Product deployment as registration. */
+export function productLoginUrl(productOrigin?: string): string {
+  return new URL('/auth/login', productSignupUrl(productOrigin)).href;
+}

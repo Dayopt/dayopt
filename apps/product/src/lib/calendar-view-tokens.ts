@@ -1,5 +1,5 @@
 /**
- * `/calendar?view=` の正規トークン一覧（day / week / 2day〜7day）
+ * `/?view=` の正規トークン一覧（day / week / 2day〜7day）
  *
  * proxy.ts（Edge runtime）、`(workspace)/_server/calendar-page-params.ts`、
  * `features/calendar` の `CalendarNavigationContext.tsx` の3箇所が同じ集合を判定に使う。
@@ -20,7 +20,7 @@ const CALENDAR_VIEW_TOKENS = [
 
 const CALENDAR_VIEW_TOKEN_SET = new Set<string>(CALENDAR_VIEW_TOKENS);
 
-/** `view` の値が `/calendar?view=` の正規トークンかどうかを判定する。 */
+/** `view` の値がホームカレンダーの `?view=` の正規トークンかどうかを判定する。 */
 export function isValidCalendarViewToken(value: string): boolean {
   return CALENDAR_VIEW_TOKEN_SET.has(value);
 }

@@ -24,7 +24,8 @@ describe('Cloud Preview durable intent', () => {
     const a = make();
     const b = make();
     expect(a).toMatchObject({ request, sourceRunId: 36405214644, sourceAttempt: 1 });
-    expect(new Set([a.runId, a.userIds.desktop, a.userIds.mobile]).size).toBe(3);
+    expect(a.schemaVersion).toBe(2);
+    expect(new Set([a.runId, ...Object.values(a.userIds)]).size).toBe(4);
     expect(a.runId).not.toBe(b.runId);
     expect(a.userIds.desktop).not.toBe(b.userIds.desktop);
     expect(validateCloudIntent(a)).toEqual(a);
@@ -63,6 +64,20 @@ describe('Cloud Preview durable intent', () => {
       }),
     ).toThrow();
   });
+  it('keeps schema v1 recovery artifacts valid without adding an unplanned identity', () => {
+    const current = make();
+    const previous = validateCloudIntent({
+      ...current,
+      schemaVersion: 1,
+      userIds: { desktop: current.userIds.desktop, mobile: current.userIds.mobile },
+    });
+    expect(previous).toMatchObject({
+      schemaVersion: 1,
+      userIds: { desktop: current.userIds.desktop, mobile: current.userIds.mobile },
+    });
+    expect(previous.userIds).not.toHaveProperty('accountDeletion');
+    expect(() => validateCloudIntent({ ...previous, userIds: current.userIds })).toThrow();
+  });
   it('keeps retries separate even for the same workflow run', () => {
     const a = make();
     const b = createCloudIntent({ request, env: { ...env, GITHUB_RUN_ATTEMPT: '2' } });
@@ -70,5 +85,20 @@ describe('Cloud Preview durable intent', () => {
     expect(b.sourceAttempt).toBe(2);
     expect(b.runId).not.toBe(a.runId);
     expect(b.userIds.desktop).not.toBe(a.userIds.desktop);
+  });
+  it('preserves an exact merged Integration binding in the recovery intent', () => {
+    const mergeRequest = {
+      ...request,
+      mergedValidation: true,
+      mergeCommitSha: 'c'.repeat(40),
+    };
+    const mergedIntent = createCloudIntent({ request: mergeRequest, env });
+    expect(validateCloudIntent(mergedIntent)).toEqual(mergedIntent);
+    expect(() =>
+      validateCloudIntent({
+        ...mergedIntent,
+        request: { ...mergeRequest, mergeCommitSha: 'short' },
+      }),
+    ).toThrow();
   });
 });

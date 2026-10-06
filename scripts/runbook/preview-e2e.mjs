@@ -19,7 +19,11 @@ import {
   requireTrustedRecoverySource,
   writePreviewRunManifest,
 } from './preview-e2e-recovery.mjs';
-import { observePreviewReadiness, parsePreviewReadinessArgs } from './preview-readiness.mjs';
+import {
+  observePreviewCleanupReadiness,
+  observePreviewReadiness,
+  parsePreviewReadinessArgs,
+} from './preview-readiness.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -29,7 +33,9 @@ export function previewWorkerEnvironment(
   privateDir,
   evidenceDir,
   runId,
-  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  cloudUserIds = /** @type {{desktop: string, mobile: string, accountDeletion?: string} | undefined} */ (
+    undefined
+  ),
 ) {
   const result = { NODE_ENV: 'test', CI: '1' };
   for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'PNPM_HOME', 'PLAYWRIGHT_BROWSERS_PATH']) {
@@ -52,6 +58,9 @@ export function previewWorkerEnvironment(
           E2E_PREVIEW_CLOUD_INTENT: '1',
           E2E_PREVIEW_DESKTOP_USER_ID: cloudUserIds.desktop,
           E2E_PREVIEW_MOBILE_USER_ID: cloudUserIds.mobile,
+          ...(cloudUserIds.accountDeletion
+            ? { E2E_PREVIEW_DELETION_USER_ID: cloudUserIds.accountDeletion }
+            : {}),
         }
       : {}),
   };
@@ -147,7 +156,7 @@ function executePlaywright(env) {
  *   onStarted?: (started: { runId: string; evidenceDirectory: string }) => void,
  *   runDirectory?: string,
  *   runId?: string,
- *   cloudUserIds?: { desktop: string, mobile: string },
+ *   cloudUserIds?: { desktop: string, mobile: string, accountDeletion?: string },
  * }} options
  */
 export async function runPreviewE2E({
@@ -160,7 +169,9 @@ export async function runPreviewE2E({
   onStarted = () => {},
   runDirectory = undefined,
   runId = randomUUID(),
-  cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  cloudUserIds = /** @type {{desktop: string, mobile: string, accountDeletion?: string} | undefined} */ (
+    undefined
+  ),
 }) {
   if (!env.SUPABASE_SECRET_KEY?.trim())
     throw new Error('Nonproduction test credentials are required');
@@ -168,6 +179,7 @@ export async function runPreviewE2E({
     githubToken: env.GITHUB_TOKEN,
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    workflowSha: env.GITHUB_SHA,
   };
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(runId))
     throw new Error('Preview run identity is invalid');
@@ -232,13 +244,15 @@ export async function runPreviewE2E({
   } catch {
     failure = 'e2e-evidence-missing';
   }
-  if (cleanup.status !== 'clean' || cleanup.checked < 2) failure = 'cleanup-unconfirmed';
+  const expectedCleanupCount = cloudUserIds?.accountDeletion ? 3 : 2;
+  if (cleanup.status !== 'clean' || cleanup.checked < expectedCleanupCount)
+    failure = 'cleanup-unconfirmed';
   const passed =
     exitCode === 0 &&
     after !== null &&
     isPassingPreviewReport(report) &&
     cleanup.status === 'clean' &&
-    cleanup.checked >= 2;
+    cleanup.checked >= expectedCleanupCount;
   const result = {
     runId,
     status: passed ? 'passed' : 'failed',
@@ -305,7 +319,7 @@ if (isDirectExecution(import.meta.url)) {
       const result = await recoverPreviewE2ERun({
         runId: args[1],
         stateRoot,
-        observe: observePreviewReadiness,
+        observe: observePreviewCleanupReadiness,
         createAdmin: createPreviewAdmin,
       });
       console.log(JSON.stringify(result, null, 2));

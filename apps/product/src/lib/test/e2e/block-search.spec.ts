@@ -7,6 +7,7 @@ import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
+import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
 import { suppressConsentBanner } from './suppress-consent-banner';
 import { test } from './trpc-budget-fixture';
 
@@ -23,9 +24,9 @@ const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe
 
 const TIMEZONE = 'Asia/Tokyo';
 const TEST_RUN_ID = crypto.randomUUID();
-const TEST_USER_ID = crypto.randomUUID();
-const TEST_EMAIL = `block-search-${TEST_RUN_ID}@example.com`;
-const TEST_PASSWORD = 'test-password-123';
+let TEST_USER_ID: string;
+let TEST_EMAIL: string;
+let TEST_PASSWORD: string;
 const SEARCH_TOKEN = TEST_RUN_ID.slice(0, 8);
 const ACTIVITY_NAME = `Search activity ${SEARCH_TOKEN}`;
 const PLAN_NOTE = `Plan note ${SEARCH_TOKEN}`;
@@ -63,7 +64,7 @@ async function login(page: Page) {
   await page.locator('input[type="email"], input[name="email"]').first().fill(TEST_EMAIL);
   await page.locator('input[type="password"]').first().fill(TEST_PASSWORD);
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+  await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   // URL 遷移だけでは hydration 完了を保証しない。ショートカットは mount 時の
   // useEffect で registry へ登録されるため、grid の描画を待たずに Ctrl+K を
   // 押すとイベントが誰にも拾われず検索ダイアログが開かない。
@@ -80,27 +81,19 @@ describeWithEnv('Block search', () => {
   const planDate = offsetDateParam(14);
   const recordDate = offsetDateParam(-14);
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { error: authError } = await adminSupabase.auth.admin.createUser({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-      email_confirm: true,
-      user_metadata: { full_name: 'block search e2e' },
-    });
-    if (authError && !authError.message.includes('already exists'))
-      throw new Error(authError.message);
+    const user = await createScopedTestUser(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY!,
+      'block-search',
+      testInfo.project.name,
+    );
+    ({ userId: TEST_USER_ID, email: TEST_EMAIL, password: TEST_PASSWORD } = user);
 
-    await adminSupabase.from('profiles').upsert({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
     await adminSupabase.from('user_settings').upsert({
       user_id: TEST_USER_ID,
       timezone: TIMEZONE,
@@ -168,90 +161,86 @@ describeWithEnv('Block search', () => {
   });
 
   test.afterAll(async () => {
-    if (!adminSupabase) return;
-    await adminSupabase.from('records').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('plans').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('activities').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('categories').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('user_settings').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('profiles').delete().eq('id', TEST_USER_ID);
-    await adminSupabase.auth.admin.deleteUser(TEST_USER_ID);
+    if (!TEST_USER_ID) return;
+    await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, TEST_USER_ID);
   });
 
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
-  test('desktop shortcut・note/アクティビティ検索・Inspector遷移がつながる', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+  test(
+    'desktop shortcut・note/アクティビティ検索・Inspector遷移がつながる',
+    { tag: '@preview-e2e/product-search-desktop' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
 
-    await page.keyboard.press('Control+K');
-    const input = page.getByRole('combobox', { name: '予定と記録を検索' });
-    await input.fill(RECORD_NOTE);
-    await page.getByText(RECORD_NOTE).click();
-    await expect(input).toHaveCount(0);
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
-      .toBe(`record:${recordId}`);
-    expect(new URL(page.url()).searchParams.get('date')).toBe(recordDate);
-    await expect(
-      page
-        .locator('[data-calendar-grid][data-calendar-day-index="0"] [data-record-lane-card]', {
-          hasText: ACTIVITY_NAME,
-        })
-        .first(),
-    ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
+      await page.keyboard.press('Control+K');
+      const input = page.getByRole('combobox', { name: '予定と記録を検索' });
+      await input.fill(RECORD_NOTE);
+      await page.getByText(RECORD_NOTE).click();
+      await expect(input).toHaveCount(0);
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+        .toBe(`record:${recordId}`);
+      expect(new URL(page.url()).searchParams.get('date')).toBe(recordDate);
+      await expect(
+        page
+          .locator('[data-calendar-grid][data-calendar-day-index="0"] [data-record-lane-card]', {
+            hasText: ACTIVITY_NAME,
+          })
+          .first(),
+      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
 
-    // Inspectorを閉じた直後に同じblockを検索し直しても、close時のURL cleanupが
-    // 後着して再オープンを打ち消さない。
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
-    await page.getByRole('button', { name: 'ブロックを検索' }).first().click();
-    await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(RECORD_NOTE);
-    await page.getByText(RECORD_NOTE).click();
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
-      .toBe(`record:${recordId}`);
-    await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
+      // Inspectorを閉じた直後に同じblockを検索し直しても、close時のURL cleanupが
+      // 後着して再オープンを打ち消さない。
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
+      await page.getByRole('button', { name: 'タイムブロックを検索' }).first().click();
+      await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(RECORD_NOTE);
+      await page.getByText(RECORD_NOTE).click();
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+        .toBe(`record:${recordId}`);
+      await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
 
-    // 検索ダイアログが exit 中（DOM に残っている間）に Escape を押すと Radix の
-    // DismissableLayer がそれを消費し、Inspector は #2661 の意図どおり閉じない。
-    // 実際の導線と同じく、ダイアログが消えてから Inspector を閉じる（#2669）。
-    await expect(page.getByRole('combobox', { name: '予定と記録を検索' })).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
+      // 検索ダイアログが exit 中（DOM に残っている間）に Escape を押すと Radix の
+      // DismissableLayer がそれを消費し、Inspector は #2661 の意図どおり閉じない。
+      // 実際の導線と同じく、ダイアログが消えてから Inspector を閉じる（#2669）。
+      await expect(page.getByRole('combobox', { name: '予定と記録を検索' })).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'ブロックを検索' }).first().click();
-    await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
-    await expect(page.getByText(PLAN_NOTE)).toBeVisible();
-    await expect(page.getByText(RECORD_NOTE)).toBeVisible();
-    await page.getByText(PLAN_NOTE).click();
+      await page.getByRole('button', { name: 'タイムブロックを検索' }).first().click();
+      await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
+      await expect(page.getByText(PLAN_NOTE)).toBeVisible();
+      await expect(page.getByText(RECORD_NOTE)).toBeVisible();
+      await page.getByText(PLAN_NOTE).click();
 
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
-      .toBe(`plan:${planId}`);
-    expect(new URL(page.url()).searchParams.get('date')).toBe(planDate);
-    await expect(
-      page
-        .locator('[data-calendar-grid][data-calendar-day-index="0"] [data-plan-lane-card]', {
-          hasText: ACTIVITY_NAME,
-        })
-        .first(),
-    ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
-  });
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+        .toBe(`plan:${planId}`);
+      expect(new URL(page.url()).searchParams.get('date')).toBe(planDate);
+      await expect(
+        page
+          .locator('[data-calendar-grid][data-calendar-day-index="0"] [data-plan-lane-card]', {
+            hasText: ACTIVITY_NAME,
+          })
+          .first(),
+      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('region', { name: ACTIVITY_NAME })).toBeVisible();
+    },
+  );
 
   test(
     'mobileは展開mini calendarから検索を開ける',
-    { tag: '@mobile' },
+    { tag: ['@mobile', '@preview-e2e/product-search-mobile'] },
     async ({ page }, testInfo) => {
       test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 
       await page.getByRole('button', { name: 'カレンダーを開く' }).click();
-      await page.getByRole('button', { name: 'ブロックを検索' }).click();
+      await page.getByRole('button', { name: 'タイムブロックを検索' }).click();
       await page.getByRole('combobox', { name: '予定と記録を検索' }).fill(ACTIVITY_NAME);
 
       await expect(page.getByText(PLAN_NOTE)).toBeVisible();

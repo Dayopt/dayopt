@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './preview-access-fixture';
 
 import { resolveServiceRoleTarget } from '../service-role-target-guard';
 import {
@@ -32,15 +33,20 @@ async function loginAndNavigate(page: import('@playwright/test').Page) {
   await passwordInput.fill(testUser!.password);
   await submitButton.click();
 
-  await page.waitForURL(/\/calendar/i, { timeout: 15000 });
+  await page.waitForURL(/\/(?:ja\/?)?(?:\?.*)?$/i, { timeout: 15000 });
 }
 
 test.describe('Mobile Navigation', () => {
   test.skip(!SERVICE_ROLE_TARGET.safe, SERVICE_ROLE_TARGET.safe ? '' : SERVICE_ROLE_TARGET.reason);
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     if (!SERVICE_ROLE_TARGET.safe) return;
-    testUser = await createScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, 'mobile-nav');
+    testUser = await createScopedTestUser(
+      SUPABASE_URL!,
+      SERVICE_ROLE_KEY!,
+      'mobile-nav',
+      testInfo.project.name,
+    );
   });
 
   test.afterAll(async () => {
@@ -50,7 +56,7 @@ test.describe('Mobile Navigation', () => {
 
   test(
     'settings route stays on mobile account page',
-    { tag: '@mobile' },
+    { tag: ['@mobile', '@preview-e2e/product-mobile-settings-navigation'] },
     async ({ page }, testInfo) => {
       test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 
@@ -99,28 +105,28 @@ test.describe('Mobile Navigation', () => {
 
   test(
     'account icon opens settings without rendering bottom tabs',
-    { tag: '@mobile' },
+    { tag: ['@mobile', '@preview-e2e/product-mobile-calendar-navigation'] },
     async ({ page }, testInfo) => {
       test.skip(!testInfo.project.name.includes('Mobile'), 'mobile-only');
 
       await loginAndNavigate(page);
-      await page.goto('/ja/calendar?view=day&date=2026-03-25');
+      await page.goto('/ja/?view=day&date=2026-03-25');
       await page.waitForLoadState('networkidle');
 
       const accountLink = page.getByRole('link', { name: 'アカウント' });
 
       await expect(accountLink).toHaveAttribute(
         'href',
-        '/ja/settings?returnTo=%2Fcalendar%3Fview%3Dday%26date%3D2026-03-25',
+        '/ja/settings?returnTo=%2F%3Fview%3Dday%26date%3D2026-03-25',
       );
 
       await accountLink.click();
       await expect(page).toHaveURL(
-        /\/ja\/settings\?returnTo=%2Fcalendar%3Fview%3Dday%26date%3D2026-03-25$/,
+        /\/ja\/settings\?returnTo=%2F%3Fview%3Dday%26date%3D2026-03-25$/,
       );
 
       await page.goBack();
-      await expect(page).toHaveURL(/\/ja\/calendar\?view=day&date=2026-03-25$/);
+      await expect(page).toHaveURL(/\/ja\/?\?view=day&date=2026-03-25$/);
     },
   );
 });

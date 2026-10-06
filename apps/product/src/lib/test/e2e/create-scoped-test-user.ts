@@ -1,72 +1,137 @@
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
+import { resolvePreviewCloudUserId } from '../preview-cloud-identity';
+import { recordPreviewUser } from '../preview-user-lifecycle';
 
-/**
- * spec ファイルごとに専用の使い捨て test user を service role で作成する。
- *
- * 旧実装は全 E2E spec が単一の `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`
- * （`scripts/ci/create-e2e-test-user.mjs` が発行）を共有していたため、
- * `workers` 並列実行下で procedures.ts の in-memory rate limiter（userId 単位
- * 300req/60s。#2669 までは 100）を spec 間で共有し、閾値超過で calendar data の取得が
- * timeout する不具合があった（#2246）。spec ごとに account を分離することで、
- * rate limit の予算も spec 単位に分離する。
- *
- * `block-search.spec.ts` 等が既に使う service-role seed パターンと同じ経路
- * （`supabase-js` の `auth.admin.createUser` + `profiles` upsert）を使う。
- * plan/record 等の重い fixture が要る spec は呼び出し元で追加で作る。
- */
+/** Local specs retain separate users. Cloud specs reuse the two preallocated IDs sequentially. */
 export interface ScopedTestUser {
   email: string;
   password: string;
   userId: string;
 }
 
-function createAdminClient(supabaseUrl: string, serviceRoleKey: string) {
-  return createClient<Database>(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+const CLOUD_SCOPES = new Set([
+  'auth',
+  'a11y',
+  'calendar-navigation',
+  'block-search',
+  'plan-record',
+  'deep-link',
+  'initial-load',
+  'derived-plan-record',
+  'conflict',
+  'drag-move',
+  'repro',
+  'mobile-nav',
+  'billing',
+]);
 
-/** scope（呼び出し元 spec 名）ごとに一意な email で test user を作成する。 */
+type AdminClient = ReturnType<typeof createClient<Database>>;
+const ownedUsers = new Map<string, { admin: AdminClient; key: string }>();
+
+/** scope + project select a reviewed allocation; no Cloud fallback to a random ID. */
 export async function createScopedTestUser(
   supabaseUrl: string,
   serviceRoleKey: string,
   scope: string,
+  project?: string,
 ): Promise<ScopedTestUser> {
-  const admin = createAdminClient(supabaseUrl, serviceRoleKey);
-  const runId = crypto.randomUUID();
-  const email = `e2e-${scope}-${runId}@example.com`;
-  const password = `E2e-${runId}`;
-
-  const { data, error: authError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: `e2e ${scope} user` },
-  });
-  if (authError || !data.user) {
-    throw new Error(authError?.message ?? `createUser failed for scope=${scope}`);
+  const prefix = project === 'Mobile Chrome' ? 'mobile-critical-path' : 'critical-path';
+  const cloudUserId = resolvePreviewCloudUserId(prefix);
+  if (
+    cloudUserId &&
+    (!CLOUD_SCOPES.has(scope) ||
+      !['chromium', 'Mobile Chrome'].includes(project ?? '') ||
+      !process.env.E2E_PREVIEW_EVIDENCE_DIR)
+  ) {
+    throw new Error('Preview Cloud scoped identity configuration is invalid');
   }
-  const userId = data.user.id;
-
-  const { error: profileError } = await admin.from('profiles').upsert({
-    id: userId,
-    email,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  const userId = cloudUserId ?? crypto.randomUUID();
+  const ownerKey = `${supabaseUrl}/${userId}`;
+  if (ownedUsers.has(ownerKey))
+    throw new Error('E2E synthetic user is still owned by another scope');
+  const nonce = crypto.randomUUID();
+  const email = cloudUserId
+    ? `${prefix}-${nonce}@example.com`
+    : `e2e-${scope}-${nonce}@example.com`;
+  const password = `E2e-${nonce}`;
+  const admin = createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
   });
-  if (profileError) throw new Error(profileError.message);
-
+  recordPreviewUser(userId, 'creating');
+  let created = false;
+  try {
+    const { data, error } = await admin.auth.admin.createUser({
+      id: userId,
+      email,
+      password,
+      email_confirm: true,
+      ...(cloudUserId ? { app_metadata: { e2e_run_id: process.env.E2E_PREVIEW_RUN_ID } } : {}),
+      user_metadata: { full_name: `e2e ${scope} user` },
+    });
+    created = !error && data.user?.id === userId;
+  } catch {
+    // Provider errors may contain credentials; only the durable state is retained.
+    created = false;
+  }
+  if (!created) {
+    recordPreviewUser(userId, 'creation-unconfirmed');
+    throw new Error('E2E synthetic user creation failed');
+  }
+  ownedUsers.set(ownerKey, { admin, key: serviceRoleKey });
+  recordPreviewUser(userId, 'created');
+  let profileReady = false;
+  try {
+    const { error } = await admin.from('profiles').upsert({
+      id: userId,
+      email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    profileReady = !error;
+  } catch {
+    profileReady = false;
+  }
+  if (!profileReady) {
+    await deleteScopedTestUser(supabaseUrl, serviceRoleKey, userId);
+    throw new Error('E2E synthetic profile setup failed');
+  }
   return { email, password, userId };
 }
 
-/** createScopedTestUser で作った user を service role で削除する。 */
+/** Only successfully created users owned by this target/client are eligible for cleanup. */
 export async function deleteScopedTestUser(
   supabaseUrl: string,
   serviceRoleKey: string,
   userId: string,
 ): Promise<void> {
-  const admin = createAdminClient(supabaseUrl, serviceRoleKey);
-  await admin.auth.admin.deleteUser(userId);
+  const ownerKey = `${supabaseUrl}/${userId}`;
+  const owned = ownedUsers.get(ownerKey);
+  if (!owned || owned.key !== serviceRoleKey) return;
+  const { admin } = owned;
+  const failures: string[] = [];
+  const operations = [
+    ['records', () => admin.from('records').delete().eq('user_id', userId)],
+    ['plans', () => admin.from('plans').delete().eq('user_id', userId)],
+    ['activities', () => admin.from('activities').delete().eq('user_id', userId)],
+    ['categories', () => admin.from('categories').delete().eq('user_id', userId)],
+    ['user_settings', () => admin.from('user_settings').delete().eq('user_id', userId)],
+    ['profiles', () => admin.from('profiles').delete().eq('id', userId)],
+    ['auth', () => admin.auth.admin.deleteUser(userId)],
+  ] as const;
+  for (const [table, remove] of operations) {
+    try {
+      const { error } = await remove();
+      if (error) failures.push(table);
+    } catch {
+      failures.push(table);
+    }
+  }
+  if (failures.length) {
+    recordPreviewUser(userId, 'cleanup-failed');
+    throw new Error(`E2E synthetic cleanup failed: ${failures.join(', ')}`);
+  }
+  recordPreviewUser(userId, 'deleted');
+  ownedUsers.delete(ownerKey);
 }

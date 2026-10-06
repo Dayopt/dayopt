@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { test } from './preview-access-fixture';
 
 import type { Database } from '@/lib/database';
 
@@ -7,6 +8,7 @@ import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
+import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -20,9 +22,9 @@ const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe
 
 const TIMEZONE = 'Asia/Tokyo';
 const TEST_RUN_ID = crypto.randomUUID();
-const TEST_USER_ID = crypto.randomUUID();
-const TEST_EMAIL = `plan-record-${TEST_RUN_ID}@example.com`;
-const TEST_PASSWORD = 'test-password-123';
+let TEST_USER_ID: string;
+let TEST_EMAIL: string;
+let TEST_PASSWORD: string;
 const TEST_ACTIVITY_NAME = `Plan Record E2E ${TEST_RUN_ID.slice(0, 8)}`;
 const PLAN_TITLE = `Plan ${TEST_RUN_ID.slice(0, 8)}`;
 const RECORD_TITLE = `Record ${TEST_RUN_ID.slice(0, 8)}`;
@@ -58,11 +60,11 @@ async function login(page: Page) {
   await page.locator('input[type="email"], input[name="email"]').first().fill(TEST_EMAIL);
   await page.locator('input[type="password"]').first().fill(TEST_PASSWORD);
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+  await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
 }
 
 async function openDay(page: Page, dateParam: string) {
-  await page.goto(`/ja/calendar?view=day&date=${dateParam}`);
+  await page.goto(`/ja/?view=day&date=${dateParam}`);
   await page.waitForLoadState('networkidle');
   await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
 }
@@ -74,28 +76,19 @@ describeWithEnv('Plan / Record Timeblock flow', () => {
   let adminSupabase: SupabaseClient;
   let recordId: string;
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { error: authError } = await adminSupabase.auth.admin.createUser({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-      email_confirm: true,
-      user_metadata: { full_name: 'plan record e2e' },
-    });
-    if (authError && !authError.message.includes('already exists')) {
-      throw new Error(authError.message);
-    }
+    const user = await createScopedTestUser(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY!,
+      'plan-record',
+      testInfo.project.name,
+    );
+    ({ userId: TEST_USER_ID, email: TEST_EMAIL, password: TEST_PASSWORD } = user);
 
-    await adminSupabase.from('profiles').upsert({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
     await adminSupabase.from('user_settings').upsert({
       user_id: TEST_USER_ID,
       timezone: TIMEZONE,
@@ -158,14 +151,8 @@ describeWithEnv('Plan / Record Timeblock flow', () => {
   });
 
   test.afterAll(async () => {
-    if (!adminSupabase) return;
-    await adminSupabase.from('records').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('plans').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('activities').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('categories').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('user_settings').delete().eq('user_id', TEST_USER_ID);
-    await adminSupabase.from('profiles').delete().eq('id', TEST_USER_ID);
-    await adminSupabase.auth.admin.deleteUser(TEST_USER_ID);
+    if (!TEST_USER_ID) return;
+    await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, TEST_USER_ID);
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -174,25 +161,36 @@ describeWithEnv('Plan / Record Timeblock flow', () => {
   });
 
   // lane カード（TwoLane/PlanLaneCard / RecordLaneCard）は title ではなくアクティビティ名を表示する
-  test('Plan と Record をそれぞれの Calendar 日付に表示する', async ({ page }) => {
-    await openDay(page, offsetDateParam(14));
-    await expect(
-      page.locator('[data-plan-lane-card]', { hasText: TEST_ACTIVITY_NAME }).first(),
-    ).toBeVisible({
-      timeout: 10_000,
-    });
+  test(
+    'Plan と Record をそれぞれの Calendar 日付に表示する',
+    { tag: '@preview-e2e/product-plan-record-calendar' },
+    async ({ page }) => {
+      await openDay(page, offsetDateParam(14));
+      await expect(
+        page.locator('[data-plan-lane-card]', { hasText: TEST_ACTIVITY_NAME }).first(),
+      ).toBeVisible({
+        timeout: 10_000,
+      });
 
-    await openDay(page, offsetDateParam(-14));
-    await expect(
-      page.locator('[data-record-lane-card]', { hasText: TEST_ACTIVITY_NAME }).first(),
-    ).toBeVisible({ timeout: 10_000 });
-  });
+      await openDay(page, offsetDateParam(-14));
+      await expect(
+        page.locator('[data-record-lane-card]', { hasText: TEST_ACTIVITY_NAME }).first(),
+      ).toBeVisible({ timeout: 10_000 });
+    },
+  );
 
-  test('Record の Inspector URL は record prefix を使う', async ({ page }) => {
-    await openDay(page, offsetDateParam(-14));
-    await page.locator('[data-record-lane-card]', { hasText: TEST_ACTIVITY_NAME }).first().click();
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('timeblock'))
-      .toBe(`record:${recordId}`);
-  });
+  test(
+    'Record の Inspector URL は record prefix を使う',
+    { tag: '@preview-e2e/product-record-inspector-url' },
+    async ({ page }) => {
+      await openDay(page, offsetDateParam(-14));
+      await page
+        .locator('[data-record-lane-card]', { hasText: TEST_ACTIVITY_NAME })
+        .first()
+        .click();
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('timeblock'))
+        .toBe(`record:${recordId}`);
+    },
+  );
 });

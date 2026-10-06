@@ -28,8 +28,7 @@ flowchart LR
 
 ## Dayopt ではどうなっているか
 
-- **カレンダーは server で先に取る**: `calendar/page.tsx` が `prefetchCalendarData` で Plan・Record・Google の予定・統計を取り、`HydrationBoundary` でブラウザの TanStack Query へ渡す。ブラウザは取り直さずに描ける。`export const dynamic = 'force-dynamic'` なので毎回 server で描く
-- **レポートは client で取る**: `/report` は server で先に取らず、ブラウザの hook が tRPC で取る → [経路: レポートを開く](journeys/report.md)
+- **カレンダーは server で先に取る**: `(workspace)/page.tsx` が `prefetchCalendarData` で Plan・Record・Google の予定・統計を取り、`HydrationBoundary` でブラウザの TanStack Query へ渡す。ブラウザは取り直さずに描ける。`export const dynamic = 'force-dynamic'` なので毎回 server で描く
 - **書き込みの hook は client**: `useTimeblockWriteMutations.ts` などは `'use client'`
 - **route handler は Node.js runtime**: `app/api/trpc/[trpc]/route.ts` などは `export const runtime = 'nodejs'` を明示している
 - **強い鍵の封じ込め**: service role の client を作る `lib/supabase/oauth.ts` と、セッションの server client `lib/supabase/server.ts` は先頭で `import 'server-only'` する。client component から import すると build が失敗するので、ブラウザの bundle に入らない。加えて Vercel の build の中で `check-client-bundle-secrets` が、client の bundle に secret の env 名や、Stripe・GitHub などの既知の値の接頭辞（`sk_live_`・`whsec_`・`ghp_` など）が混ざっていないかを検査する。実 env のある build なので、接頭辞を持つ値の漏れは捕まる。接頭辞の無い値（Supabase の secret key など）の漏れは、この検査では捕まらない
@@ -77,11 +76,11 @@ server 側の `prefetchCalendarData`（Plan・Record・Google の予定・統計
 ```json learn:refs
 [
   {
-    "path": "apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx",
+    "path": "apps/product/src/app/[locale]/(app)/(workspace)/page.tsx",
     "find": "export const dynamic = 'force-dynamic';"
   },
   {
-    "path": "apps/product/src/app/[locale]/(app)/(workspace)/calendar/page.tsx",
+    "path": "apps/product/src/app/[locale]/(app)/(workspace)/page.tsx",
     "find": "HydrationBoundary"
   },
   {

@@ -1,14 +1,15 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+import { resolveIsolatedServiceRoleTarget } from '../../isolated-service-role-target';
+import { cleanupIsolatedTestUser } from '../../isolated-user-cleanup';
 
 import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
 } from '../../service-role-target-guard';
-import {
-  createScopedTestUser,
-  deleteScopedTestUser,
-  type ScopedTestUser,
-} from '../create-scoped-test-user';
+import { createScopedTestUser, type ScopedTestUser } from '../create-scoped-test-user';
+import { createAdminSupabase } from '../critical-path-fixture';
+import { test as isolatedTest } from '../isolated-product-fixture';
+import { test } from '../preview-access-fixture';
 import { suppressConsentBanner } from '../suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,7 +19,11 @@ const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SERVICE_ROLE_
 // CI（E2E_REQUIRE_SERVICE_ROLE_SUITES=1）では skip を許さない。env が壊れて suite が
 // 丸ごと消えても「0 failed」で緑になるのを防ぐ。
 assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'PWA Service Worker');
-const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
+const isolatedTarget = resolveIsolatedServiceRoleTarget(SUPABASE_URL, SERVICE_ROLE_KEY);
+if (!process.env.E2E_PREVIEW_ORIGIN) {
+  assertServiceRoleSuiteRunnable(isolatedTarget, 'Isolated PWA Service Worker');
+}
+const describeWithEnv = isolatedTarget.safe ? isolatedTest.describe : isolatedTest.describe.skip;
 
 async function getRegisteredServiceWorker(page: Page): Promise<string | null> {
   return page.evaluate(async () => {
@@ -55,35 +60,49 @@ async function isOfflineFallbackReady(page: Page): Promise<boolean> {
   });
 }
 
-/** reload 後の document を Service Worker が制御しているか（= ブラウザのエラー画面ではない）。 */
-async function isControlledByServiceWorker(page: Page): Promise<boolean> {
-  return page.evaluate(
-    () => 'serviceWorker' in navigator && navigator.serviceWorker.controller !== null,
-  );
-}
-
 test.describe('PWA installability', () => {
-  test('exposes a valid web app manifest', async ({ page }) => {
-    await page.goto('/');
-
-    const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
-    expect(manifestHref).toBeTruthy();
-
-    const manifestUrl = new URL(manifestHref!, page.url());
-    const response = await page.request.get(manifestUrl.toString());
-    expect(response.status()).toBe(200);
-
-    const manifest = (await response.json()) as Record<string, unknown>;
-    expect(manifest).toHaveProperty('name');
-    expect(manifest).toHaveProperty('start_url');
-    expect(manifest).toHaveProperty('display');
-    expect(manifest).toHaveProperty('icons');
-
-    const icons = manifest['icons'] as Array<Record<string, unknown>>;
-    const sizes = icons.map((icon) => icon['sizes'] as string);
-    expect(sizes.some((size) => size.includes('192'))).toBe(true);
-    expect(sizes.some((size) => size.includes('512'))).toBe(true);
+  test.beforeEach(async ({ context, baseURL }) => {
+    if (process.env.E2E_ISOLATED_RUN !== '1') return;
+    const origins = [new URL(baseURL!), new URL(SUPABASE_URL!)];
+    if (
+      process.env.E2E_PREVIEW_ORIGIN ||
+      origins.some((origin) => !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))
+    ) {
+      throw new Error('Isolated manifest requires loopback origins');
+    }
+    const allowed = new Set(origins.map((origin) => origin.origin));
+    await context.route('**/*', (route) =>
+      allowed.has(new URL(route.request().url()).origin)
+        ? route.continue()
+        : route.abort('blockedbyclient'),
+    );
   });
+  test(
+    'exposes a valid web app manifest',
+    { tag: '@preview-e2e/product-pwa-manifest' },
+    async ({ page }) => {
+      await page.goto('/');
+
+      const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
+      expect(manifestHref).toBeTruthy();
+
+      const manifestUrl = new URL(manifestHref!, page.url());
+      expect(manifestUrl.origin).toBe(new URL(page.url()).origin);
+      const response = await page.goto(manifestUrl.href);
+      expect(response?.status()).toBe(200);
+
+      const manifest = (await response!.json()) as Record<string, unknown>;
+      expect(manifest).toHaveProperty('name');
+      expect(manifest).toHaveProperty('start_url');
+      expect(manifest).toHaveProperty('display');
+      expect(manifest).toHaveProperty('icons');
+
+      const icons = manifest['icons'] as Array<Record<string, unknown>>;
+      const sizes = icons.map((icon) => icon['sizes'] as string);
+      expect(sizes.some((size) => size.includes('192'))).toBe(true);
+      expect(sizes.some((size) => size.includes('512'))).toBe(true);
+    },
+  );
 });
 
 /**
@@ -91,7 +110,7 @@ test.describe('PWA installability', () => {
  *
  * **この 2 本には認証が要る。** `ServiceWorkerProvider` は `(app)` group の
  * `ProvidersComposition` にしか mount されていない。`/` は `[locale]/page.tsx` で
- * `/{locale}/calendar` へ redirect し、そこは `access-policy.ts` の
+ * `/{locale}` のホームカレンダーへ戻し、そこは `access-policy.ts` の
  * `protectedProductPaths` なので未認証だと `(auth)` group のログイン画面へ飛ぶ。
  * ログイン画面の `PublicProviders` は SW を登録しないため、未認証のまま
  * `getRegistrations()` を待っても永久に空になる（#2647 のセルフレビューで実測）。
@@ -102,20 +121,25 @@ test.describe('PWA installability', () => {
  * 以前は runner 側の `NODE_ENV` を見ており、CI でも常に真＝永久 skip だった。
  */
 describeWithEnv('PWA Service Worker', () => {
-  test.skip(
+  isolatedTest.skip(
     !process.env.CI,
     'Service Worker は CI の production build（pnpm start）でのみ登録される',
   );
 
   let testUser: ScopedTestUser | undefined;
 
-  test.beforeAll(async () => {
+  isolatedTest.beforeAll(async () => {
     testUser = await createScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, 'pwa');
   });
 
-  test.afterAll(async () => {
+  isolatedTest.afterAll(async () => {
     if (!testUser) return;
-    await deleteScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, testUser.userId);
+    await cleanupIsolatedTestUser(
+      createAdminSupabase(SUPABASE_URL!, SERVICE_ROLE_KEY!),
+      SUPABASE_URL!,
+      SERVICE_ROLE_KEY!,
+      testUser,
+    );
   });
 
   /** ログインして `(app)` group（= SW を登録する層）まで入る。 */
@@ -125,10 +149,10 @@ describeWithEnv('PWA Service Worker', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(testUser!.email);
     await page.locator('input[type="password"]').first().fill(testUser!.password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
-  test('registers the service worker in a production build', async ({ page }) => {
+  isolatedTest('registers the service worker in a production build', async ({ page }) => {
     await loginToApp(page);
 
     // ServiceWorkerProvider は dynamic import なので、chunk の取得と useEffect の
@@ -136,22 +160,32 @@ describeWithEnv('PWA Service Worker', () => {
     await expect.poll(() => getRegisteredServiceWorker(page), { timeout: 15_000 }).not.toBeNull();
   });
 
-  test('serves cached content or the offline fallback without a network', async ({
-    context,
-    page,
-  }) => {
-    await loginToApp(page);
-    // 登録の存在ではなく「activate 済みで page を制御」「/offline が precache 済み」を待つ。
-    await expect.poll(() => isOfflineFallbackReady(page), { timeout: 15_000 }).toBe(true);
+  isolatedTest(
+    'serves cached content or the offline fallback without a network',
+    async ({ context, page }) => {
+      await loginToApp(page);
+      // 登録の存在ではなく「activate 済みで page を制御」「/offline が precache 済み」を待つ。
+      await expect.poll(() => isOfflineFallbackReady(page), { timeout: 15_000 }).toBe(true);
 
-    await context.setOffline(true);
-    // sw.js は navigation を network → DYNAMIC cache → `/offline` の順で解決する（Network First）。
-    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
+      await context.setOffline(true);
+      // sw.js は navigation を network → DYNAMIC cache → `/offline` の順で解決する（Network First）。
+      const response = await page.reload({ waitUntil: 'domcontentloaded' });
+      expect(response).not.toBeNull();
+      expect(response!.status()).toBe(200);
+      expect(response!.fromServiceWorker()).toBe(true);
 
-    // 描画されたのが cache 済みページでも `/offline` でも、SW が返した document である
-    // ことは共通する。body の非空だけだとブラウザのエラー画面でも通ってしまう。
-    await expect.poll(() => isControlledByServiceWorker(page), { timeout: 10_000 }).toBe(true);
-    await expect(page.locator('body')).not.toBeEmpty();
-    await context.setOffline(false);
-  });
+      // reload の成功だけでなく、cache 済みアプリか `/offline` が実際に描画されたことを確認する。
+      // navigation が失敗して元の document が残った場合や、本文だけの503 fallbackは通さない。
+      await expect
+        .poll(async () => {
+          const cachedApp = await page.locator('[data-calendar-grid]').isVisible();
+          const offlinePage = await page
+            .getByRole('heading', { name: /You're offline|オフライン/ })
+            .isVisible();
+          return cachedApp || offlinePage;
+        })
+        .toBe(true);
+      await context.setOffline(false);
+    },
+  );
 });

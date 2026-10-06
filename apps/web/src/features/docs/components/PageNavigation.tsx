@@ -1,9 +1,9 @@
 import { Button } from '@dayopt/components';
+import { Link } from '@dayopt/i18n/navigation';
 import { getDocHref } from '@web/lib/mdx';
 import { ContentData } from '@web/types/content';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 
 interface PageNavigationProps {
   previousPage?: ContentData;

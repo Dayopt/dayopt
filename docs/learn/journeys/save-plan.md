@@ -46,7 +46,7 @@ flowchart TD
 
 #### この経路を守るテスト
 
-- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
+- [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `'ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
 
 ### 1. Plan か Record かを決める（ブラウザ）
 
@@ -399,7 +399,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "short": "Plan か Record か決める",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "select",
@@ -463,7 +463,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -478,7 +478,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "short": "作成を依頼",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "select",
@@ -546,7 +546,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "temp",
@@ -560,7 +560,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "short": "先に画面へ出す",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "temp",
@@ -634,7 +634,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -699,7 +699,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -734,7 +734,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -800,7 +800,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "screenAfter": {
             "t": "form",
             "title": "サインイン",
-            "url": "/ja/auth/login?redirect=%2Fja%2Fcalendar",
+            "url": "/ja/auth/login?redirect=%2Fja",
             "fields": [
               ["メールアドレス", "m@example.com"],
               ["パスワード", "••••••••"]
@@ -838,7 +838,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -872,7 +872,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "continues": true,
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -970,7 +970,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "continues": true,
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -1009,7 +1009,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -1049,7 +1049,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "screenAfter": {
             "t": "form",
             "title": "サインイン",
-            "url": "/ja/auth/login?redirect=%2Fja%2Fcalendar",
+            "url": "/ja/auth/login?redirect=%2Fja",
             "fields": [
               ["メールアドレス", ""],
               ["パスワード", ""]
@@ -1123,7 +1123,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "規則ごとの文言",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -1158,7 +1158,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
           "back": "重なりの案内",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "gone",
@@ -1209,7 +1209,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
       "via": "応答",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",
@@ -1227,7 +1227,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
   "tests": [
     {
       "path": "apps/product/src/lib/test/e2e/critical-path.spec.ts",
-      "find": "test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'",
+      "find": "'ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'",
       "why": "E2E。保存して再読み込みしても残ることまで見る"
     }
   ]

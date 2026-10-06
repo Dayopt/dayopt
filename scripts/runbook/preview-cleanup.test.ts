@@ -105,6 +105,24 @@ describe('Preview orphan recovery', () => {
       .mockResolvedValueOnce(response(200, ownedUser()));
     expect(await recoverPreviewUsers(s.options)).toMatchObject({ status: 'failed', recovered: 0 });
   });
+  it('run marker付きの専用account-deletion namespaceだけをcleanupできる', async () => {
+    const s = fixture();
+    s.fetchImpl
+      .mockResolvedValueOnce(
+        response(200, {
+          ...ownedUser(),
+          email: `account-deletion-${userId}@example.com`,
+        }),
+      )
+      .mockResolvedValueOnce(response(200))
+      .mockResolvedValueOnce(response(404));
+    expect(await recoverPreviewUsers(s.options)).toEqual({
+      status: 'clean',
+      checked: 1,
+      recovered: 1,
+    });
+    expect(s.fetchImpl.mock.calls.filter((call) => call[1].method === 'DELETE')).toHaveLength(1);
+  });
   it('private provider例外や本文をjournalへ残さない', async () => {
     const s = fixture();
     s.fetchImpl.mockRejectedValueOnce(new Error('sb_secret_private_test_key'));

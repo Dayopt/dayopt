@@ -31,9 +31,15 @@ function exactKeys(value, keys) {
 
 /** A public, immutable plan saved before candidate checkout and any fixture mutation. */
 export function validateCloudIntent(intent) {
+  const userIdKeys =
+    intent?.schemaVersion === 1
+      ? ['desktop', 'mobile']
+      : intent?.schemaVersion === 2
+        ? ['desktop', 'mobile', 'accountDeletion']
+        : [];
   if (
     !exactKeys(intent, KEYS) ||
-    intent.schemaVersion !== 1 ||
+    ![1, 2].includes(intent.schemaVersion) ||
     intent.repository !== REPOSITORY ||
     intent.workflow !== WORKFLOW ||
     intent.workflowRef !== REF ||
@@ -45,13 +51,13 @@ export function validateCloudIntent(intent) {
     typeof intent.createdAt !== 'string' ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(intent.createdAt) ||
     !Number.isFinite(Date.parse(intent.createdAt)) ||
-    !exactKeys(intent.userIds, ['desktop', 'mobile'])
+    !exactKeys(intent.userIds, userIdKeys)
   )
     throw new Error('Invalid Cloud Preview intent');
-  const ids = [intent.runId, intent.userIds.desktop, intent.userIds.mobile];
+  const ids = [intent.runId, ...Object.values(intent.userIds)];
   if (
     ids.some((id) => typeof id !== 'string' || !UUID.test(id) || id === SEED) ||
-    new Set(ids).size !== 3
+    new Set(ids).size !== ids.length
   )
     throw new Error('Invalid Cloud Preview intent identities');
   if (
@@ -63,7 +69,7 @@ export function validateCloudIntent(intent) {
   if (!exactKeys(intent.request, Object.keys(request)))
     throw new Error('Invalid Cloud Preview intent request');
   return {
-    schemaVersion: 1,
+    schemaVersion: intent.schemaVersion,
     repository: REPOSITORY,
     workflow: WORKFLOW,
     workflowRef: REF,
@@ -72,7 +78,7 @@ export function validateCloudIntent(intent) {
     sourceAttempt: intent.sourceAttempt,
     runId: intent.runId,
     createdAt: intent.createdAt,
-    userIds: { desktop: intent.userIds.desktop, mobile: intent.userIds.mobile },
+    userIds: { ...intent.userIds },
     request,
   };
 }
@@ -93,7 +99,7 @@ export function createCloudIntent({
   )
     throw new Error('Cloud Preview intent requires the trusted dispatched workflow');
   return validateCloudIntent({
-    schemaVersion: 1,
+    schemaVersion: 2,
     repository: REPOSITORY,
     workflow: WORKFLOW,
     workflowRef: REF,
@@ -102,7 +108,7 @@ export function createCloudIntent({
     sourceAttempt: Number(env.GITHUB_RUN_ATTEMPT),
     runId: uuid(),
     createdAt: now().toISOString(),
-    userIds: { desktop: uuid(), mobile: uuid() },
+    userIds: { desktop: uuid(), mobile: uuid(), accountDeletion: uuid() },
     request: validateCloudRequest(request),
   });
 }

@@ -44,6 +44,24 @@ describe('Preview Cloud synthetic identity', () => {
     expect(mobile.password).not.toBe(MOBILE_ID);
   });
 
+  it('requires a distinct third allocation for the destructive account deletion flow', () => {
+    const deletionId = '44444444-4444-4444-8444-444444444444';
+    expect(
+      resolvePreviewCloudUserId('account-deletion', {
+        ...CLOUD_ENV,
+        E2E_PREVIEW_DELETION_USER_ID: deletionId,
+      }),
+    ).toBe(deletionId);
+    for (const value of [undefined, '', DESKTOP_ID, MOBILE_ID, SEED_ID, 'invalid']) {
+      expect(() =>
+        resolvePreviewCloudUserId('account-deletion', {
+          ...CLOUD_ENV,
+          E2E_PREVIEW_DELETION_USER_ID: value,
+        }),
+      ).toThrow('Preview Cloud identity configuration is invalid');
+    }
+  });
+
   it('rejects Cloud intent with a noncanonical fixture prefix', () => {
     expect(() => resolvePreviewCloudUserId('unit', CLOUD_ENV)).toThrow(
       'Preview Cloud identity configuration is invalid',

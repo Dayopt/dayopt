@@ -238,6 +238,38 @@ template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
 max_frequency = "5s"
 
+# Persistent Integration is an existing non-production Supabase branch. Remote
+# configuration applies only when the `integration` Git branch is merged; the
+# production remote remains Supabase `main` above.
+[remotes.integration]
+project_id = "tilwaprottpyhlfoggbb"
+
+[remotes.integration.db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[remotes.integration.auth]
+site_url = "https://product-git-integration-dayopt.vercel.app"
+additional_redirect_urls = [
+  "https://product-git-integration-dayopt.vercel.app",
+  "https://product-git-integration-dayopt.vercel.app/**",
+  # Supabase Auth sign-in redirects only; these do not grant MCP OAuth authority.
+  # Restrict generated Preview hosts to the existing Product project/team naming.
+  "https://product-*-dayopt.vercel.app/**",
+  "http://localhost:3000/**"
+]
+# The fixed synthetic test account from seed.sql is used for sign-in. Prevent
+# arbitrary account creation from turning this shared test database into a
+# place for real personal data.
+enable_signup = false
+
+# Cloudflare's public always-pass test pair, matching the Preview site key.
+# Declare it only for Integration so GitHub Configure preserves CAPTCHA.
+[remotes.integration.auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "1x0000000000000000000000000000000AA"
+
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]
 # 4152127777 = "123456"

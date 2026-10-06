@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, BarChart3, Check, Eye, FolderUp, Pencil, Trash2, X } from 'lucide-react';
+import { Archive, Check, Eye, FolderUp, Pencil, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { ActivityIcon } from '@/features/activities';
@@ -13,6 +13,8 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@dayopt/components';
+
+import { ActivityDetailsMenuItem } from './ActivityDetailsMenuItem';
 
 /** カテゴリー選択肢（「カテゴリーを変更」ピッカーの 1 行） */
 export interface CategoryOption {
@@ -33,7 +35,7 @@ interface ActivityRowMenuProps {
   onOpenRenameDialog: () => void;
   onChangeCategory: (categoryId: string | null) => void;
   onShowOnlyActivity: () => void;
-  onViewStats?: (() => void) | undefined;
+  onViewActivityDetails?: (() => void) | undefined;
   onArchiveActivity?: (() => void) | undefined;
   onDeleteActivity?: (() => void) | undefined;
 }
@@ -52,7 +54,7 @@ export function ActivityRowMenu({
   onOpenRenameDialog,
   onChangeCategory,
   onShowOnlyActivity,
-  onViewStats,
+  onViewActivityDetails,
   onArchiveActivity,
   onDeleteActivity,
 }: ActivityRowMenuProps) {
@@ -67,6 +69,9 @@ export function ActivityRowMenu({
           <Eye className="size-4" />
           {t('calendar.filter.showOnlyThisActivity')}
         </DropdownMenuItem>
+        {onViewActivityDetails && (
+          <ActivityDetailsMenuItem onViewActivityDetails={onViewActivityDetails} />
+        )}
         {onArchiveActivity && (
           <DropdownMenuItem onClick={onArchiveActivity}>
             <Archive className="size-4" />
@@ -144,11 +149,8 @@ export function ActivityRowMenu({
         {t('calendar.filter.showOnlyThisActivity')}
       </DropdownMenuItem>
 
-      {onViewStats && (
-        <DropdownMenuItem onClick={onViewStats}>
-          <BarChart3 className="size-4" />
-          {t('calendar.filter.viewStats')}
-        </DropdownMenuItem>
+      {onViewActivityDetails && (
+        <ActivityDetailsMenuItem onViewActivityDetails={onViewActivityDetails} />
       )}
 
       {/* アーカイブ（可逆なので確認なし） */}

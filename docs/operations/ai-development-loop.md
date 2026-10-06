@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-28
+last_verified: 2026-10-04
 ---
 
 # AI開発標準ループ
@@ -21,6 +21,23 @@ Dayopt の AI 協働では、agent に変更を書かせることを完了条件
 実装を始めた主担当が plan → branch → 実装 → 検証 → 後処理まで持つ。モデルを切り替えても担当は変わらない。関連 Issue は同じ変更レーンへ束ねつつ、受け入れ条件と完了状態をIssueごとに追跡し、独立検証・revert・不可逆 migration の隔離が必要な場合だけ分ける。
 
 通常の検証失敗や環境不足は主担当が切り分ける。要求・契約・scope の未決判断がある場合は、依存作業を止めて根拠と推奨を報告する。別 session の助言が必要な時は対象 SHA・依頼 ID・状態を照合する。助言は人間の承認や authority 境界を置き換えない。環境・接続失敗を挙動の合否に数えない。
+
+### GitHub レビューを修正バッチに合わせる
+
+Code Review と Security Review は別の記録として扱い、`AGENTS.md` と `protected-path-gate.mjs` が定める対象・判断を変えない。通常 PR にレビューや required check を追加せず、PR を開いた時や draft を ready にした時に自動で起きる review も、手動依頼とは分けて PR summary で確認する。
+
+既知の指摘は一度にまとめて修正または根拠付きで反証し、対応する regression test と required CI を実行する。head が安定し、CI が成功してから必要なレビューを依頼する。小さな push ごとに全体レビューを繰り返さない。
+
+PR summary の各 review について、種類・状態・trigger・対象 commit を確認する。同じ PR・head SHA・scope の review が実行中または完了済みなら手動で重ねて依頼しない。summary が最新の一件だけを示す場合があるため、レビュー履歴と PR の commit 一覧も照合し、短縮 SHA は対象の完全な SHA に解決する。head が違う review を現 head の確認済み証拠として扱わない。設定・summary から trigger や重複抑止を確認できない時は `unknown` と記録し、自動／手動の重複が無いと推測しない。
+
+再レビューは、まとめた修正が変えたリスク境界と関連する regression に焦点を合わせる。docs・format・test-only の変更でレビュー対象の実質が変わらない時は、全体レビューを再実行しない。保護対象の実質変更には現 head に対する新しい確認を用意し、古い結果を流用しない。
+
+目安は「全体レビュー 1 回と、修正をまとめた後の focused review 1 回」。これは上限でも merge 条件でもない。P1/P2 や新しい実質リスクが残る時は件数を理由に解決扱いせず、必要な再レビューを行う。focused review で足りない追加の全体レビューでは、新しいリスク差分と focused review では不十分な理由を記録し、必要なら独立レビューまたは人の判断へエスカレーションする。
+
+PR summary / checklist では次を混ぜずに記録する。
+
+- Code Review と Security Review を別々にし、状態・trigger・完全な対象 SHA・確認 scope・指摘と裁定を残す。不要な種類は `not required`、確認できない項目は `unknown` とする。
+- GitHub Actions は workflow 名・run ID・状態・対象 SHA を記録する。Actions の実行と Codex review は別のイベントで、別 SHA の成功を現 head の証拠にしない。
 
 ## 意図の継承
 

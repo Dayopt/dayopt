@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { test } from './preview-access-fixture';
 
 import type { Database } from '@/lib/database';
 
@@ -8,7 +9,6 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
-import { REPORT_EXECUTION, REPORT_TAB_PARAM } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,11 +44,12 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
   let password: string;
   let recordId: string;
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     const user = await createScopedTestUser(
       SUPABASE_URL!,
       SUPABASE_SERVICE_KEY!,
       'derived-plan-record',
+      testInfo.project.name,
     );
     ({ email, password, userId } = user);
 
@@ -107,12 +108,6 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
 
   test.afterAll(async () => {
     if (!adminSupabase) return;
-    await adminSupabase.from('records').delete().eq('user_id', userId);
-    await adminSupabase.from('plans').delete().eq('user_id', userId);
-    await adminSupabase.from('activities').delete().eq('user_id', userId);
-    await adminSupabase.from('categories').delete().eq('user_id', userId);
-    await adminSupabase.from('user_settings').delete().eq('user_id', userId);
-    await adminSupabase.from('profiles').delete().eq('id', userId);
     await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, userId);
   });
 
@@ -123,93 +118,84 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(email);
     await page.locator('input[type="password"]').first().fill(password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
   async function openDay(page: Page) {
-    await page.goto(`/ja/calendar?view=day&date=${PAST_DATE}`);
+    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
   }
 
-  async function expectPlanRatio(page: Page) {
-    // 予実の行は差分の面（`?tab=diff`）にある。既定タブは「時間の使い方」なので
-    // tab を指定しないと `ExecutionChapter` そのものが描かれない（#2773 の 3 タブ再編）
-    await page.goto(`/ja/report?date=${PAST_DATE}&range=week&tab=${REPORT_TAB_PARAM.diff}`);
-    const row = page.locator(REPORT_EXECUTION.rows, {
-      hasText: ACTIVITY_NAME,
-    });
-    await expect(row).toContainText('予定比 150%', { timeout: 15_000 });
-  }
+  test(
+    '記録の同一週内移動後もInspectorで予定と記録の関係を確認できる',
+    { tag: '@preview-e2e/product-derived-plan-record' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
+      await login(page);
 
-  test('記録の同一週内移動でInspectorの一覧だけが変わり予定比は変わらない', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
-    await login(page);
+      await openDay(page);
 
-    await expectPlanRatio(page);
-    await openDay(page);
+      const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
+      await planCard.click();
+      const relationships = page.getByRole('region', { name: 'この時間帯の記録' });
+      await expect(relationships).toBeVisible();
+      await expect(
+        relationships.getByRole('button', { name: new RegExp(ACTIVITY_NAME) }),
+      ).toBeVisible();
 
-    const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
-    await planCard.click();
-    const relationships = page.getByRole('region', { name: 'この時間帯の記録' });
-    await expect(relationships).toBeVisible();
-    await expect(
-      relationships.getByRole('button', { name: new RegExp(ACTIVITY_NAME) }),
-    ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect.poll(() => new URL(page.url()).searchParams.get('timeblock')).toBeNull();
 
-    await page.keyboard.press('Escape');
-    await expect.poll(() => new URL(page.url()).searchParams.get('timeblock')).toBeNull();
+      const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
+      const gridHeight = await grid.evaluate((element) => element.getBoundingClientRect().height);
+      const hourHeight = gridHeight / 24;
+      await page
+        .locator('[data-calendar-scroll]')
+        .first()
+        .evaluate((element, top) => element.scrollTo({ top, behavior: 'instant' }), hourHeight * 8);
 
-    const grid = page.locator('[data-calendar-grid][data-calendar-day-index="0"]').first();
-    const gridHeight = await grid.evaluate((element) => element.getBoundingClientRect().height);
-    const hourHeight = gridHeight / 24;
-    await page
-      .locator('[data-calendar-scroll]')
-      .first()
-      .evaluate((element, top) => element.scrollTo({ top, behavior: 'instant' }), hourHeight * 8);
+      const recordCard = page
+        .locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME })
+        .first();
+      await expect(recordCard).toBeVisible();
+      const box = await recordCard.boundingBox();
+      if (!box) throw new Error('record card is not visible');
 
-    const recordCard = page.locator('[data-record-lane-card]', { hasText: ACTIVITY_NAME }).first();
-    await expect(recordCard).toBeVisible();
-    const box = await recordCard.boundingBox();
-    if (!box) throw new Error('record card is not visible');
+      const x = box.x + box.width / 2;
+      const yFrom = box.y + box.height / 2;
+      await page.mouse.move(x, yFrom);
+      await page.mouse.down();
+      await page.mouse.move(x, yFrom + 24, { steps: 4 });
+      await expect
+        .poll(() => page.evaluate(() => document.body.style.cursor), { timeout: 5_000 })
+        .toBe('grabbing');
+      // ドラッグは 15 分刻みの**相対 snap**（移動量だけを量子化し、元の分 :05 は保持する。
+      // `domain/precision.ts` の `DEFAULT_DRAG_SNAP_MINUTES` と `time-math.ts` の
+      // `snapDeltaMinutes`）。移動量は 15 の倍数にしておく —— 115 分だと snap 境界の
+      // 中点 112.5 分まで 2.5 分しかなく、ピクセル誤差で 105 分側へ倒れて flaky になる。
+      await page.mouse.move(x, yFrom + (120 / 60) * hourHeight, { steps: 12 });
+      await page.mouse.up();
 
-    const x = box.x + box.width / 2;
-    const yFrom = box.y + box.height / 2;
-    await page.mouse.move(x, yFrom);
-    await page.mouse.down();
-    await page.mouse.move(x, yFrom + 24, { steps: 4 });
-    await expect
-      .poll(() => page.evaluate(() => document.body.style.cursor), { timeout: 5_000 })
-      .toBe('grabbing');
-    // ドラッグは 15 分刻みの**相対 snap**（移動量だけを量子化し、元の分 :05 は保持する。
-    // `domain/precision.ts` の `DEFAULT_DRAG_SNAP_MINUTES` と `time-math.ts` の
-    // `snapDeltaMinutes`）。移動量は 15 の倍数にしておく —— 115 分だと snap 境界の
-    // 中点 112.5 分まで 2.5 分しかなく、ピクセル誤差で 105 分側へ倒れて flaky になる。
-    await page.mouse.move(x, yFrom + (120 / 60) * hourHeight, { steps: 12 });
-    await page.mouse.up();
+      await expect
+        .poll(
+          async () => {
+            const { data } = await adminSupabase
+              .from('records')
+              .select('start_at, end_at')
+              .eq('id', recordId)
+              .single();
+            return data
+              ? `${new Date(data.start_at).toISOString()}/${new Date(data.end_at).toISOString()}`
+              : null;
+          },
+          { timeout: 15_000 },
+        )
+        .toBe(`${isoAt('11:05')}/${isoAt('12:35')}`);
 
-    await expect
-      .poll(
-        async () => {
-          const { data } = await adminSupabase
-            .from('records')
-            .select('start_at, end_at')
-            .eq('id', recordId)
-            .single();
-          return data
-            ? `${new Date(data.start_at).toISOString()}/${new Date(data.end_at).toISOString()}`
-            : null;
-        },
-        { timeout: 15_000 },
-      )
-      .toBe(`${isoAt('11:05')}/${isoAt('12:35')}`);
-
-    await openDay(page);
-    await page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first().click();
-    await expect(page.getByRole('heading', { name: 'この時間帯の記録' })).toHaveCount(0);
-
-    await expectPlanRatio(page);
-  });
+      await openDay(page);
+      await page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first().click();
+      await expect(page.getByRole('heading', { name: 'この時間帯の記録' })).toHaveCount(0);
+    },
+  );
 });

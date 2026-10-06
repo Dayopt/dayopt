@@ -119,6 +119,12 @@
         "revokeCancelLabel": "Keep current choice",
         "saveFailed": "Could not save your choice. Browser storage rejected the write, so analytics was not changed."
       }
+    },
+    "appearance": {
+      "changeTheme": "Change theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
     }
   },
   "errors": {

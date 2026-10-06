@@ -2,20 +2,20 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { z } from 'zod';
 
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
-import {
-  assertServiceRoleSuiteRunnable,
-  resolveServiceRoleTarget,
-} from '../service-role-target-guard';
+import { resolveIsolatedServiceRoleTarget } from '../isolated-service-role-target';
+import { cleanupIsolatedTestUser } from '../isolated-user-cleanup';
+import { assertServiceRoleSuiteRunnable } from '../service-role-target-guard';
 import { createScopedTestUser, type ScopedTestUser } from './create-scoped-test-user';
+import { test } from './isolated-product-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY;
-const target = resolveServiceRoleTarget(url, key);
+const target = resolveIsolatedServiceRoleTarget(url, key);
 assertServiceRoleSuiteRunnable(target, 'HTTP CSRF boundary');
 const describeWithEnv = target.safe ? test.describe : test.describe.skip;
 
@@ -46,22 +46,32 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
         server.close((error) => (error ? reject(error) : resolve())),
       );
     if (user) {
-      const { error } = await admin.auth.admin.deleteUser(user.userId);
-      if (error) throw new Error(error.message);
+      await cleanupIsolatedTestUser(admin, url!, key!, user);
     }
   });
 
-  test('same-origin write persists, cross-origin simple/JSON/GET requests cannot change it', async ({
+  test('same-origin write works; cross-origin simple/multipart/GET requests cannot change it', async ({
     page,
+    request,
     baseURL,
+    allowIsolatedOrigin,
   }) => {
     test.setTimeout(60_000);
+    allowIsolatedOrigin(attackerOrigin);
     await suppressConsentBanner(page);
     await page.goto('/ja/auth/login');
     await page.locator('input[type="email"]').first().fill(user.email);
     await page.locator('input[type="password"]').first().fill(user.password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
+    await page.waitForLoadState('networkidle');
+    const authCookies = (await page.context().cookies(baseURL)).filter(({ name }) =>
+      /-auth-token(?:\.\d+)?$/.test(name),
+    );
+    const authCookieNames = authCookies.map(({ name }) => name);
+    const authCookieHeader = authCookies.map(({ name, value }) => `${name}=${value}`).join('; ');
+    expect(authCookieNames.length).toBeGreaterThan(0);
+    expect(authCookieHeader).not.toBe('');
     const endpoint = new URL('/api/trpc/userSettings.update', baseURL).href;
     const write = (timeFormat: string) => JSON.stringify({ json: { timeFormat } });
     const initial = await page.evaluate(
@@ -89,40 +99,101 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
 
     // 同一hostnameの別portなのでSameSiteだけには頼らない境界を試す。
     await page.goto(attackerOrigin);
-    const outcomes: string[] = [];
-    for (const contentType of ['text/plain', 'application/json']) {
-      outcomes.push(
-        await page.evaluate(
-          async ({ endpoint, body, contentType }) => {
-            return fetch(endpoint, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'content-type': contentType },
-              body,
-            }).then(
-              (response) => String(response.status),
-              () => 'browser-blocked',
-            );
-          },
-          { endpoint, body: write('24h'), contentType },
-        ),
+    await page.waitForLoadState('networkidle');
+    // Login hydration may still have a settings write in flight. Reset the disposable
+    // user's sentinel after leaving Dayopt so it cannot race the attack.
+    const reset = await admin
+      .from('user_settings')
+      .update({ time_format: '12h' })
+      .eq('user_id', user.userId);
+    expect(reset.error).toBeNull();
+    expect(await storedFormat()).toBe('12h');
+
+    for (const contentType of ['text/plain', 'multipart/form-data']) {
+      const browserRequestPromise = page.waitForRequest(
+        (browserRequest) =>
+          new URL(browserRequest.url()).origin === new URL(endpoint).origin &&
+          new URL(browserRequest.url()).pathname === new URL(endpoint).pathname &&
+          browserRequest.method() === 'POST',
       );
+      const outcome = await page.evaluate(
+        async ({ endpoint, body, contentType }) => {
+          const payload =
+            contentType === 'multipart/form-data'
+              ? (() => {
+                  const form = new FormData();
+                  form.set('input', body);
+                  return form;
+                })()
+              : body;
+          return fetch(endpoint, {
+            method: 'POST',
+            credentials: 'include',
+            ...(contentType === 'text/plain' ? { headers: { 'content-type': contentType } } : {}),
+            body: payload,
+          }).then(
+            (response) => String(response.status),
+            () => 'browser-blocked',
+          );
+        },
+        { endpoint, body: write('24h'), contentType },
+      );
+      const browserRequest = await browserRequestPromise;
+      expect(outcome).toBe('browser-blocked');
+      const browserHeaders = await browserRequest.allHeaders();
+      const browserCookie = browserHeaders.cookie;
+      expect(browserHeaders.origin).toBe(attackerOrigin);
+      expect(
+        authCookieNames.some((name) => browserCookie?.includes(`${name}=`)),
+        '攻撃元からの要求にもログイン済みの Supabase Cookie が送られること',
+      ).toBe(true);
+
+      // CORS may hide the server's response from page.waitForResponse even when the
+      // request reached the app. Verify the rejection directly with the same forged
+      // Origin, session cookie, and payload so the guard's HTTP status is observable.
+      const rejected = await request.post(endpoint, {
+        headers: {
+          origin: attackerOrigin,
+          cookie: browserCookie ?? '',
+          ...(contentType === 'text/plain' ? { 'content-type': contentType } : {}),
+        },
+        ...(contentType === 'multipart/form-data'
+          ? { multipart: { input: write('24h') } }
+          : { data: write('24h') }),
+      });
+      expect(rejected.status()).toBe(403);
       expect(await storedFormat()).toBe('12h');
     }
     const getEndpoint = endpoint + '?input=' + encodeURIComponent(write('24h'));
-    outcomes.push(
-      await page.evaluate(async (endpoint) => {
-        return fetch(endpoint, { credentials: 'include' }).then(
-          (response) => String(response.status),
-          () => 'browser-blocked',
-        );
-      }, getEndpoint),
+    const getBrowserRequestPromise = page.waitForRequest(
+      (browserRequest) =>
+        new URL(browserRequest.url()).origin === new URL(getEndpoint).origin &&
+        new URL(browserRequest.url()).pathname === new URL(getEndpoint).pathname &&
+        browserRequest.method() === 'GET',
     );
+    const getOutcome = await page.evaluate(async (endpoint) => {
+      return fetch(endpoint, { credentials: 'include' }).then(
+        (response) => String(response.status),
+        () => 'browser-blocked',
+      );
+    }, getEndpoint);
+    const getBrowserRequest = await getBrowserRequestPromise;
     expect(await storedFormat()).toBe('12h');
-    expect(outcomes).toEqual(['browser-blocked', 'browser-blocked', 'browser-blocked']);
+    expect(getOutcome).toBe('browser-blocked');
+    const getBrowserHeaders = await getBrowserRequest.allHeaders();
+    expect(getBrowserHeaders.origin).toBe(attackerOrigin);
+    expect(
+      authCookieNames.some((name) => getBrowserHeaders.cookie?.includes(`${name}=`)),
+      '攻撃元からのGETにもログイン済みのSupabase Cookieが送られること',
+    ).toBe(true);
+    const getResponse = await request.get(getEndpoint, {
+      headers: { origin: attackerOrigin, cookie: getBrowserHeaders.cookie ?? '' },
+    });
+    expect(getResponse.status()).toBe(405);
+    expect(await storedFormat()).toBe('12h');
 
     // 同じcookieが失効したから拒否された、という偽陽性を除く。
-    await page.goto('/ja/calendar');
+    await page.goto('/ja/');
     const final = await page.evaluate(
       async ({ endpoint, body }) => {
         return (
@@ -151,20 +222,32 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
       ([, action]) => action.exportedName === 'generateAndSaveRecoveryCodesAction',
     )?.[0];
     expect(actionId, '実際に配信されるServer Actionが存在すること').toBeTruthy();
-    const actionUrl = new URL('/ja/calendar', baseURL).href;
+    const actionUrl = new URL('/ja/', baseURL).href;
     const sameOriginAction = await page.evaluate(
       async ({ actionId, actionUrl }) => {
-        const form = new FormData();
-        form.set('$ACTION_ID_' + actionId, '');
-        return (await fetch(actionUrl, { method: 'POST', body: form })).status;
+        const response = await fetch(actionUrl, {
+          method: 'POST',
+          headers: { 'Next-Action': actionId, 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: '[]',
+        });
+        return { status: response.status, text: await response.text() };
       },
       { actionId: actionId!, actionUrl },
     );
-    expect(sameOriginAction).toBe(200);
+    expect(sameOriginAction.status).toBe(200);
+    // This disposable user has no second factor: the real handler must reach
+    // its AAL2 guard, not issue recovery credentials or merely render the page.
+    expect(sameOriginAction.text).toContain('MFA verification is required to issue recovery codes');
+    const recovery = await admin
+      .from('mfa_recovery_codes')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.userId);
+    expect(recovery.error).toBeNull();
+    expect(recovery.count).toBe(0);
 
     await page.goto(attackerOrigin);
-    const rejectedAction = page.waitForResponse(
-      (response) => response.url() === actionUrl && response.request().method() === 'POST',
+    const actionBrowserRequestPromise = page.waitForRequest(
+      (browserRequest) => browserRequest.method() === 'POST',
     );
     await page.evaluate(
       ({ actionId, actionUrl }) => {
@@ -180,8 +263,30 @@ describeWithEnv('authenticated browser HTTP mutation boundary', () => {
       },
       { actionId: actionId!, actionUrl },
     );
-    const actionResponse = await rejectedAction;
+    const actionBrowserRequest = await actionBrowserRequestPromise;
+    expect(new URL(actionBrowserRequest.url()).pathname).toMatch(/^\/ja\/?$/);
+    const actionBrowserHeaders = await actionBrowserRequest.allHeaders();
+    const actionBody = actionBrowserRequest.postDataBuffer();
+    expect(actionBrowserHeaders.origin).toBe(attackerOrigin);
+    expect(actionBody).not.toBeNull();
+
+    // The browser form proves that a forged-Origin Server Action request reaches the route.
+    // Replay its exact body with the authenticated session cookie from this browser context:
+    // form navigation does not guarantee that the browser sends its session cookie.
+    const actionResponse = await request.post(actionUrl, {
+      headers: {
+        origin: attackerOrigin,
+        cookie: authCookieHeader,
+        'content-type': actionBrowserHeaders['content-type'] ?? '',
+      },
+      data: actionBody!,
+    });
     expect(actionResponse.status()).toBe(500);
-    expect((await actionResponse.request().allHeaders()).origin).toBe(attackerOrigin);
+    const recoveryAfterAttack = await admin
+      .from('mfa_recovery_codes')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.userId);
+    expect(recoveryAfterAttack.error).toBeNull();
+    expect(recoveryAfterAttack.count).toBe(0);
   });
 });

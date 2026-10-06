@@ -1,9 +1,196 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
+// Reviewed browser acceptance scope. Changes require a reviewed trusted harness rollout.
+const COVERAGE = [
+  {
+    file: 'critical-path.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'desktop-plan-create',
+      'desktop-record-create',
+      'desktop-past-plan-create',
+      'desktop-summary-known-records',
+      'desktop-summary-record-deep-link',
+      'desktop-summary-empty',
+      'desktop-settings-display',
+      'desktop-data-export',
+      'desktop-activity-lifecycle',
+      'desktop-theme',
+      'desktop-timezone',
+      'desktop-locale',
+      'desktop-category-lifecycle',
+      'desktop-inspector-search',
+      'desktop-plan-move',
+      'desktop-conflict-merge',
+      'desktop-template-lifecycle',
+    ],
+  },
+  {
+    file: 'mobile-critical-path.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: [
+      'mobile-plan-create',
+      'mobile-record-create',
+      'mobile-summary-to-inspector',
+      'mobile-settings-display',
+    ],
+  },
+  {
+    file: 'account-deletion.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-account-deletion'],
+  },
+  {
+    file: 'auth.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-auth-signup-page', 'product-auth-login-page', 'product-auth-password-page'],
+  },
+  { file: 'pwa.spec.ts', project: 'chromium', flowIds: ['product-pwa-manifest'] },
+  {
+    file: 'smoke.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'product-smoke-unauth-redirect',
+      'product-smoke-en-signup-locale',
+      'product-smoke-ja-signup-locale',
+    ],
+  },
+  { file: 'a11y.spec.ts', project: 'chromium', flowIds: ['product-a11y-login'] },
+  {
+    file: 'auth.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-auth-login-valid', 'product-auth-login-invalid'],
+  },
+  {
+    file: 'a11y.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-a11y-calendar', 'product-a11y-settings'],
+  },
+  {
+    file: 'calendar-navigation.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-calendar-view-navigation', 'product-calendar-sidebar-navigation'],
+  },
+  {
+    file: 'block-search.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-search-desktop'],
+  },
+  {
+    file: 'block-search.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: ['product-search-mobile'],
+  },
+  {
+    file: 'plan-record-timeblock.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-plan-record-calendar', 'product-record-inspector-url'],
+  },
+  {
+    file: 'deep-link.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'product-deep-link-week',
+      'product-deep-link-prefixless',
+      'product-deep-link-default-week',
+      'product-deep-link-invalid-view',
+    ],
+  },
+  {
+    file: 'derived-plan-record-flow.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-derived-plan-record'],
+  },
+  {
+    file: 'timeblock-conflict.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-plan-conflict'],
+  },
+  {
+    file: 'timeblock-drag-move.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-plan-drag-move'],
+  },
+  {
+    file: 'timeblock-inspector-toggle.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-inspector-toggle'],
+  },
+  {
+    file: 'mobile-navigation.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: ['product-mobile-settings-navigation', 'product-mobile-calendar-navigation'],
+  },
+  {
+    file: 'billing.spec.ts',
+    project: 'chromium',
+    flowIds: [
+      'product-billing-checkout-mocked',
+      'product-billing-portal-mocked',
+      'product-billing-checkout-success-return',
+      'product-billing-checkout-cancel-return',
+      'product-billing-portal-return',
+    ],
+  },
+  {
+    file: 'calendar-initial-load.spec.ts',
+    project: 'chromium',
+    flowIds: ['product-initial-desktop-tokyo', 'product-initial-desktop-la'],
+  },
+  {
+    file: 'calendar-initial-load.spec.ts',
+    project: 'Mobile Chrome',
+    flowIds: ['product-initial-mobile-tokyo', 'product-initial-mobile-la'],
+  },
+];
+const FILES = new Set(COVERAGE.map((row) => row.file));
+export function isPreviewE2EFile(file) {
+  return typeof file === 'string' && FILES.has(file);
+}
+const EXPECTED_FLOWS = new Map(
+  COVERAGE.flatMap((row) => row.flowIds.map((flowId) => [flowId, row])),
+);
+const EXPECTED_COUNT = EXPECTED_FLOWS.size;
+const PREVIEW_FLOW_TAG_PREFIX = 'preview-e2e/';
+
 const CATEGORIES = new Set(['expect', 'pw:api', 'test.step', 'fixture', 'hook']);
+const BUDGET_FIELDS = ['procedures', 'budget', 'rateLimitedResponses', 'mixedBatchResponses'];
+const MAX_PUBLIC_FAILED_STEPS = 40;
+const MAX_PLAYWRIGHT_DURATION_MS = 7 * 60 * 1000;
+
+/** Numeric diagnostics only: discard procedure names and arbitrary candidate fields. */
+export function safePreviewProcedureBudget(value) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !BUDGET_FIELDS.every((key) => Number.isSafeInteger(value[key]) && value[key] >= 0)
+  )
+    return null;
+  return Object.fromEntries(BUDGET_FIELDS.map((key) => [key, value[key]]));
+}
+
+/** The candidate reporter and trusted publisher reconstruct the same allowlisted failure rows. */
+export function safePreviewFailedSteps(test) {
+  if (test.status === 'passed' || test.status === 'skipped') return [];
+  const steps = Array.isArray(test.steps)
+    ? test.steps.filter((step) => step?.failed === true)
+    : Array.isArray(test.failedSteps)
+      ? test.failedSteps
+      : [];
+  return steps.slice(0, MAX_PUBLIC_FAILED_STEPS).map((step) => ({
+    category: CATEGORIES.has(step?.category) ? step.category : 'other',
+    file: FILES.has(step?.file) ? step.file : null,
+    line:
+      FILES.has(step?.file) && Number.isSafeInteger(step.line) && step.line > 0 ? step.line : null,
+    duration:
+      Number.isFinite(step?.duration) && step.duration >= 0
+        ? Math.min(Math.round(step.duration), MAX_PLAYWRIGHT_DURATION_MS)
+        : 0,
+  }));
+}
 
 /** Do not serialize titles, parameters, error messages, stdout, headers, cookies, or bodies. */
 export function safePreviewStep(step) {
@@ -39,23 +226,32 @@ export function safePreviewNetwork(buffer) {
 
 /** Shared by the reporter and runner; exit 0 cannot replace complete evidence. */
 export function isPassingPreviewReport(report) {
-  return (
-    report?.status === 'passed' &&
-    Number.isSafeInteger(report.expected) &&
-    report.expected > 0 &&
-    Array.isArray(report.tests) &&
-    report.tests.length === report.expected &&
-    report.tests.every(
-      (test) =>
-        test &&
-        test.status === 'passed' &&
-        test.expectedPassed === true &&
-        test.retry === 0 &&
-        PROJECTS.has(test.project) &&
-        FILES.has(test.file),
-    ) &&
-    [...PROJECTS].every((project) => report.tests.some((test) => test.project === project))
-  );
+  if (
+    report?.status !== 'passed' ||
+    report.expected !== EXPECTED_COUNT ||
+    !Array.isArray(report.tests) ||
+    report.tests.length !== EXPECTED_COUNT
+  )
+    return false;
+  const declarations = new Set();
+  for (const test of report.tests) {
+    const expected = EXPECTED_FLOWS.get(test?.flowId);
+    if (
+      !test ||
+      !expected ||
+      test.status !== 'passed' ||
+      test.expectedPassed !== true ||
+      test.retry !== 0 ||
+      !Number.isSafeInteger(test.line) ||
+      test.line <= 0 ||
+      expected.file !== test.file ||
+      expected.project !== test.project
+    )
+      return false;
+    if (declarations.has(test.flowId)) return false;
+    declarations.add(test.flowId);
+  }
+  return declarations.size === EXPECTED_COUNT;
 }
 
 export default class PreviewE2EReporter {
@@ -86,12 +282,37 @@ export default class PreviewE2EReporter {
   onTestEnd(test, result) {
     const file = basename(test.location.file);
     const project = test.parent.project()?.name;
+    const flowTags = Array.isArray(test.tags)
+      ? test.tags
+          .filter((tag) => typeof tag === 'string')
+          .map((tag) => tag.replace(/^@/, ''))
+          .filter((tag) => tag.startsWith(PREVIEW_FLOW_TAG_PREFIX))
+      : [];
+    const taggedFlowId =
+      flowTags.length === 1 ? flowTags[0].slice(PREVIEW_FLOW_TAG_PREFIX.length) : null;
+    const reviewedFlow = taggedFlowId ? EXPECTED_FLOWS.get(taggedFlowId) : null;
+    const flowId =
+      reviewedFlow?.file === file && reviewedFlow.project === project ? taggedFlowId : null;
     if (!FILES.has(file) || !PROJECTS.has(project)) this.infrastructureFailure = true;
+    if (!flowId) this.infrastructureFailure = true;
     const screenshots = [];
     let network = null;
+    let procedureBudget = null;
     for (const attachment of result.attachments) {
       if (attachment.name === 'preview-network' && attachment.body) {
         network = safePreviewNetwork(attachment.body);
+      }
+      if (
+        attachment.name === 'trpc-procedure-budget' &&
+        attachment.body &&
+        attachment.body.length <= 2048
+      ) {
+        try {
+          procedureBudget = safePreviewProcedureBudget(JSON.parse(attachment.body.toString()));
+        } catch {
+          // Malformed diagnostic data is omitted; never expose parse errors or raw contents.
+          procedureBudget = null;
+        }
       }
       if (
         attachment.name === 'screenshot' &&
@@ -107,9 +328,11 @@ export default class PreviewE2EReporter {
       }
     }
     if (!network?.length) this.infrastructureFailure = true;
+    const steps = this.steps.get(test.id) ?? [];
     this.tests.push({
       file: FILES.has(file) ? file : null,
       project: PROJECTS.has(project) ? project : null,
+      flowId,
       line: test.location.line,
       status: ['passed', 'failed', 'timedOut', 'skipped', 'interrupted'].includes(result.status)
         ? result.status
@@ -117,7 +340,9 @@ export default class PreviewE2EReporter {
       expectedPassed: test.expectedStatus === 'passed',
       duration: result.duration,
       retry: result.retry,
-      steps: this.steps.get(test.id) ?? [],
+      steps,
+      failedSteps: safePreviewFailedSteps({ status: result.status, steps }),
+      ...(procedureBudget ? { procedureBudget } : {}),
       network,
       screenshots,
     });

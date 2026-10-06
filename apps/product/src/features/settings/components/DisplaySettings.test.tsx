@@ -20,7 +20,7 @@ vi.mock('@/lib/hooks/useUpdateUserSettings', () => ({
   useUpdateUserSettings: () => ({ mutate: mocks.updateMutate, isPending: false }),
 }));
 vi.mock('@dayopt/i18n/navigation', () => ({
-  usePathname: () => '/calendar',
+  usePathname: () => '/',
   useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
 }));
 vi.mock('../hooks/useUserSettings', () => ({
@@ -72,6 +72,6 @@ describe('DisplaySettings language', () => {
     fireEvent.click(option);
 
     expect(mocks.updateMutate).toHaveBeenCalledWith({ preferredLocale: 'en' });
-    expect(mocks.replace).toHaveBeenCalledWith('/calendar', { locale: 'en' });
+    expect(mocks.replace).toHaveBeenCalledWith('/', { locale: 'en' });
   });
 });
