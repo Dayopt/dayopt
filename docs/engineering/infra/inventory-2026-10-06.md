@@ -21,6 +21,25 @@ last_verified: 2026-10-06
 - 最新Vercelの公開Supabase URLを、今回改めて取得した親project限定のSupabase MCP `list_branches`（5件）と比較。Production main、Integration、および`codex/cloud-first-preview-2910`、`codex/integration-reconcile-3009`、`codex/poc-retirement-3022`のrefが対応し、一覧上はACTIVE_HEALTHY / FUNCTIONS_DEPLOYED。`codex/integration-calendar-poc-port`のVercel overrideが指す`vszahucqgipeqtnnwzkv`はこの一覧にない。古い参照の整理候補であり、別project全体の不存在・実アクセス失敗と断定しない。MCP補足をDoctorのblocked結果へ混ぜて書き換えない。
 - PostHog settingsと集計の2検査は今回もpass。Project Read追加後の設定取得不能は解消した。データ削除credentialの配布と実削除は未確認のまま。
 
+### heartbeatと旧Previewの是正案（追加調査）
+
+`pnpm ctx 2864 --reuse-brief-l1`相当の既存context readerをagentの`op run`で取得した。Issue #2864はopen、関連PR #3005はmerged。trusted L1 briefは未取得のためIssue本文を参照した。既存のCHECK制約拡張・job union・記録・監査をセットにする要求はすでに実装されており、旧CHECK不備を原因として再修正しない。
+
+課金未開始時のrouteは`configured:false`を返し、started / completedのどちらも記録しない。一方、現在の共有policyは課金照合を含む全jobに完了を要求する。この契約の組み合わせは未開始時に欠測を生む。現在の設定metadataは未開始と整合するが、11:15の実requestがこの分岐を通ったことはHTTP 200だけでは確定していない。
+
+推奨案は次の通りで、**未実装・未適用**。本番課金の有効化、heartbeatの手動挿入、欠測の正常化は是正手段にしない。
+
+1. 課金照合の運用状態（未開始 / 稼働中）を、実行時の資格情報欠落から推測せず、監査する設計上の期待状態として明示する。既存`production_activation: pending`との正本責任を一本化し、複数の切替値を独立管理しない。
+2. 定期呼出しの到達・意図したスキップ・照合完了を区別して記録する。スキップ時に`last_completed_at`や`succeeded:true`を偽装しない。到達だけで照合成功とはしない。
+3. 未開始であることを明示確認できる場合も定期到達は監視する。稼働中は現在と同じ1560分の完了条件を要求し、資格情報の消失・部分設定・起動失敗は失敗とする。状態不明は正常にしない。
+4. route / 記録schemaと型 / policy / CI audit / Doctor / monitoring docsを一体で変更し、未開始、稼働中、部分設定、期限超過、未配信契約、正常稼働後の設定消失を検証する。独立レビューと明示的な本番適用手順を経てから、自然な定期実行で確認する。
+
+旧PreviewはGitHub RESTでbranch取得404、head指定PR一覧は末尾まで取得しPR #3012だけ。#3012は2026-10-03にintegrationへmerged、headは`90652010f15670af6f8693ca293611913a4a662e`。Vercelには同SHAのProduct deploymentが2件残り、そのうち`dpl_Czq5bmAaUEaF3rdPvsAfNnV3GYiq`は現在もREADY、branch alias `product-git-codex-integration-calendar-poc-port-dayopt.vercel.app`を持つことをMCPで再取得した。READYはアプリとDBの疎通成功を示さない。
+
+当該branch限定のSupabase管理envは**16行**。先の28行は4branchのsecret相当名7項目ずつを数えたものであり、整理対象全体の行数とは異なる。default Preview・Integration・Productionの変数は別。ローカルworktreeも同branchに残っているため操作しない。
+
+整理は利用終了の意図を確認した後、Supabase Integrationが保持する当該branchの管理状態を確認し、再注入を防げる手順を先に定める。既存deployment/aliasとproject envのライフサイクルは別なので、env削除だけで過去deploymentの資格情報が消えたと扱わない。値を表示せずに復旧できることを確かめるまでは16行の手動削除をしない。今回は設定・alias・deployment・worktreeを変更していない。
+
 ### 残る44結果と、すでにある補足証拠
 
 次表の件数は今回のdrift 1 / blocked 19 / manual 24を全件対応付けたもの。UIやMCPの補足でAPI結果をpassへ置き換えず、「何をもう聞かなくてよいか」と「何が残るか」を分ける。各サービスのcheck ID・取得時刻は保存されたDoctor結果、補足の取得元は本書の各時刻の節にある。
