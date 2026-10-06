@@ -67,6 +67,37 @@ ciの一覧も6件すべてを観測した。`vercel-production`、`supabase-aut
 
 追記後にNode 24で`pnpm run doctor --offline`を実行し、108検査定義と正本参照の整合を確認した（認証・通信なし、終了コード0）。`pnpm docs:check`も成功。今回の変更は所在metadataのみで、readerや判定処理の変更・実環境APIの再実行はない。
 
+## 11:49–11:52 JSTのUI / MCP追補
+
+サービス設定は変更せず、環境変数の値・署名secret・メール本文を開かずに確認した。この追補は11:31のDoctor実行とは別の証拠であり、自動結果の件数は書き換えない。
+
+| 項目                           | 取得元と観測                                                                                                                                                                                                                                                                                                                   | 判定と残る範囲                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Vercel ProductのStripe binding | ChromeのProduct → Environment VariablesでProject / Sharedを確認。全環境のProject検索では`STRIPE_WEBHOOK_SECRET`、`STRIPE_ACCOUNT_ID`、`NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`、`STRIPE_SECRET_KEY`、`STRIPE_LIVEMODE`の5項目がすべてPreview / `integration`。ProductionのProject、Productionと全環境のShared検索はいずれも該当なし。 | `production_activation: pending`と整合。現設定のmetadataは確認できたが、配信済みdeploymentが保持する値やcronの実行分岐は証明しない。 |
+| Resend送信domain               | 接続済みMCPのdomain一覧・detail。`dayopt.app`はverified、sending enabled、receiving disabled、Open / Click Tracking false。DKIM / sending用DNSもverified。                                                                                                                                                                     | 期待設定と一致。送信実行・実配送・送信key scopeの証明ではない。                                                                      |
+| Resend Product webhook         | MCP webhook一覧。`https://app.dayopt.app/api/webhooks/resend`、enabled。eventは`email.bounced`、`email.complained`、`email.delivered`、`email.delivery_delayed`、`email.failed`、`email.suppressed`。                                                                                                                          | 接続先・状態・event集合が期待値と一致。署名secretの配布先一致と受信処理の成功は未確認。                                              |
+| Resend Web webhook             | MCP webhook一覧。`https://dayopt.app/api/webhooks/resend`、enabled。eventは`email.bounced`、`email.complained`、`email.failed`、`email.suppressed`。                                                                                                                                                                           | 接続先・状態・event集合が期待値と一致。署名secretの配布先一致と受信処理の成功は未確認。                                              |
+| Cloudflare管理画面             | Chromeで既存Dashboardを開いたがサインイン画面だった。                                                                                                                                                                                                                                                                          | 現在のログイン待ち。zone / Turnstile / R2等の非公開metadataは未取得。資格情報の不存在とは扱わない。                                  |
+
+Resendのendpointは10/5の早い時刻にも確認記録があり、後のMCP応答では省略されていた。今回は再取得できたため、「MCPではendpointが常に取得不能」という取得制約の記述を更新した。期待値そのものは変更していない。
+
+続いてVercel MCPのdeployment detailを`app.dayopt.app`から取得し、Production `READY`、deployment `dpl_hpdetJQXMNgMLhvAQutTSzDky3CK`、SHA `47f5d7c414317192bcd173255c092a29cdee0035`を確認した。公開versionのSHAと一致する。応答には環境変数bindingが含まれず、配信時点のStripe設定の証拠には使えない。生応答・creator情報は保存していない。
+
+### 残作業の整理
+
+1Passwordのhuman・ci項目について、今回ユーザーと確認した所在は記録済みであり、その確認を再入力してもらう必要はない。GitHub / Stripeの正確な項目名の省略、Resend / Gmailログインの所在未特定は上の記録どおり残す。以下は所在の確認とは別に、実設定・権限・動作の証拠が必要なもの。
+
+| 分類                                     | 確認済みの範囲                                                                                                                                        | 残りと次の確認方法                                                                                                                                                                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production heartbeatの差異               | billing activation pending、現Vercel設定にProduction Stripe bindingなし、配信SHAのrouteは未設定時にheartbeat記録前でreturn。                          | 配信deploymentのbinding / 既存cron実行metadataを読む。意図した未稼働と常時heartbeat要求の衝突を解決する。cronを発火せず、差異を消すためだけに期待値を緩めない。                                                         |
+| GitHub / Supabase / Vercelの接続metadata | 10/5にenvironment secret名・branch policy・webhook、Supabase branch / backup / Storage / RLS、Vercel alias / protection / env bindingの補足証拠あり。 | GitHub Appの権限・repo選択・pending詳細、古いPreview Config型7項目の所有者と利用先、Supabase branchのその後の状態、配信deploymentとの一致。既存metadataを読む。                                                         |
+| Resend / Stripe / Upstash                | Resend domain / webhook、Stripe Test price / webhook / Portal、Upstash DB / ACLを確認済み。                                                           | Resend key scope / Auth Edge sender、Production Stripe Live metadata、追加Test priceの意図、実deploymentのRedis接続先とtokenのACL対応。secretは表示しない。通常PreviewのRedis分離PRは別の変更として配信状態を照合する。 |
+| Cloudflare                               | 公開DNS・メール認証・registryの証拠あり。                                                                                                             | 管理画面ログイン後にzone / DNSSEC / Email Routing / Turnstile / R2 lock・lifecycle・権限metadataを確認。object本文やtoken値を読まない。                                                                                 |
+| Sentry / PostHog                         | Sentry project / org privacy / release metadata、PostHog project / privacy / authorized URL / Production送信停止の補足証拠あり。                      | Sentry hook一覧とTLS設定の対象、source map適用、通知先。PostHog Doctor読取scope、削除credentialとruntimeの配線、古いPreview許可URLの意図。個人event / personを取得せず、削除しない。                                    |
+| 配布先secret・実動作・復旧               | 1Passwordの所在と既存master参照、backup runや監視設定のmetadataあり。                                                                                 | masterとreplicaの一致、実メール / 通知、復元可能性はmetadataだけでは証明できない。読み取りで到達できる範囲と、別途実行を伴う確認を区別する。Google OAuth / Calendarは別セッションの証拠を参照する。                     |
+
+`blocked`はDoctorの自動取得経路の状態、上表は補足証拠を含む棚卸しの状態。両者を混同して未確認件数や完了率を算出しない。日々の自動追跡を広げるためのreader権限整備と、設計を把握するための確認も別に管理する。
+
 ## 検証とレビュー
 
 ### 11:31 JSTの再取得と所在情報のCLI対応

@@ -1619,8 +1619,8 @@ ui_only:
       'service': 'resend',
       'category': 'current_permission',
       'items': ['send credential master', 'webhook replica values / Auth Edge sender'],
-      'reason': 'Doctorの既存op readerは4項目すべてcredential_or_collector_failed。MCPはverified domain・enabled webhook・API key名を返すがendpoint URLをredactし、key scopeとsecret replica一致を返さない',
-      'next_step': '既存Dashboardでendpoint接続先とkey scopeのmetadataだけ確認する。signing secretは表示・保存せず、credential発行や変更をしない',
+      'reason': 'Doctorの既存op readerは4項目すべてcredential_or_collector_failed。2026-10-06のMCPでdomain設定・webhook接続先・event一覧は確認できたが、key scope、Auth Edge送信元、secret replica一致は未確認。MCP応答の項目省略をAPI未提供とは扱わない',
+      'next_step': '既存Dashboardでkey scopeと送信元のmetadataを確認し、既存の安全な照合経路でreplica一致を確認する。signing secretは表示・保存せず、credential発行や変更をしない',
       'check_ids': ['resend.sender_and_signature_replicas'],
       'documentation_urls': ['https://resend.com/docs/api-reference/webhooks/get-webhook'],
     }
