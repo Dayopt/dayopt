@@ -6,9 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const statsState = vi.hoisted(() => ({
   data: undefined as
-    { counts: Record<string, number>; planCounts: Record<string, number> } | undefined,
+    | {
+        counts: Record<string, number>;
+        planCounts: Record<string, number>;
+        lastUsed?: Record<string, string>;
+      }
+    | undefined,
   isError: false,
+  isFetching: false,
 }));
+const sortState = vi.hoisted(() => ({ sortKey: 'name' as 'name' | 'lastUsed' }));
 const empty = vi.hoisted(() => []);
 const remove = vi.hoisted(() => vi.fn());
 const notifyFailure = vi.hoisted(() => vi.fn());
@@ -39,6 +46,11 @@ vi.mock('@/features/activities', async () => {
 });
 vi.mock('@/lib/trpc', () => ({
   api: { statistics: { getActivityStats: { useQuery: () => statsState } } },
+}));
+vi.mock('@/features/calendar/stores/useActivitySortStore', () => ({
+  useActivitySortStore: (
+    selector: (state: { sortKey: 'name' | 'lastUsed'; setSortKey: () => void }) => unknown,
+  ) => selector({ sortKey: sortState.sortKey, setSortKey: vi.fn() }),
 }));
 vi.mock('@/lib/billing/useProductAccessGate', () => ({
   useProductAccessGate: () => (action: () => void) => action(),
@@ -78,6 +90,24 @@ describe('ActivityFilterList deletion failures', () => {
     vi.clearAllMocks();
     statsState.data = undefined;
     statsState.isError = false;
+    statsState.isFetching = false;
+    sortState.sortKey = 'name';
+  });
+  it('lastUsed の統計取得中は行を操作可能にしない', () => {
+    sortState.sortKey = 'lastUsed';
+    statsState.isFetching = true;
+    const client = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={client}>
+        <ActivityFilterList />
+      </QueryClientProvider>,
+    );
+    try {
+      expect(screen.queryByRole('button', { name: 'delete activity' })).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
+      client.clear();
+    }
   });
   it.each([
     ['loading', undefined, false, 'delete.activityDescriptionUnknown'],

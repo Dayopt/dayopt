@@ -155,7 +155,9 @@ describe('calendar-navigation-e2e.yml の token 分離', () => {
       /- name: Run E2E tests[\s\S]*?run: ([\s\S]*?)\n        env:/,
     )?.[1];
     expect(command).toBeDefined();
-    const filters = [...(command?.matchAll(/'([^']+)'/g) ?? [])].map((match) => match[1]!);
+    const filters = [...(command?.matchAll(/'([^']+)'/g) ?? [])]
+      .map((match) => match[1]!)
+      .filter((filter) => filter.endsWith('.spec\\.ts$'));
     const files = [
       'calendar-initial-load.spec.ts',
       'critical-path.spec.ts',
@@ -166,6 +168,32 @@ describe('calendar-navigation-e2e.yml の token 分離', () => {
     for (const file of [...files, 'mobile-critical-path.spec.ts']) {
       const selected = filters.some((filter) => new RegExp(filter).test(`/repo/e2e/${file}`));
       expect(selected, file).toBe(files.includes(file));
+    }
+    const grep = command?.match(/--grep='([^']+)'/)?.[1];
+    expect(grep).toBe(
+      '@preview-e2e/(product-initial-(desktop|mobile)-(tokyo|la)|desktop-(plan|record|past-plan)-create|product-calendar-(view|sidebar)-navigation|product-search-(desktop|mobile))',
+    );
+    const selectedFlows = [
+      'product-initial-desktop-tokyo',
+      'product-initial-desktop-la',
+      'product-initial-mobile-tokyo',
+      'product-initial-mobile-la',
+      'desktop-plan-create',
+      'desktop-record-create',
+      'desktop-past-plan-create',
+      'product-calendar-view-navigation',
+      'product-calendar-sidebar-navigation',
+      'product-search-desktop',
+      'product-search-mobile',
+    ];
+    for (const flow of selectedFlows)
+      expect(new RegExp(grep!).test(`@preview-e2e/${flow}`)).toBe(true);
+    for (const flow of [
+      'desktop-summary-record-deep-link',
+      'desktop-data-export',
+      'desktop-template-lifecycle',
+    ]) {
+      expect(new RegExp(grep!).test(`@preview-e2e/${flow}`)).toBe(false);
     }
     expect(command?.match(/--project="[^"]+"/g)).toEqual([
       '--project="chromium"',

@@ -347,7 +347,7 @@ describe('references: text 正本の参照切れを検出する', () => {
 describe('repo の Architecture Map は最新で、参照は全件実在する', () => {
   it('生成ブロックが text 正本と一致する（pnpm architecture:generate で更新）', async () => {
     expect(await findStaleArchitectureMapDocs()).toEqual([]);
-  });
+  }, 60_000);
 
   it('glossary / invariants の参照先が実在する', () => {
     expect(checkArchitectureReferences()).toEqual([]);

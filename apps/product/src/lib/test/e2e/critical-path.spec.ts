@@ -84,9 +84,13 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
     );
   await settleDragFrame();
   const preview = page.locator('[data-drag-selection-preview]');
-  // 終端を1回送る（5px超なのでこの move で drag が成立）。未反映の selection を
-  // mouseup で確定し、短い Record のまま後段の Report だけが落ちるのを防ぐ。
-  await page.mouse.move(x, yTo);
+  // listener 設定直後の最初の mousemove が CI の描画負荷で落ちても開始できるよう、
+  // 中間地点まで複数イベントを送り、selection が描画されたことを確認する。
+  await page.mouse.move(x, yFrom + 24, { steps: 4 });
+  await expect(preview).toBeVisible();
+  // 終端へ移動し、未反映の selection を mouseup で確定して短い Record を保存するのを防ぐ。
+  await settleDragFrame();
+  await page.mouse.move(x, yTo, { steps: 8 });
   await expect(preview).toContainText(
     `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourTo).padStart(2, '0')}:00`,
   );

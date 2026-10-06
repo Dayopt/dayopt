@@ -105,7 +105,11 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
   const t = useTranslations();
   const isMobile = useIsMobile();
   const { data: tree, isLoading, isFetching } = useActivityTree();
-  const { data: stats, isError: isStatsError } = api.statistics.getActivityStats.useQuery();
+  const {
+    data: stats,
+    isError: isStatsError,
+    isFetching: isStatsFetching,
+  } = api.statistics.getActivityStats.useQuery();
   const { data: archivedActivities, isFetching: isArchivedFetching } = useArchivedActivities();
   const { data: archivedCategories } = useArchivedCategories();
 
@@ -120,6 +124,10 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
   const sortKey = useActivitySortStore((s) => s.sortKey);
   const setSortKey = useActivitySortStore((s) => s.setSortKey);
   const lastUsed = useMemo(() => stats?.lastUsed ?? EMPTY_LAST_USED, [stats]);
+  // 最終利用順を選択中に統計を取得・再取得している間は、仮の名前順を操作可能にしない。
+  // 行クリックは即時作成なので、確定後に並び替わると別の行を押す危険がある。
+  const isWaitingForLastUsedSort =
+    sortKey === 'lastUsed' && (isStatsFetching || (!stats && !isStatsError));
 
   const categories = useMemo(
     () =>
@@ -294,7 +302,7 @@ export function ActivityFilterList({ betweenCategoriesAndUncategorized }: Activi
   return (
     <ActivityDragProvider allActivities={allActivities}>
       <div className="w-full min-w-0 overflow-hidden">
-        {isLoading ? (
+        {isLoading || isWaitingForLastUsedSort ? (
           <div className="space-y-1 py-1">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
