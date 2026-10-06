@@ -18,7 +18,8 @@ const STATUSES = new Set([
   'cleanup-failed',
   'deleted',
 ]);
-const SYNTHETIC_EMAIL = /^(?:mobile-)?critical-path-[a-f0-9-]{36}@example\.com$/;
+const SYNTHETIC_EMAIL =
+  /^(?:(?:mobile-)?critical-path|account-deletion)-[a-f0-9-]{36}@example\.com$/;
 
 /** Recover only journaled synthetic users whose server-side ownership matches. */
 export async function recoverPreviewUsers({

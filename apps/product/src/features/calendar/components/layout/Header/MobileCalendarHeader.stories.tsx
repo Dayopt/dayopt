@@ -37,7 +37,7 @@ export const Expanded: Story = {
     const toggle = canvas.getByRole('button', { expanded: false });
     await userEvent.click(toggle);
     await expect(
-      canvas.getByRole('button', { name: /Search blocks|ブロックを検索/i }),
+      canvas.getByRole('button', { name: /Search blocks|タイムブロックを検索/i }),
     ).toBeVisible();
   },
 };

@@ -267,6 +267,7 @@ export async function prepareCloudRecovery({
     env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
     env.GITHUB_REF !== 'refs/heads/integration' ||
     env.GITHUB_WORKFLOW_REF !== `${REPO}/.github/workflows/ci.yml@refs/heads/integration` ||
+    env.PREVIEW_MERGED_VALIDATION === 'true' ||
     !env.GITHUB_TOKEN?.trim()
   )
     throw new Error();
@@ -374,10 +375,10 @@ export async function recoverCloudIntent({
     });
     if (
       !Number.isSafeInteger(result.checked) ||
-      result.checked !== 2 ||
+      result.checked !== Object.keys(plan.userIds).length ||
       !Number.isSafeInteger(result.recovered) ||
       result.recovered < 0 ||
-      result.recovered > 2
+      result.recovered > Object.keys(plan.userIds).length
     )
       throw new Error();
     return {
@@ -385,7 +386,7 @@ export async function recoverCloudIntent({
         result.status === 'clean' && users.every((user) => user.status === 'deleted')
           ? 'clean'
           : 'failed',
-      checked: 2,
+      checked: Object.keys(plan.userIds).length,
       recovered: result.recovered,
       users,
     };

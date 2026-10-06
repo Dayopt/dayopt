@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { test } from './preview-access-fixture';
 
 import type { AppRouter } from '@/lib/trpc/root';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -9,6 +10,7 @@ import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
+import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
 import { suppressConsentBanner } from './suppress-consent-banner';
 import {
   fulfillTrpcProcedure,
@@ -51,10 +53,9 @@ const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERV
 assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Billing: Checkout / Portal 導線');
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
-const TEST_RUN_ID = crypto.randomUUID();
-const TEST_USER_ID = crypto.randomUUID();
-const TEST_EMAIL = `billing-${TEST_RUN_ID}@example.com`;
-const TEST_PASSWORD = 'test-password-123';
+let TEST_USER_ID: string;
+let TEST_EMAIL: string;
+let TEST_PASSWORD: string;
 
 const DUMMY_CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/e2e-dummy';
 const DUMMY_PORTAL_URL = 'https://billing.stripe.com/p/session/e2e-dummy';
@@ -93,31 +94,18 @@ describeWithEnv('Billing: Checkout / Portal 導線', () => {
 
   let adminSupabase: SupabaseClient;
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { error: authError } = await adminSupabase.auth.admin.createUser({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-      email_confirm: true,
-      user_metadata: { full_name: 'billing e2e' },
-    });
-    // CI retries:2 + serial mode の再実行で "already exists" になりうるため許容する
-    if (authError && !authError.message.includes('already exists')) {
-      throw new Error(authError.message);
-    }
-
-    // 既定は Free プラン（stripe_customer_id 無し、subscription_status は DB 側 default 'free'）
-    const { error: profileError } = await adminSupabase.from('profiles').upsert({
-      id: TEST_USER_ID,
-      email: TEST_EMAIL,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-    if (profileError) throw new Error(profileError.message);
+    const user = await createScopedTestUser(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_KEY!,
+      'billing',
+      testInfo.project.name,
+    );
+    ({ userId: TEST_USER_ID, email: TEST_EMAIL, password: TEST_PASSWORD } = user);
 
     const { error: settingsError } = await adminSupabase.from('user_settings').upsert({
       user_id: TEST_USER_ID,
@@ -132,31 +120,8 @@ describeWithEnv('Billing: Checkout / Portal 導線', () => {
   });
 
   test.afterAll(async () => {
-    if (!adminSupabase) return;
-
-    // PostgREST の DELETE は 0 行一致でも 204 を返すため、対象が既に無いことは
-    // error にならない。error が立つのは実際の失敗だけなので、そのまま記録する。
-    const { error: settingsError } = await adminSupabase
-      .from('user_settings')
-      .delete()
-      .eq('user_id', TEST_USER_ID);
-    if (settingsError) {
-      console.error('[billing.spec] user_settings cleanup failed', settingsError);
-    }
-
-    const { error: profileError } = await adminSupabase
-      .from('profiles')
-      .delete()
-      .eq('id', TEST_USER_ID);
-    if (profileError) {
-      console.error('[billing.spec] profiles cleanup failed', profileError);
-    }
-
-    const { error: authDeleteError } = await adminSupabase.auth.admin.deleteUser(TEST_USER_ID);
-    // ユーザーが既に存在しない場合も成功扱い（冪等な cleanup）
-    if (authDeleteError && !authDeleteError.message.toLowerCase().includes('not found')) {
-      console.error('[billing.spec] auth user cleanup failed', authDeleteError);
-    }
+    if (!TEST_USER_ID) return;
+    await deleteScopedTestUser(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, TEST_USER_ID);
   });
 
   // login() は各 test が route 登録を終えてから呼ぶ。desktop shell の
@@ -166,129 +131,143 @@ describeWithEnv('Billing: Checkout / Portal 導線', () => {
   // 送らない。
   const MOBILE_SKIP_REASON = 'desktop-only（Stripe host route intercept と SettingsDialog 前提）';
 
-  test('アップグレード操作で Stripe Checkout へ遷移しようとする', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
-    test.skip(
-      !process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
-      'NEXT_PUBLIC_STRIPE_PRO_PRICE_ID 未設定（未設定だとアップグレードボタンが disabled のまま）',
-    );
+  test(
+    'アップグレード操作で Stripe Checkout へ遷移しようとする',
+    { tag: '@preview-e2e/product-billing-checkout-mocked' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
 
-    await page.route('**/api/trpc/billing.createCheckoutSession*', (route) =>
-      fulfillTrpcResponse<CheckoutSessionResponse>(route, { url: DUMMY_CHECKOUT_URL }),
-    );
-    // Stripe 自体は叩かない。遷移が試みられたことだけを確認して即 abort する
-    await page.route('https://checkout.stripe.com/**', (route) => route.abort());
+      await page.route(trpcProcedureRoutePattern('billing.createCheckoutSession'), (route) =>
+        fulfillTrpcResponse<CheckoutSessionResponse>(route, { url: DUMMY_CHECKOUT_URL }),
+      );
+      // Stripe 自体は叩かない。遷移が試みられたことだけを確認して即 abort する
+      await page.route('https://checkout.stripe.com/**', (route) => route.abort());
 
-    await login(page);
-    await openBillingSettings(page);
+      await login(page);
+      await openBillingSettings(page);
 
-    const upgradeButton = page.getByRole('button', { name: '月 $5 で利用する' });
-    await expect(upgradeButton).toBeVisible({ timeout: 10_000 });
-    await expect(upgradeButton).toBeEnabled();
+      const upgradeButton = page.getByRole('button', { name: '月 $5 で利用する' });
+      await expect(upgradeButton).toBeVisible({ timeout: 10_000 });
+      await expect(upgradeButton).toBeEnabled();
 
-    const stripeRequestPromise = page.waitForRequest((request) =>
-      request.url().startsWith('https://checkout.stripe.com/'),
-    );
+      const stripeRequestPromise = page.waitForRequest((request) =>
+        request.url().startsWith('https://checkout.stripe.com/'),
+      );
 
-    await upgradeButton.click();
+      await upgradeButton.click();
 
-    const stripeRequest = await stripeRequestPromise;
-    expect(stripeRequest.url()).toBe(DUMMY_CHECKOUT_URL);
-  });
+      const stripeRequest = await stripeRequestPromise;
+      expect(stripeRequest.url()).toBe(DUMMY_CHECKOUT_URL);
+    },
+  );
 
-  test('プラン調整操作で Stripe Customer Portal へ遷移しようとする', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
-    // "プランを調整" ボタンは canAccessPro 限定なので、Pro ユーザーの overview を返す。
-    //
-    // profiles.stripe_customer_id を実 DB に upsert する案は採れない。getBillingOverview は
-    // stripeCustomerId が非 null だと requireStripe() 経由で実 Stripe を呼ぶため
-    // （billing-service.ts:363-374）、STRIPE_SECRET_KEY を渡さないローカル / CI では
-    // billing.getOverview が INTERNAL_SERVER_ERROR になり画面が ErrorState に落ちる。
-    // read 側も mock して Stripe には一切到達させない。
-    //
-    // 登録に trpcProcedureRoutePattern を使うのは、userSettings.get の prefetch と同一 tick で
-    // batch されると URL が `billing.getOverview` 単体でなくなるため（同ファイルの doc 参照）。
-    await page.route(trpcProcedureRoutePattern('billing.getOverview'), (route) =>
-      fulfillTrpcProcedure<BillingOverviewResponse>(route, 'billing.getOverview', {
-        billingInfo: {
-          subscriptionStatus: 'active',
-          stripeCustomerId: 'cus_e2e_dummy',
-          subscriptionId: null,
-        },
-        paymentMethod: null,
-        invoices: [],
-        trialEndsAt: null,
-        access: {
-          state: 'subscribed' as const,
-          canUseProduct: true,
+  test(
+    'プラン調整操作で Stripe Customer Portal へ遷移しようとする',
+    { tag: '@preview-e2e/product-billing-portal-mocked' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
+      // "プランを調整" ボタンは canAccessPro 限定なので、Pro ユーザーの overview を返す。
+      //
+      // profiles.stripe_customer_id を実 DB に upsert する案は採れない。getBillingOverview は
+      // stripeCustomerId が非 null だと requireStripe() 経由で実 Stripe を呼ぶため
+      // （billing-service.ts:363-374）、STRIPE_SECRET_KEY を渡さないローカル / CI では
+      // billing.getOverview が INTERNAL_SERVER_ERROR になり画面が ErrorState に落ちる。
+      // read 側も mock して Stripe には一切到達させない。
+      //
+      // 登録に trpcProcedureRoutePattern を使うのは、userSettings.get の prefetch と同一 tick で
+      // batch されると URL が `billing.getOverview` 単体でなくなるため（同ファイルの doc 参照）。
+      await page.route(trpcProcedureRoutePattern('billing.getOverview'), (route) =>
+        fulfillTrpcProcedure<BillingOverviewResponse>(route, 'billing.getOverview', {
+          billingInfo: {
+            subscriptionStatus: 'active',
+            stripeCustomerId: 'cus_e2e_dummy',
+            subscriptionId: null,
+          },
+          paymentMethod: null,
+          invoices: [],
           trialEndsAt: null,
-          enforced: false,
-        },
-      }),
-    );
-    await page.route('**/api/trpc/billing.createPortalSession*', (route) =>
-      fulfillTrpcResponse<PortalSessionResponse>(route, { url: DUMMY_PORTAL_URL }),
-    );
-    // Stripe 自体は叩かない。遷移が試みられたことだけを確認して即 abort する
-    await page.route('https://billing.stripe.com/**', (route) => route.abort());
+          access: {
+            state: 'subscribed' as const,
+            canUseProduct: true,
+            trialEndsAt: null,
+            enforced: false,
+          },
+        }),
+      );
+      await page.route(trpcProcedureRoutePattern('billing.createPortalSession'), (route) =>
+        fulfillTrpcResponse<PortalSessionResponse>(route, { url: DUMMY_PORTAL_URL }),
+      );
+      // Stripe 自体は叩かない。遷移が試みられたことだけを確認して即 abort する
+      await page.route('https://billing.stripe.com/**', (route) => route.abort());
 
-    await login(page);
-    await openBillingSettings(page);
+      await login(page);
+      await openBillingSettings(page);
 
-    const adjustPlanButton = page.getByRole('button', { name: 'プランを調整' });
-    await expect(adjustPlanButton).toBeVisible({ timeout: 10_000 });
-    await expect(adjustPlanButton).toBeEnabled();
+      const adjustPlanButton = page.getByRole('button', { name: 'プランを調整' });
+      await expect(adjustPlanButton).toBeVisible({ timeout: 10_000 });
+      await expect(adjustPlanButton).toBeEnabled();
 
-    const stripeRequestPromise = page.waitForRequest((request) =>
-      request.url().startsWith('https://billing.stripe.com/'),
-    );
+      const stripeRequestPromise = page.waitForRequest((request) =>
+        request.url().startsWith('https://billing.stripe.com/'),
+      );
 
-    await adjustPlanButton.click();
+      await adjustPlanButton.click();
 
-    const stripeRequest = await stripeRequestPromise;
-    expect(stripeRequest.url()).toBe(DUMMY_PORTAL_URL);
-  });
+      const stripeRequest = await stripeRequestPromise;
+      expect(stripeRequest.url()).toBe(DUMMY_PORTAL_URL);
+    },
+  );
 
   // Checkout からの復帰導線（#1881）。Stripe は経由しないため mock 不要。
   // settings/[category]/page.tsx が `?success=true` / `?canceled=true` を検出して
   // toast を出すことだけを確認する。PC は openSettings + workspace への replace が
   // 続くが、遷移先が (app) 内に留まるので Toaster は unmount されず toast は残る。
-  test('Checkout 成功復帰（?success=true）で成功 toast が表示される', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
+  test(
+    'Checkout 成功復帰（?success=true）で成功 toast が表示される',
+    { tag: '@preview-e2e/product-billing-checkout-success-return' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
 
-    await login(page);
-    await page.goto('/ja/settings/billing?success=true');
+      await login(page);
+      await page.goto('/ja/settings/billing?success=true');
 
-    await expect(page.getByText(CHECKOUT_SUCCESS_TOAST_TEXT)).toBeVisible({ timeout: 10_000 });
-  });
+      await expect(page.getByText(CHECKOUT_SUCCESS_TOAST_TEXT)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('button', { name: '月 $5 で利用する' })).toBeVisible();
+    },
+  );
 
-  test('Checkout キャンセル復帰（?canceled=true）でキャンセル toast が表示される', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
+  test(
+    'Checkout キャンセル復帰（?canceled=true）でキャンセル toast が表示される',
+    { tag: '@preview-e2e/product-billing-checkout-cancel-return' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
 
-    await login(page);
-    await page.goto('/ja/settings/billing?canceled=true');
+      await login(page);
+      await page.goto('/ja/settings/billing?canceled=true');
 
-    await expect(page.getByText(CHECKOUT_CANCELED_TOAST_TEXT)).toBeVisible({ timeout: 10_000 });
-  });
+      await expect(page.getByText(CHECKOUT_CANCELED_TOAST_TEXT)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('button', { name: '月 $5 で利用する' })).toBeVisible();
+    },
+  );
 
   // Portal からの復帰（?portal_return=true）は課金概要の invalidate だけが目的で、
   // 通知するイベントではないので toast を出さない。invalidate 自体は
   // settings/__tests__/routing.test.tsx が assert する。ここでは Checkout の
   // toast を巻き添えで出していないことと、白紙にならないことを確認する。
-  test('Portal 復帰（?portal_return=true）では toast を出さず画面が壊れない', async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
+  test(
+    'Portal 復帰（?portal_return=true）では toast を出さず画面が壊れない',
+    { tag: '@preview-e2e/product-billing-portal-return' },
+    async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name.includes('Mobile'), MOBILE_SKIP_REASON);
 
-    await login(page);
-    await page.goto('/ja/settings/billing?portal_return=true');
+      await login(page);
+      await page.goto('/ja/settings/billing?portal_return=true');
 
-    await expect(page.locator('main')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(CHECKOUT_SUCCESS_TOAST_TEXT)).toBeHidden();
-    await expect(page.getByText(CHECKOUT_CANCELED_TOAST_TEXT)).toBeHidden();
-  });
+      await expect(page.getByRole('button', { name: '月 $5 で利用する' })).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(page.getByText(CHECKOUT_SUCCESS_TOAST_TEXT)).toBeHidden();
+      await expect(page.getByText(CHECKOUT_CANCELED_TOAST_TEXT)).toBeHidden();
+    },
+  );
 });

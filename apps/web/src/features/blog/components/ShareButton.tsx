@@ -51,11 +51,12 @@ export function ShareButton({ title, url }: ShareButtonProps) {
     }
   };
 
-  const handleNativeShare = () => {
-    if ('share' in navigator) {
-      navigator.share({ title, url });
-    } else {
-      handleCopyLink();
+  const handleNativeShare = async () => {
+    try {
+      await navigator.share({ title, url });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      await handleCopyLink();
     }
   };
 

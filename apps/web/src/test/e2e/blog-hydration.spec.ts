@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './public-test';
 
 test('blog search waits for its input handler before accepting edits', async ({ page }) => {
   let releaseScripts!: () => void;
@@ -9,7 +9,7 @@ test('blog search waits for its input handler before accepting edits', async ({ 
   await page.route('**/_next/static/**/*.js', async (route) => {
     heldScripts += 1;
     await scriptsReady;
-    await route.continue();
+    await route.fallback();
   });
   try {
     await page.goto('/blog?page=2', { waitUntil: 'commit' });

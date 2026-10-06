@@ -229,8 +229,8 @@ function sameCandidate(expected, observed) {
   return JSON.stringify(actual) === JSON.stringify(expected);
 }
 
-function isSyntheticCriticalPathEmail(email) {
-  return /^(critical-path|mobile-critical-path)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@example\.com$/i.test(
+function isSyntheticPreviewEmail(email) {
+  return /^(critical-path|mobile-critical-path|account-deletion)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@example\.com$/i.test(
     email ?? '',
   );
 }
@@ -251,7 +251,7 @@ async function getVerifiedRunUser(admin, evidence, runId) {
     !user ||
     user.id !== evidence.userId ||
     user.app_metadata?.e2e_run_id !== runId ||
-    !isSyntheticCriticalPathEmail(user.email)
+    !isSyntheticPreviewEmail(user.email)
   ) {
     throw new Error('Preview E2E user ownership does not match the recovery run');
   }
@@ -406,7 +406,7 @@ export async function recoverPreviewE2ERun({
       supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
       bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
       // Recover the already-owned pinned run even after its PR closes or advances.
-      requireRunnablePullRequest: false,
+      pullRequestPolicy: 'cleanup',
     });
     if (!sameCandidate(current.candidate, observed)) {
       throw new Error('Preview E2E recovery target does not match the recorded candidate');

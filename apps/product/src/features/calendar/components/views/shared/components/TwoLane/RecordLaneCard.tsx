@@ -230,6 +230,7 @@ export function RecordLaneCard({
               e.preventDefault();
               onResizeStart(event, direction, e);
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <span className="calendar-resize-handle-indicator" />
           </div>

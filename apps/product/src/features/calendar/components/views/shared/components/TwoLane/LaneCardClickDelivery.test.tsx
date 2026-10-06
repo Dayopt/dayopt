@@ -179,4 +179,43 @@ describe('lane card のクリック配送', () => {
 
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it.each(['plan', 'record'] as const)(
+    '%s resize handle click does not open the Inspector',
+    (cardKind) => {
+      const onClick = vi.fn();
+      const onResizeStart = vi.fn();
+      render(
+        cardKind === 'plan' ? (
+          <PlanLaneCard
+            event={plan}
+            position={position}
+            activityName="確認"
+            onClick={onClick}
+            onPointerDown={vi.fn()}
+            onResizeStart={onResizeStart}
+          />
+        ) : (
+          <RecordLaneCard
+            event={record}
+            position={position}
+            activityName="確認"
+            onClick={onClick}
+            onPointerDown={vi.fn()}
+            onResizeStart={onResizeStart}
+          />
+        ),
+      );
+      const handle = screen
+        .getByRole('button', { name: '確認' })
+        .querySelector('[data-resize-handle="bottom"]');
+      expect(handle).not.toBeNull();
+
+      fireEvent.mouseDown(handle!, AT);
+      fireEvent.click(handle!, AT);
+
+      expect(onResizeStart).toHaveBeenCalledOnce();
+      expect(onClick).not.toHaveBeenCalled();
+    },
+  );
 });

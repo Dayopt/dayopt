@@ -114,6 +114,9 @@ function createCommands() {
 
 describe('PlanTemplateService', () => {
   beforeEach(() => {
+    // 固定した記録を直近28日の集計窓に保ち、実行日によるdurationの変化を防ぐ。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-05T00:00:00.000Z'));
     vi.clearAllMocks();
     // 固定 fixture が実行日に依存して直近28日の窓から外れないようにする。
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -259,6 +262,10 @@ describe('PlanTemplateService', () => {
         ],
       });
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('list', () => {

@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 import { resolveServiceRoleTarget } from '../service-role-target-guard';
 import {
@@ -7,6 +7,7 @@ import {
   deleteScopedTestUser,
   type ScopedTestUser,
 } from './create-scoped-test-user';
+import { test } from './preview-access-fixture';
 
 /**
  * アクセシビリティテスト
@@ -56,7 +57,7 @@ function formatViolations(violations: import('axe-core').Result[]) {
 // 未認証ページ
 // ==========================================
 test.describe('A11y: 未認証ページ', () => {
-  test('ログインページ', async ({ page }) => {
+  test('ログインページ', { tag: '@preview-e2e/product-a11y-login' }, async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -74,9 +75,14 @@ test.describe('A11y: 未認証ページ', () => {
 test.describe('A11y: 認証済みページ', () => {
   test.skip(!SERVICE_ROLE_TARGET.safe, SERVICE_ROLE_TARGET.safe ? '' : SERVICE_ROLE_TARGET.reason);
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({}, testInfo) => {
     if (!SERVICE_ROLE_TARGET.safe) return;
-    testUser = await createScopedTestUser(SUPABASE_URL!, SERVICE_ROLE_KEY!, 'a11y');
+    testUser = await createScopedTestUser(
+      SUPABASE_URL!,
+      SERVICE_ROLE_KEY!,
+      'a11y',
+      testInfo.project.name,
+    );
   });
 
   test.afterAll(async () => {
@@ -88,19 +94,27 @@ test.describe('A11y: 認証済みページ', () => {
     await loginAndNavigate(page);
   });
 
-  test('カレンダーページ（デイビュー）', async ({ page }) => {
+  test(
+    'カレンダーページ（デイビュー）',
+    { tag: '@preview-e2e/product-a11y-calendar' },
+    async ({ page }) => {
+      await page.goto('/ja/?view=day');
+      await expect(page.locator('[data-calendar-grid]')).toHaveCount(1);
+      await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
+      await page.waitForLoadState('networkidle');
+
+      const results = await new AxeBuilder({ page: page as never })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+
+      expect(results.violations, formatViolations(results.violations)).toHaveLength(0);
+    },
+  );
+
+  test('設定ページ', { tag: '@preview-e2e/product-a11y-settings' }, async ({ page }) => {
+    await page.goto('/ja/settings/display');
     await page.waitForLoadState('networkidle');
-
-    const results = await new AxeBuilder({ page: page as never })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-
-    expect(results.violations, formatViolations(results.violations)).toHaveLength(0);
-  });
-
-  test('設定ページ', async ({ page }) => {
-    await page.goto('/ja/settings/general');
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('combobox', { name: '時間表示形式', exact: true })).toBeVisible();
 
     const results = await new AxeBuilder({ page: page as never })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

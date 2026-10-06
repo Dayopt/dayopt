@@ -1,5 +1,5 @@
 import { BROWSER_TELEMETRY_CONSENT_STORAGE_KEY } from '@dayopt/observability';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from './public-test';
 
 import commonEn from '../../../messages/en/common.json' with { type: 'json' };
 

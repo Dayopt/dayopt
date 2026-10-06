@@ -52,6 +52,30 @@ describe('prefetchCalendarData', () => {
     vi.useRealTimers();
   });
 
+  it('visible range readiness does not start or wait for all-history statistics', async () => {
+    mocks.settings.mockResolvedValue({ timezone: 'UTC', weekStartsOn: 1, showWeekends: true });
+    mocks.activityStatsPrefetch.mockImplementationOnce(() => new Promise(() => {}));
+    let releaseRange!: () => void;
+    mocks.plansPrefetch.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseRange = resolve;
+        }),
+    );
+    let ready = false;
+    const pending = prefetchCalendarData('week', '2026-09-15').then(() => {
+      ready = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mocks.plansPrefetch).toHaveBeenCalledTimes(1);
+    expect(ready).toBe(false);
+    releaseRange();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ready).toBe(true);
+    expect(mocks.activityStatsPrefetch).not.toHaveBeenCalled();
+    await pending;
+  });
+
   it('client の useCalendarData と同じ builder・同じ設定値で plans / records / ghost を先読みする', async () => {
     // JST では 2026-09-15 の朝、UTC ではまだ 09-14
     vi.setSystemTime(new Date('2026-09-14T23:30:00.000Z'));

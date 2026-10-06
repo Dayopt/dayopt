@@ -154,6 +154,14 @@ describe('Cloud recovery plan intake', () => {
       JSON.stringify(JSON.parse(readFileSync(join(s.directory, 'verified.json'), 'utf8'))),
     ).not.toContain('PRIVATE_');
   });
+  it('does not mix merged-candidate validation with recovery of a prior run', async () => {
+    const s = prepare();
+    await expect(
+      prepareCloudRecovery({ ...s, env: { ...s.env, PREVIEW_MERGED_VALIDATION: 'true' } }),
+    ).rejects.toThrow();
+    expect(s.fetchImpl).not.toHaveBeenCalled();
+    expect(s.download).not.toHaveBeenCalled();
+  });
   it.each(['1;echo TOKEN', '0', '9007199254740992'])(
     'rejects malformed source input before download: %s',
     async (value) => {
@@ -238,13 +246,16 @@ describe('Cloud recovery plan intake', () => {
   });
 });
 describe('Cloud recovery after worker loss', () => {
-  it('recovers partial creation without the lost journal, using only two precommitted IDs', async () => {
+  it('recovers partial creation without the lost journal, using only precommitted IDs', async () => {
     const directory = temp();
     const authenticate = vi.fn(async () => undefined);
     let desktopDeleted = false;
     const fetchImpl = vi.fn<typeof fetch>(async (input, options) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.endsWith(`/users/${intent.userIds.mobile}`))
+      if (
+        url.endsWith(`/users/${intent.userIds.mobile}`) ||
+        url.endsWith(`/users/${intent.userIds.accountDeletion}`)
+      )
         return new Response('{}', { status: 404 });
       if (!url.endsWith(`/users/${intent.userIds.desktop}`)) throw new Error('unexpected user');
       if (options?.method === 'DELETE') {
@@ -268,7 +279,7 @@ describe('Cloud recovery after worker loss', () => {
       authenticate,
       recover: (options) => recoverPreviewUsers({ ...options, fetchImpl }),
     });
-    expect(result).toMatchObject({ status: 'clean', checked: 2, recovered: 1 });
+    expect(result).toMatchObject({ status: 'clean', checked: 3, recovered: 1 });
     expect(result.users.every((user) => user.status === 'deleted')).toBe(true);
     expect(
       fetchImpl.mock.calls.every((call) =>

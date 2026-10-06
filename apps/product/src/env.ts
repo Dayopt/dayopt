@@ -161,6 +161,7 @@ const serverSchema = z
     // 課金 enforcement。未設定（既定）= 無効＝全機能無料。
     // Phase B（成熟・ローンチ前）に production を 'true' にして Free/Pro 棲み分けを復活させる。
     BILLING_ENFORCED: z.enum(['true', 'false']).optional(),
+    INTEGRATION_BILLING_REHEARSAL: z.enum(['true', 'false']).optional(),
     VERCEL_URL: z.string().optional(),
     VERCEL_ENV: z.string().optional(),
     VERCEL_TARGET_ENV: z.string().optional(),

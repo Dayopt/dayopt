@@ -770,6 +770,8 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 
 ### Cloud Preview の未初期化台帳（#2910）
 
+過去の登録記録（master同期やcleanup成功の証明ではない）: `ci/preview-e2e` のreadiness tokenとbypass secretは **planned master** としてoptional/pendingを維持する。Preview branch keyは固定keyをmaster化せず、`supabase-preview-provision/credential` のread-only Management tokenからreadiness後に対象branchごと取得する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。値は会話へ出さない。
+
 `ci/preview-e2e` のreadiness tokenとVercel bypass secretは **planned master** としてoptional/pendingを維持する。Preview E2Eの固定DB key replicaは使わず、`SUPABASE_PREVIEW_PROVISION_TOKEN` でreadinessが検証したPreview projectのkeyを動的に取得する。1Password master値やEnvironment間の値一致は、専用同期手順とrun結果で別途確認する。値は会話へ出さない。
 
 `PREVIEW_E2E_VERCEL_TOKEN` のplanned参照は廃止する。短寿命 `GITHUB_TOKEN` のdeployments/statuses read権限で、GitHubが認証したVercel botのProduct Preview記録を確認する。Production用 `VERCEL_TOKEN` のmaster・replica・release経路は変更しない。project-scoped Vercel tokenもProductのProductionを含むread/write権限を持つため、Preview用tokenとして新規発行しない。

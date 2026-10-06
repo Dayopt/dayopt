@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({ query: 'needle', results: [] as object[] }));
 vi.mock('@dayopt/i18n/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(`q=${state.query}`),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock('@web/features/search/search-client', () => ({
   fetchSearchResults: async () => state.results,

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { observePreviewReadiness, parsePreviewReadinessArgs } from './preview-readiness.mjs';
+import {
+  observePreviewCleanupReadiness,
+  observePreviewReadiness,
+  parsePreviewReadinessArgs,
+} from './preview-readiness.mjs';
 
 const options = {
   sha: 'a'.repeat(40),
@@ -86,6 +90,20 @@ function world() {
     if (url.startsWith('https://api.github.com/')) {
       const path = new URL(url).pathname;
       if (path.endsWith(`/pulls/${options.prNumber}`)) return Response.json(pr);
+      if (path.endsWith(`/git/commits/${'c'.repeat(40)}`)) {
+        return Response.json({
+          sha: 'c'.repeat(40),
+          parents: [{ sha: 'b'.repeat(40) }, { sha: options.sha }],
+        });
+      }
+      if (path.endsWith(`/compare/${'c'.repeat(40)}...${'d'.repeat(40)}`)) {
+        return Response.json({
+          status: 'ahead',
+          ahead_by: 1,
+          behind_by: 0,
+          merge_base_commit: { sha: 'c'.repeat(40) },
+        });
+      }
       if (path.endsWith(`/commits/${options.sha}/statuses`)) return Response.json([commitStatus]);
       if (path.endsWith(`/deployments/${deployment.id}/statuses`))
         return Response.json([deploymentStatus]);
@@ -151,6 +169,28 @@ describe('Preview readiness', () => {
       );
     }
   });
+  it('merged policy keeps the exact merge binding through the readiness result', async () => {
+    const w = world();
+    const mergeCommitSha = 'c'.repeat(40);
+    Object.assign(w.pr, {
+      state: 'closed',
+      merged: true,
+      merge_commit_sha: mergeCommitSha,
+    });
+    w.pr.base.ref = 'integration';
+    const result = await observePreviewReadiness({
+      ...options,
+      mergedValidation: true,
+      mergeCommitSha,
+      workflowSha: 'd'.repeat(40),
+      fetchImpl: w.fetchImpl,
+    });
+    expect(result).toMatchObject({
+      status: 'ready',
+      mergedValidation: true,
+      mergeCommitSha,
+    });
+  });
 
   it('shared DBは指定したpersistentだけを使用する', async () => {
     const w = world();
@@ -162,7 +202,7 @@ describe('Preview readiness', () => {
     ).resolves.toMatchObject({ status: 'ready' });
   });
 
-  it('回収modeだけはclose/head更新済みPRでも元の固定provider/DB候補を照合する', async () => {
+  it('通常のreadinessはclose/head更新済みPRをcleanup policyで受け入れない', async () => {
     const w = world();
     w.pr.state = 'closed';
     w.pr.draft = true;
@@ -174,10 +214,33 @@ describe('Preview readiness', () => {
       observePreviewReadiness({
         ...options,
         fetchImpl: w.fetchImpl,
-        requireRunnablePullRequest: false,
+        // Deliberately bypass the static union to verify runtime input rejection.
+        pullRequestPolicy: 'cleanup' as never,
       }),
-    ).resolves.toMatchObject({ status: 'ready', sha: options.sha });
+    ).rejects.toThrow('candidate PR policy is invalid');
   });
+
+  it.each(['deployment', 'database', 'migrations'])(
+    'cleanup専用readinessも固定%sの不一致を拒否する',
+    async (mismatch) => {
+      const w = world();
+      w.pr.state = 'closed';
+      w.pr.draft = true;
+      w.pr.head.sha = 'b'.repeat(40);
+      if (mismatch === 'deployment') w.version.preview.sha = 'b'.repeat(40);
+      if (mismatch === 'database') w.branch.project_ref = 'b'.repeat(20);
+      if (mismatch === 'migrations') w.migrations[0].version = '20260902000000';
+      await expect(
+        observePreviewCleanupReadiness({ ...options, fetchImpl: w.fetchImpl }),
+      ).rejects.toThrow(
+        mismatch === 'deployment'
+          ? 'application deployment or database identity differs'
+          : mismatch === 'database'
+            ? 'database branch is not the requested ready nonproduction environment'
+            : 'migration sets differ',
+      );
+    },
+  );
 
   it.each([60_001, -1])(
     '全provider/DB/app観測の時間差%smsが古い/逆行した場合は合格にしない',

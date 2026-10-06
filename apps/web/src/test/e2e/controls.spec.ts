@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './public-test';
 
 for (const locale of ['', '/ja']) {
   test(`${locale || 'en'} RSS control returns a feed with article links`, async ({ page }) => {

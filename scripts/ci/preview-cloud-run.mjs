@@ -1,5 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,7 +14,12 @@ import { expectedMigrationVersions } from '../ci/production-migration-readiness.
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 import { previewServiceKeyHeaders, resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
-import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
+import {
+  isPassingPreviewReport,
+  isPreviewE2EFile,
+  safePreviewFailedSteps,
+  safePreviewProcedureBudget,
+} from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { runPreviewE2E } from '../runbook/preview-e2e.mjs';
 import { validateCloudIntent } from './preview-cloud-intent.mjs';
@@ -22,6 +34,13 @@ export function verifyCloudFixtureContract(candidateRoot, trustedRoot = ROOT) {
     'apps/product/src/lib/test/preview-cloud-identity.ts',
     'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
     'apps/product/src/lib/test/preview-service-key-fetch.mjs',
+    'apps/product/src/lib/test/e2e/account-deletion-fixture.ts',
+    'apps/product/src/lib/test/e2e/create-scoped-test-user.ts',
+    'apps/product/src/lib/test/e2e/preview-access-fixture.ts',
+    'apps/product/src/lib/test/e2e/trpc-response-mock.ts',
+    'apps/product/src/lib/test/e2e/trpc-budget-fixture.ts',
+    'apps/product/src/lib/test/preview-user-lifecycle.ts',
+    'apps/product/src/lib/test/preview-access.ts',
   ]) {
     const source = readFileSync(join(trustedRoot, path));
     const target = join(candidateRoot, path);
@@ -44,9 +63,37 @@ const STATES = new Set([
   'cleanup-failed',
   'deleted',
 ]);
-const FILES = new Set(['critical-path.spec.ts', 'mobile-critical-path.spec.ts']);
 const PROJECTS = new Set(['chromium', 'Mobile Chrome']);
 const TEST_STATES = new Set(['passed', 'failed', 'timedOut', 'skipped', 'interrupted', 'unknown']);
+const PREFLIGHT_STAGES = new Set([
+  'candidate-binding',
+  'fixture-contract',
+  'fixture-key',
+  'migration-inventory',
+  'runner-preflight',
+]);
+
+function readPreflightFailureStage(directory) {
+  // A malformed or mismatched journal keeps the existing generic binding failure.
+  if (existsSync(join(directory, 'evidence', 'run.json'))) return null;
+  try {
+    const marker = readJson(join(directory, 'preflight-failure.json'));
+    return PREFLIGHT_STAGES.has(marker?.stage) ? marker.stage : null;
+  } catch {
+    return null;
+  }
+}
+
+function recordPreflightFailure(directory, stage) {
+  if (!PREFLIGHT_STAGES.has(stage) || existsSync(join(directory, 'evidence', 'run.json'))) return;
+  // Only the trusted execute path writes this fixed enum after invocation binding succeeds.
+  // This diagnostic is not an ownership journal and cannot authorize recovery or success.
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  writeFileSync(join(directory, 'preflight-failure.json'), JSON.stringify({ stage }), {
+    mode: 0o600,
+    flag: 'wx',
+  });
+}
 const safeGitEnv = () =>
   Object.fromEntries(
     ['PATH', 'HOME', 'LANG'].flatMap((key) => (process.env[key] ? [[key, process.env[key]]] : [])),
@@ -58,8 +105,16 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-/** Authenticate the selected key against the selected nonproduction Auth API before creating fixtures. */
-export async function assertCloudFixtureKey({ request, serviceKey, fetchImpl = fetch }) {
+/**
+ * Authenticate the selected key against the selected nonproduction Auth API before creating fixtures.
+ * @param {{request: ReturnType<typeof validateCloudRequest>, serviceKey: string | undefined, userIds?: Record<string, string>, fetchImpl?: typeof fetch}} options
+ */
+export async function assertCloudFixtureKey({
+  request,
+  serviceKey,
+  userIds = undefined,
+  fetchImpl = fetch,
+}) {
   const bound = validateCloudRequest(request);
   if (!serviceKey?.trim()) throw new Error('Cloud Preview fixture key is missing');
   if (!serviceKey.startsWith('sb_secret_')) {
@@ -85,6 +140,27 @@ export async function assertCloudFixtureKey({ request, serviceKey, fetchImpl = f
     );
     if (!response.ok || (await response.json())?.id !== '00000000-0000-0000-0000-000000000001')
       throw new Error();
+    if (userIds !== undefined) {
+      const ids = Object.values(userIds);
+      if (
+        !ids.length ||
+        !ids.every((id) => UUID.test(id) && id !== '00000000-0000-0000-0000-000000000001') ||
+        new Set(ids).size !== ids.length
+      )
+        throw new Error();
+      for (const id of ids) {
+        const planned = await fetchImpl(
+          `https://${bound.supabaseProjectRef}.supabase.co/auth/v1/admin/users/${id}`,
+          {
+            method: 'GET',
+            redirect: 'error',
+            signal: AbortSignal.timeout(15000),
+            headers: previewServiceKeyHeaders(serviceKey),
+          },
+        );
+        if (planned.status !== 404) throw new Error();
+      }
+    }
   } catch {
     throw new Error('Cloud Preview fixture key or baseline is not ready');
   }
@@ -163,10 +239,12 @@ export function publishCloudEvidence({ directory, destination, request, intent =
     run = readRun(directory, bound);
     if (plan && run.runId !== plan.runId) throw new Error();
   } catch {
+    const preflightFailureStage = readPreflightFailureStage(directory);
     const output = {
       request: bound,
       status: 'failed',
       runBindingConfirmed: false,
+      ...(preflightFailureStage ? { preflightFailureStage } : {}),
       cleanupConfirmed: false,
       tests: [],
       users: [],
@@ -204,13 +282,14 @@ export function publishCloudEvidence({ directory, destination, request, intent =
     output.testsPassed = isPassingPreviewReport(report);
     output.tests = report.tests.map((test) => {
       if (
-        !FILES.has(test.file) ||
+        !isPreviewE2EFile(test.file) ||
         !PROJECTS.has(test.project) ||
         !TEST_STATES.has(test.status) ||
         !Number.isSafeInteger(test.line) ||
         !Number.isSafeInteger(test.retry)
       )
         throw new Error();
+      const procedureBudget = safePreviewProcedureBudget(test.procedureBudget);
       return {
         file: test.file,
         project: test.project,
@@ -218,6 +297,8 @@ export function publishCloudEvidence({ directory, destination, request, intent =
         status: test.status,
         retry: test.retry,
         expectedPassed: test.expectedPassed === true,
+        failedSteps: safePreviewFailedSteps(test),
+        ...(procedureBudget ? { procedureBudget } : {}),
       };
     });
   } catch {
@@ -254,7 +335,7 @@ export function publishCloudEvidence({ directory, destination, request, intent =
       cleanup.runId === run.runId &&
       cleanup.status === 'clean' &&
       Number.isSafeInteger(cleanup.checked) &&
-      cleanup.checked >= 2 &&
+      cleanup.checked >= (plan?.schemaVersion === 2 ? 3 : 2) &&
       output.journalComplete &&
       cleanup.checked === output.users.length &&
       output.users.every((user) => user.status === 'deleted');
@@ -277,6 +358,8 @@ export function publishCloudEvidence({ directory, destination, request, intent =
 }
 
 if (isDirectExecution(import.meta.url)) {
+  let failureDirectory;
+  let failureStage;
   try {
     const [operation, requestFile, candidatePath, runPath, artifactPath, intentPath, ...rest] =
       process.argv.slice(2);
@@ -290,6 +373,7 @@ if (isDirectExecution(import.meta.url)) {
     const request = validateCloudRequest(readJson(requestFile));
     const intent = validateCloudIntent(readJson(intentPath));
     if (
+      (operation === 'execute' && intent.schemaVersion !== 2) ||
       Object.entries(request).some(([key, value]) => intent.request[key] !== value) ||
       intent.sourceRunId !== Number(process.env.GITHUB_RUN_ID) ||
       intent.sourceAttempt !== Number(process.env.GITHUB_RUN_ATTEMPT) ||
@@ -299,6 +383,8 @@ if (isDirectExecution(import.meta.url)) {
     const candidateRoot = resolve(candidatePath);
     const directory = resolve(runPath);
     if (operation === 'execute') {
+      failureDirectory = directory;
+      failureStage = 'candidate-binding';
       const git = (args) =>
         execFileSync('git', args, {
           cwd: candidateRoot,
@@ -308,18 +394,23 @@ if (isDirectExecution(import.meta.url)) {
         }).trim();
       if (git(['rev-parse', 'HEAD']) !== request.sha || git(['status', '--porcelain']) !== '')
         throw new Error();
+      failureStage = 'fixture-contract';
       verifyCloudFixtureContract(candidateRoot);
+      failureStage = 'migration-inventory';
+      const expectedMigrations = expectedMigrationVersions(candidateRoot);
+      failureStage = 'runner-preflight';
       const result = await runPreviewE2E({
         resolveServiceKey: async ({ ready }) => {
+          failureStage = 'fixture-key';
           const serviceKey = await resolvePreviewSecretKey({
             projectRef: ready.supabaseProjectRef,
             provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
           });
-          await assertCloudFixtureKey({ request, serviceKey });
+          await assertCloudFixtureKey({ request, serviceKey, userIds: intent.userIds });
           return serviceKey;
         },
         runDirectory: directory,
-        request: { ...request, expectedMigrations: expectedMigrationVersions(candidateRoot) },
+        request: { ...request, expectedMigrations },
         runId: intent.runId,
         cloudUserIds: intent.userIds,
       });
@@ -348,6 +439,18 @@ if (isDirectExecution(import.meta.url)) {
       console.log('Public Cloud Preview evidence prepared');
     }
   } catch {
+    if (
+      failureDirectory &&
+      PREFLIGHT_STAGES.has(failureStage) &&
+      !existsSync(join(failureDirectory, 'evidence', 'run.json'))
+    ) {
+      try {
+        recordPreflightFailure(failureDirectory, failureStage);
+      } catch {
+        // Storage failure preserves the generic fallback; never log a path or filesystem error.
+      }
+      console.error(JSON.stringify({ preflightFailureStage: failureStage }));
+    }
     console.error(
       'Cloud Preview operation failed; check trusted binding, readiness, and scoped credentials',
     );

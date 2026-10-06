@@ -11,7 +11,7 @@
  * 作成される長さが必ず一致する。
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { toast } from '@/lib/toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -42,12 +42,16 @@ interface InlineCreateExtras {
 }
 
 export function useInlineCreate(extras: InlineCreateExtras = {}) {
-  const { note, fulfillment } = extras;
   const pendingSelection = useInlineCreateStore.use.pendingSelection();
   const clearPendingSelection = useInlineCreateStore.use.clearPendingSelection();
   const setHoveredActivity = useInlineCreateStore.use.setHoveredActivity();
   const previewActivityDuration = useInlineCreateStore.use.previewActivityDuration();
-  const { getMedianMinutes } = useActivityMedianDurations();
+  const { getMedianMinutes, isPending, resolveMedianMinutes } = useActivityMedianDurations();
+  const waitingRef = useRef<{ activityId: string; selectionRevision: number } | null>(null);
+  const extrasRef = useRef(extras);
+  useLayoutEffect(() => {
+    extrasRef.current = extras;
+  }, [extras]);
   const timezone = useUserPreferences((s) => s.timezone);
   const t = useTranslations('activities');
   const tTimeblock = useTranslations('timeblock');
@@ -75,132 +79,177 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
 
   // plan / record 作成ハンドラー（アクティビティ必須、その名前をタイトルに設定）
   const handleCreate = useCallback(
-    (activityId: string, activityName: string) => {
+    (activityId: string, activityName: string, onCreateAborted?: () => void) => {
       if (isCreating) return;
+      const selectionRevision = useInlineCreateStore.getState().selectionRevision;
+      if (
+        waitingRef.current?.activityId === activityId &&
+        waitingRef.current.selectionRevision === selectionRevision
+      )
+        return;
+      // 選び直した活動だけを確定対象にする。古い completion は identity で無効になる。
+      waitingRef.current = null;
+      const create = (medianMinutes: number | null) => {
+        // ホバーの無い環境（タップ）でも同じ長さで作る。ホバー済みなら同じ値なので
+        // 何も動かない。長さを直した後は store 側で no-op になる
+        previewActivityDuration(medianMinutes);
+        const selection = useInlineCreateStore.getState().pendingSelection;
+        if (!selection) {
+          onCreateAborted?.();
+          return;
+        }
 
-      // ホバーの無い環境（タップ）でも同じ長さで作る。ホバー済みなら同じ値なので
-      // 何も動かない。長さを直した後は store 側で no-op になる
-      previewActivityDuration(getMedianMinutes(activityId));
-      const selection = useInlineCreateStore.getState().pendingSelection;
-      if (!selection) return;
+        const { date: selDate, startHour, startMinute, endHour, endMinute } = selection;
 
-      const { date: selDate, startHour, startMinute, endHour, endMinute } = selection;
+        // ローカル時刻 → UTC変換
+        const localStart = new Date(
+          selDate.getFullYear(),
+          selDate.getMonth(),
+          selDate.getDate(),
+          startHour,
+          startMinute,
+        );
+        const localEnd = new Date(
+          selDate.getFullYear(),
+          selDate.getMonth(),
+          selDate.getDate(),
+          endHour,
+          endMinute,
+        );
 
-      // ローカル時刻 → UTC変換
-      const localStart = new Date(
-        selDate.getFullYear(),
-        selDate.getMonth(),
-        selDate.getDate(),
-        startHour,
-        startMinute,
-      );
-      const localEnd = new Date(
-        selDate.getFullYear(),
-        selDate.getMonth(),
-        selDate.getDate(),
-        endHour,
-        endMinute,
-      );
+        const utcStart = convertFromTimezone(localStart, timezone);
+        const utcEnd = convertFromTimezone(localEnd, timezone);
 
-      const utcStart = convertFromTimezone(localStart, timezone);
-      const utcEnd = convertFromTimezone(localEnd, timezone);
+        // 既定は end ルール。過去スロットに限りユーザーがタブで選んだ種別を優先する
+        // （lane はドラッグ起点の表示ヒントに留める）。
+        const { kind: destination } = resolveTimeblockKindChoice(utcEnd, selection.kind);
 
-      // 既定は end ルール。過去スロットに限りユーザーがタブで選んだ種別を優先する
-      // （lane はドラッグ起点の表示ヒントに留める）。
-      const { kind: destination } = resolveTimeblockKindChoice(utcEnd, selection.kind);
+        // 事前 overlap 判定（セレクタを開いている間の resize / 他クライアント更新による race を回避）
+        // 同一レーンのみ禁止（plan×plan / record×record）。plan×record は許可。
+        const laneItems = collectTimeblockLaneItems(
+          queryClient,
+          destination === 'plan' ? 'plans' : 'records',
+        );
+        if (hasTimeblockLaneConflict(laneItems, utcStart, utcEnd)) {
+          // パネルは開いたままにする。時間を直して選び直せる
+          toast.error(tTimeblock('errors.timeOverlap'));
+          onCreateAborted?.();
+          return;
+        }
 
-      // 事前 overlap 判定（セレクタを開いている間の resize / 他クライアント更新による race を回避）
-      // 同一レーンのみ禁止（plan×plan / record×record）。plan×record は許可。
-      const laneItems = collectTimeblockLaneItems(
-        queryClient,
-        destination === 'plan' ? 'plans' : 'records',
-      );
-      if (hasTimeblockLaneConflict(laneItems, utcStart, utcEnd)) {
-        // パネルは開いたままにする。時間を直して選び直せる
-        toast.error(tTimeblock('errors.timeOverlap'));
+        lockedRef.current = true;
+        setIsCreating(true);
+
+        logger.log('🏷️ InlineCreate: Creating', {
+          destination,
+          start: utcStart.toISOString(),
+          end: utcEnd.toISOString(),
+          activityId,
+          title: activityName,
+        });
+
+        const trimmedNote = extrasRef.current.note?.trim();
+        const currentFulfillment = extrasRef.current.fulfillment;
+        const mutation = destination === 'plan' ? createPlan : createRecord;
+        mutation.mutate(
+          {
+            title: activityName,
+            start_at: utcStart.toISOString(),
+            end_at: utcEnd.toISOString(),
+            activityId,
+            ...(trimmedNote ? { note: trimmedNote } : {}),
+            // 充実度は Record だけが持つ。Plan へ渡すと schema で弾かれる
+            ...(destination === 'record' && currentFulfillment
+              ? { fulfillment: currentFulfillment }
+              : {}),
+          },
+          {
+            onSuccess: (created) => {
+              setIsCreating(false);
+              lockedRef.current = false;
+              clearPendingSelection();
+              const message =
+                destination === 'plan'
+                  ? tTimeblock('editor.toast.planCreated')
+                  : tTimeblock('editor.toast.recorded');
+              // サイドバーのタップ作成（useActivityQuickCreate）と同じく取り消しを付ける。
+              // 作成は可逆なので速く進め、間違えたらトーストから戻せるようにする（ルール4）
+              if (created?.id) {
+                const createdId = created.id;
+                const payload = { id: createdId, expectedUpdatedAt: created.updated_at };
+                toast.success(message, {
+                  duration: 5000,
+                  action: {
+                    label: tCommon('undo'),
+                    onClick: () => {
+                      // 取り消したブロックを詳細で開いたままにしない
+                      if (useTimeblockInspectorStore.getState().timeblockId === createdId) {
+                        closeInspector();
+                      }
+                      if (destination === 'plan') {
+                        deletePlan.mutate(payload);
+                      } else {
+                        deleteRecord.mutate(payload);
+                      }
+                    },
+                  },
+                });
+              } else {
+                toast.success(message);
+              }
+              // 同じパネルをそのまま作成したブロックの詳細へ切り替える。メモ入力や
+              // 記録化へ続けて進めるようにするため（作成モードはここで終わる）
+              if (created?.id) {
+                openInspector(created.id, destination);
+              } else {
+                closeInspector();
+              }
+            },
+            // 失敗時はパネルを閉じない。時間や種別を直して選び直せる
+            onError: () => {
+              setIsCreating(false);
+              lockedRef.current = false;
+            },
+          },
+        );
+      };
+      if (isPending && !useInlineCreateStore.getState().hasUserSetDuration) {
+        // 未編集のクリック選択だけ中央値を待つ。drag/edit の長さは即保存する。
+        const request = { activityId, selectionRevision };
+        waitingRef.current = request;
+        let cancelled = false;
+        const unsubscribe = useInlineCreateStore.subscribe((state) => {
+          if (!state.pendingSelection || state.selectionRevision !== selectionRevision) {
+            cancelled = true;
+            if (waitingRef.current === request) {
+              waitingRef.current = null;
+              onCreateAborted?.();
+            }
+          }
+        });
+        void resolveMedianMinutes(activityId)
+          .then((medianMinutes) => {
+            if (!cancelled && waitingRef.current === request) create(medianMinutes);
+          })
+          .catch(() => {
+            if (!cancelled && waitingRef.current === request) onCreateAborted?.();
+          })
+          .finally(() => {
+            unsubscribe();
+            if (waitingRef.current === request) waitingRef.current = null;
+          });
         return;
       }
-
-      lockedRef.current = true;
-      setIsCreating(true);
-
-      logger.log('🏷️ InlineCreate: Creating', {
-        destination,
-        start: utcStart.toISOString(),
-        end: utcEnd.toISOString(),
-        activityId,
-        title: activityName,
-      });
-
-      const trimmedNote = note?.trim();
-      const mutation = destination === 'plan' ? createPlan : createRecord;
-      mutation.mutate(
-        {
-          title: activityName,
-          start_at: utcStart.toISOString(),
-          end_at: utcEnd.toISOString(),
-          activityId,
-          ...(trimmedNote ? { note: trimmedNote } : {}),
-          // 充実度は Record だけが持つ。Plan へ渡すと schema で弾かれる
-          ...(destination === 'record' && fulfillment ? { fulfillment } : {}),
-        },
-        {
-          onSuccess: (created) => {
-            setIsCreating(false);
-            lockedRef.current = false;
-            clearPendingSelection();
-            const message =
-              destination === 'plan'
-                ? tTimeblock('editor.toast.planCreated')
-                : tTimeblock('editor.toast.recorded');
-            // サイドバーのタップ作成（useActivityQuickCreate）と同じく取り消しを付ける。
-            // 作成は可逆なので速く進め、間違えたらトーストから戻せるようにする（ルール4）
-            if (created?.id) {
-              const createdId = created.id;
-              const payload = { id: createdId, expectedUpdatedAt: created.updated_at };
-              toast.success(message, {
-                duration: 5000,
-                action: {
-                  label: tCommon('undo'),
-                  onClick: () => {
-                    // 取り消したブロックを詳細で開いたままにしない
-                    if (useTimeblockInspectorStore.getState().timeblockId === createdId) {
-                      closeInspector();
-                    }
-                    if (destination === 'plan') {
-                      deletePlan.mutate(payload);
-                    } else {
-                      deleteRecord.mutate(payload);
-                    }
-                  },
-                },
-              });
-            } else {
-              toast.success(message);
-            }
-            // 同じパネルをそのまま作成したブロックの詳細へ切り替える。メモ入力や
-            // 記録化へ続けて進めるようにするため（作成モードはここで終わる）
-            if (created?.id) {
-              openInspector(created.id, destination);
-            } else {
-              closeInspector();
-            }
-          },
-          // 失敗時はパネルを閉じない。時間や種別を直して選び直せる
-          onError: () => {
-            setIsCreating(false);
-            lockedRef.current = false;
-          },
-        },
-      );
+      create(getMedianMinutes(activityId));
     },
     [
       isCreating,
       previewActivityDuration,
       getMedianMinutes,
+      isPending,
+      resolveMedianMinutes,
       timezone,
-      note,
-      fulfillment,
+
       createPlan,
       createRecord,
       deletePlan,
@@ -224,6 +273,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
     ) => {
       if (!pendingSelection || isCreating) return;
 
+      const selectionRevision = useInlineCreateStore.getState().selectionRevision;
       setIsCreating(true);
       try {
         // 色・アイコンはカテゴリーだけが持つ（#2162 §4-6）。アクティビティ側には保存しない
@@ -231,8 +281,16 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
           name,
           categoryId: categoryId ?? undefined,
         });
+        const currentSelection = useInlineCreateStore.getState();
+        if (
+          !currentSelection.pendingSelection ||
+          currentSelection.selectionRevision !== selectionRevision
+        ) {
+          setIsCreating(false);
+          return;
+        }
         // mutateAsync resolved → handleCreate で続行
-        handleCreate(created.id, name);
+        handleCreate(created.id, name, () => setIsCreating(false));
       } catch (err) {
         setIsCreating(false);
         const message = err instanceof Error ? err.message : String(err);
