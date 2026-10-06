@@ -1655,8 +1655,8 @@ ui_only:
       'service': 'sentry',
       'category': 'behavior_not_metadata',
       'items': ['applied artifact bundle mapping'],
-      'reason': 'project / organization privacy metadataはAPIで確認できるが、release metadataとlegacy release file数は配信中releaseへのartifact bundle/source map適用を証明しない',
-      'next_step': '認証済みSentry UIでProduct / Webのartifact bundleとserved releaseの対応だけ確認する。個別顧客eventは取得しない',
+      'reason': '2026-10-06のSentry UIとVercel MCPで、Product / Webそれぞれの配信SHAに対応するSource Map Uploadsを確認済み。uploadとreleaseの対応は、実際のstack traceへのsource map適用まで証明しない。legacy release file数だけで不存在とは扱わない',
+      'next_step': 'inventory-2026-10-06.mdのupload / served SHA対応を参照する。実適用の確認は顧客eventを取得しない別の検証として扱い、今回新しいeventは送らない',
       'check_ids': ['sentry.applied_source_maps'],
       'documentation_urls': [],
     }
@@ -1665,8 +1665,8 @@ ui_only:
       'service': 'sentry',
       'category': 'current_permission',
       'items': ['Product / Web project service hook metadata'],
-      'reason': '2026-10-05にproject settings・organization・environment GETは成功したが、両projectのservice hook一覧GETは403。存在数は不明',
-      'next_step': '認証済みSentry UIでhookの件数・event名・接続先hostだけ確認する。secret値やevent payloadは開かない',
+      'reason': '2026-10-05のservice hook一覧GETは両projectとも403。2026-10-06のUIでProduct / Webのlegacy webhook callbackは0件と確認したが、新しいintegration経由のhookを含むservice hook全体の件数は未確認',
+      'next_step': 'legacy callbackの再確認ではなく、新しいintegrationのhook metadataを取得できる既存読取経路を確認する。secret値やevent payloadは開かない',
       'check_ids': ['sentry.service_hooks.dayopt', 'sentry.service_hooks.dayopt-web'],
       'documentation_urls': ['https://docs.sentry.io/api/projects/list-a-projects-service-hooks/'],
     }
@@ -1810,8 +1810,8 @@ ui_only:
       service: sentry,
       category: collector_unavailable,
       items: [alert notification owner, read/edit/delete token scope],
-      reason: project/release metadataやtoken名だけでは通知先と操作権限を証明しない。,
-      next_step: 既存Dashboard/token scopeのmetadataを人が確認。通知テストやkey発行なし。,
+      reason: 2026-10-06のUIでProduct / Webのhigh priority通知ruleと動的recipient設定を確認。固定の復旧担当・実配送・token操作権限は未確認。,
+      next_step: inventory-2026-10-06.mdの通知rule証拠を参照し、固定担当とtoken scopeを既存経路で確認。通知テストやkey発行なし。,
       check_ids: [sentry.alert_authority],
       documentation_urls: [],
     }
