@@ -16,7 +16,7 @@ PlanとRecordを時間gridに描画するcomponent群。Storybookではviewご�
 | Interaction | selection、drag preview、context menu、inline create |
 
 - Planはoutline / 淡色、Recordは塗りを基本にする
-- 振り返りのcomponentとStoryはReview featureが所有する。面の役割は [Review仕様](../../../../../../docs/product/specs/review.md) を参照する
+- アクティビティ詳細は活動のメニューから明示的に開き、閉じた状態ではカレンダーの幅を使う
 - Calendar Storyはpanel内部やDB data flowを説明しない
 
 | ビュー        | 説明                   | コンポーネント |
@@ -26,7 +26,7 @@ PlanとRecordを時間gridに描画するcomponent群。Storybookではviewご�
 | **Multi-Day** | 2〜7日間のカスタム表示 | `MultiDayView` |
 
 ビュー切替は `ViewSwitcherList` コンポーネントで行い、`CalendarNavigationContext` で状態管理。
-振り返りの面・タブ構成は [Review仕様](../../../../../../docs/product/specs/review.md)、実在する component / Story は [Review component source](../../review/components) を正本とする。Calendar の Story は時間軸表示と操作状態を扱う。
+アクティビティ詳細は直近30日の記録時間・1件あたりの中央値・記録一覧を表示する。実装は [ActivitySummaryPanel](../../activities/components/activity-summary/ActivitySummaryPanel.tsx) を参照する。Calendar の Story は時間軸表示と操作状態を扱う。
 
 ---
 
@@ -46,7 +46,7 @@ Calendar は controller、layout / Header、views / grid、activity filter、ani
 | drag / scroll / 表示状態       | Calendar 内の一時 UI 状態と表示設定 | [stores source](../stores)                                                     |
 | 日付 / ビュー / ナビゲーション | URL と Calendar の表示範囲          | [CalendarNavigationContext](../hooks/navigation/CalendarNavigationContext.tsx) |
 
-実在する store / Context の一覧と型は source から確認する。振り返りの状態・面の構成は Review 仕様に従う。
+実在する store / Context の一覧と型は source から確認する。アクティビティ詳細の開閉状態は共通 store が持ち、カレンダーの表示日・viewから独立している。
 
 ---
 
@@ -73,10 +73,10 @@ Calendar は controller、layout / Header、views / grid、activity filter、ani
 
 ## コンテキストメニュー
 
-| メニュー               | トリガー                       | アクション                       |
-| ---------------------- | ------------------------------ | -------------------------------- |
-| `EventContextMenu`     | タイムブロックカード右クリック | 振り返り、コピー、削除、状態操作 |
-| `EmptyAreaContextMenu` | 空エリア右クリック             | プラン作成、レコード作成         |
+| メニュー               | トリガー                       | アクション                                 |
+| ---------------------- | ------------------------------ | ------------------------------------------ |
+| `EventContextMenu`     | タイムブロックカード右クリック | アクティビティ詳細、コピー、削除、状態操作 |
+| `EmptyAreaContextMenu` | 空エリア右クリック             | プラン作成、レコード作成                   |
 
 ---
 

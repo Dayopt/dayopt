@@ -76,14 +76,13 @@ features/{name}/
 | ------------ | ----------------------------------------------------------------------------------------------------------- |
 | `timeblock`  | `timeblock-destination` / `plan-template-duration` / `plan-template-compose` / `activity-estimation-factor` |
 | `activities` | `activity-tree-cache`                                                                                       |
-| `review`     | `variance` / `timePL/`（薄い構成）                                                                          |
 
 ### DAG Layer
 
 ```
 Layer 0 (基盤):       activities
 Layer 1 (中核):       timeblock, external-calendar
-Layer 2 (体験):       calendar, review
+Layer 2 (体験):       calendar
 Independent:          auth, contact
 Composition:          settings  (= 通常 feature DAG には乗せない)
 ```
@@ -583,7 +582,7 @@ import { useTimeblockInspectorStore } from '@/features/timeblock/stores/useTimeb
 import { DateTimeSection } from '@/features/timeblock';
 
 // ✅ ページ層（Composition Layer）で合成
-// src/app/[locale]/(app)/calendar/page.tsx
+// src/app/[locale]/(app)/(workspace)/page.tsx
 import { CalendarController } from '@/features/calendar';
 import { ConfirmDayButton } from '@/features/timeblock';
 ```

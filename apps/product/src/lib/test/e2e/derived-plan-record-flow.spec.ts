@@ -8,7 +8,6 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
-import { REPORT_EXECUTION, REPORT_TAB_PARAM } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -123,32 +122,21 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
     await page.locator('input[type="email"], input[name="email"]').first().fill(email);
     await page.locator('input[type="password"]').first().fill(password);
     await page.locator('button[type="submit"]').first().click();
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?(?:\?.*)?$/i, { timeout: 15_000 });
   }
 
   async function openDay(page: Page) {
-    await page.goto(`/ja/calendar?view=day&date=${PAST_DATE}`);
+    await page.goto(`/ja/?view=day&date=${PAST_DATE}`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
   }
 
-  async function expectPlanRatio(page: Page) {
-    // 予実の行は差分の面（`?tab=diff`）にある。既定タブは「時間の使い方」なので
-    // tab を指定しないと `ExecutionChapter` そのものが描かれない（#2773 の 3 タブ再編）
-    await page.goto(`/ja/report?date=${PAST_DATE}&range=week&tab=${REPORT_TAB_PARAM.diff}`);
-    const row = page.locator(REPORT_EXECUTION.rows, {
-      hasText: ACTIVITY_NAME,
-    });
-    await expect(row).toContainText('予定比 150%', { timeout: 15_000 });
-  }
-
-  test('記録の同一週内移動でInspectorの一覧だけが変わり予定比は変わらない', async ({
+  test('記録の同一週内移動後もInspectorで予定と記録の関係を確認できる', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name.includes('Mobile'), 'desktop-only');
     await login(page);
 
-    await expectPlanRatio(page);
     await openDay(page);
 
     const planCard = page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first();
@@ -209,7 +197,5 @@ describeWithEnv('Derived Plan / Record browser flow', () => {
     await openDay(page);
     await page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first().click();
     await expect(page.getByRole('heading', { name: 'この時間帯の記録' })).toHaveCount(0);
-
-    await expectPlanRatio(page);
   });
 });

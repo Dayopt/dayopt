@@ -15,7 +15,7 @@ describe('buildTimeblockSearchResultPath', () => {
         timeblockId: 'plan-1',
         kind: 'plan',
       }),
-    ).toBe('/ja/calendar?date=2026-07-15&view=day&timeblock=plan%3Aplan-1');
+    ).toBe('/ja/?date=2026-07-15&view=day&timeblock=plan%3Aplan-1');
   });
 
   it('Recordの既存URL契約を使う', () => {
@@ -27,7 +27,7 @@ describe('buildTimeblockSearchResultPath', () => {
         timeblockId: 'record-1',
         kind: 'record',
       }),
-    ).toBe('/en/calendar?date=2026-07-14&view=day&timeblock=record%3Arecord-1');
+    ).toBe('/?date=2026-07-14&view=day&timeblock=record%3Arecord-1');
   });
 });
 

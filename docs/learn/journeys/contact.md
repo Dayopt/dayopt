@@ -290,7 +290,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
       "change": "入力の上限（10〜5000 文字、環境情報の各長さ）はサーバーの zod schema が正本で、画面の 10 文字検査はその写し。カテゴリを足す時は schema、件名の対応表、翻訳を揃える。",
       "screen": {
         "t": "form",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "title": "お問い合わせ",
         "fields": [
           ["カテゴリ", "バグ報告"],
@@ -336,7 +336,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
           },
           "screenAfter": {
             "t": "form",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "title": "お問い合わせ",
             "fields": [
               ["カテゴリ", "バグ報告"],
@@ -459,7 +459,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
           "back": "上限の案内",
           "screenAfter": {
             "t": "form",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "title": "お問い合わせ",
             "fields": [
               ["カテゴリ", "バグ報告"],
@@ -704,7 +704,7 @@ Resend は配送の結果を webhook で送ってくる。宛先が support@dayo
       "change": "エラーの種類ごとに文言を増やす時は、error.data.code の分岐をここに足す。",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [],
         "toast": "メッセージを送信しました"
       },

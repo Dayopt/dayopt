@@ -10,6 +10,7 @@ import React, {
   useTransition,
 } from 'react';
 
+import { DEFAULT_LOCALE } from '@dayopt/config';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 import { useCalendarNavigationStore } from '@/features/calendar/stores/useCalendarNavigationStore';
@@ -22,7 +23,7 @@ import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 
 import { getNextPeriod, getPreviousPeriod } from '../../domain/view-range';
 import { formatCalendarDateParam, parseCalendarDateParam } from '../../lib/date-param';
-import { resolveWorkspaceTab } from '../../lib/route-utils';
+import { isCalendarViewPath } from '../../lib/route-utils';
 import type { CalendarViewType } from '../../types/calendar.types';
 
 // ── カレンダーページ判定・初期値計算（旧 useCalendarProviderProps） ──
@@ -53,43 +54,11 @@ function readDateParamFromLocation(): Date | undefined {
 }
 
 /**
- * `/report` 滞在中に最後にいた calendar view を localStorage へ憶えておく。
+ * pathname と URL searchParams からカレンダー画面の初期値を計算
  *
- * `/report` の URL は `view=` を持たないため（date のみ）、`/report` 上での
- * page reload は Provider を再マウントさせ、view の初期値を復元する手がかりが
- * URL に無くなる。WorkspaceTabs の「カレンダーへ戻る」リンクはこの Provider の
- * `viewType` を読んで `/calendar?view=` を組み立てるため、reload 直後にここが
- * 既定値へ落ちると、直前まで day だったのに reload 後は week へ戻ってしまう
- * （2026-08-19、calendar-navigation.spec.ts の reload 実走で検出）。
- */
-const LAST_CALENDAR_VIEW_STORAGE_KEY = 'dayopt:last-calendar-view';
-
-function readLastCalendarView(): CalendarViewType | undefined {
-  if (typeof window === 'undefined') return undefined;
-  try {
-    const raw = window.localStorage.getItem(LAST_CALENDAR_VIEW_STORAGE_KEY);
-    return raw && isValidViewType(raw) ? raw : undefined;
-  } catch {
-    // localStorage 利用不可（プライベートブラウジング等）は諦めて既定値へ
-    return undefined;
-  }
-}
-
-function writeLastCalendarView(view: CalendarViewType): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(LAST_CALENDAR_VIEW_STORAGE_KEY, view);
-  } catch {
-    // 同上、書き込み失敗は無視してよい（ただの復元ヒントであり必須データではない）
-  }
-}
-
-/**
- * pathname と URL searchParams からワークスペースタブ判定と初期値を計算
- *
- * `fallbackDate` は calendar / report いずれでもない workspaceTab（例: /settings）で
+ * `fallbackDate` はカレンダー以外の画面（例: /settings）で
  * 使う initialDate のフォールバック。呼び出し側の currentDateRef を渡すことで、
- * `/report` `/settings` 滞在中に initialDate が `new Date()` へ空転し続けるのを防ぐ
+ * `/settings` 滞在中に initialDate が `new Date()` へ空転し続けるのを防ぐ
  * （旧 docs/projects/_archive/workspace-shell-restructure/overview.md §6-10 B、
  * docs/projects 全廃に伴い #2473 で削除。git 履歴参照）。
  */
@@ -99,24 +68,11 @@ function resolveCalendarProps(pathname: string, fallbackDate?: Date, initialSear
   );
   const resolvedDate = parseCalendarDateParam(params.get('date')) ?? fallbackDate ?? new Date();
   const pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
-  const workspaceTab = resolveWorkspaceTab(pathWithoutLocale);
+  const isCalendarPage = isCalendarViewPath(pathWithoutLocale);
 
-  if (workspaceTab === 'report') {
-    const initialDate = resolvedDate;
+  if (!isCalendarPage) {
     return {
       isCalendarPage: false as const,
-      workspaceTab,
-      initialDate,
-      // /report の URL は view を持たないため、直前に /calendar にいた時の view を
-      // localStorage から復元する（無ければ week。readLastCalendarView 参照）。
-      initialView: initialSearch === undefined ? (readLastCalendarView() ?? 'week') : 'week',
-    };
-  }
-
-  if (workspaceTab === 'other') {
-    return {
-      isCalendarPage: false as const,
-      workspaceTab,
       initialDate: fallbackDate ?? new Date(),
       initialView: 'week' as CalendarViewType,
     };
@@ -128,7 +84,6 @@ function resolveCalendarProps(pathname: string, fallbackDate?: Date, initialSear
 
   return {
     isCalendarPage: true as const,
-    workspaceTab,
     initialDate,
     initialView: view,
   };
@@ -176,15 +131,14 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   );
   const { initialDate, initialView } = initial;
   const timezone = useUserPreferences((state) => state.timezone);
-  const workspaceTab = resolveWorkspaceTab(pathname.replace(/^\/(ja|en)/, ''));
-  const isCalendarPage = workspaceTab === 'calendar';
+  const isCalendarPage = isCalendarViewPath(pathname.replace(/^\/(ja|en)/, ''));
 
   // useRefで最新値を保持し、コールバックの依存配列を安定化
   const currentDateRef = useRef<Date>(initialDate);
 
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [viewType, setViewType] = useState<CalendarViewType>(initialView);
-  const [isViewReady, setIsViewReady] = useState(initial.workspaceTab !== 'report');
+  const isViewReady = true;
 
   // モバイル判定（Day / Week以外の表示を制限するために使用）
   const isMobile = useMediaQuery(MEDIA_QUERIES.mobile);
@@ -196,21 +150,10 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
 
   // useRefで最新値を保持し、コールバックの依存配列を安定化
   const viewTypeRef = useRef(viewType);
-  const pathnameRef = useRef(pathname);
 
   // 現在のlocaleを取得（例: /ja/day -> ja）
-  const locale = pathname?.split('/')[1] || 'ja';
+  const locale = pathname?.split('/')[1] || DEFAULT_LOCALE;
   const localeRef = useRef(locale);
-
-  React.useEffect(() => {
-    if (workspaceTab !== 'report') return;
-    const savedView = readLastCalendarView();
-    // SSR の week を戻り先として公開しない。ビューと準備完了は同じ commit で反映する。
-    startTransition(() => {
-      if (savedView) setViewType(savedView);
-      setIsViewReady(true);
-    });
-  }, [workspaceTab]);
 
   // timezone cookie の無い初回認証 redirect は SSR が UTC に仮置きする。
   // 最初の client render を合わせた後、明示 URL / 操作済み日付を上書きせず当日へ戻す。
@@ -234,41 +177,22 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     viewTypeRef.current = viewType;
     localeRef.current = locale;
     isMobileRef.current = isMobile;
-    pathnameRef.current = pathname;
     // Palette等がカレンダー表示日/ビュータイプを参照するためグローバルに同期
     useCalendarNavigationStore.getState()._syncViewedDate(currentDate);
     useCalendarNavigationStore.getState()._syncViewType(viewType);
-    // /report での reload 後に復元できるよう、calendar page にいる間だけ憶えておく
-    // （readLastCalendarView 参照。/report 自体の view は無関係のまま書き換えない）。
-    if (isCalendarPage) {
-      writeLastCalendarView(viewType);
-    }
   }, [currentDate, viewType, locale, isMobile, pathname, isCalendarPage]);
 
   /**
-   * 今いる面（calendar / report）の URL を書く。
-   *
-   * 旧 `writeCalendarUrl` から改名: view はカレンダー限定の概念になったため、
-   * 「今いる面」ベースで書き先を分岐させる（overview.md §5-4-b）。
-   * タブ判定は `pathnameRef`（usePathname() 由来）のみで行い、
-   * `useSearchParams()` は使わない（§5-3 と同じ理由）。
+   * ホームの calendar URL を書く。view と date は pathname を変えず query に持たせる。
+   * `useSearchParams()` は使わず、history API で同一ルートの query だけを更新する。
    */
   const writeWorkspaceUrl = useCallback(
     (view: CalendarViewType, date: Date, historyMode: 'push' | 'replace') => {
-      const pathWithoutLocale = pathnameRef.current.replace(/^\/(ja|en)/, '');
-      const currentTab = resolveWorkspaceTab(pathWithoutLocale);
-
       const params = new URLSearchParams(window.location.search);
       params.set('date', formatCalendarDateParam(date));
-
-      let newUrl: string;
-      if (currentTab === 'report') {
-        // range 等の既存クエリはそのまま素通しし、date だけ更新する
-        newUrl = `/${localeRef.current}/report?${params.toString()}`;
-      } else {
-        params.set('view', view);
-        newUrl = `/${localeRef.current}/calendar?${params.toString()}`;
-      }
+      params.set('view', view);
+      const localePrefix = localeRef.current === DEFAULT_LOCALE ? '' : `/${localeRef.current}`;
+      const newUrl = `${localePrefix}/?${params.toString()}`;
 
       if (historyMode === 'push') {
         window.history.pushState(null, '', newUrl);
@@ -316,8 +240,8 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     setViewType(viewParam);
   }, [isCalendarPage, pathname, searchParams, viewType]);
 
-  // /report → /calendar の client 遷移では pathname が先に変わり、その render で読む
-  // window.location はまだ /report のもの（date= が古い）。上の `initialDate` は
+  // workspace 外からホームへ client 遷移する時は pathname が先に変わり、その render で読む
+  // window.location はまだ前 route のもの（date= が古い）。上の `initialDate` は
   // [pathname] にしか反応しないので、URL が確定した後にもう一度 date= を読み直す
   // （レポートの明細 → その日のカレンダー、「カレンダーで組む」が直前の日付のまま
   // 開いていた。2026-09-14 実測）。
@@ -325,7 +249,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
   // 読み直すのは「pathname が変わった後、window.location がその pathname に追いついた
   // 最初の 1 回」だけ。calendar 内の view / date 変更も history API で URL を書き
   // （writeWorkspaceUrl）、Next はそれを useSearchParams へ反映するので、常に読み直すと
-  // 検索結果ジャンプのように「view を先に書いて date を後から直す」経路で、途中の
+  // アクティビティ詳細から記録を開くように「view を先に書いて date を後から直す」経路で、途中の
   // 古い date= を拾って戻してしまう余地がある
   const pendingDateResyncRef = useRef(false);
   const resyncPathnameRef = useRef(pathname);
@@ -334,7 +258,7 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
       resyncPathnameRef.current = pathname;
       pendingDateResyncRef.current = true;
     }
-    if (workspaceTab === 'other' || !pendingDateResyncRef.current) return;
+    if (!isCalendarPage || !pendingDateResyncRef.current) return;
     // まだ URL が前の route のまま（search も古い）。次の searchParams 更新を待つ
     if (window.location.pathname !== pathname) return;
     pendingDateResyncRef.current = false;
@@ -343,21 +267,13 @@ export const CalendarNavigationProvider = ({ children }: { children: React.React
     startTransition(() => {
       setCurrentDate(dateFromUrl);
     });
-  }, [workspaceTab, pathname, searchParams, startTransition]);
+  }, [isCalendarPage, pathname, searchParams, startTransition]);
 
   React.useEffect(() => {
     const handlePopState = () => {
       const resolved = resolveCalendarProps(window.location.pathname, currentDateRef.current);
-      // 'other'（/settings 等）は非対応のまま。calendar / report は両方扱う
-      // （overview.md §6-10 B「popstate の早期return」対策）。
-      if (resolved.workspaceTab === 'other') return;
-
-      if (resolved.workspaceTab === 'report') {
-        startTransition(() => {
-          setCurrentDate(resolved.initialDate);
-        });
-        return;
-      }
+      // workspace 外（/settings 等）の履歴状態はここでは扱わない。
+      if (!resolved.isCalendarPage) return;
 
       const nextView =
         isMobileRef.current && !isMobileCalendarViewSupported(resolved.initialView)

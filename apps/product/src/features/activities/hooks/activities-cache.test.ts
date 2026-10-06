@@ -9,37 +9,38 @@ import type { AppRouter } from '@/lib/trpc/root';
 
 import { invalidateActivityCaches } from './activities-cache';
 
-it('分類の変更後、表示中のレポートを再取得し、閉じた詳細も再取得対象にする', async () => {
+it('分類変更後にアクティビティ詳細のキャッシュを無効化する', async () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const client = createTRPCClient<AppRouter>({
     links: [httpBatchLink({ url: 'http://unused.invalid/trpc', transformer: superjson })],
   });
   const utils = createTRPCQueryUtils({ queryClient, client });
-  const periodKey = getQueryKey(trpc.review.getReportPeriod, { anchorDate: '2026-09-29' }, 'query');
-  const detailKey = getQueryKey(trpc.review.getReportActivityDetail, { activityId: 'a1' }, 'query');
+  const summaryKey = getQueryKey(
+    trpc.activities.getActivitySummary,
+    { activityId: 'a1', timezone: 'UTC' },
+    'query',
+  );
   const unrelatedKey = getQueryKey(trpc.billing.getAccess, undefined, 'query');
-  const oldReport = { activityName: '変更前', categoryName: '仕事' };
-  const changedReport = { activityName: '変更後', categoryName: null };
-  queryClient.setQueryData(periodKey, oldReport);
-  queryClient.setQueryData(detailKey, oldReport);
+  const oldSummary = { totalRecordCount: 1 };
+  const changedSummary = { totalRecordCount: 2 };
+  queryClient.setQueryData(summaryKey, oldSummary);
   queryClient.setQueryData(unrelatedKey, { status: 'active' });
   // 実際の TanStack Query と tRPC の query key/utility を使う。取得結果だけを合成する。
-  const fetchReport = vi.fn().mockResolvedValue(changedReport);
+  const fetchSummary = vi.fn().mockResolvedValue(changedSummary);
   const observer = new QueryObserver(queryClient, {
-    queryKey: periodKey,
-    queryFn: fetchReport,
+    queryKey: summaryKey,
+    queryFn: fetchSummary,
     staleTime: 60_000,
   });
   const unsubscribe = observer.subscribe(() => {});
   try {
-    expect(observer.getCurrentResult().data).toEqual(oldReport);
-    expect(fetchReport).not.toHaveBeenCalled();
+    expect(observer.getCurrentResult().data).toEqual(oldSummary);
+    expect(fetchSummary).not.toHaveBeenCalled();
 
     invalidateActivityCaches(utils);
 
-    await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual(changedReport));
-    expect(fetchReport).toHaveBeenCalledTimes(1);
-    expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(true);
+    await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual(changedSummary));
+    expect(fetchSummary).toHaveBeenCalledTimes(1);
     expect(queryClient.getQueryState(unrelatedKey)?.isInvalidated).toBe(false);
   } finally {
     unsubscribe();

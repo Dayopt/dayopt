@@ -68,7 +68,7 @@ interface CalendarCompositionResult {
 
   // === Context menu actions ===
   onDeleteTimeblockConfirm: ReturnType<typeof useCalendarCrudHandlers>['onDeleteTimeblockConfirm'];
-  onViewStats: ReturnType<typeof useCalendarCrudHandlers>['onViewStats'];
+  onViewActivityDetails: ReturnType<typeof useCalendarCrudHandlers>['onViewActivityDetails'];
 
   // === Navigation handlers ===
   onNavigate: ReturnType<typeof useCalendarNavHandlers>['onNavigate'];

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-02
+last_verified: 2026-10-05
 code: apps/product/src/features/activities
 public_docs:
   - activities
@@ -19,7 +19,7 @@ lp:
 | **アクティビティ** | 予定と記録の単位（最も具体）                 | 無限に増えてよい。色・アイコンは持たない |
 | **カテゴリー**     | 所属の主軸。1アクティビティは最大1カテゴリー | 単一所属。色（10色固定）とアイコンを持つ |
 
-カテゴリーは「集計の足し算が合う軸」。カテゴリー未所属のアクティビティは「未分類」として扱う。分析で横断的に見たい時は、`/report` のサイドバーでカテゴリー / アクティビティを出し入れする（[review.md](./review.md) §2）。
+カテゴリーは「集計の足し算が合う軸」。カテゴリー未所属のアクティビティは「未分類」として扱う。アクティビティの記録詳細はカレンダーから明示的に開く。MCP の `review.get` は別の公開読取契約として維持する。
 
 ## アクティビティ
 
@@ -65,7 +65,7 @@ lp:
 
 ## セグメント（撤去済み）
 
-2026-09-15 に UI / tRPC / MCP（`segments.list`）から撤去した。`/report` のサイドバーがアクティビティ単位のフィルタを持ったことで、「この数個のアクティビティだけで見る」を保存クエリとして別に持つ理由が無くなったため。`segments` / `segment_activities` テーブルと RLS は残っており、drop は不可逆な migration として別変更で扱う。
+2026-09-15 に UI / tRPC / MCP（`segments.list`）から撤去した。当時は `/report` のサイドバーにあるアクティビティ単位のフィルタで代替した。その後 2026-10-05 に `/report` と独立した分析ページを削除し、カレンダーをホームへ統合した。現在もカレンダーのアクティビティ一覧から表示対象を選べるため、保存クエリを別に持つ理由はない。`segments` / `segment_activities` テーブルと RLS は残っており、drop は不可逆な migration として別変更で扱う。
 
 ## 「アクティビティなし」と「未分類」の語彙分離
 
@@ -76,7 +76,7 @@ lp:
 | **アクティビティなし** | ブロック（Plan / Record） | `activity_id IS NULL` |
 | **未分類**             | アクティビティ            | `category_id IS NULL` |
 
-- 「アクティビティなし」のブロックはカレンダーに常に表示され、フィルタ行を持たない。すべての集計に必ず含める（例外なし）。分類を削除するたびに過去の時間が振り返りから目減りしないため
+- 「アクティビティなし」のブロックはカレンダーに常に表示され、フィルタ行を持たない。MCP `review.get` の集計には必ず含める。選択した1アクティビティの詳細には混ぜない。分類を削除しても MCP の記録時間が目減りしないため
 - 「未分類」のアクティビティはサイドバーの未分類見出し配下にテキストのみ（色・アイコンなし）で並ぶ
 
 ## サイドバーIA
@@ -101,7 +101,7 @@ lp:
 - スコープ `read:activities` 1本が `activities.list` / `categories.list` を束ねる（`segments.list` は 2026-09-15 に撤去）
 - `activities.list`: `includeArchived` を受け、`{ id, name, categoryId, isArchived, archivedAt }` を返す。アクティビティ自身は色・アイコンを持たないため、表示には `categories.list` の突き合わせが要る
 - `categories.list`: `{ id, name, color, icon, isArchived, archivedAt }`。カテゴリーはブロックへ直接付与されない
-- `review.get` はアクティビティ軸で集計し、`isNoActivity` / `isArchived` を各行に含める
+- MCP `review.get` は既存の公開読取契約としてアクティビティ軸で集計し、`isNoActivity` / `isArchived` を各行に含める。画面から独立した分析ページを削除したことによる変更はない
 
 ## 旧タグモデルの撤去
 

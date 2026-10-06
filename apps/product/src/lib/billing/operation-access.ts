@@ -22,7 +22,6 @@ const managementMutations = new Set([
   'planCommands.delete',
   'recordCommands.delete',
   'planTemplates.delete',
-  'review.trackOpened',
 ]);
 
 export function requiresProductAccess(path: string, type: string, oauth: boolean): boolean {

@@ -41,7 +41,6 @@ flowchart TD
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) — 他の場所で先に変わっていたら（`DT002`）どうなるか
 - [Record を作る・Plan を記録する](journeys/record-plan.md)
 - [削除と取り消し](journeys/delete-undo.md) — 取り消しに使う version の罠
-- [レポートを開く](journeys/report.md) — 読み取りの経路。集計は SQL ではなく TypeScript
 
 ## 手を動かして確かめる
 

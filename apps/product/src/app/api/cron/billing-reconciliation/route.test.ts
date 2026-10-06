@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const reconcileBillingWebhookEvents = vi.hoisted(() => vi.fn());
 const captureUnexpectedError = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
+const writeCronHeartbeat = vi.hoisted(() => vi.fn());
 const envMock = vi.hoisted(
   () =>
     ({
@@ -35,6 +36,7 @@ vi.mock('@/features/settings/server', () => ({
     summary.truncated,
   reconcileBillingWebhookEvents,
 }));
+vi.mock('@/lib/ops/cron-heartbeat', () => ({ writeCronHeartbeat }));
 vi.mock('@/lib/sentry', () => ({ captureUnexpectedError }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: loggerError, warn: vi.fn() },
@@ -73,6 +75,7 @@ describe('billing reconciliation cron', () => {
   it('Bearer認証不一致を401で拒否する', async () => {
     expect((await GET(request('Bearer wrong-secret'))).status).toBe(401);
     expect(reconcileBillingWebhookEvents).not.toHaveBeenCalled();
+    expect(writeCronHeartbeat).not.toHaveBeenCalled();
   });
 
   it('Stripeが全て未設定なら正常にskipする', async () => {
@@ -85,6 +88,7 @@ describe('billing reconciliation cron', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, configured: false });
     expect(reconcileBillingWebhookEvents).not.toHaveBeenCalled();
+    expect(writeCronHeartbeat).not.toHaveBeenCalled();
   });
 
   it('Stripe設定が一部だけなら503とSentry通知を返す', async () => {
@@ -93,6 +97,7 @@ describe('billing reconciliation cron', () => {
     const response = await GET(request('Bearer super-secret-cron'));
 
     expect(response.status).toBe(503);
+    expect(writeCronHeartbeat).not.toHaveBeenCalled();
     expect(captureUnexpectedError).toHaveBeenCalledWith(expect.any(Error), {
       feature: 'billing',
       operation: 'billing_webhook_reconciliation_configuration',
@@ -105,6 +110,16 @@ describe('billing reconciliation cron', () => {
     const response = await GET(request('Bearer super-secret-cron'));
 
     expect(response.status).toBe(200);
+    expect(writeCronHeartbeat.mock.calls).toEqual([
+      ['billing-reconciliation', 'started', expect.any(String)],
+      ['billing-reconciliation', 'completed', writeCronHeartbeat.mock.calls[0]?.[2]],
+    ]);
+    expect(writeCronHeartbeat.mock.invocationCallOrder[0]).toBeLessThan(
+      reconcileBillingWebhookEvents.mock.invocationCallOrder[0]!,
+    );
+    expect(writeCronHeartbeat.mock.invocationCallOrder[1]).toBeGreaterThan(
+      reconcileBillingWebhookEvents.mock.invocationCallOrder[0]!,
+    );
     expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({
       ok: true,
@@ -120,6 +135,10 @@ describe('billing reconciliation cron', () => {
     const body = await response.json();
 
     expect(response.status).toBe(503);
+    expect(writeCronHeartbeat.mock.calls).toEqual([
+      ['billing-reconciliation', 'started', expect.any(String)],
+      ['billing-reconciliation', 'completed', writeCronHeartbeat.mock.calls[0]?.[2]],
+    ]);
     expect(body).toEqual({
       ok: false,
       configured: true,
@@ -141,6 +160,9 @@ describe('billing reconciliation cron', () => {
     const response = await GET(request('Bearer super-secret-cron'));
 
     expect(response.status).toBe(500);
+    expect(writeCronHeartbeat.mock.calls).toEqual([
+      ['billing-reconciliation', 'started', expect.any(String)],
+    ]);
     expect(JSON.stringify(captureUnexpectedError.mock.calls)).not.toContain(
       'provider secret response',
     );

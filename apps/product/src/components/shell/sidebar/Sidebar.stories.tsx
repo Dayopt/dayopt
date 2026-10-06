@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { BarChart3, CalendarDays, PanelLeft } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useShellStore } from '@/lib/stores/useShellStore';
@@ -12,34 +12,11 @@ import { Sidebar } from './Sidebar';
 
 const MOCK_USER = { name: 'Demo User', email: 'demo@example.com', avatar: null };
 
-// ── Mock: ヘッダーの現在地タイトル + 切替タブ（WorkspaceTitle / WorkspaceTabs の簡易版） ──
+// ── Mock: ブランド名 ──
 
 function MockHeaderTitle() {
   return (
-    <span className="text-foreground truncate text-sm font-medium tracking-tight">カレンダー</span>
-  );
-}
-
-function MockHeaderTabs() {
-  return (
-    <div className="flex items-center gap-1" role="tablist">
-      <div
-        role="tab"
-        aria-selected="true"
-        aria-label="カレンダー"
-        className="bg-state-selected text-foreground flex size-8 items-center justify-center rounded-lg"
-      >
-        <CalendarDays className="size-4" />
-      </div>
-      <div
-        role="tab"
-        aria-selected="false"
-        aria-label="レポート"
-        className="text-muted-foreground flex size-8 items-center justify-center rounded-lg"
-      >
-        <BarChart3 className="size-4" />
-      </div>
-    </div>
+    <span className="text-foreground truncate text-sm font-medium tracking-tight">Dayopt</span>
   );
 }
 
@@ -67,7 +44,7 @@ function MockSidebarContent() {
   );
 }
 
-/** サイドバーコンテナ。現在地タイトル + 切替タブ + 閉じるボタン、children スロット、検索 + UserMenu + ヘルプボタン。 */
+/** サイドバーコンテナ。ブランド名 + 閉じるボタン、children スロット、検索 + UserMenu + ヘルプボタン。 */
 const meta = {
   title: 'Product/Components/Shell/Sidebar/Container',
   component: Sidebar,
@@ -77,12 +54,10 @@ const meta = {
   args: {
     user: MOCK_USER,
     headerTitle: <MockHeaderTitle />,
-    headerTabs: <MockHeaderTabs />,
   },
   argTypes: {
     user: { control: false },
     headerTitle: { control: false },
-    headerTabs: { control: false },
   },
   tags: ['autodocs'],
 } satisfies Meta<typeof Sidebar>;
@@ -113,7 +88,6 @@ function InteractiveDemo({ sidebarLabel }: { sidebarLabel?: string }) {
         <Sidebar
           user={MOCK_USER}
           headerTitle={<MockHeaderTitle />}
-          headerTabs={<MockHeaderTabs />}
           {...(sidebarLabel ? { 'aria-label': sidebarLabel } : {})}
         >
           <MockSidebarContent />
@@ -176,7 +150,7 @@ export const Empty: Story = {
  * インタラクティブデモ。閉じるボタンでサイドバーが閉じ、ヘッダーの開くボタンで復元。
  *
  * 実装構成:
- * - ヘッダー: 現在のワークスペース名 + 切替タブ + PanelLeft閉じるボタン
+ * - ヘッダー: ブランド名 + PanelLeft閉じるボタン
  * - コンテンツ: composition layerから注入（children スロット）
  * - フッター: 検索ボタン + UserMenu + ヘルプボタン
  */
@@ -199,7 +173,6 @@ export const AllPatterns: Story = {
           <Sidebar
             user={MOCK_USER}
             headerTitle={<MockHeaderTitle />}
-            headerTabs={<MockHeaderTabs />}
             aria-label="サイドバー（デフォルト）"
           >
             <MockSidebarContent />
@@ -211,12 +184,7 @@ export const AllPatterns: Story = {
           コンテンツなし（children スロットが空の状態）
         </p>
         <div className="h-[400px] w-64">
-          <Sidebar
-            user={MOCK_USER}
-            headerTitle={<MockHeaderTitle />}
-            headerTabs={<MockHeaderTabs />}
-            aria-label="サイドバー（空）"
-          >
+          <Sidebar user={MOCK_USER} headerTitle={<MockHeaderTitle />} aria-label="サイドバー（空）">
             <div className="flex flex-1 items-center justify-center p-4">
               <span className="text-muted-foreground text-sm">No content</span>
             </div>

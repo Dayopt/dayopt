@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const pathnameMock = vi.hoisted(() => vi.fn(() => '/calendar'));
+const pathnameMock = vi.hoisted(() => vi.fn(() => '/'));
 
 vi.mock('@dayopt/i18n/navigation', () => ({
   usePathname: pathnameMock,
@@ -45,8 +45,7 @@ const templateRows = vi.hoisted(() => [
 ]);
 
 vi.mock('@/features/calendar', () => ({
-  resolveWorkspaceTab: (pathname: string) =>
-    pathname === '/calendar' ? 'calendar' : pathname === '/report' ? 'report' : 'other',
+  isCalendarViewPath: (pathname: string) => pathname === '/' || pathname === '',
   formatCalendarDateParam: () => '2026-03-25',
   useCalendarNavigation: () => null,
   // カレンダーが表示中の日（壁時計 Date）。テンプレート適用の宛先になる
@@ -122,10 +121,6 @@ vi.mock('@/components/ui/inputs/mini-calendar', () => ({
   MiniCalendar: () => <div data-testid="mini-calendar" />,
 }));
 
-vi.mock('@/features/review', () => ({
-  ReportFilterList: () => <div data-testid="report-filter-list" />,
-}));
-
 vi.mock('@/lib/hooks/useTheme', () => ({
   useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }),
 }));
@@ -137,10 +132,10 @@ describe('SidebarContent', () => {
     vi.clearAllMocks();
     applyState.isPending = false;
     accessMocks.state.canUseProduct = true;
-    pathnameMock.mockReturnValue('/calendar');
+    pathnameMock.mockReturnValue('/');
   });
 
-  it('renders CalendarSidebar (view switcher + activity filter + templates) on /calendar', () => {
+  it('renders CalendarSidebar (view switcher + activity filter + templates) on the home page', () => {
     render(<SidebarContent />);
 
     expect(screen.getByTestId('view-switcher-list')).toBeInTheDocument();
@@ -160,15 +155,14 @@ describe('SidebarContent', () => {
     expect(activityFilter.contains(templateList)).toBe(true);
   });
 
-  it('renders ReportSidebar（分析フィルタだけ、calendar の view-switcher/activity-filter は出さない）on /report', () => {
-    pathnameMock.mockReturnValue('/report');
+  it('does not render calendar controls on settings pages', () => {
+    pathnameMock.mockReturnValue('/settings');
 
     render(<SidebarContent />);
 
     expect(screen.queryByTestId('view-switcher-list')).not.toBeInTheDocument();
     expect(screen.queryByTestId('activity-filter-list')).not.toBeInTheDocument();
     expect(screen.queryByTestId('template-list')).not.toBeInTheDocument();
-    expect(screen.getByTestId('report-filter-list')).toBeInTheDocument();
   });
 
   it('取得したテンプレートを一覧へ渡し、クリックで表示中の日へ適用する（#2567）', () => {
@@ -228,11 +222,11 @@ describe('SidebarContent', () => {
     expect(accessMocks.openSettings).not.toHaveBeenCalled();
   });
 
-  it('falls back to CalendarSidebar on workspace-external paths (e.g. /settings)', () => {
+  it('does not fall back to CalendarSidebar on settings pages', () => {
     pathnameMock.mockReturnValue('/settings');
 
     render(<SidebarContent />);
 
-    expect(screen.getByTestId('view-switcher-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('view-switcher-list')).not.toBeInTheDocument();
   });
 });
