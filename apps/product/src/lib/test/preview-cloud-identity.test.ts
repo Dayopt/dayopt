@@ -8,6 +8,7 @@ import { resolvePreviewCloudUserId } from './preview-cloud-identity';
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const DESKTOP_ID = '22222222-2222-4222-8222-222222222222';
 const MOBILE_ID = '33333333-3333-4333-8333-333333333333';
+const DELETION_ID = '44444444-4444-4444-8444-444444444444';
 const SEED_ID = '00000000-0000-0000-0000-000000000001';
 
 const CLOUD_ENV = {
@@ -42,6 +43,21 @@ describe('Preview Cloud synthetic identity', () => {
     expect(mobile.email).toMatch(/^mobile-critical-path-/);
     expect(desktop.password).not.toBe(DESKTOP_ID);
     expect(mobile.password).not.toBe(MOBILE_ID);
+  });
+
+  it('binds the account-deletion fixture to its predetermined Cloud ID', () => {
+    const env = { ...CLOUD_ENV, E2E_PREVIEW_DELETION_USER_ID: DELETION_ID };
+    expect(resolvePreviewCloudUserId('account-deletion', env)).toBe(DELETION_ID);
+  });
+
+  it.each([
+    ['missing', CLOUD_ENV],
+    ['the desktop ID', { ...CLOUD_ENV, E2E_PREVIEW_DELETION_USER_ID: DESKTOP_ID }],
+    ['the mobile ID', { ...CLOUD_ENV, E2E_PREVIEW_DELETION_USER_ID: MOBILE_ID }],
+  ])('rejects account-deletion identity when its ID is %s', (_reason, env) => {
+    expect(() => resolvePreviewCloudUserId('account-deletion', env)).toThrow(
+      'Preview Cloud identity configuration is invalid',
+    );
   });
 
   it('rejects Cloud intent with a noncanonical fixture prefix', () => {

@@ -219,7 +219,9 @@ export async function loginAs(page: Page, identity: CriticalPathIdentity, return
       { timeout: 15_000 },
     );
   } else {
-    await page.waitForURL(/\/ja\/?/i, { timeout: 15_000 });
+    await page.waitForURL((url) => url.pathname === '/ja' || url.pathname === '/ja/', {
+      timeout: 15_000,
+    });
   }
 }
 
