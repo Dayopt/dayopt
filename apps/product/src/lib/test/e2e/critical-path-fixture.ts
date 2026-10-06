@@ -204,7 +204,9 @@ export async function loginAs(page: Page, identity: CriticalPathIdentity) {
   await page.locator('input[type="email"], input[name="email"]').first().fill(identity.email);
   await page.locator('input[type="password"]').first().fill(identity.password);
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL(/\/ja\/?/i, { timeout: 15_000 });
+  await page.waitForURL((url) => url.pathname === '/ja' || url.pathname === '/ja/', {
+    timeout: 15_000,
+  });
 }
 
 export async function openDay(page: Page, dateParam: string) {
