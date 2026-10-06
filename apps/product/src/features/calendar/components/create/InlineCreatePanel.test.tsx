@@ -6,7 +6,7 @@
  * また「アクティビティを選んだ瞬間に保存」「閉じたら保存しない」も併せて見る。
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TimeModelEditorValue } from '@/features/timeblock';
@@ -16,6 +16,10 @@ import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
 import { InlineCreatePanel } from './InlineCreatePanel';
 
 const preferences = vi.hoisted(() => ({ timezone: 'UTC', timeFormat: '24h' }));
+const statsPending = vi.hoisted(() => ({ value: false }));
+const resolveMedianMinutes = vi.hoisted(() => vi.fn());
+const createActivityMutateAsync = vi.hoisted(() => vi.fn());
+const medians = vi.hoisted(() => new Map<string, number>([['activity-1', 45]]));
 
 const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
@@ -91,8 +95,11 @@ vi.mock('@/features/timeblock', async () => {
       </button>
     ),
     useActivityMedianDurations: () => ({
-      medianByActivityId: new Map([['activity-1', 45]]),
-      getMedianMinutes: (activityId: string | null) => (activityId === 'activity-1' ? 45 : null),
+      medianByActivityId: medians,
+      isPending: statsPending.value,
+      resolveMedianMinutes,
+      getMedianMinutes: (activityId: string | null) =>
+        activityId === null ? null : (medians.get(activityId) ?? null),
     }),
     InspectorHeaderActions: ({ onCloseInspector }: { onCloseInspector?: () => void }) => (
       <button type="button" onClick={onCloseInspector}>
@@ -106,19 +113,24 @@ vi.mock('@/features/timeblock', async () => {
 // 受け取った中央値は行の表示へ回すので、ここでは「渡ってきたか」だけを見える形にする
 // （pill の描画そのものは ActivityQuickSelector.test.tsx が実物で確認する）
 vi.mock('@/features/activities', () => ({
-  useCreateActivity: () => ({ mutateAsync: vi.fn() }),
+  useCreateActivity: () => ({ mutateAsync: createActivityMutateAsync }),
   ActivityPickerList: ({
     onSelect,
+    onCreateAndSelect,
     onActivityHover,
     durationByActivityId,
   }: {
     onSelect: (id: string, name: string) => void;
+    onCreateAndSelect: (name: string) => void;
     onActivityHover?: (
       activity: { id: string; name: string; color: string | null; icon: string | null } | null,
     ) => void;
     durationByActivityId?: ReadonlyMap<string, number> | undefined;
   }) => (
     <div>
+      <button type="button" onClick={() => onCreateAndSelect('新規活動')}>
+        新規活動を作成
+      </button>
       <button
         type="button"
         onClick={() => onSelect('activity-1', '開発')}
@@ -128,6 +140,9 @@ vi.mock('@/features/activities', () => ({
         onMouseLeave={() => onActivityHover?.(null)}
       >
         開発
+      </button>
+      <button type="button" onClick={() => onSelect('activity-2', '読書')}>
+        読書
       </button>
       <span data-testid="median">{durationByActivityId?.get('activity-1') ?? 'none'}</span>
     </div>
@@ -182,6 +197,316 @@ describe('InlineCreatePanel', () => {
     closeInspector.mockClear();
     useInlineCreateStore.getState().clearPendingSelection();
     laneItems.length = 0;
+    statsPending.value = false;
+    resolveMedianMinutes.mockReset();
+    createActivityMutateAsync.mockReset();
+    createActivityMutateAsync.mockResolvedValue({ id: 'activity-new' });
+  });
+
+  it('未編集のクリック選択は統計を待ち中央値で一度だけ保存する', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(futureDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    await act(async () => {
+      release(45);
+    });
+    expect(createPlanMutate).toHaveBeenCalledTimes(1);
+    const input = createPlanMutate.mock.calls[0]?.[0];
+    expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(45);
+  });
+
+  it('中央値待ちに閉じた選択は保存せず、新しい選択にも保存しない', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(futureDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    act(() => {
+      useInlineCreateStore.getState().clearPendingSelection();
+      setSelection(pastDay());
+    });
+    await act(async () => {
+      release(45);
+    });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(createRecordMutate).not.toHaveBeenCalled();
+  });
+
+  it('待機中の選択を閉じても次の選択の作成要求を捨てない', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(futureDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    act(() => {
+      useInlineCreateStore.getState().clearPendingSelection();
+      setSelection(pastDay());
+    });
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    await act(async () => {
+      release(45);
+    });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('新規活動の中央値待ちを選択差替えで解除し、次の選択を作成できる', async () => {
+    statsPending.value = true;
+    const releases: ((value: number | null) => void)[] = [];
+    resolveMedianMinutes.mockImplementation(
+      () => new Promise<number | null>((resolve) => releases.push(resolve)),
+    );
+    setSelection(futureDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
+
+    act(() => setSelection(pastDay()));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      releases[0]?.(45);
+      releases[1]?.(45);
+    });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('中央値待ち中の時間編集が既存予定と重なって作成を中断しても次の活動を作成できる', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    const view = render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
+
+    // 新規活動の中央値待ち中にユーザーが時間を変え、その時間帯に競合が現れる。
+    fireEvent.click(screen.getByRole('button', { name: 'edit-time' }));
+    const overlapDay = pastDay();
+    act(() => useInlineCreateStore.getState().setSelectionDate(overlapDay));
+    const overlapStart = new Date(
+      Date.UTC(overlapDay.getFullYear(), overlapDay.getMonth(), overlapDay.getDate(), 16, 30),
+    );
+    laneItems.push({
+      id: 'record-existing',
+      start_at: overlapStart.toISOString(),
+      end_at: new Date(overlapStart.getTime() + 60 * 60 * 1000).toISOString(),
+    });
+    await act(async () => {
+      release(45);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(createRecordMutate).not.toHaveBeenCalled();
+    expect(createPlanMutate).not.toHaveBeenCalled();
+
+    // 重複を解消した後、別の既存アクティビティを選ぶ操作が受け付けられる。
+    act(() => {
+      laneItems.length = 0;
+      statsPending.value = false;
+    });
+    view.rerender(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createRecordMutate).toHaveBeenCalledOnce();
+  });
+
+  it('キャンセル済み中央値の失敗で後続の新規活動作成状態を解除しない', async () => {
+    statsPending.value = true;
+    const requests: {
+      resolve: (value: number | null) => void;
+      reject: (error: Error) => void;
+    }[] = [];
+    resolveMedianMinutes.mockImplementation(
+      () =>
+        new Promise<number | null>((resolve, reject) => {
+          requests.push({ resolve, reject });
+        }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(requests).toHaveLength(1);
+
+    act(() => setSelection(pastDay()));
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(requests).toHaveLength(2);
+
+    await act(async () => {
+      requests[0]?.reject(new Error('stale request failed'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(requests).toHaveLength(2);
+    expect(createRecordMutate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      requests[1]?.resolve(45);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(createRecordMutate).toHaveBeenCalledOnce();
+    expect(createRecordMutate.mock.calls[0]?.[0].activityId).toBe('activity-new');
+  });
+
+  it('統計待ちでも明示的に編集した長さは待たず保存する', () => {
+    statsPending.value = true;
+    setSelection(pastDay());
+    act(() => useInlineCreateStore.getState().updateSelectionTimes({ endHour: 11, endMinute: 15 }));
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(resolveMedianMinutes).not.toHaveBeenCalled();
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createRecordMutate.mock.calls[0]?.[0].end_at).toContain('T11:15:00');
+  });
+
+  it('保存の統計待ち中に編集した時間・メモ・充実度を維持する', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    fireEvent.click(screen.getByRole('button', { name: 'note' }));
+    fireEvent.click(screen.getByRole('button', { name: 'fulfillment' }));
+    act(() => useInlineCreateStore.getState().updateSelectionTimes({ endHour: 11, endMinute: 15 }));
+    await act(async () => {
+      release(45);
+    });
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createRecordMutate.mock.calls[0]?.[0]).toMatchObject({
+      note: '集中できた',
+      fulfillment: 'high',
+      end_at: expect.stringContaining('T11:15:00'),
+    });
+  });
+
+  it('明示的なdragの長さは統計を待たず維持する', () => {
+    statsPending.value = true;
+    setSelection(pastDay());
+    const selection = useInlineCreateStore.getState().pendingSelection!;
+    useInlineCreateStore
+      .getState()
+      .setPendingSelection({ ...selection, durationSource: 'dragged' });
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(resolveMedianMinutes).not.toHaveBeenCalled();
+    const input = createRecordMutate.mock.calls[0]?.[0];
+    expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(60);
+  });
+
+  it('統計待ちに選び直した活動だけを保存する', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    fireEvent.click(screen.getByRole('button', { name: '読書' }));
+    await act(async () => {
+      release(30);
+    });
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createRecordMutate.mock.calls[0]?.[0]).toMatchObject({
+      activityId: 'activity-2',
+      title: '読書',
+    });
+  });
+
+  it('clearを挟まず置換した選択へ古い作成要求を保存しない', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    act(() => setSelection(futureDay()));
+    await act(async () => {
+      release(45);
+    });
+    expect(createRecordMutate).not.toHaveBeenCalled();
+    expect(createPlanMutate).not.toHaveBeenCalled();
+  });
+
+  it('late stats keep edited selection and save fields, and do not create again', () => {
+    medians.clear();
+    setSelection(pastDay());
+    const view = render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'note' }));
+    fireEvent.click(screen.getByRole('button', { name: 'fulfillment' }));
+    act(() => useInlineCreateStore.getState().updateSelectionTimes({ endHour: 11, endMinute: 15 }));
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(screen.getByTestId('median')).toHaveTextContent('none');
+    medians.set('activity-1', 45);
+    view.rerender(<InlineCreatePanel onClose={vi.fn()} />);
+    expect(screen.getByTestId('median')).toHaveTextContent('45');
+    expect(useInlineCreateStore.getState().pendingSelection).toEqual(selection);
+    expect(createRecordMutate).not.toHaveBeenCalled();
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '開発' }));
+    expect(useInlineCreateStore.getState().pendingSelection).toEqual(selection);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createRecordMutate.mock.calls[0]?.[0]).toMatchObject({
+      note: '集中できた',
+      fulfillment: 'high',
+      activityId: 'activity-1',
+      end_at: expect.stringContaining('T11:15:00'),
+    });
+    medians.set('activity-1', 90);
+    view.rerender(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    medians.set('activity-1', 45);
   });
 
   it('ニューヨークの選択日時をEditorへ実時刻で渡す', () => {

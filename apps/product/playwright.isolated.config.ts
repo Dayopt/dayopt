@@ -18,13 +18,18 @@ process.env.E2E_ISOLATED_RUN = '1';
 export default defineConfig({
   ...localConfig,
   testMatch: [
+    'calendar-initial-load.spec.ts',
+    'critical-path.spec.ts',
     'calendar-navigation.spec.ts',
+    'block-search.spec.ts',
     'record-lifecycle.spec.ts',
     'http-csrf.spec.ts',
     'pwa/pwa.spec.ts',
     'consent-ical.spec.ts',
   ],
-  projects: localConfig.projects!.filter((project) => project.name === 'chromium'),
+  projects: localConfig.projects!.filter(
+    (project) => project.name === 'chromium' || project.name === 'Mobile Chrome',
+  ),
   workers: 1,
   retries: 0,
   reporter: [['line']],

@@ -335,7 +335,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `records.getById`                            | 3                   | 1                   |
 | `records.list`                               | 8                   | 2                   |
 | `statistics.getActivityEstimationFactors`    | 1                   | 0                   |
-| `statistics.getActivityStats`                | 3                   | 0                   |
+| `statistics.getActivityStats`                | 2                   | 0                   |
 | `statistics.getMcpReview`                    | 0                   | 1                   |
 | `statistics.getTagEstimationFactors`         | 0                   | 0                   |
 | `timeblockContext.getConstraints`            | 0                   | 1                   |
@@ -548,8 +548,8 @@ page から import を宣言元まで解決して辿った結果（barrel の再
 | ------------------- | ------ | --------- | --------- | ---------------------- |
 | `activities`        | 39     | 9         | 14        | 3 / 14                 |
 | `auth`              | 22     | 15        | 8         | 7 / 8                  |
-| `calendar`          | 190    | 100       | 60        | 31 / 60                |
+| `calendar`          | 190    | 101       | 60        | 31 / 60                |
 | `contact`           | 8      | 6         | 2         | 1 / 2                  |
 | `external-calendar` | 27     | 20        | 2         | 1 / 2                  |
 | `settings`          | 49     | 43        | 22        | 18 / 22                |
-| `timeblock`         | 99     | 58        | 20        | 14 / 20                |
+| `timeblock`         | 99     | 59        | 20        | 14 / 20                |

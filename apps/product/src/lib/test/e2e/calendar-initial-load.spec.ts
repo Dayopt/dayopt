@@ -185,19 +185,37 @@ for (const { timezone, offset } of CASES) {
             route,
           ).toEqual([]);
         }
-        // 保存済みの非表示設定も hydrate 後に復元され、SSR との差で警告を起こさない。
-        await page.evaluate((id) => {
-          localStorage.setItem(
-            'calendar-filter-storage',
-            JSON.stringify({
-              state: { visibleActivityIds: [], knownActivityIds: [id], initialized: true },
-              version: 9,
-            }),
-          );
-        }, activityId);
+        // 実 UI から隠す。mounted store と食い違う storage の直接書換えは、
+        // sync effect に上書きされ得るため保存済み設定の fixture にならない。
+        await page.goto(`/ja/?view=week&date=${TARGET_DATE}`);
+        await expect(seededCard).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        const activityRow = page.getByRole('listitem').filter({
+          has: page.getByRole('button', { name: activityName, exact: true }),
+        });
+        await activityRow.hover();
+        await activityRow
+          .getByRole('button', { name: 'カレンダーから非表示', exact: true })
+          .click();
+        await expect(seededCard).toHaveCount(0);
+        const persistedVisibility = () =>
+          page.evaluate((id) => {
+            const stored = JSON.parse(localStorage.getItem('calendar-filter-storage') ?? 'null');
+            return {
+              initialized: stored?.state.initialized,
+              known: stored?.state.knownActivityIds.includes(id),
+              visible: stored?.state.visibleActivityIds.includes(id),
+            };
+          }, activityId);
+        await expect
+          .poll(persistedVisibility)
+          .toEqual({ initialized: true, known: true, visible: false });
         await page.reload();
         await page.waitForLoadState('networkidle');
         await expect(seededCard).toHaveCount(0);
+        await expect
+          .poll(persistedVisibility)
+          .toEqual({ initialized: true, known: true, visible: false });
         expect(hydrationErrors).toEqual([]);
       },
     );

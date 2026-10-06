@@ -29,8 +29,8 @@ describe('mergeActivityDeleteCounts', () => {
     expect(result).toEqual({ 'tag-record-only': 4 });
   });
 
-  it('stats 未取得（undefined）時は空 Record を返す', () => {
-    expect(mergeActivityDeleteCounts(undefined, false)).toEqual({});
+  it('stats 未取得（undefined）時は unknown を保持する', () => {
+    expect(mergeActivityDeleteCounts(undefined, false)).toBeNull();
   });
 
   it('isError=true の時は null を返す（呼び出し側は常に確認ダイアログへ倒す）', () => {

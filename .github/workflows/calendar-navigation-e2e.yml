@@ -1,4 +1,4 @@
-# Release と同じ local Supabase / production build で #2933 を配備前に検証する。
+# Release と同じ local Supabase / production build で Calendar の取得・操作を配備前に検証する。
 # 外部環境・provider secrets・Production Release workflow は使用しない。
 name: Calendar Navigation E2E
 
@@ -69,8 +69,18 @@ jobs:
 
       - name: Run E2E tests
         id: e2e
-        run: |
-          pnpm --dir apps/product exec playwright test --config=playwright.isolated.config.ts --project="chromium" --reporter=line,json --output="$RUNNER_TEMP/product-isolated-e2e"
+        # initial-load: SSR hydration と browser の範囲再取得ゼロ。
+        # critical-path: 作成・reload の3ケースと procedure 予算26。navigation: 既存の予算28。
+        # block-search: 表示データの検索操作と予算48（#2678）。
+        # grep は予算対象の flow tag に限定する。Mobile Chrome は @mobile の初回URL・検索だけ。
+        run: >-
+          pnpm --dir apps/product exec playwright test
+          --config=playwright.isolated.config.ts
+          '/calendar-initial-load\.spec\.ts$' '/critical-path\.spec\.ts$'
+          '/calendar-navigation\.spec\.ts$' '/block-search\.spec\.ts$'
+          --grep='@preview-e2e/(product-initial-(desktop|mobile)-(tokyo|la)|desktop-(plan|record|past-plan)-create|product-calendar-(view|sidebar)-navigation|product-search-(desktop|mobile))'
+          --project="chromium" --project="Mobile Chrome"
+          --reporter=line,json --output="$RUNNER_TEMP/product-isolated-e2e"
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.api_url }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ steps.supabase.outputs.anon_key }}

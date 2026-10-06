@@ -6,7 +6,7 @@
  * 既定の長さ）になることを確認する。
  */
 
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useActivityQuickCreate } from './useActivityQuickCreate';
@@ -22,7 +22,10 @@ const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
 const openInspector = vi.hoisted(() => vi.fn());
 /** activityId → 記録の中央値（分）。空なら設定の既定の長さへフォールバックする */
+const statsPending = vi.hoisted(() => ({ value: false }));
+const resolveMedianMinutes = vi.hoisted(() => vi.fn());
 const medianMinutes = vi.hoisted(() => ({ value: new Map<string, number>() }));
+const queryClient = vi.hoisted(() => ({}));
 
 vi.mock('@/features/timeblock', async () => {
   const domain = await vi.importActual<
@@ -39,13 +42,15 @@ vi.mock('@/features/timeblock', async () => {
     hasTimeblockLaneConflict: () => hasConflict.value,
     findFreeTimeblockLaneSlot: lane.findFreeTimeblockLaneSlot,
     useTimeblockWriteMutations: () => ({
-      createPlan: { mutate: createPlanMutate },
-      createRecord: { mutate: createRecordMutate },
+      createPlan: { mutate: createPlanMutate, mutateAsync: createPlanMutate },
+      createRecord: { mutate: createRecordMutate, mutateAsync: createRecordMutate },
       deletePlan: { mutate: vi.fn() },
       deleteRecord: { mutate: vi.fn() },
     }),
     useActivityMedianDurations: () => ({
       medianByActivityId: medianMinutes.value,
+      isPending: statsPending.value,
+      resolveMedianMinutes,
       getMedianMinutes: (activityId: string | null) =>
         activityId == null ? null : (medianMinutes.value.get(activityId) ?? null),
     }),
@@ -64,7 +69,7 @@ vi.mock('@/lib/hooks/useUserPreferences', () => ({
   useUserPreferences: (selector: (s: { timezone: string; defaultDuration: number }) => unknown) =>
     selector({ timezone: preferences.timezone, defaultDuration: 60 }),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => queryClient }));
 const translation = vi.hoisted(() => vi.fn((key: string) => key));
 const toastSuccess = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/toast', () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
@@ -91,6 +96,8 @@ describe('useActivityQuickCreate', () => {
     hasConflict.value = false;
     laneItems.value = [];
     medianMinutes.value = new Map();
+    statsPending.value = false;
+    resolveMedianMinutes.mockReset();
     translation.mockClear();
     toastSuccess.mockClear();
     createPlanMutate.mockClear();
@@ -100,6 +107,115 @@ describe('useActivityQuickCreate', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('統計待ちの同じタップは中央値を待って1回だけ保存する', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
+    release(45);
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
+    const input = createPlanMutate.mock.calls[0]?.[0];
+    expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(45);
+  });
+
+  it('統計待ちが設定timezoneの日付境界を跨いでもタップ時点の開始を保つ', async () => {
+    preferences.timezone = 'America/New_York';
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    // New York の 09/29 23:59:59。既定開始は次の分境界の 09/30 00:00。
+    vi.setSystemTime(new Date('2026-09-30T03:59:59.000Z'));
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    vi.setSystemTime(new Date('2026-09-30T04:00:10.000Z'));
+    release(45);
+
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledOnce());
+    expect(createPlanMutate.mock.calls[0]?.[0]).toMatchObject({
+      start_at: '2026-09-30T04:00:00.000Z',
+      end_at: '2026-09-30T04:45:00.000Z',
+    });
+  });
+
+  it('統計待ちの別アクティビティ作成も保持する', async () => {
+    statsPending.value = true;
+    resolveMedianMinutes.mockResolvedValue(45);
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    result.current({ activityId: 'activity-2', activityName: '読書' });
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(2));
+    expect(createPlanMutate.mock.calls.map(([input]) => input.activityId)).toEqual([
+      'activity-1',
+      'activity-2',
+    ]);
+  });
+
+  it('統計後の作成はasync mutation完了後に次の空きを探す', async () => {
+    statsPending.value = true;
+    resolveMedianMinutes.mockResolvedValue(45);
+    let saveFirst!: () => void;
+    createPlanMutate.mockImplementationOnce(async (input) => {
+      await new Promise<void>((resolve) => {
+        saveFirst = resolve;
+      });
+      laneItems.value.push({ id: 'first', start_at: input.start_at, end_at: input.end_at });
+    });
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    result.current({ activityId: 'activity-2', activityName: '読書' });
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
+    saveFirst();
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(2));
+    expect(createPlanMutate.mock.calls[1]?.[0].start_at).toBe(
+      createPlanMutate.mock.calls[0]?.[0].end_at,
+    );
+  });
+
+  it('統計取得後に中央値が無ければ既定の長さへ戻す', async () => {
+    statsPending.value = true;
+    resolveMedianMinutes.mockResolvedValue(null);
+    const { result } = renderHook(() => useActivityQuickCreate());
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
+    const input = createPlanMutate.mock.calls[0]?.[0];
+    expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(60);
+  });
+
+  it('別の行から統計待ちに作成してもasync mutationを共有して空きを分ける', async () => {
+    statsPending.value = true;
+    resolveMedianMinutes.mockResolvedValue(45);
+    let saveFirst!: () => void;
+    createPlanMutate.mockImplementationOnce(async (input) => {
+      await new Promise<void>((resolve) => {
+        saveFirst = resolve;
+      });
+      laneItems.value.push({ id: 'first-row', start_at: input.start_at, end_at: input.end_at });
+    });
+    const firstRow = renderHook(() => useActivityQuickCreate());
+    const secondRow = renderHook(() => useActivityQuickCreate());
+    firstRow.result.current({ activityId: 'activity-1', activityName: '開発' });
+    secondRow.result.current({ activityId: 'activity-2', activityName: '読書' });
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(1));
+    saveFirst();
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledTimes(2));
+    expect(createPlanMutate.mock.calls[1]?.[0].start_at).toBe(
+      createPlanMutate.mock.calls[0]?.[0].end_at,
+    );
   });
 
   it('OSと設定timezoneが異なっても現在の実時刻から予定を作る', () => {

@@ -188,7 +188,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（84）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -214,6 +214,7 @@ graph LR
 | [apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts](<../../../apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/time-pl-review.test.ts](<../../../apps/product/src/features/timeblock/domain/time-pl-review.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/timeblock-destination.test.ts](<../../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx>) | feature: timeblock |
@@ -437,7 +438,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（84）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -463,6 +464,7 @@ graph LR
 | [apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts](<../../../apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/time-pl-review.test.ts](<../../../apps/product/src/features/timeblock/domain/time-pl-review.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/timeblock-destination.test.ts](<../../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx>) | feature: timeblock |
@@ -686,7 +688,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（84）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -712,6 +714,7 @@ graph LR
 | [apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts](<../../../apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/time-pl-review.test.ts](<../../../apps/product/src/features/timeblock/domain/time-pl-review.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/timeblock-destination.test.ts](<../../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx>) | feature: timeblock |
@@ -1113,7 +1116,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（84）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1139,6 +1142,7 @@ graph LR
 | [apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts](<../../../apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/time-pl-review.test.ts](<../../../apps/product/src/features/timeblock/domain/time-pl-review.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/timeblock-destination.test.ts](<../../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx>) | feature: timeblock |
@@ -1447,7 +1451,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（84）</summary>
+<summary>test の候補（85）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -1473,6 +1477,7 @@ graph LR
 | [apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts](<../../../apps/product/src/features/timeblock/domain/plan-template-materialize.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/time-pl-review.test.ts](<../../../apps/product/src/features/timeblock/domain/time-pl-review.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/domain/timeblock-destination.test.ts](<../../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts>) | feature: timeblock |
+| [apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts](<../../../apps/product/src/features/timeblock/hooks/useActivityMedianDurations.test.ts>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useCoalescedTimeblockSave.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorKeyboard.test.tsx>) | feature: timeblock |
 | [apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx](<../../../apps/product/src/features/timeblock/hooks/useInspectorURLSync.test.tsx>) | feature: timeblock |
@@ -2152,7 +2157,7 @@ graph LR
 </details>
 
 <details>
-<summary>test の候補（100）</summary>
+<summary>test の候補（101）</summary>
 
 <!-- prettier-ignore -->
 | ファイル | 対応の根拠 |
@@ -2182,6 +2187,7 @@ graph LR
 | [apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/DragSelectionPreview.test.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/DragSelectionPreview.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/selection-move.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/selection-move.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/selection-reducer.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/selection-reducer.test.ts>) | feature: calendar |
+| [apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/useDragSelection.test.ts](<../../../apps/product/src/features/calendar/components/views/shared/components/CalendarDragSelection/useDragSelection.test.ts>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.test.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/CalendarGridContent.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/ConflictOverlay.test.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/ConflictOverlay.test.tsx>) | feature: calendar |
 | [apps/product/src/features/calendar/components/views/shared/components/DragSelectionHighlight/DragSelectionHighlight.test.tsx](<../../../apps/product/src/features/calendar/components/views/shared/components/DragSelectionHighlight/DragSelectionHighlight.test.tsx>) | feature: calendar |

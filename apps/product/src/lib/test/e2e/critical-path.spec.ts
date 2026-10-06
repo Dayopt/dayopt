@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import { expectIndependentPersistedHour } from '../critical-path-persistence';
 import {
@@ -65,17 +65,120 @@ function previewFlowTag(flowId: string) {
  * - 対象時間帯が viewport 外だと mouse 座標が届かないため、先にスクロールで露出させる
  */
 async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
-  const { box, hourBox, hourHeight } = await revealHour(page, hourFrom);
+  const { grid } = await revealHour(page, hourFrom);
+  const startCell = grid.locator(`[data-calendar-hour="${hourFrom}"]`).first();
+  const endCell = grid.locator(`[data-calendar-hour="${hourTo}"]`).first();
+  const readGeometry = async () => {
+    const [gridBox, startBox, endBox, hourHeight] = await Promise.all([
+      grid.boundingBox(),
+      startCell.boundingBox(),
+      endCell.boundingBox(),
+      startCell.evaluate((element) => element.getBoundingClientRect().height),
+    ]);
+    if (!gridBox || !startBox || !endBox) throw new Error('calendar drag geometry is unavailable');
+    return {
+      x: gridBox.x + gridBox.width * 0.6, // record lane 側
+      startY: startBox.y,
+      midpointY: startBox.y + hourHeight / 2 - 2,
+      endY: endBox.y - 2,
+      hourHeight,
+    };
+  };
+  const geometrySnapshot = async (pointer: { x: number; y: number }) =>
+    grid.evaluate(
+      (gridElement, { hourFrom: startHour, hourTo: endHour, pointerPosition }) => {
+        const grid = gridElement as HTMLElement;
+        const scroll = grid?.closest<HTMLElement>('[data-calendar-scroll]');
+        const start = grid?.querySelector<HTMLElement>(`[data-calendar-hour="${startHour}"]`);
+        const end = grid?.querySelector<HTMLElement>(`[data-calendar-hour="${endHour}"]`);
+        const gridRect = grid?.getBoundingClientRect();
+        const scrollRect = scroll?.getBoundingClientRect();
+        const startRect = start?.getBoundingClientRect();
+        const endRect = end?.getBoundingClientRect();
+        const hit = document.elementFromPoint(pointerPosition.x, pointerPosition.y);
+        return {
+          viewport: { width: window.innerWidth, height: window.innerHeight },
+          grid: gridRect && { top: gridRect.top, left: gridRect.left, width: gridRect.width },
+          scroll: scrollRect && {
+            top: scrollRect.top,
+            height: scrollRect.height,
+            scrollTop: scroll?.scrollTop,
+          },
+          startRow: startRect && { top: startRect.top, height: startRect.height },
+          endRow: endRect && { top: endRect.top, height: endRect.height },
+          pointer: {
+            x: pointerPosition.x,
+            y: pointerPosition.y,
+            hitHour: hit?.closest<HTMLElement>('[data-calendar-hour]')?.dataset.calendarHour,
+            hitGridDay: hit?.closest<HTMLElement>('[data-calendar-grid]')?.dataset.calendarDayIndex,
+          },
+        };
+      },
+      { hourFrom, hourTo, pointerPosition: pointer },
+    );
+  const expectPreviewText = async (
+    preview: Locator,
+    text: string,
+    pointer: { x: number; y: number },
+  ) => {
+    try {
+      await expect(preview).toContainText(text);
+    } catch (error) {
+      throw new Error(
+        `Calendar drag preview did not reach ${text}; live geometry: ${JSON.stringify(await geometrySnapshot(pointer))}; ${String(error)}`,
+      );
+    }
+  };
 
-  const x = box.x + box.width * 0.6; // record lane 側
-  const yFrom = hourBox.y;
-  const yTo = hourBox.y + hourHeight * (hourTo - hourFrom);
+  const initialGeometry = await readGeometry();
+  const x = initialGeometry.x;
+  const yFrom = initialGeometry.startY;
 
   await page.mouse.move(x, yFrom);
   await page.mouse.down();
-  // mousemove は rAF スロットルされるため中間 move を挟んで hasDragged を確定させる
-  await page.mouse.move(x, yFrom + 24, { steps: 4 });
-  await page.mouse.move(x, yTo, { steps: 8 });
+  // mouse-down 後にselection modeへ切り替わり、global listenerが登録されるまで描画を待つ。
+  const settleDragFrame = () =>
+    page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+  await settleDragFrame();
+  const preview = page.locator('[data-drag-selection-preview]');
+  // MOUSE_DOWN 後にlistenerが設定される前の移動が落ちることがあるため、
+  // 15分以内の初期gestureでselectionを成立させる。30分地点は別イベントとして
+  // フレームを空けて送り、初期gestureの終点と検証対象の座標を重ねない。
+  const halfHourPreview = `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourFrom).padStart(2, '0')}:30`;
+  // One event crosses the >5px drag threshold before RAF coalescing can drop later steps.
+  await page.mouse.move(x, yFrom + 12);
+  await expectPreviewText(preview, `${String(hourFrom).padStart(2, '0')}:00`, {
+    x,
+    y: yFrom + 12,
+  });
+  await settleDragFrame();
+  const currentGeometry = await readGeometry();
+  await page.mouse.move(
+    currentGeometry.x,
+    currentGeometry.startY + currentGeometry.hourHeight / 3 - 2,
+  );
+  await settleDragFrame();
+  const midpointGeometry = await readGeometry();
+  await page.mouse.move(midpointGeometry.x, midpointGeometry.midpointY);
+  await expectPreviewText(preview, halfHourPreview, {
+    x: midpointGeometry.x,
+    y: midpointGeometry.midpointY,
+  });
+  // 終端へ移動し、未反映の selection を mouseup で確定して短い Record を保存するのを防ぐ。
+  await settleDragFrame();
+  const endGeometry = await readGeometry();
+  await page.mouse.move(endGeometry.x, endGeometry.endY);
+  await expectPreviewText(
+    preview,
+    `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourTo).padStart(2, '0')}:00`,
+    { x: endGeometry.x, y: endGeometry.endY },
+  );
+  await settleDragFrame();
   await page.mouse.up();
 }
 
