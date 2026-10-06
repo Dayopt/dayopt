@@ -146,7 +146,12 @@ function getApiKey(keys, type) {
   );
   const legacyName = type === 'secret' ? 'service_role' : 'anon';
   const matches = modern.length > 0 ? modern : active.filter((key) => key.name === legacyName);
-  requireCondition(matches.length === 1, `branch ${type} API key is unavailable or ambiguous`);
+  const defaultKeys = matches.filter((key) => key.name === 'default');
+  if (defaultKeys.length === 1) return defaultKeys[0];
+  requireCondition(
+    defaultKeys.length === 0 && matches.length === 1,
+    `branch ${type} API key is unavailable or ambiguous`,
+  );
   return matches[0];
 }
 

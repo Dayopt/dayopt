@@ -142,8 +142,8 @@ site_url = "http://127.0.0.1:3000"
 # 旧 `app-*` パターンは project 改名前の残骸で、どの preview URL にも一致しなかった。
 additional_redirect_urls = [
   "https://127.0.0.1:3000",
-  "https://product-*-dayopt.vercel.app/**",
-  "https://product-git-*-dayopt.vercel.app/**"
+  "https://product-*-dayopt.vercel.app",
+  "https://product-git-*-dayopt.vercel.app"
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

@@ -55,7 +55,7 @@ function buildFetch({
   },
 }: {
   branch?: (typeof previewBranch & { pr_number?: number }) | null;
-  keys?: Array<{ type?: string; name?: string; api_key: string }>;
+  keys?: Array<{ type?: string; name?: string; api_key: string; disabled?: boolean }>;
   createResponse?: Response;
   loginResponse?: Response;
   logoutResponse?: Response;
@@ -142,6 +142,65 @@ describe('nonproduction login provisioning', () => {
     expect(new Headers(world.calls[5].init?.headers).get('Authorization')).toBe(
       'Bearer verification-session',
     );
+  });
+
+  it('uses the unique active default for each modern key type during rotation', async () => {
+    const world = buildFetch({
+      keys: [
+        { name: 'service_role', api_key: 'legacy-service-role' },
+        { name: 'anon', api_key: 'legacy-anon' },
+        ...['secret', 'publishable'].flatMap((type) => [
+          { type, name: 'rotation', api_key: `rotation-${type}` },
+          { type, name: 'default', api_key: `disabled-${type}`, disabled: true },
+          { type, name: 'default', api_key: `default-${type}`, disabled: false },
+        ]),
+      ],
+    });
+    await provisionNonproductionLogin({
+      target,
+      ...testCredentials,
+      githubToken: 'github-token',
+      fetchImpl: world.fetchImpl,
+      now: () => 0,
+    });
+    const authCalls = world.calls.filter(({ url }) => url.includes('/auth/v1/'));
+    expect(authCalls).toHaveLength(3);
+    expect(new Headers(authCalls[0].init?.headers).get('apikey')).toBe('default-secret');
+    expect(new Headers(authCalls[0].init?.headers).get('Authorization')).toBeNull();
+    for (const call of authCalls.slice(1)) {
+      expect(new Headers(call.init?.headers).get('apikey')).toBe('default-publishable');
+    }
+    expect(new Headers(authCalls[1].init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(authCalls[2].init?.headers).get('Authorization')).toBe(
+      'Bearer verification-session',
+    );
+  });
+
+  it.each([
+    ['secret', 'default', 'default'],
+    ['publishable', 'default', 'default'],
+    ['secret', 'rotation-a', 'rotation-b'],
+    ['publishable', 'rotation-a', 'rotation-b'],
+  ])('rejects ambiguous %s keys (%s / %s) before Auth calls', async (type, first, second) => {
+    const world = buildFetch({
+      keys: [
+        { type: type === 'secret' ? 'publishable' : 'secret', api_key: 'other-key' },
+        { type, name: first, api_key: 'first-key' },
+        { type, name: second, api_key: 'second-key' },
+        { name: 'service_role', api_key: 'legacy-service-role' },
+        { name: 'anon', api_key: 'legacy-anon' },
+      ],
+    });
+    await expect(
+      provisionNonproductionLogin({
+        target,
+        ...testCredentials,
+        githubToken: 'github-token',
+        fetchImpl: world.fetchImpl,
+        now: () => 0,
+      }),
+    ).rejects.toThrow(`branch ${type} API key is unavailable or ambiguous`);
+    expect(world.calls.some(({ url }) => url.includes('/auth/v1/'))).toBe(false);
   });
 
   it('keeps an existing password and closes only the verification session', async () => {
