@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import {
   isPassingPreviewReport,
@@ -181,11 +182,14 @@ function readRun(directory, request) {
   return run;
 }
 
-/** Always-step recovery on a surviving Actions VM. A destroyed VM needs journal replay elsewhere. */
+/** Always-step recovery on a surviving Actions VM. A destroyed VM needs journal replay elsewhere.
+ * @param {{directory: string, request: ReturnType<typeof validateCloudRequest>, serviceKey?: string, resolveServiceKey?: (input: {bound: ReturnType<typeof validateCloudRequest>, run: any, intent: any}) => Promise<string>, recover?: typeof recoverPreviewUsers, intent?: any}} options
+ */
 export async function cleanupCloudRun({
   directory,
   request,
   serviceKey,
+  resolveServiceKey = undefined,
   recover = recoverPreviewUsers,
   intent = undefined,
 }) {
@@ -205,11 +209,15 @@ export async function cleanupCloudRun({
       if (!Object.values(plan.userIds).includes(row.userId)) throw new Error();
     }
   }
+  const resolvedKey = resolveServiceKey
+    ? await resolveServiceKey({ bound, run, intent })
+    : serviceKey;
+  if (typeof resolvedKey !== 'string' || !resolvedKey.trim()) throw new Error();
   const cleanup = await recover({
     evidenceDirectory: join(directory, 'evidence'),
     runId: run.runId,
     supabaseProjectRef: bound.supabaseProjectRef,
-    serviceKey,
+    serviceKey: resolvedKey,
   });
   writeFileSync(
     join(directory, 'evidence', 'cloud-cleanup.json'),
@@ -387,16 +395,19 @@ if (isDirectExecution(import.meta.url)) {
         throw new Error();
       failureStage = 'fixture-contract';
       verifyCloudFixtureContract(candidateRoot);
-      failureStage = 'fixture-key';
-      await assertCloudFixtureKey({
-        request,
-        serviceKey: process.env.SUPABASE_SECRET_KEY,
-        userIds: intent.userIds,
-      });
       failureStage = 'migration-inventory';
       const expectedMigrations = expectedMigrationVersions(candidateRoot);
       failureStage = 'runner-preflight';
       const result = await runPreviewE2E({
+        resolveServiceKey: async ({ ready }) => {
+          failureStage = 'fixture-key';
+          const serviceKey = await resolvePreviewSecretKey({
+            projectRef: ready.supabaseProjectRef,
+            provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+          });
+          await assertCloudFixtureKey({ request, serviceKey, userIds: intent.userIds });
+          return serviceKey;
+        },
         runDirectory: directory,
         request: { ...request, expectedMigrations },
         runId: intent.runId,
@@ -410,8 +421,15 @@ if (isDirectExecution(import.meta.url)) {
       const result = await cleanupCloudRun({
         directory,
         request,
-        serviceKey: process.env.SUPABASE_SECRET_KEY,
         intent,
+        resolveServiceKey: async ({ bound }) => {
+          const serviceKey = await resolvePreviewSecretKey({
+            projectRef: bound.supabaseProjectRef,
+            provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+          });
+          await assertCloudFixtureKey({ request: bound, serviceKey });
+          return serviceKey;
+        },
       });
       console.log(JSON.stringify(result));
       if (result.status !== 'clean') process.exitCode = 1;

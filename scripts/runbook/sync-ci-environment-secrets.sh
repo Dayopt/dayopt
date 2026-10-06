@@ -98,4 +98,4 @@ fi
 # Owner saves the Integration-only Environment; do not run Production sync to set up Preview.
 # pending-secret "Preview – product" PREVIEW_E2E_SUPABASE_READINESS_TOKEN "op://ci/preview-e2e/PREVIEW_E2E_SUPABASE_READINESS_TOKEN"
 # pending-secret "Preview – product" PREVIEW_E2E_BYPASS_SECRET "op://ci/preview-e2e/PREVIEW_E2E_BYPASS_SECRET"
-# pending-secret "Preview – product" PREVIEW_E2E_SUPABASE_KEY "op://ci/preview-e2e/PREVIEW_E2E_SUPABASE_KEY"
+# pending-secret "Preview – product" SUPABASE_PREVIEW_PROVISION_TOKEN "op://ci/supabase-preview-provision/credential"
