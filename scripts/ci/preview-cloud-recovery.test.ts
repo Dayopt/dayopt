@@ -23,7 +23,7 @@ const env = {
   GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration',
   GITHUB_RUN_ID: '36405214644',
   GITHUB_RUN_ATTEMPT: '1',
-  SUPABASE_SECRET_KEY: 'PRIVATE_SUPABASE_KEY',
+  SUPABASE_PREVIEW_PROVISION_TOKEN: 'PRIVATE_PROVISION_TOKEN',
 };
 const request = {
   sha: 'a'.repeat(40),
@@ -293,6 +293,36 @@ describe('Cloud recovery after worker loss', () => {
     ).rejects.toThrow();
     expect(recover).not.toHaveBeenCalled();
   });
+  it('resolves the target key only after recovery source trust and keeps it out of evidence', async () => {
+    const directory = temp();
+    writeFileSync(join(directory, 'verified.json'), JSON.stringify(proof));
+    const verify = vi.fn(async () => proof);
+    const resolveServiceKey = vi.fn(async (input: { intent: typeof intent }) => {
+      expect(input.intent).toEqual(intent);
+      expect(verify).toHaveBeenCalledTimes(1);
+      return 'PRIVATE_SUPABASE_KEY';
+    });
+    const recover = vi.fn(async () => ({
+      status: 'clean',
+      checked: 2,
+      recovered: 2,
+      users: [{ userId: 'u1', status: 'deleted' }],
+    }));
+    const result = await executeCloudRecovery({
+      directory,
+      env,
+      recover,
+      verify,
+      resolveServiceKey,
+    });
+    expect(result).toMatchObject({ status: 'clean', cleanupConfirmed: true });
+    expect(recover).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceKey: 'PRIVATE_SUPABASE_KEY' }),
+    );
+    expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain(
+      'PRIVATE_SUPABASE_KEY',
+    );
+  });
   it('source revalidation failure publishes failure and never calls Auth recovery', async () => {
     const directory = temp();
     writeFileSync(join(directory, 'verified.json'), JSON.stringify(proof));
@@ -300,9 +330,17 @@ describe('Cloud recovery after worker loss', () => {
     const verify = vi.fn(async () => {
       throw new Error('PRIVATE_PROVIDER_BODY');
     });
-    const result = await executeCloudRecovery({ directory, env, recover, verify });
+    const resolveServiceKey = vi.fn(async () => 'PRIVATE_SUPABASE_KEY');
+    const result = await executeCloudRecovery({
+      directory,
+      env,
+      recover,
+      verify,
+      resolveServiceKey,
+    });
     expect(result).toMatchObject({ status: 'failed', cleanupConfirmed: false, users: [] });
     expect(recover).not.toHaveBeenCalled();
+    expect(resolveServiceKey).not.toHaveBeenCalled();
     expect(readFileSync(join(directory, 'recovery.json'), 'utf8')).not.toContain('PRIVATE_');
   });
 });

@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { verifyPreviewRecoveryTrust } from '../lib/preview-cloud-recovery-trust.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
 import { validateCloudIntent } from './preview-cloud-intent.mjs';
@@ -398,6 +399,11 @@ export async function executeCloudRecovery({
   env = process.env,
   verify = verifyPreviewRecoveryTrust,
   recover = recoverCloudIntent,
+  resolveServiceKey = ({ intent: plan, env: runtimeEnv }) =>
+    resolvePreviewSecretKey({
+      projectRef: plan.request.supabaseProjectRef,
+      provisionToken: runtimeEnv.SUPABASE_PREVIEW_PROVISION_TOKEN,
+    }),
 }) {
   const saved = readJson(join(directory, 'verified.json'));
   const intent = validateCloudIntent(saved.intent);
@@ -423,7 +429,8 @@ export async function executeCloudRecovery({
     });
     if (current.artifactId !== saved.artifactId || current.digest !== saved.digest)
       throw new Error();
-    const cleanup = await recover({ intent, directory, serviceKey: env.SUPABASE_SECRET_KEY });
+    const serviceKey = await resolveServiceKey({ intent, env });
+    const cleanup = await recover({ intent, directory, serviceKey });
     result.status = cleanup.status;
     result.cleanupConfirmed = cleanup.status === 'clean';
     result.users = cleanup.users;

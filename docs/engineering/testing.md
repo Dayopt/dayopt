@@ -208,12 +208,12 @@ Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head 
 
 既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch integrationのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。現在は `integration` のみ許可する設定を保存・確認済み。ユーザーの明示指示によりagentが設定保存を行えるが、個人Vault・1Passwordを開かず、値を会話へ出さない。
 
-このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` と `PREVIEW_E2E_SUPABASE_KEY` はEnvironmentへの直接保存をUIで確認済みで、1Password masterの初期化・同期を証明するものではない。Protection bypassの権限境界は未決のため、保存・実走完了とは扱わない。
+このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` はEnvironmentへの直接保存をUIで確認済みで、1Password masterの初期化・同期を証明するものではない。`SUPABASE_PREVIEW_PROVISION_TOKEN` はtarget branchのsecret keyを読むためexecute/cleanup/recoveryに注入する。候補workerには渡さない。Protection bypassの権限境界は未決のため、保存・実走完了とは扱わない。
 
 - `GITHUB_TOKEN`（`${{ github.token }}`）: trusted workerの短寿命token。`deployments: read` と `statuses: read` でGitHubにVercelが発行したProduct Previewのdeployment/statusを読む。長寿命Vercel PATはPreviewへ保存・注入しない。Playwrightの環境へGitHub tokenを渡さない。
 - `PREVIEW_E2E_SUPABASE_READINESS_TOKEN`（workerでは `SUPABASE_PREVIEW_READINESS_TOKEN`）: branch一覧と選択した非本番DBのmigration metadata確認用。fine-grained tokenは **Development Branches Read**（`branching_development_read`）と **Migrations Read**（`database_migrations_read`）だけを付け、Database Data Readやwrite権限は付けない。migration確認は `GET /v1/projects/{ref}/database/migrations` を使い、SQLへfallbackしない。branch選択UIが子projectを提供しない場合は親projectを選ぶため、親のbranch/migration metadataへ到達できる権限であり非本番projectだけの権限とは呼ばない。選択した子projectへ同tokenでGETできることは初回実走で確認し、403では権限を広げず停止する。
 - `PREVIEW_E2E_BYPASS_SECRET`（workerでは `VERCEL_AUTOMATION_BYPASS_SECRET`）: Product PreviewのProtection用。現在は方式・保存が未決。project単位bypassは同じProduct projectのProductionにも到達し得るため、非本番だけの資格情報とは扱わない。対象Previewだけのshare方式との選択は所有者判断を待つ。アプリへの正規ログインは省略しない。
-- `PREVIEW_E2E_SUPABASE_KEY`（workerでは `SUPABASE_SECRET_KEY`）: 選択した非本番DBの合成user作成・所有runの回収用。隔離DBを選ぶ場合は対象DBのkeyが必要で、共有DBのkeyへfallbackしない。
+- `SUPABASE_PREVIEW_PROVISION_TOKEN`: Supabase Management APIの`API Keys Read`と`API Key Secrets Read`を使い、readinessが検証した対象Preview project refのkeyをworker内で取得する。対象ref以外を要求せず、Production refを拒否する。固定Integration keyへfallbackしない。実際のkeyはtrusted supervisorだけに渡し、候補worker env、artifact、公開証拠へ含めない。
 
 Vercel側のreadinessは数値project IDのAPI照合から、GitHubが認証した `vercel[bot]`（ID `35613825`）・Product path `/dayopt/product/`・`Preview – product` 環境・本番flag false・exact SHA・requested deployment ID・immutable originの契約へ置き換える。最新Product commit statusと最新deployment statusの成功を要求し、古い成功へのfallbackや曖昧な再デプロイ対応を拒否する。アプリの自己申告だけで合格にせず、同originのlive SHA/deployment ID/DB refとhealthを前後確認する。これは数値Vercel project IDの直接観測ではない。APIの観測失敗・発行者違い・別Product/環境・候補の変更はuser作成前に停止する。
 

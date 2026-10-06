@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { validateCloudRequest } from '../lib/preview-cloud-binding.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from '../runbook/preview-cleanup.mjs';
@@ -300,8 +301,15 @@ if (isDirectExecution(import.meta.url)) {
       if (git(['rev-parse', 'HEAD']) !== request.sha || git(['status', '--porcelain']) !== '')
         throw new Error();
       verifyCloudFixtureContract(candidateRoot);
-      await assertCloudFixtureKey({ request, serviceKey: process.env.SUPABASE_SECRET_KEY });
       const result = await runPreviewE2E({
+        resolveServiceKey: async ({ ready }) => {
+          const serviceKey = await resolvePreviewSecretKey({
+            projectRef: ready.supabaseProjectRef,
+            provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+          });
+          await assertCloudFixtureKey({ request, serviceKey });
+          return serviceKey;
+        },
         runDirectory: directory,
         request: { ...request, expectedMigrations: expectedMigrationVersions(candidateRoot) },
         runId: intent.runId,
@@ -312,12 +320,12 @@ if (isDirectExecution(import.meta.url)) {
       );
       if (result.status !== 'passed') process.exitCode = 1;
     } else if (operation === 'cleanup') {
-      const result = await cleanupCloudRun({
-        directory,
-        request,
-        serviceKey: process.env.SUPABASE_SECRET_KEY,
-        intent,
+      const serviceKey = await resolvePreviewSecretKey({
+        projectRef: request.supabaseProjectRef,
+        provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
       });
+      await assertCloudFixtureKey({ request, serviceKey });
+      const result = await cleanupCloudRun({ directory, request, serviceKey, intent });
       console.log(JSON.stringify(result));
       if (result.status !== 'clean') process.exitCode = 1;
     } else {

@@ -24,7 +24,7 @@ describe('Cloud Preview credential wiring', () => {
     const execute = cloud.indexOf('- id: execute');
     expect(gate).toBeLessThan(execute);
     expect(cloud.slice(0, execute)).not.toMatch(
-      /secrets\.(PREVIEW_E2E_SUPABASE_KEY|PREVIEW_E2E_BYPASS_SECRET|PREVIEW_E2E_SUPABASE_READINESS_TOKEN)/,
+      /secrets\.(PREVIEW_E2E_SUPABASE_KEY|PREVIEW_E2E_BYPASS_SECRET|PREVIEW_E2E_SUPABASE_READINESS_TOKEN|SUPABASE_PREVIEW_PROVISION_TOKEN)/,
     );
   });
   it('uses a short-lived GitHub read token for provider provenance without a Vercel PAT', () => {
@@ -74,7 +74,9 @@ describe('Cloud Preview credential wiring', () => {
     expect(recovery).toContain('cancel-in-progress: false');
     expect(recovery).not.toContain('path: candidate');
     expect(recovery).not.toContain('pnpm');
-    expect(recovery.match(/secrets\.[A-Z0-9_]+/g)).toEqual(['secrets.PREVIEW_E2E_SUPABASE_KEY']);
+    expect(recovery.match(/secrets\.[A-Z0-9_]+/g)).toEqual([
+      'secrets.SUPABASE_PREVIEW_PROVISION_TOKEN',
+    ]);
     expect(recovery).toContain('path: ${{ runner.temp }}/preview-recovery/recovery.json');
   });
 });

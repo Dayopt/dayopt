@@ -54,7 +54,7 @@ const ready = {
   },
 };
 const env = {
-  SUPABASE_SECRET_KEY: 'synthetic-admin',
+  SUPABASE_PREVIEW_PROVISION_TOKEN: 'management-private',
   GITHUB_TOKEN: 'github-private',
   VERCEL_TOKEN: 'production-vercel-private',
   SUPABASE_PREVIEW_READINESS_TOKEN: 'management-private',
@@ -134,7 +134,10 @@ function scenario() {
     return 0;
   });
   const recover = vi.fn(async () => ({ status: 'clean', checked: 2, recovered: 0 }));
-  return { root, observe, execute, recover };
+  const resolveServiceKey = vi.fn(
+    async (_input: { ready: any; request: any; env: NodeJS.ProcessEnv }) => 'synthetic-target-key',
+  );
+  return { root, observe, execute, recover, resolveServiceKey };
 }
 
 describe('Preview E2E runner', () => {
@@ -144,6 +147,7 @@ describe('Preview E2E runner', () => {
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -156,6 +160,11 @@ describe('Preview E2E runner', () => {
     });
     expect(result.status).toBe('passed');
     expect(s.observe).toHaveBeenCalledTimes(2);
+    expect(s.resolveServiceKey).toHaveBeenCalledWith(
+      expect.objectContaining({ ready, request: {} }),
+    );
+    expect(s.execute.mock.calls[0]?.[0].SUPABASE_SECRET_KEY).toBe('synthetic-target-key');
+    expect(JSON.stringify(result)).not.toContain('synthetic-target-key');
     expect(s.observe).toHaveBeenCalledWith(
       expect.objectContaining({ githubToken: 'github-private' }),
     );
@@ -188,7 +197,7 @@ describe('Preview E2E runner', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
-fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
+fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'worker-observation.json'), JSON.stringify({cwd:process.cwd(), hasManagement: Boolean(process.env.GITHUB_TOKEN || process.env.VERCEL_TOKEN || process.env.SUPABASE_PREVIEW_READINESS_TOKEN || process.env.SUPABASE_PREVIEW_PROVISION_TOKEN || process.env.STRIPE_SECRET_KEY), runId:process.env.E2E_PREVIEW_RUN_ID, cloudIntent:process.env.E2E_PREVIEW_CLOUD_INTENT, desktop:process.env.E2E_PREVIEW_DESKTOP_USER_ID, mobile:process.env.E2E_PREVIEW_MOBILE_USER_ID}));
 fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JSON.stringify(${JSON.stringify(reviewedReport())}));
 `,
     );
@@ -206,6 +215,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       runDirectory,
       runId,
       cloudUserIds,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       recover: s.recover,
     });
@@ -229,6 +239,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       runPreviewE2E({
         request: {},
         env,
+        resolveServiceKey: s.resolveServiceKey,
         observe: s.observe,
         execute: s.execute,
         recover: s.recover,
@@ -236,6 +247,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
       }),
     ).rejects.toThrow();
     expect(s.execute).not.toHaveBeenCalled();
+    expect(s.resolveServiceKey).not.toHaveBeenCalled();
   });
   it('後段のDB等の不一致はE2E成功でも失敗', async () => {
     const s = scenario();
@@ -243,6 +255,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -256,6 +269,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -282,6 +296,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     const result = await runPreviewE2E({
       request: {},
       env,
+      resolveServiceKey: s.resolveServiceKey,
       observe: s.observe,
       execute: s.execute,
       recover: s.recover,
@@ -297,7 +312,7 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
   });
   it('子プロセスには管理tokenと本番secretを渡さない', () => {
     const worker = previewWorkerEnvironment(
-      env,
+      { ...env, SUPABASE_SECRET_KEY: 'synthetic-target-key' },
       ready,
       '/private',
       '/evidence',
@@ -308,6 +323,8 @@ fs.writeFileSync(path.join(process.env.E2E_PREVIEW_EVIDENCE_DIR, 'e2e.json'), JS
     expect(worker).not.toHaveProperty('SUPABASE_PREVIEW_READINESS_TOKEN');
     expect(worker).not.toHaveProperty('STRIPE_SECRET_KEY');
     expect(worker.NEXT_PUBLIC_SUPABASE_URL).toBe('https://abcdefghijklmnopqrst.supabase.co');
+    expect(worker).not.toHaveProperty('SUPABASE_PREVIEW_PROVISION_TOKEN');
+    expect(worker.SUPABASE_SECRET_KEY).toBe('synthetic-target-key');
   });
 });
 

@@ -241,7 +241,7 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 | `SUPABASE_MIGRATION_READINESS_TOKEN`     | no   | secret     | production          | supabase-migration-readiness    | —                          |
 | `SUPABASE_PREVIEW_PROVISION_TOKEN`       | no   | secret     | staging             | supabase-preview-provision      | —                          |
 | `SUPABASE_PREVIEW_READINESS_TOKEN`       | no   | secret     | staging             | preview-e2e                     | —                          |
-| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production, staging | supabase, preview-e2e           | —                          |
+| `SUPABASE_SECRET_KEY`                    | yes  | secret     | production          | supabase                        | —                          |
 | `SUPABASE_STORAGE_RLS_AUDIT_TOKEN`       | yes  | secret     | production          | supabase-storage-rls-audit      | —                          |
 | `TURNSTILE_SECRET_KEY`                   | no   | secret     | shared              | turnstile                       | —                          |
 | `UPSTASH_REDIS_REST_TOKEN`               | no   | secret     | staging, production | upstash                         | —                          |

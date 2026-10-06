@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expectedMigrationVersions } from '../ci/production-migration-readiness.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { resolvePreviewSecretKey } from '../lib/preview-branch-key.mjs';
 import { isPassingPreviewReport } from '../lib/preview-e2e-reporter.mjs';
 import { recoverPreviewUsers } from './preview-cleanup.mjs';
 import {
@@ -148,6 +149,7 @@ function executePlaywright(env) {
  *   runDirectory?: string,
  *   runId?: string,
  *   cloudUserIds?: { desktop: string, mobile: string },
+ *   resolveServiceKey?: (input: {ready: any, request: any, env: NodeJS.ProcessEnv}) => Promise<string>,
  * }} options
  */
 export async function runPreviewE2E({
@@ -161,9 +163,12 @@ export async function runPreviewE2E({
   runDirectory = undefined,
   runId = randomUUID(),
   cloudUserIds = /** @type {{desktop: string, mobile: string} | undefined} */ (undefined),
+  resolveServiceKey = ({ ready }) =>
+    resolvePreviewSecretKey({
+      projectRef: ready.supabaseProjectRef,
+      provisionToken: env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+    }),
 }) {
-  if (!env.SUPABASE_SECRET_KEY?.trim())
-    throw new Error('Nonproduction test credentials are required');
   const credentials = {
     githubToken: env.GITHUB_TOKEN,
     supabaseToken: env.SUPABASE_PREVIEW_READINESS_TOKEN,
@@ -172,6 +177,10 @@ export async function runPreviewE2E({
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(runId))
     throw new Error('Preview run identity is invalid');
   const before = await observe({ ...request, ...credentials });
+  const serviceKey = await resolveServiceKey({ ready: before, request, env });
+  if (typeof serviceKey !== 'string' || !serviceKey.trim())
+    throw new Error('Preview target service key is unavailable');
+  const runEnv = { ...env, SUPABASE_SECRET_KEY: serviceKey };
   const directory = runDirectory
     ? resolve(runDirectory)
     : join(ensurePreviewE2EStateRoot(tempRoot), runId);
@@ -202,7 +211,7 @@ export async function runPreviewE2E({
   let failure = 'execution-failed';
   try {
     exitCode = await execute(
-      previewWorkerEnvironment(env, before, privateDir, evidenceDir, runId, cloudUserIds),
+      previewWorkerEnvironment(runEnv, before, privateDir, evidenceDir, runId, cloudUserIds),
     );
   } catch {
     // A raw process error can contain env, command output, or request details.
@@ -216,7 +225,7 @@ export async function runPreviewE2E({
       evidenceDirectory: evidenceDir,
       runId,
       supabaseProjectRef: before.supabaseProjectRef,
-      serviceKey: env.SUPABASE_SECRET_KEY,
+      serviceKey,
     });
   } catch {
     // Invalid journal or raw provider errors cannot be disclosed.
