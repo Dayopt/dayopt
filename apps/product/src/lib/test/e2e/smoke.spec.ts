@@ -69,8 +69,7 @@ test.describe('Smoke: 認証フロー', () => {
     });
 
     for (const route of [
-      '/calendar',
-      '/report',
+      '/',
       '/settings',
       '/settings/account',
       '/settings/display',

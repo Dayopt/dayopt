@@ -247,13 +247,22 @@ function isDuplicateEmail(result) {
 async function verifyPasswordAndCloseLocalSession({
   origin,
   publishableKey,
+  adminVerificationKey,
   email,
   password,
   fetchImpl,
 }) {
+  // Administrative Integration verification must not disable the public CAPTCHA policy.
+  // Modern keys use apikey; only legacy service-role JWTs belong in Authorization.
+  const verificationKey = adminVerificationKey ?? publishableKey;
+  const legacyAdmin =
+    adminVerificationKey &&
+    (adminVerificationKey.type === 'legacy' ||
+      (adminVerificationKey.type === undefined && adminVerificationKey.name === 'service_role'));
   const signIn = await apiJson(`${origin}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    key: publishableKey.api_key,
+    key: verificationKey.api_key,
+    ...(legacyAdmin ? { authorizationToken: verificationKey.api_key } : {}),
     body: { email, password },
     fetchImpl,
   });
@@ -334,7 +343,14 @@ export async function provisionNonproductionLogin({
   if (!created.ok && !isDuplicateEmail(created))
     throw new ProvisionError('Nonproduction login: Auth user creation failed');
 
-  await verifyPasswordAndCloseLocalSession({ origin, publishableKey, email, password, fetchImpl });
+  await verifyPasswordAndCloseLocalSession({
+    origin,
+    publishableKey,
+    ...(target.kind === 'integration' ? { adminVerificationKey: secretKey } : {}),
+    email,
+    password,
+    fetchImpl,
+  });
   return {
     status: created.ok ? 'created-and-verified' : 'existing-credentials-verified',
     target: target.kind,

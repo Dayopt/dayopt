@@ -238,9 +238,49 @@ describe('nonproduction login provisioning', () => {
       'Bearer legacy-service-role',
     );
     expect(world.calls[3].url).toContain('grant_type=password');
-    expect(new Headers(world.calls[3].init?.headers).get('Authorization')).toBeNull();
+    expect(new Headers(world.calls[3].init?.headers).get('apikey')).toBe('legacy-service-role');
+    expect(new Headers(world.calls[3].init?.headers).get('Authorization')).toBe(
+      'Bearer legacy-service-role',
+    );
     expect(world.calls[4].url).toContain('scope=local');
     expect(new Headers(world.calls[4].init?.headers).get('Authorization')).toBe(
+      'Bearer verification-session',
+    );
+  });
+
+  it('verifies Integration with its modern admin key while retaining user-token logout', async () => {
+    const world = buildFetch({
+      branch: {
+        ...previewBranch,
+        id: INTEGRATION_BRANCH_ID,
+        project_ref: INTEGRATION_PROJECT_REF,
+        persistent: true,
+        git_branch: 'integration',
+        pr_number: 0,
+      },
+      keys: [
+        { type: 'secret', api_key: 'sb_secret_SYNTHETIC_ADMIN' },
+        { type: 'publishable', api_key: 'sb_publishable_SYNTHETIC_PUBLIC' },
+      ],
+    });
+    await provisionNonproductionLogin({
+      target: { kind: 'integration' },
+      ...testCredentials,
+      fetchImpl: world.fetchImpl,
+      now: () => 0,
+    });
+    const login = world.calls.find(({ url }) =>
+      url.endsWith('/auth/v1/token?grant_type=password'),
+    )!;
+    const logout = world.calls.find(({ url }) => url.endsWith('/auth/v1/logout?scope=local'))!;
+    expect(new Headers(login.init?.headers).get('apikey')).toBe('sb_secret_SYNTHETIC_ADMIN');
+    expect(new Headers(login.init?.headers).get('Authorization')).toBeNull();
+    expect(JSON.parse(String(login.init?.body))).toEqual({
+      email: testCredentials.email,
+      password: testCredentials.password,
+    });
+    expect(new Headers(logout.init?.headers).get('apikey')).toBe('sb_publishable_SYNTHETIC_PUBLIC');
+    expect(new Headers(logout.init?.headers).get('Authorization')).toBe(
       'Bearer verification-session',
     );
   });

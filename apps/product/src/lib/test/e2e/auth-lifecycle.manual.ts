@@ -80,7 +80,7 @@ test.describe('Auth credential lifecycle (explicit local prerequisite)', () => {
     await expect(dialog).toBeHidden();
     await page.getByRole('button', { name: 'サインアウト', exact: true }).click();
     await expect(page).toHaveURL(/\/ja\/auth\/login/);
-    await page.goto('/ja/calendar');
+    await page.goto('/ja');
     await expect(page).toHaveURL(/\/ja\/auth\/login/);
     // The stale password must actually reach GoTrue and be rejected.
     await page.locator('input[type="email"]').fill(IDENTITY.email);
@@ -92,7 +92,7 @@ test.describe('Auth credential lifecycle (explicit local prerequisite)', () => {
     await expect(page).toHaveURL(/\/auth\/login/);
     await page.locator('input[type="password"]').fill(newPassword);
     await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/\/ja\/calendar/);
+    await expect(page).toHaveURL(/\/ja\/?(?:\?|$)/);
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
     const authenticated = await adminSupabase.auth.admin.getUserById(IDENTITY.userId);
     expect(authenticated.error === null).toBe(true);
