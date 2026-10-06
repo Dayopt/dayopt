@@ -46,6 +46,9 @@ export function useDragSelection({
   const lastSnapRef = useRef<{ startMin: number; endMin: number } | null>(null);
 
   const [mode, dispatch] = useReducer(selectionReducer, IDLE);
+  const modeRef = useRef(mode);
+  // eslint-disable-next-line react-hooks/refs -- ref mirrors current reducer state for stable document handlers
+  modeRef.current = mode;
 
   // Stable refs for latest props (global event handlers 用)
   const propsRef = useRef({
@@ -178,16 +181,17 @@ export function useDragSelection({
       rafId.current = requestAnimationFrame(() => {
         rafId.current = null;
         if (!containerRef.current) return;
-        if (mode.type !== 'mouse-selecting') return;
+        const currentMode = modeRef.current;
+        if (currentMode.type !== 'mouse-selecting') return;
 
         const rect = containerRef.current.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const result = computeSelectionMove({
           y,
           hourHeight: propsRef.current.hourHeight,
-          start: mode.start,
-          startPixelY: mode.startPixelY,
-          hasDragged: mode.hasDragged,
+          start: currentMode.start,
+          startPixelY: currentMode.startPixelY,
+          hasDragged: currentMode.hasDragged,
           date: propsRef.current.date,
           plans: propsRef.current.plans,
           lastSnap: lastSnapRef.current,
@@ -211,11 +215,16 @@ export function useDragSelection({
         dispatch({ type: 'CANCEL' });
         return;
       }
-      if (mode.type === 'mouse-selecting' && mode.hasDragged) {
-        if (mode.isOverlapping) {
+      const currentMode = modeRef.current;
+      if (currentMode.type === 'mouse-selecting' && currentMode.hasDragged) {
+        if (currentMode.isOverlapping) {
           toast.error(p.t('errors.timeOverlap'));
         } else if (p.onTimeRangeSelect) {
-          p.onTimeRangeSelect({ date: p.date, ...mode.selection, durationSource: 'dragged' });
+          p.onTimeRangeSelect({
+            date: p.date,
+            ...currentMode.selection,
+            durationSource: 'dragged',
+          });
         }
       }
       dispatch({ type: 'MOUSE_UP' });
@@ -227,9 +236,10 @@ export function useDragSelection({
 
       // touch-pending: 長押し前に動いたらキャンセル
       // 縦方向は閾値を低くしてスクロールに素早く譲る
-      if (mode.type === 'touch-pending') {
-        const dx = Math.abs(touch.clientX - mode.startPos.x);
-        const dy = Math.abs(touch.clientY - mode.startPos.y);
+      const currentMode = modeRef.current;
+      if (currentMode.type === 'touch-pending') {
+        const dx = Math.abs(touch.clientX - currentMode.startPos.x);
+        const dy = Math.abs(touch.clientY - currentMode.startPos.y);
         if (
           dx > DRAG_CONSTANTS.LONG_PRESS_MOVE_THRESHOLD ||
           dy > DRAG_CONSTANTS.LONG_PRESS_VERTICAL_THRESHOLD
@@ -240,28 +250,29 @@ export function useDragSelection({
         return;
       }
 
-      if (mode.type !== 'touch-selecting' || !containerRef.current) return;
+      if (currentMode.type !== 'touch-selecting' || !containerRef.current) return;
 
       // スクロール抑制（ドラッグ中のみ）
       const rect = containerRef.current.getBoundingClientRect();
       const y = touch.clientY - rect.top;
-      if (Math.abs(y - mode.startPixelY) > DRAG_CONSTANTS.MIN_DRAG_DISTANCE) {
+      if (Math.abs(y - currentMode.startPixelY) > DRAG_CONSTANTS.MIN_DRAG_DISTANCE) {
         e.preventDefault();
       }
 
       if (rafId.current !== null) return;
       rafId.current = requestAnimationFrame(() => {
         rafId.current = null;
-        if (!containerRef.current || mode.type !== 'touch-selecting') return;
+        const activeMode = modeRef.current;
+        if (!containerRef.current || activeMode.type !== 'touch-selecting') return;
 
         const touchRect = containerRef.current.getBoundingClientRect();
         const touchY = touch.clientY - touchRect.top;
         const result = computeSelectionMove({
           y: touchY,
           hourHeight: propsRef.current.hourHeight,
-          start: mode.start,
-          startPixelY: mode.startPixelY,
-          hasDragged: mode.hasDragged,
+          start: activeMode.start,
+          startPixelY: activeMode.startPixelY,
+          hasDragged: activeMode.hasDragged,
           date: propsRef.current.date,
           plans: propsRef.current.plans,
           lastSnap: lastSnapRef.current,
@@ -285,12 +296,13 @@ export function useDragSelection({
       const handler = p.onDoubleClickProp || p.onTimeRangeSelect;
 
       // touch-pending: シングルタップは無視（長押しのみでTimeblock作成）
-      if (mode.type === 'touch-pending') {
+      const currentMode = modeRef.current;
+      if (currentMode.type === 'touch-pending') {
         dispatch({ type: 'TOUCH_END' });
         return;
       }
 
-      if (mode.type !== 'touch-selecting') {
+      if (currentMode.type !== 'touch-selecting') {
         dispatch({ type: 'CANCEL' });
         return;
       }
@@ -299,9 +311,9 @@ export function useDragSelection({
         return;
       }
 
-      const sel = mode.selection;
-      if (mode.hasDragged) {
-        if (mode.isOverlapping) {
+      const sel = currentMode.selection;
+      if (currentMode.hasDragged) {
+        if (currentMode.isOverlapping) {
           toast.error(p.t('errors.timeOverlap'));
         } else if (p.onTimeRangeSelect) {
           p.onTimeRangeSelect({ date: p.date, ...sel, durationSource: 'dragged' });
@@ -350,7 +362,7 @@ export function useDragSelection({
         rafId.current = null;
       }
     };
-  }, [isActive, mode, clearTimer]);
+  }, [isActive, clearTimer]);
 
   // Custom events: calendar-drag-cancel / calendar-show-selection
   useSelectionExternalEvents(date, dispatch, clearTimer);
