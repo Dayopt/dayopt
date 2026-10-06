@@ -184,7 +184,7 @@ node scripts/runbook/preview-readiness.mjs \
 
 #### Remote E2E の実行
 
-`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに `SUPABASE_PREVIEW_PROVISION_TOKEN` が必要。readinessが確認した非Production branch refに対してManagement APIでキーを取得し、候補keyの照合後にのみworkerへ渡す。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。既存CIからの明示opt-in経路は下記。実クラウドでの通し確認はまだ未完了。
+`node scripts/runbook/preview-e2e.mjs` に上記 readiness と同じ引数を渡す。さらに `SUPABASE_PREVIEW_PROVISION_TOKEN` が必要。readinessが確認した非Production branch refに対してManagement APIでキーを取得し、候補keyの照合後にのみworkerへ渡す。同じrefに有効なsecret keyが複数ある時は `name=default` を一意に優先し、defaultが無い場合は唯一の候補だけを使う。default重複または複数の非default候補は fail closed にする。readiness に成功した具体 deployment に対し、既存の desktop / mobile critical-path（作成・reload・Report確認）を実行し、終了後に再照合する。localhost の build / 起動はしない。個人の1Password認証も呼び出さない。run IDとstate directoryは実行開始時に出力される。既存CIからの明示opt-in経路は下記。実クラウドでの通し確認はまだ未完了。
 
 - 子プロセスへは非本番DB keyと当該Previewのbypassだけを渡し、Vercel/Supabase管理tokenや他のアプリSecretは引き継がない。信頼できるコード・runnerでのみ実行する。未審査のforkへSecretを渡す仕組みではない。
 - ブラウザ通信は具体Preview、選択したSupabase、CAPTCHA providerに限定する。本番domainを含むその他originは拒否する。bypassはPreviewだけへ1 hopずつ付け、redirect先で再判定する。

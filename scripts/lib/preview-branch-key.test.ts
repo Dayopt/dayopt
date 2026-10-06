@@ -11,7 +11,7 @@ describe('resolvePreviewSecretKey', () => {
     const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       Response.json([
         { type: 'publishable', api_key: 'synthetic-publishable' },
-        { type: 'secret', api_key: 'synthetic-target-secret' },
+        { type: 'secret', name: 'default', api_key: 'synthetic-target-secret' },
       ]),
     );
 
@@ -60,6 +60,30 @@ describe('resolvePreviewSecretKey', () => {
       expect(String(error)).not.toContain('PRIVATE_TOKEN_BODY');
       expect(String(error)).not.toContain(token);
     }
+  });
+
+  it('prefers the named default secret during an overlapping key rotation', async () => {
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json([
+        { type: 'secret', name: 'new-service', api_key: 'synthetic-new-key' },
+        { type: 'secret', name: 'default', api_key: 'synthetic-default-key' },
+      ]),
+    );
+    await expect(
+      resolvePreviewSecretKey({ projectRef, provisionToken: token, fetchImpl }),
+    ).resolves.toBe('synthetic-default-key');
+  });
+
+  it('uses the only remaining named secret after the default is disabled', async () => {
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json([
+        { type: 'secret', name: 'default', api_key: 'synthetic-disabled-key', disabled: true },
+        { type: 'secret', name: 'rotated', api_key: 'synthetic-rotated-key' },
+      ]),
+    );
+    await expect(
+      resolvePreviewSecretKey({ projectRef, provisionToken: token, fetchImpl }),
+    ).resolves.toBe('synthetic-rotated-key');
   });
 
   it('rejects a missing or ambiguous target secret key without exposing response values', async () => {

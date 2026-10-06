@@ -142,6 +142,7 @@ function runScript(
   rollup: RollupEntry[],
   options: {
     compare?: string;
+    baseRefName?: string;
     isDraft?: boolean;
     /** PR の変更ファイル一覧。省略時は product / web 両方に触れる形（従来テストの前提を維持） */
     files?: string[];
@@ -179,7 +180,7 @@ function runScript(
       hasNextPage?: boolean;
     }>;
   } = {},
-): { status: number | null; stderr: string; auditStatusArgs: string } {
+): { status: number | null; stderr: string; auditStatusArgs: string; compareArgs: string } {
   // repo 直下ではなく os の temp に作る。プロセスが afterEach 前に落ちると untracked な
   // ディレクトリが repo に残り、まさにこのスクリプトの dirty ゲートが以後の掃除を止める。
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'finish-branch-test-'));
@@ -199,6 +200,7 @@ function runScript(
       isDraft: options.isDraft ?? false,
       headRefName: BRANCH,
       headRefOid: DEFAULT_HEAD_SHA,
+      baseRefName: options.baseRefName ?? 'main',
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'CLEAN',
       statusCheckRollup: rollup,
@@ -297,7 +299,7 @@ case "$1" in
           cat "$FINISH_BRANCH_PR_FILES"
           if [[ "\${FINISH_BRANCH_FILES_EXIT:-0}" != "0" ]]; then exit 1; fi
           ;;
-        *compare*) echo "$FINISH_BRANCH_COMPARE" ;;
+        *compare*) printf '%s\n' "$*" >> "$FINISH_BRANCH_COMPARE_ARGS"; echo "$FINISH_BRANCH_COMPARE" ;;
         *full_name*) echo "Dayopt/dayopt" ;;
         *) exit 2 ;;
       esac
@@ -320,6 +322,7 @@ esac
   git('commit', '-m', 'seed');
 
   const auditStatusArgsPath = join(temporaryDirectory, 'audit-status-args.txt');
+  const compareArgsPath = join(temporaryDirectory, 'compare-args.txt');
 
   const result = spawnSync('bash', [scriptPath, '123', '--dry-run'], {
     cwd: temporaryDirectory,
@@ -329,6 +332,7 @@ esac
       PATH: `${binDirectory}:${process.env.PATH ?? ''}`,
       FINISH_BRANCH_PR_JSON: payloadPath,
       FINISH_BRANCH_COMPARE: options.compare ?? 'ahead',
+      FINISH_BRANCH_COMPARE_ARGS: compareArgsPath,
       FINISH_BRANCH_PR_FILES: options.filesUnavailable
         ? join(temporaryDirectory, 'missing-files.txt')
         : filesPath,
@@ -350,6 +354,7 @@ esac
     auditStatusArgs: existsSync(auditStatusArgsPath)
       ? readFileSync(auditStatusArgsPath, 'utf8')
       : '',
+    compareArgs: existsSync(compareArgsPath) ? readFileSync(compareArgsPath, 'utf8') : '',
   };
 }
 
@@ -369,7 +374,9 @@ type RepoScenario = {
   prState: 'OPEN' | 'MERGED' | 'CLOSED';
   /** OPEN のとき、マージ API を失敗させる */
   mergeFails?: boolean;
-  /** origin/main に feature を merge --no-ff 済みにするか */
+  /** PR の実 base branch。省略時は main */
+  baseRefName?: 'main' | 'integration';
+  /** PR の実 base branch に feature を merge --no-ff 済みにするか */
   mergeIntoMain: boolean;
   /** MAIN_ROOT の HEAD。'other' は別セッションが作業中の状態を表す */
   mainRootHead: 'main' | 'other' | 'feature';
@@ -415,7 +422,16 @@ function runScriptOnRepo(scenario: RepoScenario) {
   git(seeder, 'commit', '-m', 'seed');
   git(seeder, 'push', 'origin', 'main');
 
-  git(seeder, 'checkout', '-b', BRANCH);
+  const baseRefName = scenario.baseRefName ?? 'main';
+  if (baseRefName !== 'main') {
+    git(seeder, 'checkout', '-b', baseRefName, 'main');
+    writeFileSync(join(seeder, `${baseRefName}.txt`), `${baseRefName}\n`);
+    git(seeder, 'add', `${baseRefName}.txt`);
+    git(seeder, 'commit', `-m`, `${baseRefName} base`);
+    git(seeder, 'push', 'origin', baseRefName);
+  }
+
+  git(seeder, 'checkout', '-b', BRANCH, baseRefName);
   writeFileSync(join(seeder, 'feature.txt'), 'feature\n');
   git(seeder, 'add', 'feature.txt');
   git(seeder, 'commit', '-m', 'feature');
@@ -445,8 +461,10 @@ function runScriptOnRepo(scenario: RepoScenario) {
   }
 
   if (scenario.mergeIntoMain) {
+    git(seeder, 'checkout', baseRefName);
     git(seeder, 'merge', '--no-ff', BRANCH, '-m', `Merge pull request #123 from ${BRANCH}`);
-    git(seeder, 'push', 'origin', 'main');
+    git(seeder, 'push', 'origin', baseRefName);
+    git(seeder, 'checkout', 'main');
   }
 
   const binDirectory = join(root, 'bin');
@@ -483,6 +501,7 @@ exec "$FINISH_BRANCH_REAL_GIT" "$@"
     JSON.stringify({
       state: scenario.prState,
       isDraft: false,
+      baseRefName,
       headRefName: scenario.prHeadBranch ?? BRANCH,
       headRefOid: scenario.prHeadSha ?? headSha,
       mergeable: 'MERGEABLE',
@@ -1459,13 +1478,49 @@ describe('レビュー thread の必須解決 gate', () => {
   });
 });
 
+describe('gate は PR の実 base branch を使う', () => {
+  it('integration base の最新を含む branch は compare で通す', () => {
+    const { status, stderr, compareArgs } = runScript(
+      [checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z'), ...requiredChecks()],
+      { baseRefName: 'integration', compare: 'ahead' },
+    );
+
+    expect(status).toBe(0);
+    expect(stderr).not.toContain('integration の最新を含んでいません');
+    expect(compareArgs).toContain(`compare/integration...${DEFAULT_HEAD_SHA}`);
+    expect(compareArgs).not.toContain(`compare/main...${DEFAULT_HEAD_SHA}`);
+  });
+
+  it('integration base と diverged なら main が ahead でも止める', () => {
+    const { status, stderr, compareArgs } = runScript(
+      [checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z'), ...requiredChecks()],
+      { baseRefName: 'integration', compare: 'diverged' },
+    );
+
+    expect(stderr).toContain("PR base 'integration' の最新を含んでいません");
+    expect(compareArgs).toContain(`compare/integration...${DEFAULT_HEAD_SHA}`);
+    expect(status).toBe(1);
+  });
+
+  it('baseRefName が欠損なら main にfallbackせず停止する', () => {
+    const { status, stderr, compareArgs } = runScript(
+      [checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z')],
+      { baseRefName: '' },
+    );
+
+    expect(stderr).toContain('PR #123 の base branch を取得できませんでした');
+    expect(compareArgs).toBe('');
+    expect(status).toBe(1);
+  });
+});
+
 describe('gate は REST 直叩きでも緩まない', () => {
   it('branch が main の最新を含んでいなければ止める', () => {
     // up-to-date gate。マージ対象 SHA を compare に pin した後も判定が生きていること。
     const { status, stderr } = runScript([checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z')], {
       compare: 'behind',
     });
-    expect(stderr).toContain('branch が main の最新を含んでいません');
+    expect(stderr).toContain("branch が PR base 'main' の最新を含んでいません");
     expect(status).toBe(1);
   });
 
@@ -1477,7 +1532,7 @@ describe('gate は REST 直叩きでも緩まない', () => {
     const { status, stderr } = runScript([checkRun('CI', 'SUCCESS', '2026-07-30T10:00:00Z')], {
       compare: 'diverged',
     });
-    expect(stderr).toContain('branch が main の最新を含んでいません');
+    expect(stderr).toContain("branch が PR base 'main' の最新を含んでいません");
     expect(status).toBe(1);
   });
 
@@ -1568,7 +1623,7 @@ describe('main checkout に触らない掃除（#1771）', () => {
 
     expect(repo.status).toBe(0);
     expect(repo.branchExists()).toBe(false);
-    expect(repo.stderr).toContain('main への到達を確認');
+    expect(repo.stderr).toContain("PR base 'main' への到達を確認");
     // 別セッションの作業（other）を奪っていないこと
     expect(repo.currentBranch(repo.mainRoot)).toBe('other');
     expect(repo.localMainMatchesRemote()).toBe(true);
@@ -1683,6 +1738,38 @@ describe('掃除で緩めてはいけない判定（#1771）', () => {
     expect(repo.branchExists()).toBe(true);
   });
 
+  it('integration に到達した保持 checkout は PR base を照合して detach する', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      baseRefName: 'integration',
+      mergeIntoMain: true,
+      mainRootHead: 'feature',
+    });
+
+    expect(repo.status).toBe(0);
+    expect(repo.branchExists()).toBe(false);
+    expect(repo.remoteBranchExists()).toBe(false);
+    expect(repo.currentBranch(repo.mainRoot)).toBe('');
+    expect(repo.stderr).toContain('通常 checkout を保持して対象 branch を終了');
+    expect(repo.stderr).not.toContain('origin/main に到達していません');
+  });
+
+  it('integration にマージ済みなら main を進めず対象 branch を掃除できる', () => {
+    const repo = runScriptOnRepo({
+      prState: 'MERGED',
+      baseRefName: 'integration',
+      mergeIntoMain: true,
+      mainRootHead: 'other',
+    });
+
+    expect(repo.status).toBe(0);
+    expect(repo.branchExists()).toBe(false);
+    expect(repo.remoteBranchExists()).toBe(false);
+    expect(repo.localMainMatchesRemote()).toBe(true);
+    expect(repo.stderr).toContain("PR base 'integration' は remote ref を取得し");
+    expect(repo.stderr).not.toContain('main を最新化');
+  });
+
   it('main に到達していない branch は rescue せず停止する', () => {
     // main 基準の判定を入れたことで「未マージでも -D で消える」方向へ倒れていないこと。
     // HEAD が別 branch = -d の偽陰性が起きる条件そのもので確認する。
@@ -1693,7 +1780,7 @@ describe('掃除で緩めてはいけない判定（#1771）', () => {
     });
 
     expect(repo.status).toBe(1);
-    expect(repo.stderr).toContain('main に到達しておらず');
+    expect(repo.stderr).toContain("PR base 'main' に到達しておらず");
     expect(repo.branchExists()).toBe(true);
   });
 });

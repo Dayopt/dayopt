@@ -18,12 +18,10 @@ INSERT INTO public.mcp_mutation_control (
 ON CONFLICT (singleton_key) DO UPDATE
 SET writes_enabled = false, enabled_client_ids = '{}'::TEXT[];
 
--- This rollback-only Integration contract retains its historical sample email.
--- Normalize either exact seed revision inside this disposable test transaction.
+-- Keep the fresh seed untouched. The provisioning contract accepts either the
+-- historical Integration tuple or the current sample tuple only when all Auth
+-- email fields agree with the user row.
 DO $fixture$
-DECLARE
-  v_user_count BIGINT;
-  v_identity_count BIGINT;
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -42,23 +40,6 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Expected exact deterministic seed Auth tuple';
   END IF;
-
-  UPDATE auth.users
-  SET email = 'test@dayopt.dev'
-  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
-  GET DIAGNOSTICS v_user_count = ROW_COUNT;
-  UPDATE auth.identities
-  SET provider_id = 'test@dayopt.dev',
-      identity_data = jsonb_build_object(
-        'sub', '00000000-0000-0000-0000-000000000001',
-        'email', 'test@dayopt.dev'
-      )
-  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
-    AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
-  GET DIAGNOSTICS v_identity_count = ROW_COUNT;
-  IF v_user_count <> 1 OR v_identity_count <> 1 THEN
-    RAISE EXCEPTION 'Could not normalize exact Integration test seed tuple';
-  END IF;
 END
 $fixture$;
 
@@ -67,6 +48,8 @@ DECLARE
   v_identity RECORD;
   v_repeated RECORD;
   v_extra_user UUID := gen_random_uuid();
+  v_alternate_email TEXT;
+  v_mixed_email TEXT;
   v_failures TEXT[] := '{}'::TEXT[];
 BEGIN
   IF has_function_privilege('anon', 'public.ensure_mcp_integration_environment_identity_v1()', 'EXECUTE')
@@ -208,6 +191,53 @@ BEGIN
     OR (SELECT count(*) FROM public.mcp_environment_identity) <> 1 THEN
     RAISE EXCEPTION 'Provisioning is not idempotent';
   END IF;
+
+  -- Rebuild the singleton inside this rollback-only test and prove the other
+  -- exact historical/current email tuple is accepted without normalizing seed.
+  DELETE FROM public.mcp_environment_identity;
+  v_alternate_email := CASE
+    WHEN (SELECT email FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000001'::UUID)
+      = 'test-seed@dayopt.dev' THEN 'test@dayopt.dev'
+    ELSE 'test-seed@dayopt.dev'
+  END;
+  UPDATE auth.users
+  SET email = v_alternate_email
+  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
+  UPDATE auth.identities
+  SET provider_id = v_alternate_email,
+      identity_data = jsonb_build_object(
+        'sub', '00000000-0000-0000-0000-000000000001',
+        'email', v_alternate_email
+      )
+  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+    AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+  SELECT * INTO STRICT v_identity
+  FROM public.ensure_mcp_integration_environment_identity_v1();
+  IF v_identity.environment <> 'integration' THEN
+    RAISE EXCEPTION 'Alternate coherent sample email tuple was rejected';
+  END IF;
+
+  -- A mixed tuple must stay rejected even though each email is individually
+  -- in the old/new allowlist.
+  DELETE FROM public.mcp_environment_identity;
+  v_mixed_email := CASE
+    WHEN v_alternate_email = 'test-seed@dayopt.dev' THEN 'test@dayopt.dev'
+    ELSE 'test-seed@dayopt.dev'
+  END;
+  UPDATE auth.identities
+  SET identity_data = jsonb_build_object(
+    'sub', '00000000-0000-0000-0000-000000000001',
+    'email', v_mixed_email
+  )
+  WHERE id = '00000000-0000-0000-0000-000000000001'::UUID
+    AND user_id = '00000000-0000-0000-0000-000000000001'::UUID;
+  BEGIN
+    PERFORM public.ensure_mcp_integration_environment_identity_v1();
+    RAISE EXCEPTION 'Mixed old/new Auth tuple unexpectedly provisioned' USING ERRCODE = 'PT001';
+  EXCEPTION
+    WHEN SQLSTATE 'DI005' THEN NULL;
+    WHEN SQLSTATE 'PT001' THEN RAISE;
+  END;
 
 END
 $test$;
