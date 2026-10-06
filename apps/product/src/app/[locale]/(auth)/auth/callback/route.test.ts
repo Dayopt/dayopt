@@ -71,6 +71,6 @@ describe('OAuth registration analytics redirect', () => {
       ),
     );
 
-    expect(response.headers.get('location')).toBe('https://app.dayopt.app/calendar');
+    expect(response.headers.get('location')).toBe('https://app.dayopt.app/');
   });
 });

@@ -1394,7 +1394,7 @@ Realtime の購読は無いので、MCP で作った Plan はすぐには画面�
       "fails": [],
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",

@@ -1,0 +1,84 @@
+name: Candidate Promotion
+
+# Candidate validation finishes before PR creation; evidence never trusts an
+# in-progress run. The event-triggering credential remains pending approval.
+on:
+  workflow_run:
+    workflows: [Release Candidate]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Completed candidate run ID (same route for emergency)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: candidate-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote_candidate:
+    outputs:
+      verified_main_merge_sha: ${{ steps.publish_candidate.outputs.verified_main_merge_sha }}
+    if: vars.RELEASE_CANDIDATE_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    environment:
+      name: production-release
+      deployment: false
+    steps:
+      # Never execute the candidate while holding the PR/merge credential.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Open, verify ordinary PR checks, and merge the exact candidate
+        id: publish_candidate
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_CANDIDATE_TOKEN }}
+          RELEASE_CANDIDATE_ENABLED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}
+          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
+          CANDIDATE_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_run || github.event.workflow_run.id }}
+        run: node scripts/ci/release-candidate-publish.mjs auto "$CANDIDATE_RUN"
+
+  notify_failure:
+    needs: [promote_candidate]
+    if: ${{ always() && needs.promote_candidate.result == 'failure' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: candidate-failure-issue
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No checkout, dependencies or candidate code with the write token.
+      - name: Hold the whole candidate and update its failure Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: 'Release candidate held (#3009)'
+          VERIFIED_MAIN_MERGE_SHA: ${{ needs.promote_candidate.outputs.verified_main_merge_sha }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number,title --jq '.[] | select(.title == "Release candidate held (#3009)") | .number' | head -1)
+          if [ -n "$VERIFIED_MAIN_MERGE_SHA" ]; then
+            body="Writer: Release Candidate workflow. Main promotion PR merge was verified at $VERIFIED_MAIN_MERGE_SHA, but the post-merge Integration merge-back step failed. This controller has not asserted Production deployment status. Inspect the merge-back and run before assuming environments are aligned. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          else
+            body="Writer: Release Candidate workflow. Candidate held before a verified main merge; no partial release was confirmed. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)."
+          fi
+          if [ -n "$existing" ]; then
+            marker="actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT)"
+            found=$({ gh api "repos/$GITHUB_REPOSITORY/issues/$existing" --jq \.body; gh api "repos/$GITHUB_REPOSITORY/issues/$existing/comments" --paginate --jq '.[].body'; } | { rg -F "$marker" || true; })
+            if [ -z "$found" ]; then gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"; fi
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --label type:bug,area:deployment --body "$body"
+          fi

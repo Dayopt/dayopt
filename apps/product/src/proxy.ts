@@ -148,7 +148,7 @@ function redirectWithCsp(url: URL, contentSecurityPolicy: string): NextResponse 
  * next-intl 4.13.2 は `decodeURI`（`middleware.js:16`）**の後に**
  * `sanitizePathname`（`middleware.js:25` → `utils.js:187`）を通した値で
  * rewrite 先を決める。decode だけを揃えても sanitize の 3 段が残るため、
- * `/%09calendar`（TAB）・`/%0A/calendar`（LF）・`//calendar`（連続スラッシュ）は
+ * `/%09`（TAB）・`/%0A/`（LF）・`//`（連続スラッシュ）は
  * 判定側で別物のままになり、同じバイパスが 1 文字違いで成立する。
  * **decodeURI + sanitize 相当を同じ順で 1 回ずつ**通すのが要件で、
  * 多重 decode すると rewrite 側と再びずれる（`%2F` を decode しない挙動も
@@ -224,50 +224,8 @@ export function getLocalizedPath(path: string, locale: string): string {
   return `/${locale}${path}`;
 }
 
-// workspace の旧 URL（/day, /week, /2day〜/7day）。/calendar への統一後も
-// workspace-shell-restructure Step 6（旧route削除）まで redirect の入力として残す。
-const LEGACY_WORKSPACE_VIEW_PATTERN = /^\/(day|week|[2-7]day)$/;
-
-interface LegacyWorkspaceRedirect {
-  pathname: '/calendar' | '/report';
-  search: string;
-}
-
 /**
- * 旧 URL（/day, /week, /Nday、`?panel=` 付き含む）を新 URL契約（/calendar, /report）へ写す。
- *
- * `?panel=review|diff|analytics` は `/report` へ、それ以外は `/calendar?view=` へ。
- * 既存クエリは素通しし、この関数が明示的に扱うキー（panel / reviewTagId / view / range）
- * だけを置換・削除する（旧 docs/projects/_archive/workspace-shell-restructure/overview.md
- * §4-4、docs/projects 全廃に伴い #2473 で削除。git 履歴参照）。
- *
- * `/review`（削除済み旧route）はこの関数の対象外（張らない。§4-4）。
- */
-function resolveLegacyWorkspaceRedirect(
-  pathWithoutLocale: string,
-  searchParams: URLSearchParams,
-): LegacyWorkspaceRedirect | null {
-  const match = LEGACY_WORKSPACE_VIEW_PATTERN.exec(pathWithoutLocale);
-  if (!match) return null;
-
-  const legacyView = match[1]!;
-  const panel = searchParams.get('panel');
-  const params = new URLSearchParams(searchParams);
-
-  if (panel === 'review' || panel === 'diff' || panel === 'analytics') {
-    params.delete('panel');
-    params.delete('reviewTagId');
-    // レポートは週 / 月 / 年の 3 粒度しか持たない（#2575）。旧 `/day?panel=` も週へ寄せる。
-    params.set('range', 'week');
-    return { pathname: '/report', search: params.toString() };
-  }
-
-  params.set('view', legacyView);
-  return { pathname: '/calendar', search: params.toString() };
-}
-
-/**
- * `/calendar?view=` が範囲外の場合、page.tsx の notFound() を待たず edge で 404 を返す。
+ * `/?view=` が範囲外の場合、page.tsx の notFound() を待たず edge で 404 を返す。
  *
  * page 側の notFound()（searchParams 依存）は静的シェルの prerender と競合し、
  * status code に反映されない（`x-nextjs-prerender: 1` で 200 が返る、2026-08-19 実測。
@@ -282,7 +240,7 @@ function resolveCalendarViewNotFound(
   pathWithoutLocale: string,
   searchParams: URLSearchParams,
 ): boolean {
-  if (pathWithoutLocale !== '/calendar') return false;
+  if (pathWithoutLocale !== '/') return false;
   const values = searchParams.getAll('view');
   if (values.length === 0) return false;
   return values.some((value) => !isValidCalendarViewToken(value));
@@ -296,14 +254,13 @@ export async function proxy(request: NextRequest) {
   // `request.nextUrl.pathname` は percent-encoding を保ったまま渡ってくるのに対し、
   // next-intl の middleware は `decodeURI` した値で rewrite 先を決める
   // （4.13.2 `middleware.js:16`、encode 前後が異なれば `:40` で rewrite が出る）。
-  // 判定側だけが encode されたままだと `/%63alendar` は
-  // `isProtectedProductPath` の `startsWith` に一致せず「保護対象ではない」と
-  // 扱われる一方、rewrite で `/calendar` が描画され、未認証の login redirect と
+  // 判定側だけが encode されたままだと、ホームを指す `/%09` は
+  // `isProtectedProductPath` の判定に一致せず「保護対象ではない」と
+  // 扱われる一方、rewrite で `/` が描画され、未認証の login redirect と
   // aal1 の MFA gate を同時に迂回できる（locale prefix を encode した
-  // `/%6a%61/calendar` は getPathWithoutLocale も素通りするため同じ穴になる）。
+  // `/%6a%61/` は getPathWithoutLocale も素通りするため同じ穴になる）。
   // decode だけでは足りず、next-intl が続けて通す sanitize（TAB / LF / CR の
-  // 除去と連続スラッシュの畳み込み）まで揃えないと `/%09calendar` や
-  // `//calendar` が同じ穴として残る。
+  // 除去と連続スラッシュの畳み込み）まで揃えないと `/%09` や `//` が同じ穴として残る。
   // **rewrite 先を決めるのと同じ正規化を通した値だけで判定する**のが唯一の
   // 防ぎ方で、判定関数を個別に直しても encode の入り口が残る。
   const rawPathname = request.nextUrl.pathname;
@@ -387,21 +344,9 @@ export async function proxy(request: NextRequest) {
   const currentLocale = getCurrentLocale(pathname);
   const pathWithoutLocale = getPathWithoutLocale(pathname);
 
-  // 旧URL → /calendar・/report への写像。認証状態を問わないので Supabase への
-  // 往復（updateSession）より前、パス分類より前で返す（overview.md §4-3）。
-  const legacyRedirect = resolveLegacyWorkspaceRedirect(
-    pathWithoutLocale,
-    request.nextUrl.searchParams,
-  );
-  if (legacyRedirect) {
-    const target = new URL(getLocalizedPath(legacyRedirect.pathname, currentLocale), request.url);
-    target.search = legacyRedirect.search;
-    return redirectWithCsp(target, contentSecurityPolicy);
-  }
-
-  // /calendar?view= の範囲外検証（page.tsx の notFound() が prerender シェルの
+  // ホームの ?view= の範囲外検証（page.tsx の notFound() が prerender シェルの
   // status に効かないため edge で完結させる。resolveCalendarViewNotFound 参照）。
-  // 認証状態を問わないので legacy redirect と同じ位置、auth 判定より前で返す。
+  // 認証状態を問わず auth 判定より前で返す。
   if (resolveCalendarViewNotFound(pathWithoutLocale, request.nextUrl.searchParams)) {
     return notFoundWithCsp(contentSecurityPolicy);
   }
@@ -463,9 +408,7 @@ export async function proxy(request: NextRequest) {
     const isAllowedWhileAuthenticated = isAuthPathAllowedWhileAuthenticated(pathWithoutLocale);
 
     if (user && isAuthPath && !isAllowedWhileAuthenticated) {
-      return redirectWithSession(
-        new URL(getLocalizedPath('/calendar', currentLocale), request.url),
-      );
+      return redirectWithSession(new URL(getLocalizedPath('/', currentLocale), request.url));
     }
 
     // MFA AAL強制（認証済みユーザーのみ）

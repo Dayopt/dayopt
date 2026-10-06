@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database';
 import { resolvePreviewCloudUserId } from '../preview-cloud-identity';
 import { recordPreviewUser } from '../preview-user-lifecycle';
-import { REPORT_ALLOCATION } from './report-selectors';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
 /**
@@ -16,9 +15,6 @@ import { suppressConsentBanner } from './suppress-consent-banner';
  */
 
 export const TIMEZONE = 'Asia/Tokyo';
-
-/** `formatReportSpan(60, 'ja')` の表記。E2E は ja locale で開く。 */
-const ONE_HOUR_SPAN = '1時間';
 
 export type AdminSupabase = ReturnType<typeof createClient<Database>>;
 
@@ -223,12 +219,12 @@ export async function loginAs(page: Page, identity: CriticalPathIdentity, return
       { timeout: 15_000 },
     );
   } else {
-    await page.waitForURL(/\/ja\/calendar/i, { timeout: 15_000 });
+    await page.waitForURL(/\/ja\/?/i, { timeout: 15_000 });
   }
 }
 
 export async function openDay(page: Page, dateParam: string) {
-  await page.goto(`/ja/calendar?view=day&date=${dateParam}`);
+  await page.goto(`/ja/?view=day&date=${dateParam}`);
   await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
 }
 
@@ -268,33 +264,4 @@ export async function revealHour(page: Page, hour: number) {
   const hourBox = await hourCell.boundingBox();
   if (!box || !hourBox) throw new Error('calendar grid is not visible');
   return { grid, box, hourBox, hourHeight };
-}
-
-/**
- * 記録した 1 時間が /report の「時間の使い方」へ反映されたことを確かめる。
- *
- * **完全一致で見る。** 表記は読み物向けの `formatReportSpan`（`1時間` / `12分`）で、
- * `not.toHaveText('0:00')` のような否定は書式が変われば何にでも当たる
- * （#2773 で `h:mm` から変わった後も緑のままだった。#2774）。
- *
- * 行は**配分の横棒ではなくアクティビティ一覧**を見る。横棒は記録のあるカテゴリーも
- * アクティビティも 1 つだけだと `resolveAllocationMode` が `'none'` を返して
- * 描かれず、この seed（カテゴリー 1・アクティビティ 1）では必ず 0 件になる。
- *
- * カテゴリー紐付けが `未分類` へ落ちる回帰は unit 側で固定してある
- * （`ReportBody.test.tsx` の配分・凡例の test 群）。ここは「記録した 1 時間が
- * この面のこのアクティビティの行に出る」ことだけを end-to-end で見る。
- */
-export async function expectReportAllocationShowsOneHour(page: Page, activityName: string) {
-  const allocation = page.locator(REPORT_ALLOCATION.chapter);
-  await expect(allocation).toBeVisible({ timeout: 10_000 });
-
-  const recorded = allocation.locator(REPORT_ALLOCATION.recordedHeadline);
-  await expect(recorded).toHaveText(ONE_HOUR_SPAN, { timeout: 10_000 });
-
-  const usageRow = allocation
-    .locator(REPORT_ALLOCATION.usageRows)
-    .filter({ hasText: activityName });
-  await expect(usageRow).toHaveCount(1, { timeout: 10_000 });
-  await expect(usageRow).toContainText(ONE_HOUR_SPAN);
 }

@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-let mockPathname = '/ja/calendar';
+let mockPathname = '/ja/';
 let mockSearchParams = new URLSearchParams();
 const mockUseMediaQuery = vi.fn(() => false);
 let mockTimezone = 'UTC';
@@ -63,12 +63,12 @@ describe('CalendarNavigationProvider', () => {
     vi.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false);
     mockTimezone = 'UTC';
-    mockPathname = '/ja/calendar';
+    mockPathname = '/ja/';
     mockSearchParams = new URLSearchParams('date=2026-03-25');
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25');
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25');
   });
 
-  it('/report → /calendar の client 遷移で search が遅れて確定しても ?date= と ?view= に追従する', () => {
+  it('settings からホームへ戻る遷移で search が遅れて確定しても ?date= と ?view= に追従する', () => {
     // 同じ element を渡すと React が再 render を省くため、毎回作り直す
     const tree = () => (
       <CalendarNavigationProvider>
@@ -77,20 +77,20 @@ describe('CalendarNavigationProvider', () => {
     );
     const { rerender } = render(tree());
 
-    mockPathname = '/ja/report';
+    mockPathname = '/ja/settings';
     mockSearchParams = new URLSearchParams('date=2026-03-30');
-    window.history.replaceState(null, '', '/ja/report?date=2026-03-30');
+    window.history.replaceState(null, '', '/ja/settings?date=2026-03-30');
     rerender(tree());
 
-    // Next は pathname を先に確定し、その render では window.location.search がまだ古い
-    // （/report の date= のまま）。この瞬間は /report の日付を拾ってしまう
-    mockPathname = '/ja/calendar';
+    // Next は pathname を先に確定し、その render では window.location.pathname がまだ古い。
+    // destination の search が確定するまでは、表示中の日付を維持する。
+    mockPathname = '/ja/';
     rerender(tree());
-    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-30');
+    expect(screen.getByTestId('date')).toHaveTextContent('2026-03-25');
 
     // search が確定した（useSearchParams が更新される）
     mockSearchParams = new URLSearchParams('view=day&date=2026-03-27');
-    window.history.replaceState(null, '', '/ja/calendar?view=day&date=2026-03-27');
+    window.history.replaceState(null, '', '/ja/?view=day&date=2026-03-27');
     rerender(tree());
     expect(screen.getByTestId('date')).toHaveTextContent('2026-03-27');
     expect(screen.getByTestId('view')).toHaveTextContent('day');
@@ -98,12 +98,12 @@ describe('CalendarNavigationProvider', () => {
     // 確定後の calendar 内の URL 書き換え（検索ジャンプ等が途中で書く古い date=）は
     // 「外からの遷移」ではないので拾わない
     mockSearchParams = new URLSearchParams('view=day&date=2026-03-20');
-    window.history.replaceState(null, '', '/ja/calendar?view=day&date=2026-03-20');
+    window.history.replaceState(null, '', '/ja/?view=day&date=2026-03-20');
     rerender(tree());
     expect(screen.getByTestId('date')).toHaveTextContent('2026-03-27');
   });
 
-  it('レポートと戻り先の日付が同じでも以前のカレンダー日付を残さない', () => {
+  it('アクティビティ詳細と戻り先の日付が同じでも以前のカレンダー日付を残さない', () => {
     const content = (
       <CalendarNavigationProvider>
         <TestConsumer />
@@ -112,15 +112,15 @@ describe('CalendarNavigationProvider', () => {
     const { rerender } = render(content);
     expect(screen.getByTestId('date')).toHaveTextContent('2026-03-25');
 
-    mockPathname = '/ja/report';
-    window.history.replaceState(null, '', '/ja/report?date=2026-03-30');
+    mockPathname = '/ja/settings';
+    window.history.replaceState(null, '', '/ja/settings?date=2026-03-30');
     rerender(
       <CalendarNavigationProvider>
         <TestConsumer />
       </CalendarNavigationProvider>,
     );
-    mockPathname = '/ja/calendar';
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-30');
+    mockPathname = '/ja/';
+    window.history.replaceState(null, '', '/ja/?date=2026-03-30');
     rerender(
       <CalendarNavigationProvider>
         <TestConsumer />
@@ -129,9 +129,9 @@ describe('CalendarNavigationProvider', () => {
     expect(screen.getByTestId('date')).toHaveTextContent('2026-03-30');
   });
 
-  it('resolves view from query on the /calendar URL contract', () => {
-    window.history.replaceState(null, '', '/ja/calendar?view=week&date=2026-03-25');
-    mockPathname = '/ja/calendar';
+  it('resolves view from query on the home URL contract', () => {
+    window.history.replaceState(null, '', '/ja/?view=week&date=2026-03-25');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -143,9 +143,9 @@ describe('CalendarNavigationProvider', () => {
     expect(screen.getByTestId('view')).toHaveTextContent('week');
   });
 
-  it('/calendar without view defaults to week', () => {
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25');
-    mockPathname = '/ja/calendar';
+  it('home without view defaults to week', () => {
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -156,9 +156,9 @@ describe('CalendarNavigationProvider', () => {
     expect(screen.getByTestId('view')).toHaveTextContent('week');
   });
 
-  it('resolves multi-day view from query on /calendar', () => {
-    window.history.replaceState(null, '', '/ja/calendar?view=3day&date=2026-03-25');
-    mockPathname = '/ja/calendar';
+  it('resolves multi-day view from query on home', () => {
+    window.history.replaceState(null, '', '/ja/?view=3day&date=2026-03-25');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -169,46 +169,10 @@ describe('CalendarNavigationProvider', () => {
     expect(screen.getByTestId('view')).toHaveTextContent('3day');
   });
 
-  // report タブでは currentDate だけを ?date= から読み、view は無関係のまま
-  // （overview.md §6-9 #1）。
-  it('resolves currentDate from ?date= on /report without touching view', () => {
-    window.history.replaceState(null, '', '/ja/report?date=2026-04-01');
-    mockSearchParams = new URLSearchParams('date=2026-04-01');
-    mockPathname = '/ja/report';
-
-    render(
-      <CalendarNavigationProvider>
-        <TestConsumer />
-      </CalendarNavigationProvider>,
-    );
-
-    expect(screen.getByTestId('date')).toHaveTextContent('2026-04-01');
-  });
-
-  it.each([null, 'invalid'])(
-    '/report の保存ビューが %s でも復元完了して week を使える',
-    (savedView) => {
-      window.localStorage.removeItem('dayopt:last-calendar-view');
-      if (savedView) window.localStorage.setItem('dayopt:last-calendar-view', savedView);
-      mockPathname = '/ja/report';
-      window.history.replaceState(null, '', '/ja/report?date=2026-03-25');
-      render(
-        <CalendarNavigationProvider>
-          <TestConsumer />
-        </CalendarNavigationProvider>,
-      );
-      expect(screen.getByTestId('view')).toHaveTextContent('week');
-      expect(screen.getByTestId('view-ready')).toHaveTextContent('true');
-      window.localStorage.removeItem('dayopt:last-calendar-view');
-    },
-  );
-
-  // URL の書き手はタブ対応（overview.md §5-4-b）: /report 滞在中に日付を変えたら
-  // /report の URL を書く。/calendar へタブが飛ばないことを固定する。
-  it('writes /report URL (not /calendar) when navigating date while on the report tab', () => {
-    window.history.replaceState(null, '', '/ja/report?date=2026-04-01');
-    mockSearchParams = new URLSearchParams('date=2026-04-01');
-    mockPathname = '/ja/report';
+  it('writes the home URL when navigating to a date', () => {
+    window.history.replaceState(null, '', '/ja/?date=2026-04-01&view=day');
+    mockSearchParams = new URLSearchParams('date=2026-04-01&view=day');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -218,12 +182,12 @@ describe('CalendarNavigationProvider', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'move-url' }));
 
-    expect(window.location.pathname + window.location.search).toBe('/ja/report?date=2026-03-30');
+    expect(window.location.pathname + window.location.search).toBe('/ja/?date=2026-03-30&view=day');
   });
 
   it('keeps internal date changes after navigateToDate', () => {
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=day');
-    mockPathname = '/ja/calendar';
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=day');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -235,9 +199,9 @@ describe('CalendarNavigationProvider', () => {
     expect(screen.getByTestId('date')).toHaveTextContent('2026-03-29');
   });
 
-  it('writes /calendar URL with the new view when changing view', () => {
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=day');
-    mockPathname = '/ja/calendar';
+  it('writes the home URL with the new view when changing view', () => {
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=day');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -248,7 +212,7 @@ describe('CalendarNavigationProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'week' }));
     expect(screen.getByTestId('view')).toHaveTextContent('week');
     expect(window.location.pathname + window.location.search).toBe(
-      '/ja/calendar?date=2026-03-25&view=week',
+      '/ja/?date=2026-03-25&view=week',
     );
   });
 
@@ -256,8 +220,8 @@ describe('CalendarNavigationProvider', () => {
   // 選択肢だったため、changeView('week') はモバイルでは無視される。
   it('モバイルではWeekへ切り替えられない（day-only, #2299）', () => {
     mockUseMediaQuery.mockReturnValue(true);
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=day');
-    mockPathname = '/ja/calendar';
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=day');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -268,15 +232,13 @@ describe('CalendarNavigationProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'week' }));
 
     expect(screen.getByTestId('view')).toHaveTextContent('day');
-    expect(window.location.pathname + window.location.search).toBe(
-      '/ja/calendar?date=2026-03-25&view=day',
-    );
+    expect(window.location.pathname + window.location.search).toBe('/ja/?date=2026-03-25&view=day');
   });
 
   it('モバイルのWeek直URLをdayへ戻す（#2299）', () => {
     mockUseMediaQuery.mockReturnValue(true);
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=week');
-    mockPathname = '/ja/calendar';
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=week');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -285,15 +247,13 @@ describe('CalendarNavigationProvider', () => {
     );
 
     expect(screen.getByTestId('view')).toHaveTextContent('day');
-    expect(window.location.pathname + window.location.search).toBe(
-      '/ja/calendar?date=2026-03-25&view=day',
-    );
+    expect(window.location.pathname + window.location.search).toBe('/ja/?date=2026-03-25&view=day');
   });
 
   it('モバイルでは未対応の複数日表示へ切り替えない', () => {
     mockUseMediaQuery.mockReturnValue(true);
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=day');
-    mockPathname = '/ja/calendar';
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=day');
+    mockPathname = '/ja/';
 
     render(
       <CalendarNavigationProvider>
@@ -304,14 +264,12 @@ describe('CalendarNavigationProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: '3day' }));
 
     expect(screen.getByTestId('view')).toHaveTextContent('day');
-    expect(window.location.pathname + window.location.search).toBe(
-      '/ja/calendar?date=2026-03-25&view=day',
-    );
+    expect(window.location.pathname + window.location.search).toBe('/ja/?date=2026-03-25&view=day');
   });
 
   it('preserves calendar state when the current route is not a calendar page', () => {
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=day');
-    mockPathname = '/ja/calendar';
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=day');
+    mockPathname = '/ja/';
 
     const { rerender } = render(
       <CalendarNavigationProvider>
@@ -335,16 +293,9 @@ describe('CalendarNavigationProvider', () => {
     expect(screen.getByTestId('view')).toHaveTextContent('day');
   });
 
-  // /report の URL は view= を持たないため（date のみ）、/report 上での
-  // full page reload は Provider を再マウントさせ、view の初期値を URL から
-  // 復元する手がかりが無くなる。WorkspaceTabs の「カレンダーへ戻る」リンクは
-  // この Provider の viewType を読んで /calendar?view= を組み立てるため、
-  // reload 直後に既定値（week）へ落ちると直前まで day だったのに week へ戻って
-  // しまう（calendar-navigation.spec.ts の reload 実走で検出、2026-08-19）。
-  it('/report での reload（Provider 再マウント）後も直前の calendar view を localStorage から復元する', () => {
-    localStorage.clear();
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-03-25&view=day');
-    mockPathname = '/ja/calendar';
+  it('restores the selected view from the home URL after remount', () => {
+    window.history.replaceState(null, '', '/ja/?date=2026-03-25&view=day');
+    mockPathname = '/ja/';
 
     const { unmount } = render(
       <CalendarNavigationProvider>
@@ -353,12 +304,7 @@ describe('CalendarNavigationProvider', () => {
     );
     expect(screen.getByTestId('view')).toHaveTextContent('day');
 
-    // /report へ client-side 遷移（soft nav）。Provider は同一インスタンスのまま。
-    mockPathname = '/ja/report';
-    window.history.replaceState(null, '', '/ja/report?date=2026-03-25');
-
-    // ここで full page reload が起きたとみなし、Provider を明示的に unmount→remount する
-    // （テストでは実ブラウザの reload を再現できないため、この unmount/remount が代替）。
+    // Full page reload を Provider の unmount/remount で再現する。
     unmount();
 
     render(
@@ -369,17 +315,15 @@ describe('CalendarNavigationProvider', () => {
 
     expect(screen.getByTestId('view-ready')).toHaveTextContent('true');
 
-    // /report 自体は view を持たない概念だが、Provider 内部の viewType は
-    // 「カレンダーへ戻る」リンクの組み立てに使われるため、reload 前の day を保持する
     expect(screen.getByTestId('view')).toHaveTextContent('day');
   });
 });
 
 describe('CalendarNavigationProvider server initialization', () => {
   it('uses request search params rather than browser location during the first render', () => {
-    mockPathname = '/ja/calendar';
+    mockPathname = '/ja/';
     mockSearchParams = new URLSearchParams('date=2026-04-22&view=3day');
-    window.history.replaceState(null, '', '/ja/calendar?date=2025-01-01&view=day');
+    window.history.replaceState(null, '', '/ja/?date=2025-01-01&view=day');
     const html = renderToString(
       <InitialCalendarDateProvider dateKey="2026-09-17">
         <CalendarNavigationProvider>
@@ -391,10 +335,9 @@ describe('CalendarNavigationProvider server initialization', () => {
     expect(html).toContain('3day');
     expect(html).not.toContain('2025-01-01');
   });
-  it('uses the supplied request day when date is absent and ignores stored view until hydration', () => {
-    mockPathname = '/ja/report';
+  it('uses the supplied request day when date is absent and defaults to week', () => {
+    mockPathname = '/ja/';
     mockSearchParams = new URLSearchParams();
-    window.localStorage.setItem('dayopt:last-calendar-view', 'day');
     const html = renderToString(
       <InitialCalendarDateProvider dateKey="2026-01-01">
         <CalendarNavigationProvider>
@@ -404,8 +347,7 @@ describe('CalendarNavigationProvider server initialization', () => {
     );
     expect(html).toContain('2026-01-01');
     expect(html).toContain('week');
-    expect(html).toContain('data-testid="view-ready">false');
-    window.localStorage.removeItem('dayopt:last-calendar-view');
+    expect(html).toContain('data-testid="view-ready">true');
   });
 });
 
@@ -414,9 +356,9 @@ it.each([undefined, '2026-04-22'])(
   (date) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-18T08:00:00Z'));
-    mockPathname = '/ja/calendar';
+    mockPathname = '/ja/';
     mockSearchParams = new URLSearchParams(date ? `date=${date}` : '');
-    window.history.replaceState(null, '', `/ja/calendar?${mockSearchParams}`);
+    window.history.replaceState(null, '', `/ja/?${mockSearchParams}`);
     try {
       render(
         <InitialCalendarDateProvider dateKey="2026-09-17" needsBrowserDate>
@@ -436,9 +378,9 @@ it('初回モバイルのday切替は補正後の日付をURLへ書く', () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-18T08:00:00Z'));
   mockUseMediaQuery.mockReturnValue(true);
-  mockPathname = '/ja/calendar';
+  mockPathname = '/ja/';
   mockSearchParams = new URLSearchParams();
-  window.history.replaceState(null, '', '/ja/calendar');
+  window.history.replaceState(null, '', '/ja/');
   try {
     render(
       <InitialCalendarDateProvider dateKey="2026-09-17" needsBrowserDate>
@@ -460,9 +402,9 @@ it('today navigation uses the configured timezone wall date', () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-17T16:00:00.000Z'));
   mockTimezone = 'Asia/Tokyo';
-  mockPathname = '/ja/calendar';
+  mockPathname = '/ja/';
   mockSearchParams = new URLSearchParams('date=2026-09-17');
-  window.history.replaceState(null, '', '/ja/calendar?date=2026-09-17');
+  window.history.replaceState(null, '', '/ja/?date=2026-09-17');
   try {
     render(
       <InitialCalendarDateProvider dateKey="2026-09-17">

@@ -10,7 +10,6 @@ import {
   clickAndAwaitCreate,
   createAdminSupabase,
   createCriticalPathIdentity,
-  expectReportAllocationShowsOneHour,
   loginAs,
   offsetDateParam,
   openDay,
@@ -23,11 +22,11 @@ import { test } from './trpc-budget-fixture';
 test.use({ trpcProcedureBudget: 26 });
 
 /**
- * クリティカルパス E2E（desktop）— 計画 → 実績 → 振り返りの中核ループを実 UI 操作で通す
+ * クリティカルパス E2E（desktop）— 計画 → 実績の中核ループを実 UI 操作で通す
  *
  * 「作成導線が存在する」ではなく、ドラッグ選択 → アクティビティ選択で実際に Plan / Record を作り、
- * リロード後も残る（= DB へ永続化された）ことと、Report の配分へ反映されることを検証する。
- * mobile の同じループは mobile-critical-path.spec.ts（長押し → Drawer → ヘッダーのレポートリンク）。
+ * リロード後も残る（= DB へ永続化された）ことを検証する。
+ * mobile の同じループは mobile-critical-path.spec.ts（長押し → Drawer）。
  *
  * 過去帯ドラッグでパレットが開かない症状は、ドラッグ x 座標が Plan lane 側
  * （`box.width * 0.15`）だったことが原因だった。過去スロットの新規作成は宛先が
@@ -44,7 +43,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 const SERVICE_ROLE_TARGET = resolveServiceRoleTarget(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // CI（E2E_REQUIRE_SERVICE_ROLE_SUITES=1）では skip を許さない。env が壊れて suite が
 // 丸ごと消えても「0 failed」で緑になるのを防ぐ。
-assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Critical Path: 計画 → 実績 → 振り返り');
+assertServiceRoleSuiteRunnable(SERVICE_ROLE_TARGET, 'Critical Path: 計画 → 実績');
 const describeWithEnv = SERVICE_ROLE_TARGET.safe ? test.describe : test.describe.skip;
 
 const IDENTITY = createCriticalPathIdentity('critical-path');
@@ -107,7 +106,7 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
   await page.mouse.up();
 }
 
-describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
+describeWithEnv('Critical Path: 計画 → 実績', () => {
   test.describe.configure({ mode: 'serial' });
   test.use({ timezoneId: TIMEZONE });
 
@@ -130,7 +129,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       'desktop-only（ドラッグ座標は desktop 前提）',
     );
     if (testInfo.title.startsWith('認証後の戻り先:')) {
-      await loginAs(page, IDENTITY, `/ja/calendar?view=day&date=${RETURN_TARGET_DATE}`);
+      await loginAs(page, IDENTITY, `/ja/?view=day&date=${RETURN_TARGET_DATE}`);
       return;
     }
     await loginAs(page, IDENTITY);
@@ -138,7 +137,7 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
 
   test('認証後の戻り先: 元の保護URLを開く', async ({ page }) => {
     const current = new URL(page.url());
-    expect(current.pathname).toBe('/ja/calendar');
+    expect(current.pathname).toBe('/ja/');
     expect(current.searchParams.get('view')).toBe('day');
     expect(current.searchParams.get('date')).toBe(RETURN_TARGET_DATE);
     await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
@@ -232,14 +231,6 @@ describeWithEnv('Critical Path: 計画 → 実績 → 振り返り', () => {
       page.locator('[data-plan-lane-card]', { hasText: ACTIVITY_NAME }).first(),
     ).toBeVisible({ timeout: 10_000 });
   });
-
-  test('記録した実績が /report の 1 章（配分）に反映される', async ({ page }) => {
-    // レポートは週 / 月 / 年の 3 粒度（#2575）。前日の記録は今週の中に入る。
-    await page.goto(`/ja/report?date=${offsetDateParam(-1)}&range=week`);
-
-    await expectReportAllocationShowsOneHour(page, IDENTITY.activityName);
-  });
-
   test('Record を作成・編集・削除し、変更が永続化される', async ({ page }) => {
     const twoDaysAgo = offsetDateParam(-2);
     await openDay(page, twoDaysAgo);
