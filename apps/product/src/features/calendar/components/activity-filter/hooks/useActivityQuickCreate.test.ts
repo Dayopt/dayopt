@@ -128,6 +128,30 @@ describe('useActivityQuickCreate', () => {
     expect((Date.parse(input.end_at) - Date.parse(input.start_at)) / 60000).toBe(45);
   });
 
+  it('統計待ちが設定timezoneの日付境界を跨いでもタップ時点の開始を保つ', async () => {
+    preferences.timezone = 'America/New_York';
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    // New York の 09/29 23:59:59。既定開始は次の分境界の 09/30 00:00。
+    vi.setSystemTime(new Date('2026-09-30T03:59:59.000Z'));
+    const { result } = renderHook(() => useActivityQuickCreate());
+
+    result.current({ activityId: 'activity-1', activityName: '開発' });
+    vi.setSystemTime(new Date('2026-09-30T04:00:10.000Z'));
+    release(45);
+
+    await waitFor(() => expect(createPlanMutate).toHaveBeenCalledOnce());
+    expect(createPlanMutate.mock.calls[0]?.[0]).toMatchObject({
+      start_at: '2026-09-30T04:00:00.000Z',
+      end_at: '2026-09-30T04:45:00.000Z',
+    });
+  });
+
   it('統計待ちの別アクティビティ作成も保持する', async () => {
     statsPending.value = true;
     resolveMedianMinutes.mockResolvedValue(45);

@@ -118,8 +118,10 @@ export function useActivityQuickCreate() {
         openSettings('billing');
         return;
       }
+      // 開始時刻と対象日はタップ時点で固定する。統計取得や共有キューの待ち時間で
+      // minute/day boundary を跨いでも、ユーザーが選んだ時間を後からずらさない。
+      const defaultStart = defaultStartAt(date, timezone);
       const create = async (medianMinutes: number | null) => {
-        const defaultStart = defaultStartAt(date, timezone);
         const localStart = convertToTimezone(defaultStart, timezone);
         const durationMinutes = medianMinutes ?? defaultDuration;
         const defaultEnd = new Date(defaultStart.getTime() + durationMinutes * 60 * 1000);
