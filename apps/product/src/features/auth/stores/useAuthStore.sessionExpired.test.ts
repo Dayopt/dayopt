@@ -150,7 +150,7 @@ describe('signUp の emailRedirectTo', () => {
     listeners.length = 0;
   });
 
-  it('現行の契約 URL（/calendar）を指す', async () => {
+  it('現行のホーム URL を指す', async () => {
     mockSignUp.mockResolvedValue({ data: { session: null, user: null }, error: null });
 
     await useAuthStore.getState().signUp('a@example.com', 'pw');
@@ -158,7 +158,7 @@ describe('signUp の emailRedirectTo', () => {
     expect(mockSignUp).toHaveBeenCalledWith(
       expect.objectContaining({
         options: expect.objectContaining({
-          emailRedirectTo: `${window.location.origin}/calendar`,
+          emailRedirectTo: `${window.location.origin}/`,
         }),
       }),
     );

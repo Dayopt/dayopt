@@ -143,6 +143,13 @@ export const PROTECTED_PATH_GLOBS = [
   'scripts/hooks/**',
   'scripts/tasks/finish-branch.sh',
   'scripts/ci/protected-path-gate.mjs',
+  // Nonproduction login provisioning holds Auth admin credentials behind a
+  // trusted-base workflow and a protected Environment; changes to either side
+  // of that boundary require focused review.
+  'scripts/ci/nonproduction-login-*.mjs',
+  'scripts/ci/nonproduction-login-*.test.ts',
+  'scripts/runbook/setup-nonproduction-login.sh',
+  '.github/workflows/nonproduction-login.yml',
   // CI の中枢。check.mjs は write 権限つき GH_TOKEN を PR コードから隔離する
   // 処理とどの test を skip するかの判定を持ち、ci.yml はその job / permissions
   // を決める。どちらも「壊れても CI は green のまま」になりうるため、

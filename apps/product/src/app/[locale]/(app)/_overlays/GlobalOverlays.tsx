@@ -2,13 +2,13 @@
 
 import { useLocale } from 'next-intl';
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
 
 import { Toaster } from '@/components/ui/feedback/toast';
 import { ShortcutCheatSheetDialog } from '@/components/ui/overlays/shortcut-cheat-sheet-dialog';
+import { useActivitiesMap } from '@/features/activities';
 import {
-  buildReportPath,
   InlineCreatePanel,
   isCalendarViewPath,
   useCalendarNavigation,
@@ -17,6 +17,7 @@ import {
 } from '@/features/calendar';
 import { useTimeblockInspectorStore } from '@/features/timeblock';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 import { useShellStore } from '@/lib/stores/useShellStore';
 import { APP_SHORTCUT_CATALOG } from './app-shortcut-catalog';
 import { useTimeblockSearchResultNavigation } from './useTimeblockSearchResultNavigation';
@@ -63,9 +64,8 @@ export function GlobalOverlays() {
   useShortcutRegistry();
   useTimeblockSearchShortcut();
 
-  const locale = useLocale();
-  const router = useRouter();
   const pathname = usePathname();
+  const locale = useLocale();
   const calendarNavigation = useCalendarNavigation();
   const timezone = useUserPreferences((preferences) => preferences.timezone);
 
@@ -84,6 +84,9 @@ export function GlobalOverlays() {
     : 'global';
   const isInspectorOpen = useTimeblockInspectorStore((s) => s.isOpen);
   const closeInspector = useTimeblockInspectorStore((s) => s.closeInspector);
+  const isActivityDetailOpen = useActivityDetailStore((s) => s.isOpen);
+  const closeActivityDetail = useActivityDetailStore((s) => s.close);
+  const { getActivityById } = useActivitiesMap();
 
   // shell overlayが開いたら Inspector を閉じる（排他制御）
   useEffect(() => {
@@ -93,27 +96,28 @@ export function GlobalOverlays() {
   }, [settingsOpen, contactOpen, timeblockSearchOpen, shortcutCheatSheetOpen, closeInspector]);
 
   // Inspector は Calendar ビュー専用 — workspace ビュー外への遷移で自動 close。
-  // `/calendar` への集約済み（isCalendarViewPath で判定）。
+  // Home への集約済み（isCalendarViewPath で判定）。
   useEffect(() => {
     if (!isInspectorOpen) return;
+    if (isActivityDetailOpen) closeActivityDetail();
     const pathWithoutLocale = pathname?.replace(/^\/(ja|en)/, '') ?? '';
     if (!isCalendarViewPath(pathWithoutLocale)) {
       closeInspector();
     }
-  }, [pathname, isInspectorOpen, closeInspector]);
+  }, [pathname, isInspectorOpen, isActivityDetailOpen, closeActivityDetail, closeInspector]);
 
-  // Inspector → /report。カレンダー内パネル（CalendarReviewRail）は廃止済み
-  // （#2181 Step 4）。アクティビティによるセグメント絞り込みは Step 5（セグメント配線）で
-  // 復元する（旧 docs/projects/_archive/workspace-shell-restructure/overview.md §6-5、
-  // docs/projects 全廃に伴い #2473 で削除。git 履歴参照）。
-  const handleViewStats = useCallback(
-    (activityId: string) => {
-      void activityId;
-      // 遷移開始後に閉じると Inspector の URL 同期が遷移を上書きする。
-      // workspace 外への遷移後に上の effect が閉じるため、ここでは遷移だけ行う。
-      router.push(buildReportPath(locale, calendarNavigation?.currentDate ?? new Date()));
+  // Inspector から選択中アクティビティの直近30日を開く。
+  const handleViewActivityDetails = useCallback(
+    (activityId: string, fallbackName: string) => {
+      const activity = getActivityById(activityId);
+      useActivityDetailStore.getState().open({
+        activityId,
+        name: activity?.name ?? fallbackName,
+        ...(activity ? { categoryName: activity.categoryName, color: activity.color } : {}),
+      });
+      closeInspector();
     },
-    [router, locale, calendarNavigation?.currentDate],
+    [closeInspector, getActivityById],
   );
 
   const handleSearchOpenChange = useCallback(
@@ -158,7 +162,7 @@ export function GlobalOverlays() {
         activeScope={shortcutActiveScope}
       />
       <TimeblockInspector
-        onViewStats={handleViewStats}
+        onViewActivityDetails={handleViewActivityDetails}
         createContent={<InlineCreatePanel onClose={closeInspector} />}
       />
       <Toaster />

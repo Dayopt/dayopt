@@ -20,9 +20,7 @@ vi.mock('@/features/auth', () => ({
 }));
 
 vi.mock('@/features/calendar', () => ({
-  isCalendarViewPath: (pathname: string) => pathname === '/calendar',
-  resolveWorkspaceTab: (pathname: string) =>
-    pathname === '/calendar' ? 'calendar' : pathname === '/report' ? 'report' : 'other',
+  isCalendarViewPath: (pathname: string) => pathname === '/' || pathname === '',
   formatCalendarDateParam: () => '2026-03-25',
   useCalendarNavigation: () => null,
   ActivityChipRow: () => <div data-testid="activity-chip-row" />,
@@ -85,8 +83,8 @@ vi.mock('./useAppInlineBanner', () => ({
   useAppInlineBanner: () => bannerState.current,
 }));
 
-import { REPORT_DETAIL_PANEL_DEFAULT_WIDTH, useReportDetailStore } from '@/features/review';
 import { useTimeblockInspectorStore } from '@/features/timeblock';
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 
 import { DesktopLayout } from './desktop-layout';
 import { MobileLayout } from './mobile-layout';
@@ -123,23 +121,19 @@ describe('DesktopLayout', () => {
     expectBefore(alert, main);
   });
 
-  // `/calendar` と `/report` は自前で AppHeader を組むため shell 側は出さない（#2575）。
-  it.each(['/calendar', '/report'])(
-    'keeps one banner before main content and omits the shell header on %s',
-    (pathname) => {
-      pathnameMock.mockReturnValue(pathname);
+  it('keeps one banner before home content and omits the shell header', () => {
+    pathnameMock.mockReturnValue('/');
 
-      const { container } = render(
-        <DesktopLayout>
-          <div>Content</div>
-        </DesktopLayout>,
-      );
+    const { container } = render(
+      <DesktopLayout>
+        <div>Content</div>
+      </DesktopLayout>,
+    );
 
-      expect(screen.queryByRole('banner')).not.toBeInTheDocument();
-      const alert = expectSingleVisibleBanner(container);
-      expectBefore(alert, screen.getByRole('main'));
-    },
-  );
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    const alert = expectSingleVisibleBanner(container);
+    expectBefore(alert, screen.getByRole('main'));
+  });
 
   it.each(['/projects', '/settings'])('keeps the shell header on %s', (pathname) => {
     pathnameMock.mockReturnValue(pathname);
@@ -175,8 +169,7 @@ describe('DesktopLayout', () => {
       </DesktopLayout>,
     );
 
-    // 右側のパネルは 2 枚あるので、並び順ではなく `data-panel` で選ぶ（#2581 で
-    // report detail を足した時、末尾の aside を見る書き方が壊れた）
+    // 右側のパネルは 2 枚あるので、並び順ではなく `data-panel` で選ぶ。
     const inspector = () => container.querySelector('[data-panel="timeblock-inspector"]');
     expect(inspector()?.getAttribute('data-open')).toBe('false');
 
@@ -186,12 +179,8 @@ describe('DesktopLayout', () => {
     act(() => useTimeblockInspectorStore.getState().closeInspector());
   });
 
-  /**
-   * 詳細パネル（#2581）は inspector とは別の 4 枚目。DOM 上は常に存在し、
-   * `useReportDetailStore` が開いた時だけ幅を持つ。
-   */
-  it('renders the report detail panel as a separate column driven by its own store', () => {
-    act(() => useReportDetailStore.getState().close());
+  it('renders the activity detail panel as a separate column driven by the activity store', () => {
+    act(() => useActivityDetailStore.getState().close());
 
     const { container } = render(
       <DesktopLayout>
@@ -199,51 +188,17 @@ describe('DesktopLayout', () => {
       </DesktopLayout>,
     );
 
-    const detail = () => container.querySelector('[data-panel="report-detail"]');
+    const detail = () => container.querySelector('[data-panel="activity-detail"]');
     const inspector = () => container.querySelector('[data-panel="timeblock-inspector"]');
     expect(detail()?.getAttribute('data-open')).toBe('false');
 
-    act(() =>
-      useReportDetailStore.getState().toggle({
-        activityId: 'act-1',
-        name: '執筆',
-        categoryName: '仕事',
-        color: 'blue',
-      }),
-    );
+    act(() => useActivityDetailStore.getState().open({ activityId: 'act-1', name: 'Writing' }));
 
     expect(detail()?.getAttribute('data-open')).toBe('true');
-    // inspector は道連れで開かない（別ページに属する 2 枚が独立していること）
+    // Detail panel and inspector are mutually exclusive.
     expect(inspector()?.getAttribute('data-open')).toBe('false');
 
-    act(() => useReportDetailStore.getState().close());
-  });
-
-  /** 幅は review の store が持つ。shell は読むだけで、調停ロジックを持たない。 */
-  it('follows the report detail width stored by the review feature', () => {
-    act(() => {
-      useReportDetailStore.getState().toggle({
-        activityId: 'act-1',
-        name: '執筆',
-        categoryName: '仕事',
-        color: 'blue',
-      });
-      useReportDetailStore.getState().setWidth(480);
-    });
-
-    const { container } = render(
-      <DesktopLayout>
-        <div>Content</div>
-      </DesktopLayout>,
-    );
-
-    const detail = container.querySelector('[data-panel="report-detail"]') as HTMLElement;
-    expect(detail.getAttribute('data-width')).toBe('480');
-
-    act(() => {
-      useReportDetailStore.getState().close();
-      useReportDetailStore.getState().setWidth(REPORT_DETAIL_PANEL_DEFAULT_WIDTH);
-    });
+    act(() => useActivityDetailStore.getState().close());
   });
 });
 
@@ -268,7 +223,7 @@ describe('MobileLayout', () => {
     expectBefore(alert, main);
   });
 
-  it.each(['/calendar', '/report', '/settings', '/settings/billing'])(
+  it.each(['/', '/settings', '/settings/billing'])(
     'shows one banner before main content and omits the shell header on %s',
     (pathname) => {
       pathnameMock.mockReturnValue(pathname);
@@ -282,15 +237,11 @@ describe('MobileLayout', () => {
       expect(screen.queryByRole('banner')).not.toBeInTheDocument();
       const alert = expectSingleVisibleBanner(container);
       expectBefore(alert, screen.getByRole('main'));
-      expect(screen.queryAllByTestId('activity-chip-row')).toHaveLength(
-        pathname === '/calendar' ? 1 : 0,
-      );
+      expect(screen.queryAllByTestId('activity-chip-row')).toHaveLength(pathname === '/' ? 1 : 0);
     },
   );
 
-  // #2300 のカレンダーへ戻るトグルは、`/report` が独自ヘッダーを持つようになった
-  // （#2575）のに伴い ReportViewClient 側へ移した。shell はどの経路でも出さない。
-  it.each(['/calendar', '/report', '/projects'])(
+  it.each(['/', '/projects'])(
     'does not show the calendar toggle in the shell header on %s',
     (pathname) => {
       pathnameMock.mockReturnValue(pathname);

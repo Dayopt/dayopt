@@ -39,7 +39,7 @@ last_verified: 2026-09-21
 ### Plan を保存
 
 - **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('ドラッグ選択とアクティビティ選択で明日の Plan を作成し、リロード後も残る'` を探す（E2E。保存して再読み込みしても残ることまで見る）
+  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('明日の Plan を作成・編集・削除し、変更が永続化される'` を探す（E2E。作成・編集・削除の結果を再読み込み後に確認する）
 - **1. Plan か Record か決める**:
   - [`apps/product/src/features/timeblock/domain/timeblock-destination.test.ts`](../../apps/product/src/features/timeblock/domain/timeblock-destination.test.ts) で `it('終了が現在より未来なら Plan を返す'` を探す
   - [`apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx`](../../apps/product/src/features/calendar/components/create/InlineCreatePanel.test.tsx) で `it('未来スロットでは記録タブが選べず、選択すると Plan を作る'` を探す
@@ -129,39 +129,6 @@ last_verified: 2026-09-21
   - [`apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts`](../../apps/product/src/lib/test/integration/timeblock-atomic-commands.integration.test.ts) で `it('allows either Record restore or overlapping create, never both'` を探す
 - **8. 入れ直す**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx`](../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.inline-error.test.tsx) で `it('restore commandの返却行を一致する一覧へ再挿入する'` を探す
-
-### レポートを開く（集計）
-
-- **経路全体**:
-  - [`apps/product/src/lib/test/e2e/critical-path.spec.ts`](../../apps/product/src/lib/test/e2e/critical-path.spec.ts) で `test('記録した実績が /report の 1 章（配分）に反映される'` を探す（E2E。カレンダーで作った Record が週のレポートに出るところまで）
-  - [`apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts`](../../apps/product/src/lib/test/e2e/derived-plan-record-flow.spec.ts) で `test('記録の同一週内移動でInspectorの一覧だけが変わり予定比は変わらない'` を探す（E2E。差分タブの予定比が Plan と Record の対応付けに依らないこと）
-- **1. 期間を決める**:
-  - [`apps/product/src/features/review/lib/report-tab.test.ts`](../../apps/product/src/features/review/lib/report-tab.test.ts) で `it('省略と不正値は時間の使い方へ丸める'` を探す
-- **2. 集計を問い合わせる**:
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('タブを切り替えても期間の query は同じ引数のまま（往復しない）'` を探す
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('項目が足りない古い形の集計が復元されても描ける'` を探す
-- **4. Router で検証**:
-  - [`apps/product/src/features/review/server/router.test.ts`](../../apps/product/src/features/review/server/router.test.ts) で `it('client 入力ではなく認証済み context の userId で集計する'` を探す
-  - [`apps/product/src/features/review/server/router.test.ts`](../../apps/product/src/features/review/server/router.test.ts) で ``it('不正な粒度を受け付けない（`day` は廃止した）'`` を探す
-- **5. 期間の境界を出す**:
-  - [`apps/product/src/features/review/lib/report-period.test.ts`](../../apps/product/src/features/review/lib/report-period.test.ts) で `it('timezone ごとに UTC の瞬間が変わる'` を探す
-  - [`apps/product/src/features/review/lib/report-period.test.ts`](../../apps/product/src/features/review/lib/report-period.test.ts) で `it('DST 開始週でも lengthMinutes は 10080 のまま（意図的に無視する）'` を探す
-  - [`apps/product/src/features/review/lib/report-period.test.ts`](../../apps/product/src/features/review/lib/report-period.test.ts) で `it('隣り合う週の間に隙間が無い（1ms の穴を作らない）'` を探す
-- **6. 行を取る**:
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('期間境界を跨ぐ記録が clip され、跨いだ先の期間にも計上される'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('別ユーザーの記録・予定・アクティビティを混ぜない'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('削除済み記録を除外し、残存する予定は計上する'` を探す
-- **7. TS で集計**:
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `describe('ReportAggregationService.getReportPeriod'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('planPast は開始が now 以下の予定だけを数える'` を探す
-  - [`apps/product/src/features/review/server/report-aggregation-service.test.ts`](../../apps/product/src/features/review/server/report-aggregation-service.test.ts) で `it('アクティビティごとに 1 件の長さの度数を返し、自動移行の記録は数えない'` を探す
-- **8. 派生して描く**:
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('睡眠を隠すと V から睡眠分が抜け、余白の値は変わらない'` を探す
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('カードの前期間比を、見えているアクティビティだけで出す'` を探す
-- **9. 詳細を開いた時だけ取る**:
-  - [`apps/product/src/features/review/server/report-detail-service.test.ts`](../../apps/product/src/features/review/server/report-detail-service.test.ts) で `it('分布は明細の 200 件上限に切られず、全件から出す'` を探す
-  - [`apps/product/src/features/review/server/report-detail-service.test.ts`](../../apps/product/src/features/review/server/report-detail-service.test.ts) で `it('auto_migrated の記録は合計に入るが中央値からは除く'` を探す
-  - [`apps/product/src/features/review/components/report/ReportBody.test.tsx`](../../apps/product/src/features/review/components/report/ReportBody.test.tsx) で `it('期間を移すと詳細パネルは閉じる'` を探す
 
 ### ログイン（MFA 含む）
 
@@ -365,7 +332,6 @@ last_verified: 2026-09-21
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service
 - [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service
-- [レポートを開く（集計）](journeys/report.md) の 3. /api/trpc と関門
 - [ログイン（MFA 含む）](journeys/login.md) の 1. サインイン画面
 - [ログイン（MFA 含む）](journeys/login.md) の 3. MFA が要るか確かめる
 - [ログイン（MFA 含む）](journeys/login.md) の 5. コードを検証
@@ -420,7 +386,7 @@ last_verified: 2026-09-21
 <details>
 <summary>1. 保存時の重なり判定のバグを直す。まずどの層に赤を入れるか</summary>
 
-重なり判定の関数がある層の Unit。DB の排他制約が関わるなら Integration。E2E は、中核の流れ（Plan → Record → Report）を壊す種類の時だけ足す。
+重なり判定の関数がある層の Unit。DB の排他制約が関わるなら Integration。E2E は、中核の流れ（Plan → Record → カレンダー）を壊す種類の時だけ足す。
 
 </details>
 

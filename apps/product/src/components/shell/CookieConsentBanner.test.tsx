@@ -11,7 +11,7 @@ vi.mock('next-intl', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/ja/calendar',
+  usePathname: () => '/ja/',
 }));
 
 import { CookieConsentBanner } from './CookieConsentBanner';

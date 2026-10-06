@@ -2,20 +2,21 @@
 
 import { useCallback } from 'react';
 
-import { useLocale } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useActivitiesMap } from '@/features/activities';
+import {
+  useTimeblockDeleteUndo,
+  useTimeblockInspectorStore,
+  useTimeblockWriteMutations,
+} from '@/features/timeblock';
+import { useActivityDetailStore } from '@/lib/stores/useActivityDetailStore';
 
-import { useTimeblockDeleteUndo, useTimeblockWriteMutations } from '@/features/timeblock';
-
-import { buildReportPath } from '../../lib/panel-url';
 import type { CalendarDisplayEvent } from '../../types/calendar.types';
 
 /** コンテキストメニューで使用する plan / record 操作アクションを提供するフック */
 export function useTimeblockContextActions() {
-  const router = useRouter();
-  const locale = useLocale();
   const { deleteRecord, deletePlan } = useTimeblockWriteMutations();
   const showDeleteUndo = useTimeblockDeleteUndo();
+  const { getActivityById } = useActivitiesMap();
 
   const handleDeleteTimeblock = useCallback(
     (timeblock: CalendarDisplayEvent) => {
@@ -34,18 +35,23 @@ export function useTimeblockContextActions() {
     [deletePlan, deleteRecord, showDeleteUndo],
   );
 
-  const handleViewStats = useCallback(
+  const handleViewActivityDetails = useCallback(
     (timeblock: CalendarDisplayEvent) => {
       if (!timeblock.activityId) return;
-      // カレンダー内パネル（CalendarReviewRail）は廃止済み（#2181 Step 4）。
-      // アクティビティによるセグメント絞り込みは Step 5（セグメント配線）で復元する。
-      router.push(buildReportPath(locale, timeblock.startDate ?? new Date()));
+      const activity = getActivityById(timeblock.activityId);
+      useActivityDetailStore.getState().open({
+        activityId: timeblock.activityId,
+        name: activity?.name ?? timeblock.title,
+        categoryName: activity?.categoryName ?? null,
+        color: activity?.color ?? null,
+      });
+      useTimeblockInspectorStore.getState().closeInspector();
     },
-    [router, locale],
+    [getActivityById],
   );
 
   return {
     handleDeleteTimeblock,
-    handleViewStats,
+    handleViewActivityDetails,
   };
 }

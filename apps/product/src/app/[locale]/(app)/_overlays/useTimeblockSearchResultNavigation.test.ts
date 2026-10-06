@@ -24,7 +24,7 @@ const RESULT: TimeblockSearchResult = {
 describe('useTimeblockSearchResultNavigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.replaceState(null, '', '/ja/calendar?date=2026-08-09&view=day');
+    window.history.replaceState(null, '', '/ja/?date=2026-08-09&view=day');
   });
 
   it('対象日の描画とoverlay終了後にだけ検索結果URLを1回公開する', async () => {
@@ -67,7 +67,7 @@ describe('useTimeblockSearchResultNavigation', () => {
     rerender({ currentDate: targetDate, searchOpen: false, inspectorOpen: false });
     await waitFor(() => expect(pushState).toHaveBeenCalledOnce());
     expect(window.location.pathname + window.location.search).toBe(
-      '/ja/calendar?date=2026-07-14&view=day&timeblock=record%3Arecord-1',
+      '/ja/?date=2026-07-14&view=day&timeblock=record%3Arecord-1',
     );
 
     rerender({ currentDate: targetDate, searchOpen: false, inspectorOpen: false });
@@ -88,7 +88,7 @@ describe('useTimeblockSearchResultNavigation', () => {
     act(() => result.current(RESULT));
 
     expect(routerPush).toHaveBeenCalledWith(
-      '/ja/calendar?date=2026-07-14&view=day&timeblock=record%3Arecord-1',
+      '/ja/?date=2026-07-14&view=day&timeblock=record%3Arecord-1',
     );
   });
 
@@ -115,7 +115,7 @@ describe('useTimeblockSearchResultNavigation', () => {
     rerender({ searchOpen: false });
     await waitFor(() =>
       expect(window.location.pathname + window.location.search).toBe(
-        '/ja/calendar?date=2026-07-14&view=day&timeblock=record%3Arecord-1',
+        '/ja/?date=2026-07-14&view=day&timeblock=record%3Arecord-1',
       ),
     );
   });

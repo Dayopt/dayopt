@@ -118,7 +118,7 @@ function renderCalendarLayout({
       currentDate={new Date(2026, 2, 25)}
       onNavigate={vi.fn()}
       onViewChange={vi.fn()}
-      sideRail={<div>Review rail</div>}
+      sideRail={<div>Activity details rail</div>}
       sideRailOpen={sideRailOpen}
       recoverableSidebarWidth={recoverableSidebarWidth}
       onSideRailSpaceRecoveryChange={onSideRailSpaceRecoveryChange}

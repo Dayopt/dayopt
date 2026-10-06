@@ -33,8 +33,8 @@ describe('single-plan operation boundary', () => {
   ])('preserves management/deletion for %s', (path) =>
     expect(requiresProductAccess(path, 'mutation', false)).toBe(false),
   );
-  it('keeps all saved report ranges readable, but blocks provider reads and MCP', () => {
-    expect(requiresProductAccess('review.getReportPeriod', 'query', false)).toBe(false);
+  it('keeps saved activity summaries readable, but blocks provider reads and MCP', () => {
+    expect(requiresProductAccess('activities.getActivitySummary', 'query', false)).toBe(false);
     expect(requiresProductAccess('externalCalendar.listEvents', 'query', false)).toBe(false);
     expect(requiresProductAccess('externalCalendar.listProviderCalendars', 'query', false)).toBe(
       true,

@@ -74,6 +74,10 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'scripts/hooks/**': 'guardrails',
   'scripts/tasks/finish-branch.sh': 'guardrails',
   'scripts/ci/protected-path-gate.mjs': 'guardrails',
+  'scripts/ci/nonproduction-login-*.mjs': 'guardrails',
+  'scripts/ci/nonproduction-login-*.test.ts': 'guardrails',
+  'scripts/runbook/setup-nonproduction-login.sh': 'guardrails',
+  '.github/workflows/nonproduction-login.yml': 'guardrails',
   ...Object.fromEntries(
     VALIDATION_PRODUCER_DEFINITIONS.map((path) => [path, 'guardrails'] as const),
   ),

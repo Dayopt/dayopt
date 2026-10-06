@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -30,8 +31,17 @@ beforeEach(() => {
   git('config', 'user.email', 'fixture@example.invalid');
   writeFileSync(
     join(root, 'package.json'),
-    JSON.stringify({ scripts: { 'docs:check': 'node inspect.mjs' } }),
+    JSON.stringify({ scripts: { 'docs:check': 'tsx scripts/tasks/docs-guard/index.ts' } }),
   );
+  writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
+  mkdirSync(join(root, 'node_modules/tsx/dist'), { recursive: true });
+  writeFileSync(
+    join(root, 'node_modules/tsx/dist/cli.mjs'),
+    "#!/usr/bin/env node\nimport {execFileSync} from 'node:child_process'; execFileSync(process.execPath, ['inspect.mjs'], {stdio: 'inherit'});",
+  );
+  chmodSync(join(root, 'node_modules/tsx/dist/cli.mjs'), 0o755);
+  mkdirSync(join(root, 'node_modules/.bin'), { recursive: true });
+  symlinkSync('../tsx/dist/cli.mjs', join(root, 'node_modules/.bin/tsx'));
   writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
   writeFileSync(
     join(root, 'inspect.mjs'),

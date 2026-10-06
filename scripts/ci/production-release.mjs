@@ -1180,7 +1180,7 @@ export async function runProductionRelease({
    *
    * **既定は空 = 全 project「未検証」**。true 側を既定にすると fail open になり、
    * workflow の env 配線が 1 行落ちただけで層 3 ゼロの promote が通る。
-   * `force`（break-glass）の時だけこの検査ごと免除する。
+   * 影響がある project はすべて true が必要。未指定や false は fail closed にする。
    */
   impactAffected = {},
   /**
@@ -1204,15 +1204,15 @@ export async function runProductionRelease({
   isAncestorImpl = gitIsAncestor,
   logger = console,
 }) {
+  // Retain the legacy option so stale callers fail clearly instead of silently releasing.
+  // Emergency releases use the same candidate, smoke, config, and live-state gates.
+  if (force) {
+    throw new ReleaseError('Force Promote is no longer supported; all release gates are required');
+  }
   if (!token) throw new ReleaseError('VERCEL_TOKEN is required for Production Release');
   if (!teamId) throw new ReleaseError('VERCEL_TEAM_ID is required for Production Release');
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) {
     throw new ReleaseError('RELEASE_SHA must be a 40 character commit SHA');
-  }
-  if (redeploy && force) {
-    // 再配備は「通常の検証を維持したまま同じ commit を出し直す」経路。force は検証を
-    // 省くので、組み合わせると env 更新後の build が一度も検証されずに live になる。
-    throw new ReleaseError('A redeploy cannot be combined with Force Promote');
   }
   if (redeploy && !projects.some((project) => project.name === redeploy.projectName)) {
     throw new ReleaseError(`Unknown redeploy project: ${redeploy.projectName}`);
@@ -1447,8 +1447,7 @@ export async function runProductionRelease({
    * - skip した project … 判定の基準にした SHA のままであること（変わっていれば
    *   「影響なし」の判定自体が別の基準で下されたことになり、陳腐化している）
    *
-   * force でも実行する。Force Promote が免除するのは health / config の gate であって、
-   * 「promote した SHA が今も live」という主張そのものではない。
+   * promote した SHA が今も live であることを確認する。
    */
   const verifyLiveState = async (candidateEntries) => {
     const expectedId = new Map(
@@ -1613,11 +1612,7 @@ export async function runProductionRelease({
     // 外部 actor や Auto-assign が先に candidate を live にすると pending から消えるため、
     // 未検証のまま stabilize を通って success になり、層 3 未実行の build へ tag gate 用の
     // status を出してしまう。
-    const unverified = force
-      ? // break-glass は層 3 job 自体を skip する（promote.yml の e2e / web job の `if:`）。
-        // 検査を効かせると、impact job が壊れている時の最後の手段が使えなくなる。
-        []
-      : targets.filter((project) => impactAffected[project.name] !== true);
+    const unverified = targets.filter((project) => impactAffected[project.name] !== true);
     if (unverified.length > 0) {
       const detail = unverified
         .map((project) => {
@@ -1685,7 +1680,7 @@ export async function runProductionRelease({
       // 上の復元は gate より前なので、**抜ける経路すべてで掃き直す**（finally）。
       // 掃き忘れると次の main merge が gate を迂回して直接公開される。
       try {
-        if (!force && alreadyServing.length > 0) {
+        if (alreadyServing.length > 0) {
           // **smoke は alreadyServing だけでなく全 project の domain へ。** 通常経路と
           // 同じ範囲にする。片側だけ見て success を出すと、健全でない skip 側の domain や
           // cross-app の組み合わせ破損を認証したまま tag を打てる。
@@ -1722,7 +1717,7 @@ export async function runProductionRelease({
             status,
             candidateEntries: [],
             preexistingSplit,
-            gateChecksRan: !force && alreadyServing.length > 0,
+            gateChecksRan: alreadyServing.length > 0,
           };
           throw Object.assign(driftError(sha, residual), {
             manifest: manifestFor('settings-drift'),
@@ -1746,7 +1741,7 @@ export async function runProductionRelease({
         promoted: [],
         rolledBack: [],
         preexistingSplit,
-        gateChecksRan: !force && alreadyServing.length > 0,
+        gateChecksRan: alreadyServing.length > 0,
         manifest: manifestFor(status),
       };
     }
@@ -1975,38 +1970,34 @@ export async function runProductionRelease({
       ({ project, deployment }) => current.get(project.name)?.id !== deployment.id,
     );
 
-    if (force) {
-      logger.log('Force Promote: skipping smoke and Production Config Audit.');
-    } else {
-      // smoke は promote 対象（pending）ではなく全 candidate に対して走らせる。
-      // Auto-assign が有効な段階適用中は candidate が待機中に自動割当されて
-      // pending が空になるため、pending だけを対象にすると smoke のコードパスが
-      // 一度も実行されないまま cutover を迎えてしまう。全 candidate に走らせる
-      // ことで、毎 merge が smoke と bypass secret の実働テストを兼ねる。
-      try {
-        for (const { project, deployment } of candidates) {
-          assertSimulationPoint(simulateFailure, `smoke:${project.name}`);
-          await smokeDeployment({
-            projectName: project.name,
-            deploymentUrl: deployment.url,
-            checks: project.smokeChecks,
-            bypassSecret: bypassSecrets[project.name],
-            fetchImpl,
-            sleepImpl,
-            logger,
-          });
-        }
-
-        // checkProjectSettings: false — 上の already-serving 分岐と同じ理由。
-        await runProductionConfigAudit({ token, teamId, fetchImpl, checkProjectSettings: false });
-        logger.log('Production Config Audit passed against live Vercel metadata.');
-      } catch (error) {
-        // 外部の promote が待機中に auto-assign を飛ばしていた場合、ここで抜けると
-        // 誰も設定を戻さない。掃いてから失敗させる。
-        reportSweepDrift((await sweepSettings()).drifted);
-        await refreshObservedLive();
-        throw Object.assign(error, { manifest: manifestFor('failed') });
+    // smoke は promote 対象（pending）ではなく全 candidate に対して走らせる。
+    // Auto-assign が有効な段階適用中は candidate が待機中に自動割当されて
+    // pending が空になるため、pending だけを対象にすると smoke のコードパスが
+    // 一度も実行されないまま cutover を迎えてしまう。全 candidate に走らせる
+    // ことで、毎 merge が smoke と bypass secret の実働テストを兼ねる。
+    try {
+      for (const { project, deployment } of candidates) {
+        assertSimulationPoint(simulateFailure, `smoke:${project.name}`);
+        await smokeDeployment({
+          projectName: project.name,
+          deploymentUrl: deployment.url,
+          checks: project.smokeChecks,
+          bypassSecret: bypassSecrets[project.name],
+          fetchImpl,
+          sleepImpl,
+          logger,
+        });
       }
+
+      // checkProjectSettings: false — 上の already-serving 分岐と同じ理由。
+      await runProductionConfigAudit({ token, teamId, fetchImpl, checkProjectSettings: false });
+      logger.log('Production Config Audit passed against live Vercel metadata.');
+    } catch (error) {
+      // 外部の promote が待機中に auto-assign を飛ばしていた場合、ここで抜けると
+      // 誰も設定を戻さない。掃いてから失敗させる。
+      reportSweepDrift((await sweepSettings()).drifted);
+      await refreshObservedLive();
+      throw Object.assign(error, { manifest: manifestFor('failed') });
     }
 
     const driftedProjects = [];
@@ -2148,7 +2139,7 @@ export async function runProductionRelease({
       // rollback が唯一の復旧手段になる。代償として、無関係な既存障害が正常な promote を
       // 巻き戻しうるが、production は数分前の既知状態へ戻るだけで、run は失敗として残る。
       // 「壊れたまま success で終える」より安全な側へ倒す。
-      if (!force && targets.length > 0) {
+      if (targets.length > 0) {
         for (const project of projects) {
           assertSimulationPoint(simulateFailure, `production-smoke:${project.name}`);
           await smokeDeployment({
@@ -2164,8 +2155,7 @@ export async function runProductionRelease({
 
       // smoke は「domain が健全か」しか見ず、**どの deployment が応答したかは見ない**。
       // 全 project について「判定の前提が今も成り立つか」を確認する（§verifyLiveState）。
-      // force でも実行する。Force Promote が免除するのは health / config の gate であって、
-      // 「promote した SHA が今も live」という主張そのものではない。
+      // promote した SHA が今も live であることを確認する。
       //
       // 掃きと検証は安定するまで交互に回す。**rollback 保護の内側**で行うので、ここで
       // 不受理の移動を見つけた場合はこの run が promote した分が巻き戻る。
@@ -2238,7 +2228,7 @@ export async function runProductionRelease({
         status: 'promoted',
         candidateEntries: candidates,
         preexistingSplit,
-        gateChecksRan: !force,
+        gateChecksRan: true,
       };
       throw Object.assign(driftError(sha, residualDrift), {
         manifest: manifestFor('settings-drift', { promoted }),
@@ -2251,7 +2241,7 @@ export async function runProductionRelease({
       promoted,
       rolledBack: [],
       preexistingSplit,
-      gateChecksRan: !force,
+      gateChecksRan: true,
       manifest: manifestFor('promoted', { promoted }),
     };
   })().catch(async (error) => {
@@ -2648,11 +2638,7 @@ function summarize(result) {
       '',
       'Nothing was left to promote: Vercel auto-assigned the candidates (Auto-assign is on).',
     );
-    lines.push(
-      result.gateChecksRan
-        ? 'The gate still verified smoke and the config audit against them.'
-        : 'Force Promote: smoke and the config audit were skipped, so nothing was verified.',
-    );
+    lines.push('The gate verified smoke and the config audit against them.');
   }
   if (result.status === 'superseded') {
     lines.push(

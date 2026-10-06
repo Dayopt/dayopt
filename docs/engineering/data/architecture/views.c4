@@ -72,9 +72,9 @@ views {
     include c_plan-template, c_plan-template ->
     autoLayout LeftRight
   }
-  view concept_review of c_review {
-    title 'Review（review）'
-    include c_review, c_review ->
+  view concept_activity_details of c_activity-details {
+    title 'Activity details（activity-details）'
+    include c_activity-details, c_activity-details ->
     autoLayout LeftRight
   }
   view concept_inspector of c_inspector {
@@ -105,6 +105,11 @@ views {
   view concept_external_event of c_external-event {
     title 'External calendar event（external-event）'
     include c_external-event, c_external-event ->
+    autoLayout LeftRight
+  }
+  view concept_mcp_review of c_mcp-review {
+    title 'MCP review.get（mcp-review）'
+    include c_mcp-review, c_mcp-review ->
     autoLayout LeftRight
   }
   view concept_plan_source of c_plan-source {

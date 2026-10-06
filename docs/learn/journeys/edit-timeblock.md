@@ -360,7 +360,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -380,7 +380,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
       "short": "ドラッグを離す",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "select",
@@ -449,7 +449,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "record",
@@ -522,7 +522,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "screenAfter": {
             "t": "form",
             "title": "仕事",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "fields": [
               ["日付", "今日"],
               ["時間", "10:00 – 11:00"],
@@ -536,7 +536,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
       "screen": {
         "t": "form",
         "title": "仕事",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "fields": [
           ["日付", "今日"],
           ["時間", "10:00 – 11:30"],
@@ -599,7 +599,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -616,7 +616,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
       "short": "先に書き換える",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "temp",
@@ -719,7 +719,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "back": "巻き戻し + トースト",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -801,7 +801,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "back": "巻き戻し + 読み直し",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -842,7 +842,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "back": "巻き戻し + 重なりの案内",
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -880,7 +880,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           "screenAfter": {
             "t": "form",
             "title": "読書",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "fields": [
               ["日付", "今日"],
               ["時間", "16:00 – 18:00"]
@@ -949,7 +949,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
           },
           "screenAfter": {
             "t": "calendar",
-            "url": "/ja/calendar",
+            "url": "/ja",
             "blocks": [
               {
                 "state": "saved",
@@ -966,7 +966,7 @@ service role の client で update_plan_command_v1 / update_record_command_v1 �
       "via": "応答",
       "screen": {
         "t": "calendar",
-        "url": "/ja/calendar",
+        "url": "/ja",
         "blocks": [
           {
             "state": "saved",

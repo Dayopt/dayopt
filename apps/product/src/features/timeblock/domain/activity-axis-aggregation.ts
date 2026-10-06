@@ -10,7 +10,6 @@
  *
  * カテゴリー軸とセグメント軸の集計もここにあったが、唯一の consumer だった旧レポートの
  * Time P/L とセグメント合計を撤去したので落とした（#2583）。新レポートはこれらの派生を
- * client の純粋関数（`features/review/domain/report/`）が持つ。
  * 現在このモジュールを使うのは MCP の `review.get`（`time-pl-review.ts` 経由）だけ。
  */
 

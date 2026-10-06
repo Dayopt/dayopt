@@ -674,7 +674,11 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
     void queryClient.invalidateQueries({
       predicate: (query) => {
         const path = query.queryKey[0];
-        return Array.isArray(path) && (path[0] === 'statistics' || path[0] === 'review');
+        return (
+          Array.isArray(path) &&
+          (path[0] === 'statistics' ||
+            (path[0] === 'activities' && path[1] === 'getActivitySummary'))
+        );
       },
     });
     void utils.plans.invalidate();

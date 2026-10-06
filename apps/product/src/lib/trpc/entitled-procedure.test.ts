@@ -11,7 +11,7 @@ import {
 
 const router = createTRPCRouter({
   billing: createTRPCRouter({ startTrial: protectedProcedure.mutation(() => 'started') }),
-  review: createTRPCRouter({ getReportPeriod: protectedProcedure.query(() => 'report') }),
+  activities: createTRPCRouter({ getActivitySummary: protectedProcedure.query(() => 'summary') }),
   planCommands: createTRPCRouter({
     create: protectedProcedure.mutation(() => 'created'),
     delete: protectedProcedure.mutation(() => 'deleted'),
@@ -56,7 +56,7 @@ describe('single-plan procedure boundary', () => {
     'uses the database profile status for %s access checks',
     async (status) => {
       const api = caller(context(status) as never);
-      await expect(api.review.getReportPeriod()).resolves.toBe('report');
+      await expect(api.activities.getActivitySummary()).resolves.toBe('summary');
       await expect(api.planCommands.delete()).resolves.toBe('deleted');
       await expect(api.planCommands.create()).rejects.toMatchObject({ code: 'FORBIDDEN' });
       await expect(api.externalCalendar.listProviderCalendars()).rejects.toMatchObject({
@@ -86,7 +86,7 @@ describe('single-plan procedure boundary', () => {
   });
   it('continues to require authentication', async () => {
     await expect(
-      caller({ ...context('active'), userId: null } as never).review.getReportPeriod(),
+      caller({ ...context('active'), userId: null } as never).activities.getActivitySummary(),
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 });
@@ -165,7 +165,7 @@ describe('single-plan tenant and lifecycle boundary', () => {
     const api = caller({ ...createMockContext({ userId: 'user-1' }), supabase: db } as never);
 
     await expect(api.planCommands.create()).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(api.review.getReportPeriod()).resolves.toBe('report');
+    await expect(api.activities.getActivitySummary()).resolves.toBe('summary');
 
     profile.subscription_status = 'active';
 

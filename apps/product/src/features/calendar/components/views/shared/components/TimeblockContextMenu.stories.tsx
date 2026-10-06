@@ -112,7 +112,7 @@ function ContextMenuTrigger({
 
 const allHandlers = {
   onDelete: fn(),
-  onViewStats: fn(),
+  onViewActivityDetails: fn(),
   onDuplicate: fn(),
 };
 
