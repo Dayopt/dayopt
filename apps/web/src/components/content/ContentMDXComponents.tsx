@@ -1,3 +1,4 @@
+import { Link } from '@dayopt/i18n/navigation';
 import { generateAnchorId } from '@web/features/docs/lib/toc';
 import type { MDXComponents } from 'mdx/types';
 import Image from 'next/image';
@@ -125,14 +126,21 @@ export const contentMDXComponents: MDXComponents = {
   p: (props: ParagraphProps) => <p className="text-foreground mb-4 text-xl leading-7" {...props} />,
 
   // Links
-  a: (props: AnchorProps) => (
-    <a
-      className="text-primary hover:text-primary/80 underline underline-offset-2"
-      target={props.href?.startsWith('http') ? '_blank' : undefined}
-      rel={props.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-      {...props}
-    />
-  ),
+  a: (props: AnchorProps) =>
+    props.href?.startsWith('/') && !props.href.startsWith('//') ? (
+      <Link
+        className="text-primary hover:text-primary/80 underline underline-offset-2"
+        {...props}
+        href={props.href}
+      />
+    ) : (
+      <a
+        className="text-primary hover:text-primary/80 underline underline-offset-2"
+        target={props.href?.startsWith('http') ? '_blank' : undefined}
+        rel={props.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+        {...props}
+      />
+    ),
 
   // Blockquote
   blockquote: (props: BlockquoteProps) => (

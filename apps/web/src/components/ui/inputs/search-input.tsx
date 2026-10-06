@@ -2,6 +2,7 @@
 
 import { Button, cn, Input } from '@dayopt/components';
 import { Search, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface SearchInputProps {
   value: string;
@@ -18,6 +19,9 @@ export function SearchInput({
   clearLabel,
   className,
 }: SearchInputProps) {
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => setInteractive(true), []);
+
   return (
     <div className={cn('relative', className)}>
       <Search
@@ -27,6 +31,7 @@ export function SearchInput({
       <Input
         type="text"
         role="searchbox"
+        disabled={!interactive}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -34,6 +39,7 @@ export function SearchInput({
       />
       {value && (
         <Button
+          disabled={!interactive}
           onClick={() => onChange('')}
           variant="ghost"
           icon

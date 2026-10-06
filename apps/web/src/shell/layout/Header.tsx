@@ -4,12 +4,13 @@ import { Button, cn, Logo, Sheet, SheetContent } from '@dayopt/components';
 import { Link, usePathname } from '@dayopt/i18n/navigation';
 import { Menu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { trackSignupCta } from '@web/platform/analytics/signup-cta';
-import { productSignupUrl } from '@web/platform/config/product-signup-url';
+import { productLoginUrl, productSignupUrl } from '@web/platform/config/product-signup-url';
 
 export function Header() {
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const t = useTranslations('common');
@@ -85,7 +86,7 @@ export function Header() {
           {/* Desktop: Login + Signup */}
           <div className="hidden lg:flex lg:items-center lg:gap-x-2">
             <Button variant="ghost" size="default" asChild>
-              <Link href="/login">{t('actions.login')}</Link>
+              <a href={productLoginUrl()}>{t('actions.login')}</a>
             </Button>
             <Button variant="primary" size="default" asChild>
               <a href={productSignupUrl()} onClick={() => trackSignupCta('header_desktop')}>
@@ -97,7 +98,7 @@ export function Header() {
           {/* Mobile: Login + Signup + Menu */}
           <div className="flex items-center gap-x-2 lg:hidden">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">{t('actions.login')}</Link>
+              <a href={productLoginUrl()}>{t('actions.login')}</a>
             </Button>
             <Button variant="primary" size="sm" asChild>
               <a href={productSignupUrl()} onClick={() => trackSignupCta('header_mobile')}>
@@ -108,6 +109,7 @@ export function Header() {
               variant="ghost"
               icon
               size="sm"
+              ref={mobileMenuTriggerRef}
               onClick={() => setMobileMenuOpen(true)}
               aria-label={t('aria.openMenu')}
             >
@@ -121,6 +123,10 @@ export function Header() {
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent
           side="right"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            mobileMenuTriggerRef.current?.focus();
+          }}
           aria-label={t('aria.navigationMenu')}
           closeButtonLabel={t('aria.closeMenu')}
           className="w-4/5 max-w-80 overflow-y-auto px-6 py-6 lg:hidden"
@@ -156,9 +162,9 @@ export function Header() {
 
               <div className="py-6">
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <a href={productLoginUrl()} onClick={() => setMobileMenuOpen(false)}>
                     {t('actions.login')}
-                  </Link>
+                  </a>
                 </Button>
               </div>
             </div>

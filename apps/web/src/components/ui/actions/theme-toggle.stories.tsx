@@ -5,13 +5,22 @@
  * 無いため theme は未設定（System 表示）になる。ドロップダウンの開閉のみ確認する。
  */
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { NextIntlClientProvider } from 'next-intl';
 import { expect, userEvent, within } from 'storybook/test';
+import commonEn from '../../../../messages/en/common.json';
 
 import { ThemeToggle } from './theme-toggle';
 
 const meta = {
   title: 'Web/Components/Actions/ThemeToggle',
   component: ThemeToggle,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="en" messages={commonEn}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
   tags: ['autodocs'],
   parameters: { layout: 'centered' },
 } satisfies Meta<typeof ThemeToggle>;
