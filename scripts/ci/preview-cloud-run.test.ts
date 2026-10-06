@@ -210,6 +210,23 @@ describe('Cloud Preview evidence and cleanup', () => {
       serviceKey: 'safe-dummy-key',
     });
   });
+  it('validates the owned journal before resolving the Preview key for cleanup', async () => {
+    const options = fixture();
+    const resolveServiceKey = vi.fn(async () => 'safe-dummy-key');
+    const recover = vi.fn().mockResolvedValue({ status: 'clean', checked: 1, recovered: 0 });
+    await cleanupCloudRun({ ...options, resolveServiceKey, recover });
+    expect(resolveServiceKey).toHaveBeenCalledWith(
+      expect.objectContaining({ bound: request, run: expect.objectContaining({ runId }) }),
+    );
+
+    const missing = fixture();
+    rmSync(missing.directory, { recursive: true, force: true });
+    const forbiddenResolve = vi.fn(async () => 'safe-dummy-key');
+    await expect(
+      cleanupCloudRun({ ...missing, resolveServiceKey: forbiddenResolve }),
+    ).rejects.toThrow();
+    expect(forbiddenResolve).not.toHaveBeenCalled();
+  });
   it('does not publish an ownership journal claiming another run', () => {
     const options = fixture();
     writeFileSync(

@@ -106,11 +106,14 @@ function readRun(directory, request) {
   return run;
 }
 
-/** Always-step recovery on a surviving Actions VM. A destroyed VM needs journal replay elsewhere. */
+/** Always-step recovery on a surviving Actions VM. A destroyed VM needs journal replay elsewhere.
+ * @param {{directory: string, request: ReturnType<typeof validateCloudRequest>, serviceKey?: string, resolveServiceKey?: (input: {bound: ReturnType<typeof validateCloudRequest>, run: any, intent: any}) => Promise<string>, recover?: typeof recoverPreviewUsers, intent?: any}} options
+ */
 export async function cleanupCloudRun({
   directory,
   request,
   serviceKey,
+  resolveServiceKey = undefined,
   recover = recoverPreviewUsers,
   intent = undefined,
 }) {
@@ -130,11 +133,15 @@ export async function cleanupCloudRun({
       if (!Object.values(plan.userIds).includes(row.userId)) throw new Error();
     }
   }
+  const resolvedKey = resolveServiceKey
+    ? await resolveServiceKey({ bound, run, intent })
+    : serviceKey;
+  if (typeof resolvedKey !== 'string' || !resolvedKey.trim()) throw new Error();
   const cleanup = await recover({
     evidenceDirectory: join(directory, 'evidence'),
     runId: run.runId,
     supabaseProjectRef: bound.supabaseProjectRef,
-    serviceKey,
+    serviceKey: resolvedKey,
   });
   writeFileSync(
     join(directory, 'evidence', 'cloud-cleanup.json'),
@@ -320,12 +327,19 @@ if (isDirectExecution(import.meta.url)) {
       );
       if (result.status !== 'passed') process.exitCode = 1;
     } else if (operation === 'cleanup') {
-      const serviceKey = await resolvePreviewSecretKey({
-        projectRef: request.supabaseProjectRef,
-        provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+      const result = await cleanupCloudRun({
+        directory,
+        request,
+        intent,
+        resolveServiceKey: async ({ bound }) => {
+          const serviceKey = await resolvePreviewSecretKey({
+            projectRef: bound.supabaseProjectRef,
+            provisionToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+          });
+          await assertCloudFixtureKey({ request: bound, serviceKey });
+          return serviceKey;
+        },
       });
-      await assertCloudFixtureKey({ request, serviceKey });
-      const result = await cleanupCloudRun({ directory, request, serviceKey, intent });
       console.log(JSON.stringify(result));
       if (result.status !== 'clean') process.exitCode = 1;
     } else {
