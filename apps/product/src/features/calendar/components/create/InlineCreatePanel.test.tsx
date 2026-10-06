@@ -296,6 +296,96 @@ describe('InlineCreatePanel', () => {
     expect(createRecordMutate).toHaveBeenCalledTimes(1);
   });
 
+  it('中央値待ち中の時間編集が既存予定と重なって作成を中断しても次の活動を作成できる', async () => {
+    statsPending.value = true;
+    let release!: (value: number | null) => void;
+    resolveMedianMinutes.mockReturnValue(
+      new Promise<number | null>((resolve) => {
+        release = resolve;
+      }),
+    );
+    setSelection(pastDay());
+    const view = render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
+
+    // 新規活動の中央値待ち中にユーザーが時間を変え、その時間帯に競合が現れる。
+    fireEvent.click(screen.getByRole('button', { name: 'edit-time' }));
+    const overlapDay = pastDay();
+    act(() => useInlineCreateStore.getState().setSelectionDate(overlapDay));
+    const overlapStart = new Date(
+      Date.UTC(overlapDay.getFullYear(), overlapDay.getMonth(), overlapDay.getDate(), 16, 30),
+    );
+    laneItems.push({
+      id: 'record-existing',
+      start_at: overlapStart.toISOString(),
+      end_at: new Date(overlapStart.getTime() + 60 * 60 * 1000).toISOString(),
+    });
+    await act(async () => {
+      release(45);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(createRecordMutate).not.toHaveBeenCalled();
+    expect(createPlanMutate).not.toHaveBeenCalled();
+
+    // 重複を解消した後、別の既存アクティビティを選ぶ操作が受け付けられる。
+    act(() => {
+      laneItems.length = 0;
+      statsPending.value = false;
+    });
+    view.rerender(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createRecordMutate).toHaveBeenCalledOnce();
+  });
+
+  it('キャンセル済み中央値の失敗で後続の新規活動作成状態を解除しない', async () => {
+    statsPending.value = true;
+    const requests: {
+      resolve: (value: number | null) => void;
+      reject: (error: Error) => void;
+    }[] = [];
+    resolveMedianMinutes.mockImplementation(
+      () =>
+        new Promise<number | null>((resolve, reject) => {
+          requests.push({ resolve, reject });
+        }),
+    );
+    setSelection(pastDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(requests).toHaveLength(1);
+
+    act(() => setSelection(pastDay()));
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(requests).toHaveLength(2);
+
+    await act(async () => {
+      requests[0]?.reject(new Error('stale request failed'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(requests).toHaveLength(2);
+    expect(createRecordMutate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      requests[1]?.resolve(45);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(createRecordMutate).toHaveBeenCalledOnce();
+    expect(createRecordMutate.mock.calls[0]?.[0].activityId).toBe('activity-new');
+  });
+
   it('統計待ちでも明示的に編集した長さは待たず保存する', () => {
     statsPending.value = true;
     setSelection(pastDay());

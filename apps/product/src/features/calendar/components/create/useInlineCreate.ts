@@ -79,7 +79,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
 
   // plan / record 作成ハンドラー（アクティビティ必須、その名前をタイトルに設定）
   const handleCreate = useCallback(
-    (activityId: string, activityName: string, onMedianWaitCancelled?: () => void) => {
+    (activityId: string, activityName: string, onCreateAborted?: () => void) => {
       if (isCreating) return;
       const selectionRevision = useInlineCreateStore.getState().selectionRevision;
       if (
@@ -94,7 +94,10 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
         // 何も動かない。長さを直した後は store 側で no-op になる
         previewActivityDuration(medianMinutes);
         const selection = useInlineCreateStore.getState().pendingSelection;
-        if (!selection) return;
+        if (!selection) {
+          onCreateAborted?.();
+          return;
+        }
 
         const { date: selDate, startHour, startMinute, endHour, endMinute } = selection;
 
@@ -130,6 +133,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
         if (hasTimeblockLaneConflict(laneItems, utcStart, utcEnd)) {
           // パネルは開いたままにする。時間を直して選び直せる
           toast.error(tTimeblock('errors.timeOverlap'));
+          onCreateAborted?.();
           return;
         }
 
@@ -219,13 +223,16 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
             cancelled = true;
             if (waitingRef.current === request) {
               waitingRef.current = null;
-              onMedianWaitCancelled?.();
+              onCreateAborted?.();
             }
           }
         });
         void resolveMedianMinutes(activityId)
           .then((medianMinutes) => {
             if (!cancelled && waitingRef.current === request) create(medianMinutes);
+          })
+          .catch(() => {
+            if (!cancelled && waitingRef.current === request) onCreateAborted?.();
           })
           .finally(() => {
             unsubscribe();
