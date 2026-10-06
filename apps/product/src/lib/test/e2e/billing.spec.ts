@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
+import type { createClient } from '@supabase/supabase-js';
 import { test } from './preview-access-fixture';
 
 import type { AppRouter } from '@/lib/trpc/root';
@@ -11,6 +11,7 @@ import {
   resolveServiceRoleTarget,
 } from '../service-role-target-guard';
 import { createScopedTestUser, deleteScopedTestUser } from './create-scoped-test-user';
+import { createAdminSupabase } from './critical-path-fixture';
 import { suppressConsentBanner } from './suppress-consent-banner';
 import {
   fulfillTrpcProcedure,
@@ -95,9 +96,7 @@ describeWithEnv('Billing: Checkout / Portal 導線', () => {
   let adminSupabase: SupabaseClient;
 
   test.beforeAll(async ({}, testInfo) => {
-    adminSupabase = createClient<Database>(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    adminSupabase = createAdminSupabase(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
 
     const user = await createScopedTestUser(
       SUPABASE_URL!,

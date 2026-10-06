@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
+import { expectIndependentPersistedHour } from '../critical-path-persistence';
+
 import {
   assertServiceRoleSuiteRunnable,
   resolveServiceRoleTarget,
@@ -126,7 +128,8 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
     '明日の枠を長押しして Plan を作成し、リロード後も残る',
     mobilePreviewFlowTag('mobile-plan-create'),
     async ({ page }) => {
-      await openDay(page, offsetDateParam(1));
+      const planDate = offsetDateParam(1);
+      await openDay(page, planDate);
 
       await longPressHour(page, 9);
       await pickActivityInDrawer(page, 'plan');
@@ -137,6 +140,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
       await page.reload();
       await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
       await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+      await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', planDate, 9);
     },
   );
 
@@ -144,7 +148,8 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
     '昨日の枠を長押しして Record を記録し、リロード後も残る',
     mobilePreviewFlowTag('mobile-record-create'),
     async ({ page }) => {
-      await openDay(page, offsetDateParam(-1));
+      const recordDate = offsetDateParam(-1);
+      await openDay(page, recordDate);
 
       // 過去スロットの既定は Record（resolveTimeblockDestination）。タブは触らない
       await longPressHour(page, 9);
@@ -158,6 +163,7 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
       await page.reload();
       await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
       await expect(recordCard.first()).toBeVisible({ timeout: 10_000 });
+      await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'record', recordDate, 9);
     },
   );
 
@@ -227,4 +233,25 @@ describeWithEnv('Mobile Critical Path: 計画 → 実績 → アクティビテ�
       await expect(page.locator('[data-calendar-grid]').first()).toBeVisible();
     },
   );
+  test('過去の枠でも明示選択すれば Plan として保存される', { tag: '@mobile' }, async ({ page }) => {
+    const yesterday = offsetDateParam(-1);
+    await openDay(page, yesterday);
+
+    await longPressHour(page, 14);
+    const drawer = page.getByRole('dialog', { name: 'アクティビティを選択' });
+    await expect(drawer).toBeVisible({ timeout: 10_000 });
+    await drawer.getByRole('tab', { name: '予定', exact: true }).click();
+    await clickAndAwaitCreate(
+      page,
+      drawer.getByRole('button', { name: IDENTITY.activityName }),
+      'plan',
+    );
+
+    const planCard = page.locator('[data-plan-lane-card]', { hasText: IDENTITY.activityName });
+    await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+    await page.reload();
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(planCard.first()).toBeVisible({ timeout: 10_000 });
+    await expectIndependentPersistedHour(adminSupabase, IDENTITY.userId, 'plan', yesterday, 14);
+  });
 });

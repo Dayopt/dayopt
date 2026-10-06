@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database';
 import { resolvePreviewCloudUserId } from '../preview-cloud-identity';
+import { previewServiceKeyFetch } from '../preview-service-key-fetch.mjs';
 import { recordPreviewUser } from '../preview-user-lifecycle';
 import { suppressConsentBanner } from './suppress-consent-banner';
 
@@ -64,6 +65,7 @@ export function offsetDateParam(offsetDays: number): string {
 export function createAdminSupabase(url: string, serviceKey: string): AdminSupabase {
   return createClient<Database>(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: previewServiceKeyFetch(serviceKey) },
   });
 }
 

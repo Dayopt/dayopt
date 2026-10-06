@@ -33,6 +33,7 @@ export function verifyCloudFixtureContract(candidateRoot, trustedRoot = ROOT) {
   for (const path of [
     'apps/product/src/lib/test/preview-cloud-identity.ts',
     'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
+    'apps/product/src/lib/test/preview-service-key-fetch.mjs',
     'apps/product/src/lib/test/e2e/account-deletion-fixture.ts',
     'apps/product/src/lib/test/e2e/create-scoped-test-user.ts',
     'apps/product/src/lib/test/e2e/preview-access-fixture.ts',
