@@ -21,7 +21,7 @@ Alice のつもりで Bob の Plan を読む・書く。**どの層がどう止�
 
 ## 準備
 
-- local Supabase を起動している。Alice 役は seed の利用者 `test@dayopt.dev`（id `00000000-0000-0000-0000-000000000001`）
+- local Supabase を起動している。Alice 役は seed の利用者 `test-seed@dayopt.dev`（id `00000000-0000-0000-0000-000000000001`）
 - Bob を作る。`supabase db reset` 直後の local には seed の利用者しかいないので、この lab 用の利用者と Plan を作り、最後に消す（local の admin API と command 関数を使う。どちらも local だけに効く）:
 
 ```bash

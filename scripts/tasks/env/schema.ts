@@ -466,18 +466,35 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
   // Planned masters remain pending independently of replicas saved directly in the Environment.
   // GitHub's short-lived read token observes Vercel; never add a Production-capable Vercel PAT here.
   ...[
-    ['SUPABASE_PREVIEW_READINESS_TOKEN', 'PREVIEW_E2E_SUPABASE_READINESS_TOKEN'],
-    ['VERCEL_AUTOMATION_BYPASS_SECRET', 'PREVIEW_E2E_BYPASS_SECRET'],
-    ['SUPABASE_SECRET_KEY', 'PREVIEW_E2E_SUPABASE_KEY'],
-  ].map(([envName, githubSecret]) => ({
+    [
+      'SUPABASE_PREVIEW_READINESS_TOKEN',
+      'PREVIEW_E2E_SUPABASE_READINESS_TOKEN',
+      'preview-e2e',
+      'PREVIEW_E2E_SUPABASE_READINESS_TOKEN',
+    ],
+    [
+      'VERCEL_AUTOMATION_BYPASS_SECRET',
+      'PREVIEW_E2E_BYPASS_SECRET',
+      'preview-e2e',
+      'PREVIEW_E2E_BYPASS_SECRET',
+    ],
+    [
+      'SUPABASE_PREVIEW_PROVISION_TOKEN',
+      'SUPABASE_PREVIEW_PROVISION_TOKEN',
+      'supabase-preview-provision',
+      'credential',
+    ],
+  ].map(([envName, githubSecret, item, field]) => ({
     ...pendingEnvEntry(
       envName,
       'secret',
       'staging',
       ci,
-      'preview-e2e',
-      'Cloud Preview master is not initialized; direct Environment replicas do not prove a master exists or resolve the remaining bypass boundary',
-      githubSecret,
+      item,
+      envName === 'SUPABASE_PREVIEW_PROVISION_TOKEN'
+        ? 'Scoped read-only token fetches the exact Preview branch key only after readiness validation'
+        : 'Cloud Preview master is not initialized; direct Environment replicas do not prove a master exists or resolve the remaining bypass boundary',
+      field,
     ),
     githubSecret,
     githubEnvironments: ['Preview – product'],

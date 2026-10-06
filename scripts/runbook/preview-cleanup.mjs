@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { previewServiceKeyHeaders } from '../lib/preview-branch-key.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const SEED_USER = '00000000-0000-0000-0000-000000000001';
@@ -91,7 +92,7 @@ export async function recoverPreviewUsers({
       method,
       redirect: 'error',
       signal: AbortSignal.timeout(Math.min(15_000, remaining)),
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      headers: previewServiceKeyHeaders(serviceKey),
     });
   }
   let recovered = 0;

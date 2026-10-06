@@ -75,6 +75,23 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'seed re-run changed fixture Auth identities';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM auth.users AS app_user
+    JOIN auth.identities AS identity ON identity.user_id = app_user.id
+    WHERE app_user.id = '00000000-0000-0000-0000-000000000001'::UUID
+      AND app_user.email = 'test-seed@dayopt.dev'
+      AND identity.id = app_user.id
+      AND identity.provider = 'email'
+      AND identity.provider_id = app_user.email
+      AND identity.email = app_user.email
+      AND identity.identity_data = jsonb_build_object(
+        'sub', app_user.id::TEXT,
+        'email', app_user.email
+      )
+  ) THEN
+    RAISE EXCEPTION 'fresh seed sample Auth email tuple differs';
+  END IF;
   IF before_state.setting_user_ids IS DISTINCT FROM (
     SELECT array_agg(user_id::TEXT ORDER BY user_id::TEXT)
     FROM public.user_settings WHERE user_id = '00000000-0000-0000-0000-000000000001'

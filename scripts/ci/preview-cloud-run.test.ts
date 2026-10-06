@@ -603,6 +603,14 @@ describe('Cloud Preview evidence and cleanup', () => {
       'https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/admin/users/00000000-0000-0000-0000-000000000001',
     );
     expect(fetchImpl.mock.calls[0][1].method).toBe('GET');
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('apikey')).toBe(
+      'sb_secret_safe-dummy',
+    );
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('Authorization')).toBeNull();
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('apikey')).toBe(
+      'sb_secret_safe-dummy',
+    );
+    expect(new Headers(fetchImpl.mock.calls[0][1].headers).get('Authorization')).toBeNull();
     fetchImpl.mockResolvedValueOnce(new Response('PRIVATE_PROVIDER_ERROR', { status: 401 }));
     await expect(
       assertCloudFixtureKey({ request, serviceKey: 'sb_secret_wrong', fetchImpl }),
@@ -677,7 +685,7 @@ describe('Cloud Preview evidence and cleanup', () => {
       'PRIVATE_',
     );
   });
-  it.each(['candidate-binding', 'fixture-contract', 'fixture-key'])(
+  it.each(['candidate-binding', 'fixture-contract'])(
     'records a CLI failure before run.json without exposing child errors: %s',
     (stage) => {
       const root = mkdtempSync(join(tmpdir(), 'cloud-preflight-cli-'));
@@ -697,23 +705,6 @@ if [ "$1" = rev-parse ]; then printf '%s' '${observedSha}'; fi
 `,
       );
       chmodSync(git, 0o700);
-      if (stage === 'fixture-key') {
-        for (const path of [
-          'apps/product/src/lib/test/preview-cloud-identity.ts',
-          'apps/product/src/lib/test/e2e/critical-path-fixture.ts',
-          'apps/product/src/lib/test/e2e/account-deletion-fixture.ts',
-          'apps/product/src/lib/test/e2e/create-scoped-test-user.ts',
-          'apps/product/src/lib/test/e2e/preview-access-fixture.ts',
-          'apps/product/src/lib/test/e2e/trpc-response-mock.ts',
-          'apps/product/src/lib/test/e2e/trpc-budget-fixture.ts',
-          'apps/product/src/lib/test/preview-user-lifecycle.ts',
-          'apps/product/src/lib/test/preview-access.ts',
-        ]) {
-          const file = join(candidate, path);
-          mkdirSync(join(file, '..'), { recursive: true });
-          writeFileSync(file, readFileSync(path));
-        }
-      }
       const requestFile = join(root, 'request.json');
       const intentFile = join(root, 'intent.json');
       writeFileSync(requestFile, JSON.stringify(request));
@@ -756,7 +747,7 @@ if [ "$1" = rev-parse ]; then printf '%s' '${observedSha}'; fi
             GITHUB_RUN_ID: '4500',
             GITHUB_RUN_ATTEMPT: '1',
             GITHUB_SHA: workflowSha,
-            SUPABASE_SECRET_KEY: 'PRIVATE_CREDENTIAL',
+            SUPABASE_PREVIEW_PROVISION_TOKEN: 'PRIVATE_CREDENTIAL',
           },
           timeout: 15_000,
         },
@@ -830,6 +821,23 @@ if [ "$1" = rev-parse ]; then printf '%s' '${observedSha}'; fi
       supabaseProjectRef: request.supabaseProjectRef,
       serviceKey: 'safe-dummy-key',
     });
+  });
+  it('validates the owned journal before resolving the Preview key for cleanup', async () => {
+    const options = fixture();
+    const resolveServiceKey = vi.fn(async () => 'safe-dummy-key');
+    const recover = vi.fn().mockResolvedValue({ status: 'clean', checked: 1, recovered: 0 });
+    await cleanupCloudRun({ ...options, resolveServiceKey, recover });
+    expect(resolveServiceKey).toHaveBeenCalledWith(
+      expect.objectContaining({ bound: request, run: expect.objectContaining({ runId }) }),
+    );
+
+    const missing = fixture();
+    rmSync(missing.directory, { recursive: true, force: true });
+    const forbiddenResolve = vi.fn(async () => 'safe-dummy-key');
+    await expect(
+      cleanupCloudRun({ ...missing, resolveServiceKey: forbiddenResolve }),
+    ).rejects.toThrow();
+    expect(forbiddenResolve).not.toHaveBeenCalled();
   });
   it('does not publish an ownership journal claiming another run', () => {
     const options = fixture();

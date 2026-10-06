@@ -43,7 +43,7 @@ const ready = {
   origin: 'https://product-abc123-dayopt.vercel.app',
 };
 const env = {
-  SUPABASE_SECRET_KEY: 'nonproduction-secret',
+  SUPABASE_PREVIEW_PROVISION_TOKEN: 'nonproduction-provision-token',
   GITHUB_TOKEN: 'github-read-token',
   SUPABASE_PREVIEW_READINESS_TOKEN: 'supabase-read-token',
   VERCEL_AUTOMATION_BYPASS_SECRET: 'preview-bypass',
@@ -140,6 +140,11 @@ function recovery(root: string, runId: string, admin: unknown, observed = ready)
     env,
     observe: vi.fn(async () => observed),
     createAdmin: vi.fn(() => admin),
+    resolveServiceKey: vi.fn(async ({ projectRef, provisionToken }) => {
+      expect(projectRef).toBe(ready.supabaseProjectRef);
+      expect(provisionToken).toBe(env.SUPABASE_PREVIEW_PROVISION_TOKEN);
+      return 'sb_secret_preview-test';
+    }),
     now: () => fixedNow,
   });
 }
@@ -266,14 +271,50 @@ describe('Preview E2E interrupted-run recovery', () => {
     ).toMatchObject({ runId: runA, userId: userA, status: 'deleted' });
   });
 
+  it('resolves the pinned candidate key after exact readiness before creating the admin client', async () => {
+    const root = workspace();
+    addRun(root, runA, [{ userId: userA }]);
+    const remoteAdmin = fakeAdmin(new Map([[userA, ownedUser(userA, runA)]]));
+    const resolvedKey = 'sb_secret_preview-test';
+    const resolveServiceKey = vi.fn(async () => resolvedKey);
+    const createAdmin = vi.fn(() => remoteAdmin.admin);
+
+    await recoverPreviewE2ERun({
+      runId: runA,
+      stateRoot: root,
+      env,
+      observe: vi.fn(async () => ready),
+      createAdmin,
+      resolveServiceKey,
+      now: () => fixedNow,
+    });
+
+    expect(resolveServiceKey).toHaveBeenCalledOnce();
+    expect(resolveServiceKey).toHaveBeenCalledWith({
+      projectRef: ready.supabaseProjectRef,
+      provisionToken: env.SUPABASE_PREVIEW_PROVISION_TOKEN,
+    });
+    expect(createAdmin).toHaveBeenCalledWith(ready.supabaseProjectRef, resolvedKey);
+  });
+
   it('rejects database identity changes before constructing an admin client', async () => {
     const root = workspace();
     addRun(root, runA, [{ userId: userA }]);
     const remoteAdmin = fakeAdmin(new Map([[userA, ownedUser(userA, runA)]]));
 
+    const resolveServiceKey = vi.fn(async () => 'sb_secret_preview-test');
     await expect(
-      recovery(root, runA, remoteAdmin.admin, { ...ready, supabaseBranchId: runB }),
+      recoverPreviewE2ERun({
+        runId: runA,
+        stateRoot: root,
+        env,
+        observe: vi.fn(async () => ({ ...ready, supabaseBranchId: runB })),
+        createAdmin: vi.fn(() => remoteAdmin.admin),
+        resolveServiceKey,
+        now: () => fixedNow,
+      }),
     ).rejects.toThrow('target does not match');
+    expect(resolveServiceKey).not.toHaveBeenCalled();
     expect(remoteAdmin.calls).toEqual([]);
   });
 
@@ -289,6 +330,11 @@ describe('Preview E2E interrupted-run recovery', () => {
         env,
         observe,
         createAdmin: () => remoteAdmin.admin,
+        resolveServiceKey: async ({ projectRef, provisionToken }) => {
+          expect(projectRef).toBe(ready.supabaseProjectRef);
+          expect(provisionToken).toBe(env.SUPABASE_PREVIEW_PROVISION_TOKEN);
+          return 'sb_secret_preview-test';
+        },
         now: () => fixedNow,
       }),
     ).resolves.toMatchObject({ status: 'recovered', recoveredUserIds: [userA] });
@@ -421,6 +467,11 @@ describe('Preview E2E interrupted-run recovery', () => {
       observe: (input: Parameters<typeof observePreviewCleanupReadiness>[0]) =>
         observePreviewCleanupReadiness({ ...input, fetchImpl, now: () => fixedNow }),
       createAdmin: () => remoteAdmin.admin,
+      resolveServiceKey: async ({ projectRef, provisionToken }) => {
+        expect(projectRef).toBe(ready.supabaseProjectRef);
+        expect(provisionToken).toBe(env.SUPABASE_PREVIEW_PROVISION_TOKEN);
+        return 'sb_secret_preview-test';
+      },
       now: () => fixedNow,
     });
 
