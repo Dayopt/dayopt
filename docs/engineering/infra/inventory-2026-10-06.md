@@ -51,6 +51,20 @@ last_verified: 2026-10-06
 
 Vercel接続設定、Resend設定、Cloudflare非公開metadataなどは今回再確認できていない。過去のUI/API観測をこのrunの成功へ置き換えない。Google Console、実メール配送、secret replicaの値一致、復元、実通知も確認済みにはしない。確認方法・所在の記録規則は台帳の`ui_only`、各結果の`next_step`、`manual_access_policy`に残してある。
 
+## 1Password項目の所在確認（11:20 JSTごろ追記）
+
+ユーザーと1Passwordアプリの項目一覧を確認し、「1Passwordに入っているなら正しい」というユーザー確認を受けた。値・field・notesを開かず、項目名とVaultだけを観測した。`agent`・`ci`・`human`がGUIに存在することは確認できたが、Service AccountのVault権限を確認した証拠にはしない。
+
+- Vercel・Supabase・Cloudflare・Sentry・PostHog・Upstash・UptimeRobotの7サービスのログイン項目を、`expected.yaml`の`resources.human_onepassword_items`へ記録した。確認は項目の所在・用途に限り、provider設定・配布済みsecretとの一致は未確認。
+- Supabaseのログイン項目は`supabase-login t3-nico's Project`。最初に見えた`supabase`とは別項目であり、項目名中のproject名をDayopt接続先の期待値へ昇格させない。
+- GitHub・Stripeのログイン項目もhumanに見えたが、正確な項目名に個人メールを含むため転記していない。所在の存在確認とlocatorの未完成を分けて記録した。
+- human一覧46件、dayopt/resendタグ4件の確認ではResendログイン項目を特定できなかった。`resend-send`・`resend-support-replies`・`resend-web`・`resend`の項目名は見えたが、ログイン項目やfieldの証明とはしない。他Vaultに存在しないとは判定しない。
+- Gmail管理用ログインの所在は未特定。Googleの作業は引き続き別セッション。台帳・入力Page以外の設定、1Password項目、認証権限は変更していない。
+
+今回の確認は上記のAPI実行結果を更新しない。1Passwordのitem存在だけでDoctorのprovider確認・復旧確認をpassへ変えない。
+
+追記後にNode 24で`pnpm run doctor --offline`を実行し、108検査定義と正本参照の整合を確認した（認証・通信なし、終了コード0）。`pnpm docs:check`も成功。今回の変更は所在metadataのみで、readerや判定処理の変更・実環境APIの再実行はない。
+
 ## 検証とレビュー
 
 Lunaが履歴機能を実装し、Solが追加diffを読み取りレビュー、主担当が差分と実行結果を確認した。保存JSONと画面の比較不一致、textの環境識別不足を修正した。

@@ -590,6 +590,72 @@ resources:
       provider_configuration_and_replica_match: separate_verification
       inaccessible_means: unverified_not_absent
       secret_values_in_inventory: forbidden
+  human_onepassword_items:
+    confirmation_scope: item_presence_and_service_use_only_not_provider_settings_or_replica_match
+    source: 1password_app_item_list_and_user_confirmation_2026-10-06
+    confirmed_by: user
+    verified_at: '2026-10-06'
+    items:
+      vercel:
+        vault: human
+        item: vercel-login GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      supabase:
+        vault: human
+        item: supabase-login t3-nico's Project
+        presence_status: user_confirmed
+        locator_status: complete
+        note: 項目名中のproject名は接続先の期待値ではない。別項目supabaseと区別する。
+      cloudflare:
+        vault: human
+        item: Cloudflare GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      sentry:
+        vault: human
+        item: sentry-login Dayopt
+        presence_status: user_confirmed
+        locator_status: complete
+      posthog:
+        vault: human
+        item: PostHog GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      upstash:
+        vault: human
+        item: upstash-login GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      uptimerobot:
+        vault: human
+        item: UptimeRobot GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      github:
+        vault: human
+        item: null
+        presence_status: user_confirmed
+        locator_status: incomplete
+        reason: ログイン項目をUI一覧で観測。正確な項目名に個人メールを含むため転記していない。
+      stripe:
+        vault: human
+        item: null
+        presence_status: user_confirmed
+        locator_status: incomplete
+        reason: ログイン項目をUI一覧で観測。正確な項目名に個人メールを含むため転記していない。
+      resend:
+        vault: null
+        item: null
+        presence_status: unknown
+        locator_status: incomplete
+        reason: human一覧46件とdayopt/resendタグ4件でログイン項目を特定できず。API用項目の所在とは分ける。他Vaultでの不存在は未確認。
+      support_smtp:
+        vault: null
+        item: null
+        presence_status: unknown
+        locator_status: incomplete
+        reason: human/resend-support-repliesの項目名は観測したが、Gmail管理用ログイン項目は未特定。SMTP値や設定は未確認。
 connections:
   - {
       'id': 'github.product.release',
