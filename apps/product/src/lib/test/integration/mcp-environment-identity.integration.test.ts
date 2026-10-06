@@ -443,14 +443,6 @@ describe.skipIf(!RUN_LOCAL)('MCP environment identity integration', () => {
       WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
 
       UPDATE auth.identities
-      SET email = 'test-seed@dayopt.dev'
-      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
-      SELECT pg_temp.assert_preview_provision_rejected('DI005');
-      UPDATE auth.identities
-      SET email = 'test@dayopt.dev'
-      WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
-
-      UPDATE auth.identities
       SET identity_data = pg_catalog.jsonb_build_object(
         'sub', '00000000-0000-0000-0000-000000000001',
         'email', 'test-seed@dayopt.dev'
@@ -462,8 +454,7 @@ describe.skipIf(!RUN_LOCAL)('MCP environment identity integration', () => {
       SET email = 'test-seed@dayopt.dev'
       WHERE id = '00000000-0000-0000-0000-000000000001'::UUID;
       UPDATE auth.identities
-      SET provider_id = 'test-seed@dayopt.dev',
-          email = 'test-seed@dayopt.dev'
+      SET provider_id = 'test-seed@dayopt.dev'
       WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID;
       UPDATE auth.identities
       SET identity_data = pg_catalog.jsonb_build_object(

@@ -49,7 +49,6 @@ BEGIN
   GET DIAGNOSTICS v_user_count = ROW_COUNT;
   UPDATE auth.identities
   SET provider_id = 'test@dayopt.dev',
-      email = 'test@dayopt.dev',
       identity_data = jsonb_build_object(
         'sub', '00000000-0000-0000-0000-000000000001',
         'email', 'test@dayopt.dev'
