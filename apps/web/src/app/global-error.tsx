@@ -1,9 +1,18 @@
 'use client';
 
-import { Button, Container, Heading, Text } from '@dayopt/components';
-import { isDevelopment } from '@web/platform/config/env';
+import { BoundaryRecovery } from '@web/components/errors/BoundaryRecovery';
+import { isDevelopment } from '@web/platform/config/runtime-env';
 import { captureBoundaryError } from '@web/platform/observability/capture-boundary-error';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
+
+const GlobalErrorPresentation = lazy(() =>
+  import('@web/components/errors/GlobalErrorPresentation')
+    .then((module) => ({ default: module.GlobalErrorPresentation }))
+    .catch((error: unknown) => {
+      if (error instanceof globalThis.Error) captureBoundaryError(error, 'global_error');
+      return { default: BoundaryRecovery };
+    }),
+);
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -18,48 +27,9 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html>
       <body>
-        <div className="bg-background flex min-h-screen items-center justify-center">
-          <Container>
-            <div className="mx-auto max-w-md text-center">
-              <Heading as="h2" size="xl" className="mb-4">
-                Something went wrong
-              </Heading>
-
-              <Text variant="muted" className="mb-8">
-                An unexpected error occurred. Please try again. If it continues, contact support.
-              </Text>
-
-              <div className="space-y-4">
-                <Button onClick={reset} className="w-full">
-                  Try again
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => (window.location.href = '/')}
-                >
-                  Go home
-                </Button>
-              </div>
-
-              {/* Error details for development */}
-              {isDevelopment && (
-                <div className="bg-container mt-8 rounded-lg p-4 text-left">
-                  <Text size="sm" variant="muted" className="mb-2 block">
-                    Development Error Details:
-                  </Text>
-                  <pre className="text-destructive overflow-auto text-xs">{error.message}</pre>
-                  {error.digest && (
-                    <Text size="xs" variant="muted" className="mt-2 block">
-                      Error ID: {error.digest}
-                    </Text>
-                  )}
-                </div>
-              )}
-            </div>
-          </Container>
-        </div>
+        <Suspense fallback={<BoundaryRecovery error={error} onRetry={reset} />}>
+          <GlobalErrorPresentation error={error} onRetry={reset} showDetails={isDevelopment} />
+        </Suspense>
       </body>
     </html>
   );

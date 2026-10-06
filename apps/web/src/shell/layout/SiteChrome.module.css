@@ -1,0 +1,72 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-index-dropdown);
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+.scrolled {
+  box-shadow: var(--shadow-sm);
+}
+.nav {
+  max-width: 1600px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 5vw, 96px);
+}
+.signup {
+  background: var(--foreground);
+  color: var(--background);
+}
+.signup:hover {
+  background: color-mix(in oklch, var(--foreground) 88%, var(--background));
+}
+.footer {
+  background: var(--background);
+  color: var(--foreground);
+  border-top: 1px solid var(--border);
+}
+.inner {
+  max-width: 1600px;
+  margin-inline: auto;
+  padding: 64px clamp(20px, 5vw, 96px) 40px;
+}
+.footer a {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+.logo svg {
+  width: 180px;
+  height: auto;
+}
+.watermark {
+  margin-top: 64px;
+  color: var(--brand-ink);
+}
+.watermark svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+@media (max-width: 359px) {
+  /* ログインは既存メニューにもある。320px ではロゴと登録を重ねない。 */
+  .mobileLogin {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .nav {
+    padding-inline: 16px;
+  }
+  .inner {
+    padding-top: 48px;
+    padding-bottom: 24px;
+  }
+  .watermark {
+    margin-top: 40px;
+  }
+  .footer a {
+    min-height: 44px;
+  }
+}

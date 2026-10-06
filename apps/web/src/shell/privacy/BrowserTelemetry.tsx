@@ -7,18 +7,15 @@ import {
   isBrowserTelemetryConsentStorageChange,
   resolveAnalyticsConsentDetail,
 } from '@dayopt/observability';
-import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 import { PostHogWebAnalytics } from './PostHogWebAnalytics';
 
-const Analytics = dynamic(
-  () => import('@vercel/analytics/react').then((module) => module.Analytics),
-  { ssr: false },
+const Analytics = lazy(() =>
+  import('@vercel/analytics/react').then((module) => ({ default: module.Analytics })),
 );
-const SpeedInsights = dynamic(
-  () => import('@vercel/speed-insights/next').then((module) => module.SpeedInsights),
-  { ssr: false },
+const SpeedInsights = lazy(() =>
+  import('@vercel/speed-insights/next').then((module) => ({ default: module.SpeedInsights })),
 );
 
 /** Load consented browser analytics; Vercel SDKs additionally require Production. */
@@ -52,10 +49,10 @@ export function BrowserTelemetry() {
   return (
     <>
       {enabled && process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' && (
-        <>
+        <Suspense fallback={null}>
           <Analytics />
           <SpeedInsights />
-        </>
+        </Suspense>
       )}
       {enabled && <PostHogWebAnalytics />}
     </>

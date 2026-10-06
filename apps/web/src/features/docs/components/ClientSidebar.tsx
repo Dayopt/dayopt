@@ -1,10 +1,10 @@
 'use client';
 
+import { Link } from '@dayopt/i18n/navigation';
 import { SearchDialog } from '@web/features/search';
 import { type NavigationItem, type NavigationSection } from '@web/shell/navigation';
 import { ExternalLink, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -28,6 +28,7 @@ function NavigationItemComponent({ item, level, currentPath }: NavigationItemPro
         {hasHref ? (
           <Link
             href={item.href!}
+            aria-current={isActive ? 'page' : undefined}
             className={`hover:bg-state-hover flex flex-1 items-center rounded-lg text-sm transition-colors ${
               isActive
                 ? 'text-foreground bg-state-selected font-medium'
@@ -36,8 +37,8 @@ function NavigationItemComponent({ item, level, currentPath }: NavigationItemPro
             style={{
               paddingLeft,
               paddingRight: '8px',
-              paddingTop: '6px',
-              paddingBottom: '6px',
+              paddingTop: '10px',
+              paddingBottom: '10px',
             }}
           >
             <span className="flex-1">{item.title}</span>
@@ -54,8 +55,8 @@ function NavigationItemComponent({ item, level, currentPath }: NavigationItemPro
             style={{
               paddingLeft,
               paddingRight: '8px',
-              paddingTop: '6px',
-              paddingBottom: '6px',
+              paddingTop: '10px',
+              paddingBottom: '10px',
             }}
           >
             <span className="flex-1">{item.title}</span>
@@ -108,7 +109,7 @@ export function ClientSidebar({ navigation }: ClientSidebarProps) {
       <button
         type="button"
         onClick={() => setSearchOpen(true)}
-        className="border-input bg-background text-muted-foreground hover:bg-state-hover hover:text-foreground mb-6 flex h-8 w-full items-center gap-2 rounded-lg border px-3 text-sm transition-colors"
+        className="border-input bg-background text-muted-foreground hover:bg-state-hover hover:text-foreground mb-6 flex h-11 w-full items-center gap-2 rounded-lg border px-3 text-sm transition-colors"
       >
         <Search className="size-4 flex-shrink-0" />
         <span className="flex-1 text-left">{t('actions.search')}</span>
@@ -117,7 +118,7 @@ export function ClientSidebar({ navigation }: ClientSidebarProps) {
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} locale={locale} />
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-6">
+      <nav className="flex-1 space-y-6" aria-label={t('navigation.docs')}>
         {navigation.map((section) => (
           <div key={section.title}>
             <div className="text-foreground cursor-default py-2 pr-4 pl-2 text-xs font-medium tracking-wider uppercase">

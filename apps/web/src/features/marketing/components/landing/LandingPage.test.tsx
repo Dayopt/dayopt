@@ -6,14 +6,15 @@ import { describe, expect, it, vi } from 'vitest';
 const trackSignupCta = vi.hoisted(() => vi.fn());
 
 vi.mock('@dayopt/billing', () => ({
+  appTrialDays: 45,
   dayoptPlans: { free: { id: 'free' }, pro: { id: 'pro' } },
   dayoptPricing: { free: { displayPrice: '$0' }, pro: { displayPrice: '$8' } },
 }));
 vi.mock('@dayopt/components', () => ({
   Button: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock('@dayopt/i18n/navigation', () => ({
-  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+vi.mock('@web/shell/layout/SiteLink', () => ({
+  SiteLink: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
@@ -24,10 +25,10 @@ vi.mock('@web/platform/analytics/signup-cta', () => ({ trackSignupCta }));
 vi.mock('@web/platform/config/product-signup-url', () => ({
   productSignupUrl: () => 'https://product-preview.example/auth/signup',
 }));
+vi.mock('./DayCanvas', () => ({ DayCanvas: () => null }));
 vi.mock('./LandingInteractions', () => ({
   CalendarDemo: () => null,
   ClosingMark: () => null,
-  HeroJourney: () => null,
   TemplateDemo: () => null,
 }));
 
@@ -43,13 +44,8 @@ describe('LandingPage signup calls to action', () => {
       ),
     );
 
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(3);
     for (const link of links) fireEvent.click(link);
-    expect(trackSignupCta.mock.calls).toEqual([
-      ['hero'],
-      ['pricing_free'],
-      ['pricing_pro'],
-      ['closing'],
-    ]);
+    expect(trackSignupCta.mock.calls).toEqual([['hero'], ['pricing_pro'], ['closing']]);
   });
 });

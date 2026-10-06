@@ -16,6 +16,29 @@
     "toSelect": "to select",
     "toClose": "to close",
     "close": "Close search",
-    "poweredBy": "Powered by Dayopt Search"
+    "poweredBy": "Powered by Dayopt Search",
+    "page": {
+      "eyebrow": "Dayopt Library",
+      "title": "Find your next answer.",
+      "description": "Search the guides and the journal for a practical answer or a new idea.",
+      "input": "Keywords",
+      "placeholder": "Plans, records, spending time…",
+      "submit": "Search",
+      "all": "All",
+      "docs": "Guides",
+      "blog": "Journal",
+      "filters": "Search in",
+      "count": "{count} results for “{query}”",
+      "loading": "Searching…",
+      "emptyTitle": "No matching results",
+      "emptyDescription": "Try another keyword or browse the guides.",
+      "startTitle": "Start with a question.",
+      "startDescription": "Enter a keyword, or start with the guides and journal.",
+      "clear": "Clear search",
+      "read": "Read more",
+      "updated": "Updated {date}",
+      "errorTitle": "Search is unavailable",
+      "errorDescription": "Try searching again in a moment. You can also browse the guides and journal."
+    }
   }
 }

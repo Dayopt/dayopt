@@ -1,5 +1,8 @@
 'use client';
 
+import { EditorialHeader } from '@web/components/content/EditorialHeader';
+import styles from './BlogDesign.module.css';
+
 import { cn } from '@dayopt/components';
 import { Link } from '@dayopt/i18n/navigation';
 import { EmptyState } from '@web/components/ui/feedback/empty-state';
@@ -7,7 +10,6 @@ import { SearchInput } from '@web/components/ui/inputs/search-input';
 import { ContentPagination } from '@web/components/ui/navigation/content-pagination';
 import { Rss, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import type { BlogPostMeta } from '../lib/blog';
 import { BLOG_CATEGORIES, type BlogCategory, blogCategoryHref } from '../lib/categories';
@@ -18,6 +20,7 @@ const POSTS_PER_PAGE = 12;
 interface FilteredBlogClientProps {
   initialPosts: BlogPostMeta[];
   locale: string;
+  currentPage?: number;
   /** 現在のタブ（URL 由来）。/blog は 'all'、/blog/{category} はその category。 */
   activeCategory?: BlogCategory;
 }
@@ -26,12 +29,10 @@ export function FilteredBlogClient({
   initialPosts,
   locale,
   activeCategory = 'all',
+  currentPage: requestedPage = 1,
 }: FilteredBlogClientProps) {
   const t = useTranslations('blog');
-  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-
-  const currentPage = Number(searchParams?.get('page')) || 1;
 
   // カテゴリ（タブ＝URL）+ 検索で絞り込み、日付降順
   const filteredPosts = useMemo(() => {
@@ -66,17 +67,23 @@ export function FilteredBlogClient({
   }, [initialPosts, activeCategory, searchQuery]);
 
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const currentPage = searchQuery ? 1 : Math.min(requestedPage, Math.max(1, totalPages));
   const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
   const currentPosts = filteredPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 
   return (
     <div>
-      {/* タイトルは header ナビの「ブログ」ハイライトで示すため非表示（a11y/SEO 用に sr-only で残す） */}
-      <h1 className="sr-only">{t('header.title')}</h1>
+      {/* 記事の入口 */}
+      <EditorialHeader
+        eyebrow={t('header.eyebrow')}
+        title={t('header.title')}
+        description={t('header.description')}
+        artwork
+      />
 
       {/* タブ（カテゴリ＝URL）+ RSS + 検索 */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <nav className="flex flex-wrap items-center gap-0" aria-label={t('header.title')}>
+      <div className={styles.toolbar}>
+        <nav className={styles.categories} aria-label={t('filters.title')}>
           {BLOG_CATEGORIES.map((category) => {
             const isActive = category === activeCategory;
             return (
@@ -85,7 +92,7 @@ export function FilteredBlogClient({
                 href={blogCategoryHref(category)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'relative inline-flex items-center justify-center rounded-lg px-2 py-1 text-sm whitespace-nowrap transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent after:transition-colors',
+                  styles.category,
                   isActive
                     ? 'text-foreground after:bg-foreground font-medium'
                     : 'text-muted-foreground hover:bg-state-hover hover:text-foreground',
@@ -103,12 +110,12 @@ export function FilteredBlogClient({
             href={`${locale === 'ja' ? '/ja' : ''}/blog/feed.xml`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
-            aria-label="RSS Feed"
+            className={styles.rss}
+            aria-label={t('header.rss')}
           >
             <Rss className="size-5" />
           </a>
-          <div className="sm:w-72">
+          <div className="min-w-0 flex-1 sm:w-72">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
@@ -123,13 +130,15 @@ export function FilteredBlogClient({
       <div className="mt-8">
         {currentPosts.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className={styles.postGrid}>
               {currentPosts.map((post, index) => (
                 <PostCard
                   key={post.slug}
                   post={post}
                   priority={currentPage === 1 && index < 3}
-                  layout="vertical"
+                  layout={
+                    index === 0 && currentPage === 1 && !searchQuery ? 'featured' : 'vertical'
+                  }
                   locale={locale}
                 />
               ))}

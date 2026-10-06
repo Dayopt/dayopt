@@ -5,24 +5,27 @@ import {
   isBrowserTelemetryConsentStorageChange,
   resolveAnalyticsConsentDetail,
 } from '@dayopt/observability';
-import * as Sentry from '@sentry/nextjs';
 import { config as configureZod } from 'zod';
 
 import {
-  sanitizeBreadcrumbEvent,
-  sanitizeErrorEvent,
-  sanitizeSpanEvent,
-  sanitizeTransactionEvent,
-} from './src/platform/observability/sentry-sanitizers';
+  loadBrowserSentryRuntime,
+  type BrowserSentryRuntime,
+} from './src/platform/observability/browser-sentry-runtime';
 
 // Production CSP forbids eval. Configure Zod before application schemas are constructed.
 configureZod({ jitless: true });
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+let sentryRuntime: BrowserSentryRuntime | undefined;
+export const onRouterTransitionStart = (
+  ...args: Parameters<BrowserSentryRuntime['captureRouterTransitionStart']>
+): void => {
+  sentryRuntime?.captureRouterTransitionStart(...args);
+};
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const isProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
 let initialized = false;
+let loading = false;
 let browserTelemetryAllowed = false;
 let revocationReloadRequested = false;
 
@@ -39,6 +42,7 @@ function hasStoredAnalyticsConsent(): boolean {
 function initializeBrowserSentry(): void {
   if (
     initialized ||
+    loading ||
     !browserTelemetryAllowed ||
     !isProduction ||
     !dsn ||
@@ -47,25 +51,32 @@ function initializeBrowserSentry(): void {
     return;
   }
 
-  initialized = true;
-
-  Sentry.init({
-    dsn,
-    enabled: true,
-    environment: 'production',
-    sendDefaultPii: false,
-    tracesSampler: ({ inheritOrSampleWith }) => inheritOrSampleWith(0.1),
-    integrations: [Sentry.browserTracingIntegration({ enableInp: true })],
-    beforeSend: (event, hint) => sanitizeErrorEvent(event, hint),
-    beforeSendTransaction: (event) => sanitizeTransactionEvent(event),
-    beforeSendSpan: (span) => sanitizeSpanEvent(span),
-    beforeBreadcrumb: (breadcrumb) => sanitizeBreadcrumbEvent(breadcrumb),
-  });
+  loading = true;
+  void loadBrowserSentryRuntime()
+    .then((runtime) => {
+      loading = false;
+      // A user can withdraw consent while the SDK chunk is loading.
+      if (
+        initialized ||
+        revocationReloadRequested ||
+        !browserTelemetryAllowed ||
+        !hasStoredAnalyticsConsent()
+      )
+        return;
+      sentryRuntime = runtime;
+      runtime.initialize(dsn);
+      initialized = true;
+    })
+    .catch(() => {
+      loading = false;
+      sentryRuntime?.setEnabled(false);
+      // Optional monitoring must not prevent reading, signup or consent withdrawal.
+      console.warn('[telemetry] Browser error monitoring could not be loaded.');
+    });
 }
 
 function setSentryClientEnabled(enabled: boolean): void {
-  const client = Sentry.getClient();
-  if (client) client.getOptions().enabled = enabled;
+  sentryRuntime?.setEnabled(enabled);
 }
 
 function applyBrowserTelemetryConsent(allowed: boolean): void {

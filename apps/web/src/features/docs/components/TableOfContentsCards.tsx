@@ -1,5 +1,6 @@
 'use client';
 
+import design from '@web/components/content/ContentDesign.module.css';
 import { TocLinks } from './AutoTableOfContents';
 import { ClientTableOfContents } from './ClientTableOfContents';
 
@@ -19,11 +20,11 @@ export function TableOfContentsCards({ content }: TableOfContentsCardsProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* card 1: 目次（スクロールなし。全項目を常に表示する） */}
-      <div className="bg-card text-card-foreground border-border-subtle rounded-lg border p-4 shadow-sm">
+      <div className={design.toc}>
         <ClientTableOfContents content={content} showLinks={false} />
       </div>
       {/* card 2: リンク（問題の報告） */}
-      <div className="bg-card text-card-foreground border-border-subtle rounded-lg border p-4 shadow-sm">
+      <div className={design.tocLinks}>
         <TocLinks />
       </div>
     </div>

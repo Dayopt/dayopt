@@ -38,32 +38,34 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
 
         <div className="bg-container mb-6 rounded-2xl p-6">
           <h3 className="mb-4 text-lg font-medium">{readLegalText(supportedVersions, 'title')}</h3>
-          <table className="border-border w-full border">
-            <thead className="bg-container">
-              <tr>
-                <th className="border-border border p-4 text-left">
-                  {readLegalText(supportedVersions, 'version')}
-                </th>
-                <th className="border-border border p-4 text-left">
-                  {readLegalText(supportedVersions, 'status')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <SecurityTableCell>{readLegalText(supportedVersions, 'v1')}</SecurityTableCell>
-                <SecurityTableCell>
-                  {readLegalText(supportedVersions, 'v1Status')}
-                </SecurityTableCell>
-              </tr>
-              <tr>
-                <SecurityTableCell>{readLegalText(supportedVersions, 'v0')}</SecurityTableCell>
-                <SecurityTableCell>
-                  {readLegalText(supportedVersions, 'v0Status')}
-                </SecurityTableCell>
-              </tr>
-            </tbody>
-          </table>
+          <div className="overflow-x-auto" tabIndex={0}>
+            <table className="border-border w-full border">
+              <thead className="bg-container">
+                <tr>
+                  <th className="border-border border p-4 text-left">
+                    {readLegalText(supportedVersions, 'version')}
+                  </th>
+                  <th className="border-border border p-4 text-left">
+                    {readLegalText(supportedVersions, 'status')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <SecurityTableCell>{readLegalText(supportedVersions, 'v1')}</SecurityTableCell>
+                  <SecurityTableCell>
+                    {readLegalText(supportedVersions, 'v1Status')}
+                  </SecurityTableCell>
+                </tr>
+                <tr>
+                  <SecurityTableCell>{readLegalText(supportedVersions, 'v0')}</SecurityTableCell>
+                  <SecurityTableCell>
+                    {readLegalText(supportedVersions, 'v0Status')}
+                  </SecurityTableCell>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="prose dark:prose-invert max-w-none">
@@ -91,7 +93,7 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
         </SectionHeading>
 
         <div className="bg-muted mb-6 rounded-2xl p-6">
-          <p className="text-destructive-foreground mb-4 font-medium">
+          <p className="text-foreground mb-4 font-medium">
             {readLegalText(vulnerability, 'warning', 'title')}
           </p>
           <p className="text-muted-foreground text-sm">
@@ -123,33 +125,35 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
           </ul>
 
           <h3 className="mt-6 text-lg font-medium">{readLegalText(timeline, 'title')}</h3>
-          <table className="border-border w-full border">
-            <thead className="bg-container">
-              <tr>
-                {['severity', 'initialResponse', 'fixRelease'].map((key) => (
-                  <th key={key} className="border-border border p-4 text-left">
-                    {readLegalText(timeline, key)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(
-                [
-                  ['critical', 'criticalResponse', 'criticalFix'],
-                  ['high', 'highResponse', 'highFix'],
-                  ['medium', 'mediumResponse', 'mediumFix'],
-                  ['low', 'lowResponse', 'lowFix'],
-                ] as const
-              ).map(([severity, response, fix]) => (
-                <tr key={severity}>
-                  <SecurityTableCell>{readLegalText(timeline, severity)}</SecurityTableCell>
-                  <SecurityTableCell>{readLegalText(timeline, response)}</SecurityTableCell>
-                  <SecurityTableCell>{readLegalText(timeline, fix)}</SecurityTableCell>
+          <div className="overflow-x-auto" tabIndex={0}>
+            <table className="border-border w-full border">
+              <thead className="bg-container">
+                <tr>
+                  {['severity', 'initialResponse', 'fixRelease'].map((key) => (
+                    <th key={key} className="border-border border p-4 text-left">
+                      {readLegalText(timeline, key)}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    ['critical', 'criticalResponse', 'criticalFix'],
+                    ['high', 'highResponse', 'highFix'],
+                    ['medium', 'mediumResponse', 'mediumFix'],
+                    ['low', 'lowResponse', 'lowFix'],
+                  ] as const
+                ).map(([severity, response, fix]) => (
+                  <tr key={severity}>
+                    <SecurityTableCell>{readLegalText(timeline, severity)}</SecurityTableCell>
+                    <SecurityTableCell>{readLegalText(timeline, response)}</SecurityTableCell>
+                    <SecurityTableCell>{readLegalText(timeline, fix)}</SecurityTableCell>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

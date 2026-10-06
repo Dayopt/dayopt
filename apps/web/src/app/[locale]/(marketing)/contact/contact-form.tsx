@@ -43,7 +43,8 @@ function getSubmissionPayloadKey(data: ContactFormValues): string {
 
 /** 必須ラベルコンポーネント（デジタル庁ガイドライン準拠） */
 function RequiredBadge() {
-  return <span className="text-destructive ml-2 text-sm font-normal">※必須</span>;
+  const t = useTranslations('marketing.contact.form');
+  return <span className="text-destructive ml-2 text-sm font-normal">{t('requiredBadge')}</span>;
 }
 
 /** サポートテキストコンポーネント */
@@ -283,7 +284,7 @@ export function ContactForm() {
 
         <p className="text-muted-foreground text-center text-xs">
           {t('form.privacyNotice')}{' '}
-          <Link href="/legal/privacy" className="text-primary hover:underline">
+          <Link href="/legal/privacy" className="text-foreground underline underline-offset-4">
             {t('form.privacyLink')}
           </Link>
         </p>
