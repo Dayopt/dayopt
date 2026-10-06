@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { ciSecretSchema } from '../tasks/env/schema.ts';
 import type { Definition, Observation, Result } from './types.ts';
 
@@ -151,8 +152,12 @@ export function evaluate(
       const metadata = objects(value)[0];
       if (!metadata) return { status: 'blocked', reason: 'database_metadata_missing' };
       matches = metadata.storage_rls_enabled === true;
-      if (observation.environment === 'production')
-        matches = matches && subset(expected.mcp_control, metadata.mcp_control);
+      if (expected.mcp_control !== undefined)
+        matches =
+          matches &&
+          Object.entries(object(expected.mcp_control)).every(([key, value]) =>
+            isDeepStrictEqual(value, object(metadata.mcp_control)[key]),
+          );
       break;
     }
     default:

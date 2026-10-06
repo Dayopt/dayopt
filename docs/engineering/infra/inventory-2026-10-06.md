@@ -7,6 +7,8 @@ last_verified: 2026-10-06
 
 目的は、重要なサービス設計を人とagentが見失わず、日常の実態・変更・未観測を追えるようにすること。全検査を正常にすることは完了条件にしない。期待値は[expected.yaml](./expected.yaml)、実行方法は[doctor.md](./doctor.md)、前回の観測は[10/5の記録](./inventory-2026-10-05.md)を参照する。
 
+> 以下の認証付きCLI実行は当時の観測記録。PR #3038のレビュー後、日常の認証付き実行は[信頼済みmain専用runtime](./doctor.md#初回設置更新人による信頼の確定)へ変更した。過去コマンドをPR checkoutで再実行しない。
+
 ## 最新結果と既存証拠の突き合わせ（13:16 JSTの実行後）
 
 ユーザーがTerminalで既存1Passwordアカウントを認証し、`OP_BIOMETRIC_UNLOCK_ENABLED=true PATH=/opt/homebrew/opt/node@24/bin:$PATH pnpm run doctor --record`を実行した。13:16:55 JST、113結果は **pass 68 / drift 1 / blocked 19 / manual 24 / not_applicable 1、終了コード1**。ローカル履歴 `1791260215402-dca2a471-2bd0-40ed-8ed4-7020e82d3606.json` を読み取って確認した。生応答や秘密値は転記していない。
@@ -307,4 +309,4 @@ Lunaが履歴機能を実装し、Solが追加diffを読み取りレビュー、
 - 実際の既定text形式`--service onepassword --record`も保存でき、pass 1 / manual 1、終了コード2を保持。個別履歴は全対象履歴と分離され、読み取りは終了コード0、初回は未比較。
 - `pnpm docs:check`成功。サービス設定、token、メール、cron、backup、課金の変更・実行はしていない。
 
-日々の入口は`pnpm run doctor --coverage`と`pnpm run doctor --record`。変更・未観測の理由を見て、必要な人の確認または別の修正作業へ進む。台帳を自動で実測へ合わせない。
+日々の入口は`pnpm run doctor --coverage`と、専用runtimeのlauncherに渡す`--record`。変更・未観測の理由を見て、必要な人の確認または別の修正作業へ進む。台帳を自動で実測へ合わせない。

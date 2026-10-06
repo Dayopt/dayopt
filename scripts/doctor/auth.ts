@@ -38,6 +38,7 @@ export function collectorEnvironment(
       'TMPDIR',
       'LANG',
       'LC_ALL',
+      'DOCTOR_TRUSTED_REVISION',
       'SSH_AUTH_SOCK',
       'OP_BIOMETRIC_UNLOCK_ENABLED',
       // The existing op wrapper uses these identifiers to select agent-only auth.

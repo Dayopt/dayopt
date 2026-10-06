@@ -289,3 +289,27 @@ describe('doctor comparisons', () => {
       expect(evaluate(def, observation([fixture])).status).toBe('drift');
   });
 });
+
+it('compares declared MCP controls in Integration as well as Production', () => {
+  const control = { writes_enabled: false, enabled_client_ids: [], billing_enforced: false };
+  const check = definition('database', { mcp_control: control });
+  for (const environment of ['integration', 'production'] as const) {
+    const observed = {
+      ...observation([{ storage_rls_enabled: true, mcp_control: control }]),
+      environment,
+    };
+    expect(evaluate(check, observed).status).toBe('pass');
+    for (const drift of [
+      { writes_enabled: true },
+      { enabled_client_ids: ['unexpected'] },
+      { billing_enforced: true },
+    ]) {
+      expect(
+        evaluate(check, {
+          ...observed,
+          value: [{ storage_rls_enabled: true, mcp_control: { ...control, ...drift } }],
+        }).status,
+      ).toBe('drift');
+    }
+  }
+});

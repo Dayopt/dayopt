@@ -7,7 +7,7 @@ last_verified: 2026-10-05
 
 環境構成（Local / PR Preview / Integration / Production）、CI品質ゲートのロードマップ、DNS 管理（Cloudflare）、Bot 対策（Turnstile）、API endpoints 総覧、Supabase 型自動生成、App Router routing 総覧、パフォーマンス監視の原則、開発コマンド一覧、マイグレーション/リリースチェックリスト、災害復旧手順、DB Migration Rollback 手順書、出口コスト台帳。「環境・デプロイ・シークレットは?」の正。
 
-サービス設定の重要設計・役割・接続・環境分離・取得制約の一覧は[expected.yaml](infra/expected.yaml)、日々の読み取り点検と履歴の手順は[Infrastructure doctor](infra/doctor.md)を参照する。設計を調べる時は`pnpm run doctor --coverage`、実態を確認して変化を残す時は`pnpm run doctor --record`を入口にする。実測を自動的に期待値へ昇格させず、取得不能を不存在や正常と扱わない。
+サービス設定の重要設計・役割・接続・環境分離・取得制約の一覧は[expected.yaml](infra/expected.yaml)、日々の読み取り点検と履歴の手順は[Infrastructure doctor](infra/doctor.md)を参照する。設計を調べる時は`pnpm run doctor --coverage`、実態を確認して変化を残す時は、手順書に従いレビュー済みmain専用runtimeのlauncherに`--record`を渡す。PR checkoutから認証付き実行をしない。実測を自動的に期待値へ昇格させず、取得不能を不存在や正常と扱わない。
 
 ---
 

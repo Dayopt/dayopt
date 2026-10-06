@@ -1,3 +1,4 @@
+vi.mock('../runbook/doctor-trusted.mjs', () => ({ assertTrustedRuntime: vi.fn() }));
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

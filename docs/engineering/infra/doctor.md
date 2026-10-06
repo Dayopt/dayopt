@@ -18,21 +18,40 @@ last_verified: 2026-10-06
 
 ## 実行
 
-Node 24とrepo指定のpnpmを使う。
+認証付き実行は、レビュー済みmainのSHAに固定した**専用clone**だけで行う。PR checkout、未レビューbranch、共有の開発用node_modulesからは資格情報を解決しない。`scripts/runbook/doctor-trusted.mjs`をそのcloneの外に設置し、絶対pathで起動する。任意のcheckout内の`pnpm run doctor`を承認する運用は廃止した。
+
+### 初回設置・更新（人による信頼の確定）
+
+Node 24を使う。以下の`REVIEWED_MAIN_SHA`は、このDoctorを含むレビュー済み・mainへmerge済みの40桁SHAに置換する。PRのheadや自動取得した未レビューSHAを使わない。**このPRのmerge前は設置・認証付き実行を行わない。**
+
+```bash
+DOCTOR_INSTALL="$HOME/.local/share/dayopt-doctor"
+DOCTOR_REVISION=REVIEWED_MAIN_SHA
+mkdir -p "$DOCTOR_INSTALL"
+git clone --no-checkout https://github.com/Dayopt/dayopt.git "$DOCTOR_INSTALL/runtime"
+git -C "$DOCTOR_INSTALL/runtime" checkout --detach "$DOCTOR_REVISION"
+git -C "$DOCTOR_INSTALL/runtime" merge-base --is-ancestor "$DOCTOR_REVISION" origin/main
+pnpm --dir "$DOCTOR_INSTALL/runtime" install --frozen-lockfile --ignore-scripts
+install -m 700 "$DOCTOR_INSTALL/runtime/scripts/runbook/doctor-trusted.mjs" "$DOCTOR_INSTALL/doctor.mjs"
+printf '%s\n' "$DOCTOR_REVISION" > "$DOCTOR_INSTALL/revision"
+node "$DOCTOR_INSTALL/doctor.mjs" --offline
+node "$DOCTOR_INSTALL/doctor.mjs" --record
+```
+
+設置の各コマンドが失敗したら次へ進まない。cloneと依存は開発checkoutと共有しない。更新は履歴を保持した上で、新しいレビュー済みmain SHAから専用clone・依存・launcherを再設置する。自動更新はしない。launcher自身、revision pin、Node/op/Gitバイナリ、専用依存を変更できるOSユーザーは信頼境界内であり、悪意のあるコードを同じOSユーザーで実行してからの安全性は保証しない。任意のPR自身に書かれた自己検査を信頼根拠にしない。
+
+launcherは自身の隣の`runtime`だけを使い、呼び出し元cwdのコード・package.json・依存を起動しない。固定SHA、mainへの到達、detached HEAD、正規origin、追跡ファイルの無変更、未追跡moduleの不在を認証前に確認する。Node preload指定を継承せず、collectorとDB監査もこのruntime内のコードだけを実行する。対象PRのコードを監査する機能は提供しない。
+
+開発checkoutでは次の認証不要の入口を使える（`pnpm doctor`はpnpm自身の別コマンド）。
 
 ```bash
 pnpm run doctor --offline
 pnpm run doctor --list
 pnpm run doctor --coverage
-pnpm run doctor
-pnpm run doctor --record
 pnpm run doctor --history
-pnpm run doctor --service vercel
-pnpm run doctor --environment integration
-pnpm run doctor --format json
 ```
 
-**`pnpm doctor`はpnpm自体の組み込みコマンド。Dayoptのdoctorには必ず`pnpm run doctor`を使う。** JSONの標準出力にpackage managerの進捗を混ぜたくない場合は`pnpm exec tsx scripts/doctor/cli.ts --format json`を使う。
+専用launcherには`--service vercel`、`--environment integration`、`--format json`等を同じように渡せる。
 
 `--offline`はYAML、正本ファイル、検査定義を確認し、認証・通信をしない。通常実行は結果を標準出力へ出す。結果ファイルは自動作成しない。必要なら呼び出し元でリダイレクトする。
 
@@ -46,7 +65,7 @@ pnpm run doctor --format json
 
 ## 日々の確認と履歴
 
-日々の作業開始時とサービス・環境・資格情報・release経路の設計変更後に、重要設計の一覧を見て`pnpm run doctor --record`を実行する。同じcheckout・同じ対象範囲で`pnpm run doctor --history`を読む。取得権限がない状態もそのまま記録する。終了コード1・2は保存失敗ではなく、差異・必須検査の判定不能を含む結果である。
+日々の作業開始時とサービス・環境・資格情報・release経路の設計変更後に、重要設計の一覧を見て`node "$HOME/.local/share/dayopt-doctor/doctor.mjs" --record`を実行する。同じ専用runtime・同じ対象範囲でlauncherに`--history`を渡して読む。取得権限がない状態もそのまま記録する。終了コード1・2は保存失敗ではなく、差異・必須検査の判定不能を含む結果である。
 
 - 保存先はGit管理外の`.local/infra-doctor/history/`。資格情報・生API応答を保存せず、安全に射影した結果だけを保存する。履歴directoryは0700、JSON fileは0600。保存失敗・不正な履歴はプロセス終了コード3で報告する。保存失敗でも今回の検査結果を標準出力へ残す。JSONの`exit_code`は検査結果、`history_saved:false`と`history_error`は記録失敗を表す。
 - 全サービス/個別サービス、全環境/個別環境は別々の履歴として比較する。初回は比較対象なしであり、「変化なし」としない。別checkoutへ履歴を自動転送しない。

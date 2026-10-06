@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { assertTrustedRuntime } from '../runbook/doctor-trusted.mjs';
 import { collectAuthenticated, CREDENTIALS } from './auth.ts';
 import { compare, RULES } from './compare.ts';
 import { loadConfig } from './config.ts';
@@ -187,6 +188,16 @@ export async function run(args: string[], root = ROOT): Promise<number> {
       'pnpm run doctor [--service NAME] [--environment all|production|preview|integration] [--format text|json] [--offline] [--list] [--record|--history|--coverage]\n読み取り専用。pnpm doctor はpnpm組み込みの別コマンドです。\n',
     );
     return 0;
+  }
+  if (!options.offline && !options.list && !options.history && !options.coverage) {
+    try {
+      assertTrustedRuntime(root, process.env.DOCTOR_TRUSTED_REVISION);
+    } catch {
+      process.stdout.write(
+        'doctor: trusted_runtime_required。承認済みmainから専用runtimeを設置してください。\n',
+      );
+      return 3;
+    }
   }
   if (options.collector) {
     const observations = await read(options.collector, options.environment, root);
