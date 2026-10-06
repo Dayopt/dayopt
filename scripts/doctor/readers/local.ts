@@ -5,6 +5,13 @@ import { failureCode } from '../safety.ts';
 import type { Observation, ReaderContext } from '../types.ts';
 
 const CONTRACTS: Record<string, { paths: string[]; live: string; reason: string; next: string }> = {
+  onepassword: {
+    paths: ['docs/operations/secrets.md', 'scripts/tasks/env/schema.ts'],
+    live: 'access_and_recovery',
+    reason:
+      'Secret references do not prove item presence, Vault permissions, replica equality or human account recovery.',
+    next: '人間用itemはVault・正確なitem名・confirmed_by・verified_atだけを台帳へ記録。Service Accountのagent vault read-only境界と復旧担当を人が確認し、取得不能を不存在と扱わない。値やTOTP/recovery codeは表示しない。',
+  },
   google: {
     paths: ['docs/operations/google-oauth-verification.md', 'docs/operations/secrets.md'],
     live: 'registered_callbacks',
@@ -52,6 +59,49 @@ const CONTRACTS: Record<string, { paths: string[]; live: string; reason: string;
     next: 'Inspect existing Vercel AI Gateway project/key metadata and budget settings; do not invoke models or create keys.',
   },
 };
+
+const MANUAL_CONTROLS: Record<string, { id: string; reason: string; next: string }[]> = {
+  cloudflare: [
+    {
+      id: 'email_routing',
+      reason:
+        'MX/SPF do not establish Email Routing routes, verified destinations or catch-all state.',
+      next: '既存Cloudflare Email Routingでsupport@の転送先認証・route有効・catch-all無効を確認。個人Gmail addressやメール本文は記録しない。正本: docs/operations/contact-email.md。',
+    },
+    {
+      id: 'zone_operations',
+      reason:
+        'Public DNS does not establish the full zone, proxy mode, DNSSEC or account recovery ownership.',
+      next: '既存Cloudflare zoneのDNS一覧・Vercel向けDNS only・DNSSECと権限/復旧担当を確認。登録事業者の管理画面と権威DNSを別々に扱う。',
+    },
+    {
+      id: 'restore_readiness',
+      reason:
+        'Backup runs, bucket locks and retention metadata do not prove a successful restore or current recovery readiness.',
+      next: '最新の復元演習の日時・対象revision・結果・担当と復旧手順の正本を確認。doctorはbackup同期・復元・cronを実行しない。',
+    },
+  ],
+  sentry: [
+    {
+      id: 'alert_authority',
+      reason:
+        'Project and release metadata do not prove alert delivery, notification ownership or read/edit/delete token capabilities.',
+      next: 'Sentry既存alert/通知先・担当とtoken scopeをmetadata/UIで確認。read-only token名から編集/削除権限を推定せず、test event送信や設定変更は行わない。正本: docs/operations/monitoring.md / secrets.md。',
+    },
+  ],
+};
+
+function manualControls(service: string): Observation[] {
+  return (MANUAL_CONTROLS[service] ?? []).map((entry) => ({
+    key: `${service}.${entry.id}`,
+    environment: 'shared',
+    value: null,
+    source: 'manual_design_control',
+    status: 'manual',
+    reason: entry.reason,
+    next_step: entry.next,
+  }));
+}
 
 async function contract(service: string, ctx: ReaderContext): Promise<Observation[]> {
   const spec = CONTRACTS[service];
@@ -387,7 +437,9 @@ export async function readLocal(service: string, ctx: ReaderContext): Promise<Ob
       ...(await contract(name, ctx)),
       ...(name === 'mcp_oauth' ? await oauthMetadata(ctx) : []),
     ];
-  if (name === 'cloudflare') return [...(await dns()), ...(await registration(ctx))];
+  if (name === 'cloudflare')
+    return [...(await dns()), ...(await registration(ctx)), ...manualControls(name)];
+  if (name === 'sentry') return manualControls(name);
   if (name === 'vercel') return health(ctx);
   if (name === 'github')
     return [

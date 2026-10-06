@@ -5,7 +5,15 @@ import { collectAuthenticated, CREDENTIALS } from './auth.ts';
 import { compare, RULES } from './compare.ts';
 import { loadConfig } from './config.ts';
 import { databaseChecks } from './database.ts';
+import {
+  compareResults,
+  expectedFingerprint,
+  historySummary,
+  readHistory,
+  saveHistory,
+} from './history.ts';
 import { evaluatePreviewPolicy } from './preview-policy.ts';
+import { contractFingerprint } from './provenance.ts';
 import { readLocal } from './readers/local.ts';
 import { readPlatform } from './readers/platform.ts';
 import { readService } from './readers/services.ts';
@@ -21,6 +29,9 @@ export function parseArgs(args: string[]) {
   let environment: Environment = 'all';
   let format: 'text' | 'json' = 'text';
   let offline = false;
+  let record = false;
+  let history = false;
+  let coverage = false;
   let list = false;
   let help = false;
   let collector: string | undefined;
@@ -38,6 +49,15 @@ export function parseArgs(args: string[]) {
       case '--format':
         format = args[++i] as 'text' | 'json';
         if (!['text', 'json'].includes(format)) throw new Error('format');
+        break;
+      case '--record':
+        record = true;
+        break;
+      case '--history':
+        history = true;
+        break;
+      case '--coverage':
+        coverage = true;
         break;
       case '--offline':
         offline = true;
@@ -57,7 +77,24 @@ export function parseArgs(args: string[]) {
         throw new Error('argument');
     }
   }
-  return { service, environment, format, offline, list, help, collector };
+  if (
+    (record && (history || offline || list || collector || coverage)) ||
+    (history && (offline || list || collector || coverage)) ||
+    (coverage && (offline || list || collector))
+  )
+    throw new Error('flag_combination');
+  return {
+    service,
+    environment,
+    format,
+    offline,
+    list,
+    help,
+    collector,
+    record,
+    history,
+    coverage,
+  };
 }
 function selected(definition: Definition, environment: Environment) {
   return (
@@ -146,7 +183,7 @@ export async function run(args: string[], root = ROOT): Promise<number> {
   const options = parseArgs(args);
   if (options.help) {
     process.stdout.write(
-      'pnpm run doctor [--service NAME] [--environment all|production|preview|integration] [--format text|json] [--offline] [--list]\n読み取り専用。pnpm doctor はpnpm組み込みの別コマンドです。\n',
+      'pnpm run doctor [--service NAME] [--environment all|production|preview|integration] [--format text|json] [--offline] [--list] [--record|--history|--coverage]\n読み取り専用。pnpm doctor はpnpm組み込みの別コマンドです。\n',
     );
     return 0;
   }
@@ -169,6 +206,21 @@ export async function run(args: string[], root = ROOT): Promise<number> {
       selected(check, options.environment),
   );
   if (!definitions.length) throw new Error('Empty selection');
+  if (options.history) {
+    const data = await readHistory(root, options.service ?? null, options.environment);
+    process.stdout.write(historySummary(data, options.format) + '\n');
+    return 0;
+  }
+  if (options.coverage) {
+    const { renderCoverage } = await import('./coverage.ts');
+    process.stdout.write(
+      renderCoverage(config, options.format, {
+        service: options.service,
+        environment: options.environment,
+      }) + '\n',
+    );
+    return 0;
+  }
   if (options.list) {
     process.stdout.write(
       options.format === 'json'
@@ -192,6 +244,8 @@ export async function run(args: string[], root = ROOT): Promise<number> {
     );
     return 0;
   }
+  const expectedHash = expectedFingerprint(root);
+  const contractHash = contractFingerprint(root, config.source_contracts);
   const results: Result[] = [];
   const observations: Observation[] = [];
   for (const service of new Set(definitions.map((check) => check.service))) {
@@ -251,15 +305,74 @@ export async function run(args: string[], root = ROOT): Promise<number> {
     (observation) => !config.checks.some((check) => check.id === observation.key),
   );
   if (unmatched.length) throw new Error('Unregistered observation');
-  process.stdout.write(
-    renderReport(results, options.format, {
-      mode: 'live_read_only',
-      repo_revision: revision(root),
-      expectation_revision: config.scope.repository_baseline,
-      advisories: config.advisories,
-      checked_at_jst: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }) + ' JST',
-    }) + '\n',
-  );
+  const baseMetadata = {
+    mode: 'live_read_only',
+    repo_revision: revision(root),
+    expectation_revision: config.scope.repository_baseline,
+    expected_fingerprint: expectedHash,
+    contract_fingerprint: contractHash,
+    advisories: config.advisories,
+    checked_at_jst: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }) + ' JST',
+  };
+  let report = renderReport(results, options.format, baseMetadata);
+  if (options.record) {
+    try {
+      const prior = await readHistory(root, options.service ?? null, options.environment);
+      const safeRunReport = JSON.parse(renderReport(results, 'json', baseMetadata)) as {
+        results: Result[];
+      };
+      const comparisonAvailable = prior.records.length > 0;
+      const changes = comparisonAvailable
+        ? compareResults(prior.records[0].results, safeRunReport.results)
+        : [];
+      const designChanged =
+        comparisonAvailable &&
+        (prior.records[0].expected_fingerprint !== expectedHash ||
+          prior.records[0].contract_fingerprint !== contractHash);
+      const comparisonMetadata = {
+        comparison_available: comparisonAvailable,
+        ...(comparisonAvailable ? {} : { comparison_reason: 'no_previous_record' }),
+        history_changes: changes,
+        history_design_changed: designChanged,
+      };
+      const savedPath = await saveHistory(
+        root,
+        renderReport(results, 'json', { ...baseMetadata, ...comparisonMetadata }),
+        options.service ?? null,
+        options.environment,
+      );
+      const confirmed = await readHistory(root, options.service ?? null, options.environment);
+      const metadata = {
+        ...baseMetadata,
+        ...comparisonMetadata,
+        history_saved_path: savedPath,
+        history_changes: confirmed.changes,
+        history_design_changed: confirmed.designChanged,
+      };
+      report = renderReport(results, options.format, metadata);
+    } catch (error) {
+      const knownHistoryErrors = new Set([
+        'history_too_large',
+        'history_invalid_report',
+        'history_invalid_path',
+        'history_unavailable',
+        'history_invalid_file',
+      ]);
+      const historyError =
+        error instanceof Error && knownHistoryErrors.has(error.message)
+          ? error.message
+          : 'history_unavailable';
+      report = renderReport(results, options.format, {
+        ...baseMetadata,
+        history_saved: false,
+        history_error: historyError,
+      });
+      process.stderr.write(`doctor: 履歴を保存できませんでした (${historyError})。\n`);
+      process.stdout.write(report + '\n');
+      return 3;
+    }
+  }
+  process.stdout.write(report + '\n');
   return exitCode(results);
 }
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

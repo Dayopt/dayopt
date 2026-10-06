@@ -14,7 +14,7 @@ last_verified: 2026-10-06
 - `expected.yaml`には合意済みの設計とその正本参照を置く。ライブ観測値を自動的に期待値へ昇格しない。
 - `drift`は記録した設計と実測が異なる合図。意図した変更か、設計の更新が必要か、実設定の修正が必要かを判断する材料として残す。
 - `blocked`と`manual`は取得権限やAPIの限界も含む観測状態。理由と次の確認方法が記録されていれば、未解決のまま追跡できる。
-- Doctorは現在CLIから手動実行する。自動定期実行や実行履歴の保存はこの文書・コマンドでは設定していない。
+- DoctorはCLIから手動実行する。`--record`で安全な結果を保存し、`--history`で同じ対象範囲の前回からの変化を確認する。自動定期実行は設定していない。
 
 ## 実行
 
@@ -23,7 +23,10 @@ Node 24とrepo指定のpnpmを使う。
 ```bash
 pnpm run doctor --offline
 pnpm run doctor --list
+pnpm run doctor --coverage
 pnpm run doctor
+pnpm run doctor --record
+pnpm run doctor --history
 pnpm run doctor --service vercel
 pnpm run doctor --environment integration
 pnpm run doctor --format json
@@ -33,13 +36,29 @@ pnpm run doctor --format json
 
 `--offline`はYAML、正本ファイル、検査定義を確認し、認証・通信をしない。通常実行は結果を標準出力へ出す。結果ファイルは自動作成しない。必要なら呼び出し元でリダイレクトする。
 
+`--coverage`も認証・通信をせず、各サービスの役割・停止時の影響・再確認のきっかけ・設計正本・接続・検査方法・取得制約を一覧にする。表示は台帳の宣言であり、実設定の検証結果ではない。`metadata_or_source_only`はmetadataやソースの取得だけ、`comparison_rule`は指定条件の比較、`manual_verification`は人による確認を表す。比較規則でも実行時に取得不能・手動確認となることがある。
+
 通常のテキスト出力にも実行repoのrevision、期待値のbaseline、確認日時を表示する。期待値のbaselineは台帳の`scope.repository_baseline`であり、現在の期待値ファイルを保存したcommitとは限らない。
+
+## 日々の確認と履歴
+
+日々の作業開始時とサービス・環境・資格情報・release経路の設計変更後に、重要設計の一覧を見て`pnpm run doctor --record`を実行する。同じcheckout・同じ対象範囲で`pnpm run doctor --history`を読む。取得権限がない状態もそのまま記録する。終了コード1・2は保存失敗ではなく、差異・必須検査の判定不能を含む結果である。
+
+- 保存先はGit管理外の`.local/infra-doctor/history/`。資格情報・生API応答を保存せず、安全に射影した結果だけを保存する。履歴directoryは0700、JSON fileは0600。保存失敗・不正な履歴はプロセス終了コード3で報告する。保存失敗でも今回の検査結果を標準出力へ残す。JSONの`exit_code`は検査結果、`history_saved:false`と`history_error`は記録失敗を表す。
+- 全サービス/個別サービス、全環境/個別環境は別々の履歴として比較する。初回は比較対象なしであり、「変化なし」としない。別checkoutへ履歴を自動転送しない。
+- 状態・期待値・実測・理由と検査の追加/消滅を追う。確認日時だけの変化と配列順だけの違いは差分にしない。heartbeat日時や集計countなど実測値の更新は表示されるため、すべてを設定変更とは解釈しない。
+- 実行時の`expected.yaml`と参照先契約のfingerprintを保持し、設計変更を実測driftとは別に表示する。意図した変更なら正本と台帳を更新し、外部設定の変更が必要なら対象と影響を確認して別作業にする。
+- `--history`の終了コード0は履歴の読み取り成功。保存されたrunの終了コード・未確認件数を見て現在の観測状況を判断する。古い履歴を現在の成功にしない。
+
+手動確認はサービスの`review_triggers`にある変更時と月次に見直す。人間用資格情報の所在は既存の`manual_access_policy`に従い、Vault・正確なitem名と確認担当/日時を記録する。API非提供・現在の権限不足・reader不足・secret再表示不可・実動作検証を区別し、未確認のままでも次の確認方法を残す。
 
 ## 対象と正本
 
 [expected.yaml](./expected.yaml)の`checks`が機械判定の一覧。`source_contracts`が既存監査・環境台帳の正本参照。現行の追加確認は[inventory-2026-10-05.md](./inventory-2026-10-05.md)、直前の追補は[inventory-2026-10-04.md](./inventory-2026-10-04.md)、前回の追補は[inventory-2026-10-03.md](./inventory-2026-10-03.md)、接続・検査の詳細snapshotは[inventory-2026-10-01.md](./inventory-2026-10-01.md)、初回の履歴は[inventory-2026-09-30.md](./inventory-2026-09-30.md)。観測値で期待値を自動上書きしない。
 
-`--service`には`github`, `vercel`, `supabase`, `stripe`, `resend`, `cloudflare`, `sentry`, `posthog`, `upstash`, `uptimerobot`, `google`, `mcp_oauth`, `telemetry`, `pwned_passwords`, `support_smtp`, `optional`を指定できる。Cloudflareには公開DNS、Turnstile、R2とdomain registration metadataを含む。GitHub Appsはrepository hooksとは別のmanual検査。`all`はCLI既定の環境選択。
+最新の観測と日常運用の検証は[10/6の記録](./inventory-2026-10-06.md)を参照する。
+
+`--service`には`github`, `vercel`, `supabase`, `stripe`, `resend`, `cloudflare`, `sentry`, `posthog`, `upstash`, `uptimerobot`, `google`, `mcp_oauth`, `telemetry`, `pwned_passwords`, `support_smtp`, `optional`, `onepassword`を指定できる。Cloudflareには公開DNS、Turnstile、R2とdomain registration metadataを含む。Email Routing/zone運用・復元可能性・Sentry通知/権限・1Password復旧境界は取得できたmetadataと別のmanual検査として残す。1Password検査はitem値を取得しない。GitHub Appsはrepository hooksとは別のmanual検査。`all`はCLI既定の環境選択。
 
 API/CLI readerはAPIが返すmetadataの安全な列だけを射影する。Googleの登録callback、Gmail SMTP、実際のsource map適用、secret replica値の一致など、現在のAPI資格情報で証明できない事項は`manual`または`blocked`。ソースファイルの存在、PING、domain verification、HTTP metadata取得だけで動作成功と扱わない。
 

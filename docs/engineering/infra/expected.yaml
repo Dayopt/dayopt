@@ -60,8 +60,25 @@ source_contracts:
   development_ai:
     - scripts/tasks/env/schema.ts
     - scripts/lib/jev-adapter.ts
+  contact:
+    - docs/operations/contact-email.md
+  monitoring:
+    - docs/operations/monitoring.md
+  analytics:
+    - docs/operations/product-analytics.md
+    - docs/operations/posthog-analytics.md
 services:
   github:
+    purpose: repo・CI・review・Supabase/Vercel deployment の制御
+    failure_impact: 開発と Production deploy の経路が止まる
+    review_triggers:
+      - repository/ruleset/App権限変更
+      - workflow/release経路変更
+    contract_refs:
+      - infrastructure
+      - release
+      - operations
+      - secrets
     expected:
       visibility_direction: private
       visibility_precondition: github_team
@@ -91,6 +108,15 @@ services:
       - secrets_api
       - ruleset_details
   vercel:
+    purpose: Product/Web の配信・domain・環境ごとの接続設定
+    failure_impact: アプリ/公開サイトの配信や Preview 分離が崩れる
+    review_triggers:
+      - project/domain/env変更
+      - 配信revision更新
+    contract_refs:
+      - vercel
+      - release
+      - infrastructure
     expected:
       product_and_web:
         autoAssignCustomDomains: false
@@ -112,6 +138,17 @@ services:
       - project_settings
       - deployed_cron_heartbeat
   supabase:
+    purpose: DB・Auth・Storage・schema/RLS・cron の保存と強制点
+    failure_impact: 認証・ユーザーデータ・アクセス分離・定期処理へ影響する
+    review_triggers:
+      - project/branch/Auth変更
+      - migration/Storage policy変更
+    contract_refs:
+      - auth
+      - storage_rls
+      - schema
+      - cron
+      - infrastructure
     expected:
       contracts:
         - auth
@@ -142,6 +179,14 @@ services:
       - storage_rls_and_schema_live
       - pg_cron_success
   mcp_oauth:
+    purpose: MCP の issuer/resource/client と書込許可の契約
+    failure_impact: MCP接続または書込の認可境界が崩れる
+    review_triggers:
+      - OAuth client/callback変更
+      - write gate/Preview構成変更
+    contract_refs:
+      - mcp
+      - secrets
     expected:
       production:
         issuer: https://app.dayopt.app
@@ -163,6 +208,14 @@ services:
       - sensitive_upstash_binding
       - maintenance_write_fence
   stripe:
+    purpose: Live/Test を分離した課金と削除時customer cleanup
+    failure_impact: 課金・解約・Stripe利用者のアカウント削除へ影響する
+    review_triggers:
+      - Live有効化
+      - price/webhook/Portal/API version変更
+    contract_refs:
+      - billing
+      - secrets
     expected:
       production_activation: pending
       integration: test_only
@@ -173,6 +226,15 @@ services:
       - webhook_secret_replica
       - billing_flow
   resend:
+    purpose: Auth・Product・Web のメール送信とbounce/complaint抑止
+    failure_impact: 認証メール/問い合わせ送信・不達/苦情の抑止記録へ影響する
+    review_triggers:
+      - domain/sender/webhook変更
+      - 送信キー/署名キーrotation
+    contract_refs:
+      - contact
+      - auth
+      - secrets
     expected:
       separate_webhook_signatures: true
       auth_hook_and_contact_sender: explicit_verified_sender
@@ -182,6 +244,16 @@ services:
       - edge_secret_replicas
       - support_smtp
   cloudflare:
+    purpose: 権威DNS・Email Routing・Turnstile・R2 backup の境界
+    failure_impact: 全domainの名前解決・問い合わせ受信・Bot対策・復旧へ影響する
+    review_triggers:
+      - DNS/転送先/CAPTCHA変更
+      - registrar/R2権限/retention変更
+    contract_refs:
+      - infrastructure
+      - contact
+      - backup
+      - secrets
     expected:
       authoritative_zone: dayopt.app
       backup_buckets:
@@ -189,6 +261,11 @@ services:
         - attachments
       backup_retention_days: 35
       rclone_sync_default_max_delete: 1000
+      turnstile:
+        production_domains:
+          - app.dayopt.app
+          - dayopt.app
+        server_secret_matches_site_key: true
     coverage:
       - zone_admin_settings
       - turnstile_domains
@@ -196,6 +273,16 @@ services:
       - r2_permissions_and_retention
       - backup_restore_evidence
   posthog:
+    purpose: 同意に基づくProduct/Web計測と削除契約
+    failure_impact: 計測品質・プライバシー・データ削除へ影響する
+    review_triggers:
+      - 法務承認/計測有効化
+      - project/key/consent/replay設定変更
+    contract_refs:
+      - analytics
+      - privacy
+      - telemetry
+      - secrets
     expected:
       production_activation: legal_approval_pending
       consent: required
@@ -210,6 +297,15 @@ services:
       - deletion_master_exists
       - deletion_flow
   sentry:
+    purpose: Product/Webのエラー監視・PII除去・build source maps
+    failure_impact: 障害の検知/調査に加えProduction buildが止まり得る
+    review_triggers:
+      - project/token/source-map/release変更
+      - PII/組織設定変更
+    contract_refs:
+      - monitoring
+      - privacy
+      - secrets
     expected:
       send_default_pii: false
       pii_scrubbing: required
@@ -225,35 +321,88 @@ services:
       - service_hooks
       - source_map_application
   google:
+    purpose: 環境を分離したAuthログイン・Calendar OAuth
+    failure_impact: Googleログイン・外部Calendar連携へ影響する
+    review_triggers:
+      - Cloud project/client/callback変更
+      - consent/test users/refresh-token鍵変更
+    contract_refs:
+      - auth
+      - calendar
+      - secrets
     expected:
-      auth_callback: https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback
-      calendar_callback: https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback
       calendar_authority_contract: calendar
       environment_separation_contract: docs/operations/secrets.md#google-oauth-の本番非本番分離
+      auth_callbacks:
+        production: https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback
+        nonproduction: https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback
+      calendar_callbacks:
+        production: https://app.dayopt.app/api/integrations/google-calendar/callback
+        integration: https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback
     coverage:
       - registered_callbacks
       - consent_screen_and_test_users
       - project_number_and_refresh_token_key_replicas
-  turnstile:
-    expected:
-      production_domains:
-        - app.dayopt.app
-        - dayopt.app
-      server_secret_matches_site_key: true
-    coverage:
-      - allowed_domains
-      - sensitive_product_secret_pair
   upstash:
+    purpose: rate limitとwebhookの冪等処理、非本番の隔離
+    failure_impact: operational起動・OAuth/MCP制限・webhook処理へ影響する
+    review_triggers:
+      - Redis接続先/token権限変更
+      - Preview/Integrationの利用方針変更
+    contract_refs:
+      - infrastructure
+      - mcp
+      - secrets
     expected:
       preview_binding: isolated_nonproduction
     coverage:
       - product_sensitive_url
       - token_permissions
-  uptime_robot:
+  pwned_passwords:
+    purpose: SHA-1先頭5文字だけを使う漏洩パスワード検査
+    failure_impact: 漏洩パスワード検出が失われる。停止時は検査を通す契約
+    review_triggers:
+      - provider/timeout/fail-open契約変更
+    contract_refs:
+      - password_check
+    expected:
+      origin: https://api.pwnedpasswords.com
+      authentication: none
+      payload: sha1_prefix_5_characters
+      timeout_ms: 3000
+      failure: continue_without_check
+    coverage:
+      - live_availability
+  optional:
+    purpose: Jev/AI Gatewayなど任意の開発支援
+    failure_impact: 開発支援と利用予算へ影響する
+    review_triggers:
+      - project/key/budget/provider変更
+    contract_refs:
+      - development_ai
+      - secrets
+    expected: {}
+    coverage: []
+  uptimerobot:
+    purpose: 公開healthの外形監視と通知
+    failure_impact: 障害の検知や通知先への到達が失われる
+    review_triggers:
+      - monitor target/status変更
+      - 通知先変更
+    contract_refs:
+      - monitoring
     expected: {}
     coverage:
       - notification_routes
-  vercel_browser_telemetry:
+  telemetry:
+    purpose: 同意と環境境界に従うVercel Analytics/Speed Insights
+    failure_impact: 計測品質・プライバシーへ影響する
+    review_triggers:
+      - Dashboard有効化
+      - 同意/環境/build revision変更
+    contract_refs:
+      - telemetry
+      - analytics
     expected:
       products:
         - product
@@ -266,18 +415,43 @@ services:
       contract_ref: telemetry
     coverage:
       - dashboard_enablement_and_ingestion
-  pwned_passwords:
+  support_smtp:
+    purpose: support受信とGmailからの専用Resend SMTP返信
+    failure_impact: 問い合わせの受信・返信が失われる
+    review_triggers:
+      - Email Routing転送先変更
+      - Gmail Send mail as/専用SMTP key変更
+    contract_refs:
+      - contact
+      - secrets
     expected:
-      origin: https://api.pwnedpasswords.com
-      authentication: none
-      payload: sha1_prefix_5_characters
-      timeout_ms: 3000
-      failure: continue_without_check
+      receiving: Cloudflare Email Routing to the human-managed Gmail destination
+      replying: Gmail Send mail as via dedicated Resend SMTP key
+      contract_ref: contact
     coverage:
-      - live_availability
-  optional:
-    expected: {}
-    coverage: []
+      - receiving_destination
+      - gmail_sender_and_smtp_replica
+  onepassword:
+    purpose: secretの正本・注入・人間のアカウント復旧手段
+    failure_impact: 資格情報rotation・replica同期元・account recoveryが失われる
+    review_triggers:
+      - item移動/名称変更/rotation
+      - Vault/Service Account権限/復旧担当変更
+    contract_refs:
+      - secrets
+      - infrastructure
+    expected:
+      master: 1Password
+      replicas:
+        - Vercel
+        - GitHub Actions
+        - Supabase Edge/Auth
+      agent_boundary: agent vault read-only; inaccessible human and ci items stay unverified
+      human_locator: Vault and exact item name; optional human bookmark
+    coverage:
+      - human_item_locations_and_confirmation
+      - service_account_vault_scope
+      - replica_match_and_recovery
 secret_refs:
   ledger:
     contract_ref: secrets
@@ -287,6 +461,7 @@ secret_refs:
     owner: vercel_supabase_integration
     op_ref: null
     verification: integration_owned_no_invented_master
+    ownership_kind: env_injection_not_database_deployment
   nonproduction_test_username:
     op_ref: op://dlmo7yfs5buvd3j3sbikjjqypa/s3tems3afbzvvguakggydcgxni/username
     usage: existing_seed_user_login_verification
@@ -686,11 +861,12 @@ connections:
       'expected': '受信経路・forward先を確認。Resend receivingの有効化を要求しない',
       'check_ids':
         [
-          'cloudflare.public_dns.apex_mx',
-          'cloudflare.public_dns.apex_spf',
-          'support_smtp.gmail_sender_and_smtp_replica',
+          cloudflare.public_dns.apex_mx,
+          cloudflare.public_dns.apex_spf,
+          support_smtp.gmail_sender_and_smtp_replica,
+          cloudflare.email_routing,
         ],
-      'contract_refs': ['secrets'],
+      'contract_refs': [contact, infrastructure],
       'secret_refs': [],
     }
   - {
@@ -917,7 +1093,7 @@ connections:
       'to': 'Sentry dayopt',
       'type': 'error_reporting',
       'expected': 'PII scrub / sampling / release契約と対応。生eventやstack traceは読まない',
-      'check_ids': ['sentry.projects', 'sentry.applied_source_maps'],
+      'check_ids': [sentry.projects, sentry.applied_source_maps, sentry.alert_authority],
       'contract_refs': ['privacy', 'secrets'],
       'secret_refs': [],
     }
@@ -970,7 +1146,7 @@ connections:
       'to': 'Sentry dayopt-web',
       'type': 'error_reporting',
       'expected': 'PII scrub / sampling / release契約と対応。生eventやstack traceは読まない',
-      'check_ids': ['sentry.projects', 'sentry.applied_source_maps'],
+      'check_ids': [sentry.projects, sentry.applied_source_maps, sentry.alert_authority],
       'contract_refs': ['privacy', 'secrets'],
       'secret_refs': [],
     }
@@ -1020,11 +1196,12 @@ connections:
       'expected': '既存backup正本 / bucket scope / 35日locks。restore成功は別証拠',
       'check_ids':
         [
-          'github.backup_runs',
-          'cloudflare.r2_buckets',
-          'cloudflare.r2_locks.avatars',
-          'cloudflare.r2_locks.attachments',
-          'cloudflare.backup_credential_scope',
+          github.backup_runs,
+          cloudflare.r2_buckets,
+          cloudflare.r2_locks.avatars,
+          cloudflare.r2_locks.attachments,
+          cloudflare.backup_credential_scope,
+          cloudflare.restore_readiness,
         ],
       'contract_refs': ['backup', 'secrets'],
       'secret_refs': ['backup_source', 'backup_destination'],
@@ -1189,6 +1366,36 @@ connections:
       'check_ids': ['github.installed_apps'],
       'contract_refs': ['secrets'],
       'secret_refs': [],
+    }
+  - {
+      id: onepassword.master.replicas,
+      service: onepassword,
+      environments: [shared],
+      from: 1Password master / human and ci item locators,
+      to: Vercel / GitHub / Supabase replicas,
+      type: secret_authority,
+      expected: secrets正本参照。item所在確認・値一致・権限と復旧を別の証拠で扱う,
+      check_ids:
+        [
+          onepassword.access_and_recovery,
+          github.production-release.secret_names,
+          vercel.product.environment_metadata,
+        ],
+      contract_refs: [secrets],
+      secret_refs: [ledger],
+    }
+  - {
+      id: github.supabase.deployment_owner,
+      service: github,
+      environments: [shared],
+      from: Supabase GitHub integration for Dayopt/dayopt,
+      to: migrations / Edge Functions / Storage bucket deployment,
+      type: deployment_ownership,
+      expected: GitHub integrationがdeployment owner。Vercel Supabase integrationのenv注入ownerと区別する,
+      check_ids:
+        [github.installed_apps, supabase.production.migrations, supabase.production.functions],
+      contract_refs: [infrastructure, schema, auth],
+      secret_refs: [],
     }
 ui_only:
   - {
@@ -1475,11 +1682,51 @@ ui_only:
       'id': 'domain.registration.account',
       'service': 'cloudflare',
       'category': 'collector_unavailable',
-      'items': ['Name.com auto-renewal / account recovery'],
+      'items': [registrar auto-renewal / account recovery],
       'reason': '公開RDAPは期限・registrar・NSのみ。登録アカウントの資格情報 / readerは未確認',
-      'next_step': '既存Name.com Dashboardで自動更新・担当・回復方式を読む。支払情報・個人連絡先は記録しない',
+      'next_step': 公開RDAPのregistrarと販売/管理画面を区別し、既存domain管理画面で自動更新・担当・回復方式を確認。管理先の現状は独立確認し、支払情報・個人連絡先は記録しない。,
       'check_ids': ['cloudflare.registrar_metadata', 'cloudflare.registrar_operations'],
       'documentation_urls': ['https://data.iana.org/rdap/dns.json'],
+    }
+  - {
+      id: onepassword.human_access,
+      service: onepassword,
+      category: current_permission,
+      items: [human/ci item locations, Vault boundary, replica equality, account recovery],
+      reason: agentから読めないitemは未確認。所在と人の存在確認、provider設定とreplica一致は別証拠。,
+      next_step: Vaultと正確なitem名だけを記録し、confirmed_by/verified_atを人の確認後に追加。権限を増やさず既存policyで追う。,
+      check_ids: [onepassword.access_and_recovery],
+      documentation_urls: [],
+    }
+  - {
+      id: cloudflare.routing_and_zone,
+      service: cloudflare,
+      category: collector_unavailable,
+      items: [Email Routing route/destination/catch-all, proxy/DNSSEC/zone ownership],
+      reason: 公開DNSと既存metadata readerは転送先やzone運用設定を返さない。,
+      next_step: 既存Dashboardでmetadataだけ確認。個人addressやメール本文を保存しない。,
+      check_ids: [cloudflare.email_routing, cloudflare.zone_operations],
+      documentation_urls: [],
+    }
+  - {
+      id: backup.restore_readiness,
+      service: cloudflare,
+      category: behavior_not_metadata,
+      items: [dated restore evidence, recovery owner],
+      reason: backup jobやlocksだけでは復元可能性を証明しない。,
+      next_step: 既存の復元証跡と手順を確認。今回のdoctorは復元しない。,
+      check_ids: [cloudflare.restore_readiness],
+      documentation_urls: [],
+    }
+  - {
+      id: sentry.alert_and_token_authority,
+      service: sentry,
+      category: collector_unavailable,
+      items: [alert notification owner, read/edit/delete token scope],
+      reason: project/release metadataやtoken名だけでは通知先と操作権限を証明しない。,
+      next_step: 既存Dashboard/token scopeのmetadataを人が確認。通知テストやkey発行なし。,
+      check_ids: [sentry.alert_authority],
+      documentation_urls: [],
     }
 checks:
   - id: github.repository
@@ -2379,3 +2626,51 @@ checks:
     rule: manual
     required: true
     next_step: GitHub Settingsの既存App名・権限・対象repoを確認。hook一覧だけで未接続と判定しない。
+  - id: onepassword.source_contract
+    service: onepassword
+    environments:
+      - shared
+    rule: evidence
+    expected: refs_only_no_live_claim
+    required: true
+    next_step: Secrets正本とenv台帳の所在を確認。item存在やreplica一致は別確認。
+  - id: onepassword.access_and_recovery
+    service: onepassword
+    environments:
+      - shared
+    rule: manual
+    expected: human_locator_vault_boundary_replica_and_recovery
+    required: true
+    next_step: Vault・正確なitem名と人の確認日時/担当を記録。secret/TOTP/recovery codeの値は記録しない。
+  - id: cloudflare.email_routing
+    service: cloudflare
+    environments:
+      - shared
+    rule: manual
+    expected: support_route_verified_destination_catch_all_disabled
+    required: true
+    next_step: support@ route・転送先認証・catch-all無効を確認。個人メールアドレスを出力しない。
+  - id: cloudflare.zone_operations
+    service: cloudflare
+    environments:
+      - shared
+    rule: manual
+    expected: zone_dns_only_dnssec_and_account_ownership
+    required: true
+    next_step: 既存zoneのDNS only・DNSSEC・管理/復旧担当を確認。公開DNSを完全zone一覧の証拠にしない。
+  - id: cloudflare.restore_readiness
+    service: cloudflare
+    environments:
+      - shared
+    rule: manual
+    expected: dated_restore_evidence_and_recovery_owner
+    required: true
+    next_step: 復元証跡・日時・revision・結果・担当を確認。backup同期や復元はdoctorで実行しない。
+  - id: sentry.alert_authority
+    service: sentry
+    environments:
+      - shared
+    rule: manual
+    expected: notification_owner_and_read_edit_delete_authority
+    required: true
+    next_step: 既存alert/通知先とtoken権限を確認。名前だけから権限や通知到達を推測しない。

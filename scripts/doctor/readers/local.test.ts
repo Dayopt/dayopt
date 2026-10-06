@@ -45,6 +45,23 @@ beforeEach(() => {
 });
 
 describe('local doctor reader', () => {
+  it('tracks 1Password access and recovery without authenticating or reading items', async () => {
+    const ctx = context();
+    const result = await readLocal('onepassword', ctx);
+    expect(result).toMatchObject([
+      { key: 'onepassword.source_contract', environment: 'shared' },
+      { key: 'onepassword.access_and_recovery', status: 'manual', value: null },
+    ]);
+    expect(ctx.request).not.toHaveBeenCalled();
+    expect(mocks.ns).not.toHaveBeenCalled();
+  });
+  it('keeps notification authority separate from Sentry metadata and token names', async () => {
+    const ctx = context();
+    expect(await readLocal('sentry', ctx)).toMatchObject([
+      { key: 'sentry.alert_authority', status: 'manual', value: null },
+    ]);
+    expect(ctx.request).not.toHaveBeenCalled();
+  });
   it('retains installed GitHub Apps as a manual inventory check without treating hooks as Apps', async () => {
     const ctx = context();
     expect(await readLocal('github', ctx)).toMatchObject([
@@ -84,7 +101,12 @@ describe('local doctor reader', () => {
     expect(mocks.constructor).toHaveBeenCalledWith({ timeout: 10_000, tries: 1 });
     expect(mocks.ns).toHaveBeenCalledWith('dayopt.app');
     expect(mocks.cname.mock.calls).toEqual([['app.dayopt.app'], ['mcp.dayopt.app']]);
-    expect(result).toHaveLength(11);
+    expect(result).toHaveLength(14);
+    for (const key of ['email_routing', 'zone_operations', 'restore_readiness'])
+      expect(result.find((row) => row.key === `cloudflare.${key}`)).toMatchObject({
+        status: 'manual',
+        value: null,
+      });
     expect(result.find((row) => row.key.endsWith('.dkim'))?.value).toEqual([
       { record_present: true, public_key_present: true, key_type: 'rsa' },
     ]);

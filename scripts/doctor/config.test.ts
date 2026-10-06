@@ -101,4 +101,23 @@ describe('inventory connection and capability contracts', () => {
     expect(config.connections.length).toBeGreaterThan(30);
     expect(config.ui_only.length).toBeGreaterThan(10);
   });
+  it('rejects a service without its role or canonical design references', () => {
+    expect(() =>
+      fixture((config) => {
+        delete config.services.github.purpose;
+      }),
+    ).toThrow();
+    expect(() =>
+      fixture((config) => {
+        config.services.github.contract_refs = ['missing'];
+      }),
+    ).toThrow();
+  });
+  it('rejects a check whose service has no design entry', () => {
+    expect(() =>
+      fixture((config) => {
+        delete config.services.github;
+      }),
+    ).toThrow();
+  });
 });

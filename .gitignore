@@ -182,3 +182,5 @@ temp/
 .op-env.local
 .op-env.admin
 .claude/scheduled_tasks.lock
+# doctor の安全に射影した実行履歴（checkout ごとの一時運用記録）
+/.local/infra-doctor/

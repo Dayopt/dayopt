@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
+import { isPrivateEnvironmentPath } from './provenance.ts';
 import type { Definition } from './types.ts';
 
 const stableId = z.string().regex(/^[a-z0-9_.-]+$/);
@@ -53,12 +54,22 @@ const check = z
     next_step: z.string(),
   })
   .strict();
+const serviceDesign = z
+  .object({
+    purpose: z.string().min(1),
+    failure_impact: z.string().min(1),
+    review_triggers: z.array(z.string().min(1)).min(1),
+    contract_refs: z.array(z.string().min(1)).min(1),
+    expected: z.record(z.string(), z.unknown()),
+    coverage: z.array(z.string()).default([]),
+  })
+  .strict();
 const schema = z
   .object({
     version: z.literal(1),
     scope: z.object({ project: z.literal('Dayopt') }).passthrough(),
     source_contracts: z.record(z.string(), z.array(z.string())),
-    services: z.record(z.string(), z.unknown()),
+    services: z.record(z.string(), serviceDesign),
     secret_refs: z.record(z.string(), z.unknown()),
     resources: z.record(z.string(), z.unknown()),
     advisories: z.array(z.unknown()),
@@ -80,6 +91,14 @@ export function loadConfig(root: string) {
     ids.add(item.id);
   }
   const services = new Set(config.checks.map((item) => item.service));
+  for (const name of services)
+    if (!Object.hasOwn(config.services, name)) throw new Error('Missing service design');
+  for (const [name, design] of Object.entries(config.services))
+    if (
+      !services.has(name) ||
+      design.contract_refs.some((ref) => !(ref in config.source_contracts))
+    )
+      throw new Error('Unknown service design or contract reference');
   for (const entries of [config.connections, config.ui_only]) {
     const entryIds = new Set<string>();
     for (const entry of entries) {
@@ -111,6 +130,7 @@ export function loadConfig(root: string) {
       if (
         path.startsWith('/') ||
         path.split('/').includes('..') ||
+        isPrivateEnvironmentPath(path) ||
         !existsSync(resolve(root, path))
       ) {
         throw new Error('Missing or invalid contract reference');

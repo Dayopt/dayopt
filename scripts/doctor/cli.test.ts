@@ -13,6 +13,11 @@ describe('doctor CLI contracts', () => {
       ['--format', 'csv'],
       ['--service'],
       ['--collector', 'github'],
+      ['--record', '--offline'],
+      ['--record', '--history'],
+      ['--history', '--list'],
+      ['--coverage', '--record'],
+      ['--coverage', '--collector', 'github'],
     ])
       expect(() => parseArgs(args)).toThrow();
   });
@@ -44,6 +49,21 @@ describe('doctor CLI contracts', () => {
     ])
       expect(services.has(service)).toBe(true);
     expect(new Set(checks.map((entry: { id: string }) => entry.id)).size).toBe(checks.length);
+  });
+  it('rejects unknown service for history mode before any collector can run', () => {
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [
+          'node_modules/tsx/dist/cli.mjs',
+          'scripts/doctor/cli.ts',
+          '--history',
+          '--service',
+          'not-a-service',
+        ],
+        { cwd: root, stdio: 'pipe' },
+      ),
+    ).toThrow();
   });
   it('offline validates references without needing op or inherited credentials', () => {
     const text = execFileSync(

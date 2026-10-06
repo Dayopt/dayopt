@@ -1,0 +1,64 @@
+---
+status: current
+last_verified: 2026-10-06
+---
+
+# Dayopt サービス棚卸し — 2026-10-06
+
+目的は、重要なサービス設計を人とagentが見失わず、日常の実態・変更・未観測を追えるようにすること。全検査を正常にすることは完了条件にしない。期待値は[expected.yaml](./expected.yaml)、実行方法は[doctor.md](./doctor.md)、前回の観測は[10/5の記録](./inventory-2026-10-05.md)を参照する。
+
+## 台帳と運用の追加
+
+- 17サービスに役割、停止時の影響、再確認のきっかけ、設計の正本参照を追加。108検査定義、62接続、28取得制約を登録した。
+- 検査定義は条件比較49件、metadata・正本の取得確認36件、手動確認23件。`--coverage`は宣言の一覧であり、外部設定を確認済みとは扱わない。
+- 1Passwordのmaster/replica/アクセス・復旧境界、Cloudflare Email Routing・zone運用・復元可能性、Sentry通知・token権限を独立した確認項目にした。item参照やmetadata取得だけでは証明できない部分を残す。
+- Supabase GitHub連携によるDB/Edge配信責任と、Vercel Integrationによるenv注入責任を区別。Google Auth/CalendarはProduction/非本番のcallback契約を明示したが、Console変更・実OAuth確認は別セッションの範囲。
+- Registrarはpublic registry上の登録事業者と販売/管理画面を区別し、古い文書だけから現在の管理先を断定しない。
+- `--record`は安全に射影した結果をGit管理外のcheckout別履歴へ保存。`--history`は同じ対象範囲の直前記録と比較する。初回は未比較、保存失敗時も結果を残してプロセス終了コード3。自動定期実行は設定していない。
+- 期待値と登録した正本のfingerprintを記録し、設計変更と実測driftを区別する。生API応答、資格情報、顧客行、メール本文は保存しない。
+
+## 全サービス実行
+
+主担当がNode 24で`pnpm exec tsx scripts/doctor/cli.ts --record --format json`を実行した。取得元は既存`op run`子プロセスのAPI/CLI reader、固定のread-only SQL、公開DNS/RDAP、repo正本。既存ログインや別資格情報へ切り替えていない。
+
+- レポート確認時刻: **2026-10-06 09:20:17 JST**。各結果にも取得時刻と取得元を保持。
+- 実行repo HEAD: `0f189028b29ee93b6087a75d6667a37e67131461`。今回の未コミット追加を含むcheckoutから実行した。HEADだけでは作業中の正本内容を特定できないため、fingerprintも保持した。
+- 期待値baseline: `650f62dc733831765aa8c110e29533b532e023f2`。baselineは現在の台帳を保存したcommitとは異なる。
+- expected fingerprint: `3d7878dbc76e7557fa3d73935daa3b1b51b769c5e568f6c8d766db4c9fa7b755`
+- source contract fingerprint: `5c121d22da848108e9ca5ffff3fe9579b66f833bfab58240dc42d8944d6eded3`
+- **113結果: pass 53 / drift 1 / blocked 38 / manual 21 / not_applicable 0、終了コード1**。108定義すべてに結果があり、未登録結果は0件。環境別結果があるため定義数とは異なる。
+- 初回履歴として保存され、`--history`は「未比較（前回記録なし）」を返した。passには取得成功だけの検査も含むため、53件の実動作成功を意味しない。
+
+| サービス                                                                               | pass | drift | blocked | manual |
+| -------------------------------------------------------------------------------------- | ---: | ----: | ------: | -----: |
+| GitHub                                                                                 |    5 |     0 |       3 |      1 |
+| Vercel                                                                                 |    1 |     0 |      13 |      1 |
+| Supabase                                                                               |   11 |     1 |       4 |      3 |
+| Stripe                                                                                 |    4 |     0 |       5 |      1 |
+| Resend                                                                                 |    0 |     0 |       4 |      0 |
+| Cloudflare                                                                             |   10 |     0 |       6 |      4 |
+| Sentry                                                                                 |   10 |     0 |       2 |      2 |
+| PostHog                                                                                |    1 |     0 |       1 |      1 |
+| Upstash                                                                                |    1 |     0 |       0 |      1 |
+| UptimeRobot                                                                            |    1 |     0 |       0 |      0 |
+| Google / MCP OAuth / telemetry / Pwned Passwords / support SMTP / optional / 1Password |    9 |     0 |       0 |      7 |
+
+## 差異と未観測
+
+差異は`supabase.production.heartbeats:production`の`billing-reconciliation: missing or duplicate heartbeat`。今回の観測はheartbeat監査の失敗であり、cronは実行していない。現行routeにはStripe identity未構成時にheartbeat記録より前で戻る経路がある。監査の期待条件、配信中契約、実際の有効化設定を突き合わせる必要があり、この結果だけでcron障害や原因を断定しない。
+
+取得不能38件は、資格情報解決/collector失敗25件、HTTP 403が6件、明示的な不足権限3件、AUTH_FAILEDが1件、HTTP 404が1件、サービス間証拠不足1件、Preview env/public bindings欠測1件。APIエラー本文は保存しない。404や読めないVaultを、リソース/itemの不存在と扱わない。
+
+Vercel接続設定、Resend設定、Cloudflare非公開metadataなどは今回再確認できていない。過去のUI/API観測をこのrunの成功へ置き換えない。Google Console、実メール配送、secret replicaの値一致、復元、実通知も確認済みにはしない。確認方法・所在の記録規則は台帳の`ui_only`、各結果の`next_step`、`manual_access_policy`に残してある。
+
+## 検証とレビュー
+
+Lunaが履歴機能を実装し、Solが追加diffを読み取りレビュー、主担当が差分と実行結果を確認した。保存JSONと画面の比較不一致、textの環境識別不足を修正した。
+
+- `pnpm test:scripts scripts/doctor`: 17ファイル166テスト成功。取得失敗・ページング・secret射影・環境分離・履歴整合/順序・保存失敗時の結果保持を含む。
+- `pnpm typecheck:scripts`成功。`--offline`は108定義を検証し、認証・通信なし。
+- `--coverage`は17サービス/108定義と検査方法を表示し、実設定未検証と明示。
+- 実際の既定text形式`--service onepassword --record`も保存でき、pass 1 / manual 1、終了コード2を保持。個別履歴は全対象履歴と分離され、読み取りは終了コード0、初回は未比較。
+- `pnpm docs:check`成功。サービス設定、token、メール、cron、backup、課金の変更・実行はしていない。
+
+日々の入口は`pnpm run doctor --coverage`と`pnpm run doctor --record`。変更・未観測の理由を見て、必要な人の確認または別の修正作業へ進む。台帳を自動で実測へ合わせない。
