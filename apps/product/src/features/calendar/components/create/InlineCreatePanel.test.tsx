@@ -18,6 +18,7 @@ import { InlineCreatePanel } from './InlineCreatePanel';
 const preferences = vi.hoisted(() => ({ timezone: 'UTC', timeFormat: '24h' }));
 const statsPending = vi.hoisted(() => ({ value: false }));
 const resolveMedianMinutes = vi.hoisted(() => vi.fn());
+const createActivityMutateAsync = vi.hoisted(() => vi.fn());
 const medians = vi.hoisted(() => new Map<string, number>([['activity-1', 45]]));
 
 const createPlanMutate = vi.hoisted(() => vi.fn());
@@ -112,19 +113,24 @@ vi.mock('@/features/timeblock', async () => {
 // 受け取った中央値は行の表示へ回すので、ここでは「渡ってきたか」だけを見える形にする
 // （pill の描画そのものは ActivityQuickSelector.test.tsx が実物で確認する）
 vi.mock('@/features/activities', () => ({
-  useCreateActivity: () => ({ mutateAsync: vi.fn() }),
+  useCreateActivity: () => ({ mutateAsync: createActivityMutateAsync }),
   ActivityPickerList: ({
     onSelect,
+    onCreateAndSelect,
     onActivityHover,
     durationByActivityId,
   }: {
     onSelect: (id: string, name: string) => void;
+    onCreateAndSelect: (name: string) => void;
     onActivityHover?: (
       activity: { id: string; name: string; color: string | null; icon: string | null } | null,
     ) => void;
     durationByActivityId?: ReadonlyMap<string, number> | undefined;
   }) => (
     <div>
+      <button type="button" onClick={() => onCreateAndSelect('新規活動')}>
+        新規活動を作成
+      </button>
       <button
         type="button"
         onClick={() => onSelect('activity-1', '開発')}
@@ -193,6 +199,8 @@ describe('InlineCreatePanel', () => {
     laneItems.length = 0;
     statsPending.value = false;
     resolveMedianMinutes.mockReset();
+    createActivityMutateAsync.mockReset();
+    createActivityMutateAsync.mockResolvedValue({ id: 'activity-new' });
   });
 
   it('未編集のクリック選択は統計を待ち中央値で一度だけ保存する', async () => {
@@ -256,6 +264,33 @@ describe('InlineCreatePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '開発' }));
     await act(async () => {
       release(45);
+    });
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(createRecordMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('新規活動の中央値待ちを選択差替えで解除し、次の選択を作成できる', async () => {
+    statsPending.value = true;
+    const releases: ((value: number | null) => void)[] = [];
+    resolveMedianMinutes.mockImplementation(
+      () => new Promise<number | null>((resolve) => releases.push(resolve)),
+    );
+    setSelection(futureDay());
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '新規活動を作成' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(1);
+
+    act(() => setSelection(pastDay()));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(resolveMedianMinutes).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      releases[0]?.(45);
+      releases[1]?.(45);
     });
     expect(createPlanMutate).not.toHaveBeenCalled();
     expect(createRecordMutate).toHaveBeenCalledTimes(1);

@@ -79,7 +79,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
 
   // plan / record 作成ハンドラー（アクティビティ必須、その名前をタイトルに設定）
   const handleCreate = useCallback(
-    (activityId: string, activityName: string) => {
+    (activityId: string, activityName: string, onMedianWaitCancelled?: () => void) => {
       if (isCreating) return;
       const selectionRevision = useInlineCreateStore.getState().selectionRevision;
       if (
@@ -217,7 +217,10 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
         const unsubscribe = useInlineCreateStore.subscribe((state) => {
           if (!state.pendingSelection || state.selectionRevision !== selectionRevision) {
             cancelled = true;
-            if (waitingRef.current === request) waitingRef.current = null;
+            if (waitingRef.current === request) {
+              waitingRef.current = null;
+              onMedianWaitCancelled?.();
+            }
           }
         });
         void resolveMedianMinutes(activityId)
@@ -263,6 +266,7 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
     ) => {
       if (!pendingSelection || isCreating) return;
 
+      const selectionRevision = useInlineCreateStore.getState().selectionRevision;
       setIsCreating(true);
       try {
         // 色・アイコンはカテゴリーだけが持つ（#2162 §4-6）。アクティビティ側には保存しない
@@ -270,8 +274,16 @@ export function useInlineCreate(extras: InlineCreateExtras = {}) {
           name,
           categoryId: categoryId ?? undefined,
         });
+        const currentSelection = useInlineCreateStore.getState();
+        if (
+          !currentSelection.pendingSelection ||
+          currentSelection.selectionRevision !== selectionRevision
+        ) {
+          setIsCreating(false);
+          return;
+        }
         // mutateAsync resolved → handleCreate で続行
-        handleCreate(created.id, name);
+        handleCreate(created.id, name, () => setIsCreating(false));
       } catch (err) {
         setIsCreating(false);
         const message = err instanceof Error ? err.message : String(err);

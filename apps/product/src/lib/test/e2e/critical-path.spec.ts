@@ -88,7 +88,8 @@ async function dragSelect(page: Page, hourFrom: number, hourTo: number) {
   // 15分以内の初期gestureでselectionを成立させる。30分地点は別イベントとして
   // フレームを空けて送り、初期gestureの終点と検証対象の座標を重ねない。
   const halfHourPreview = `${String(hourFrom).padStart(2, '0')}:00 – ${String(hourFrom).padStart(2, '0')}:30`;
-  await page.mouse.move(x, yFrom + 12, { steps: 4 });
+  // One event crosses the >5px drag threshold before RAF coalescing can drop later steps.
+  await page.mouse.move(x, yFrom + 12);
   await expect(preview).toBeVisible();
   await settleDragFrame();
   await page.mouse.move(x, yFrom + hourHeight / 3);
