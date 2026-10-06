@@ -198,15 +198,31 @@ export async function clickAndAwaitCreate(
   expect(response.ok(), `${procedure} が保存に失敗した（HTTP ${response.status()}）`).toBe(true);
 }
 
-export async function loginAs(page: Page, identity: CriticalPathIdentity) {
+export async function loginAs(page: Page, identity: CriticalPathIdentity, returnTo?: string) {
   await suppressConsentBanner(page);
-  await page.goto('/ja/auth/login');
+  if (returnTo) {
+    await page.goto(returnTo);
+    await page.waitForURL(
+      (url) => url.pathname === '/ja/auth/login' && url.searchParams.has('redirect'),
+      { timeout: 15_000 },
+    );
+  } else {
+    await page.goto('/ja/auth/login');
+  }
   await page.locator('input[type="email"], input[name="email"]').first().fill(identity.email);
   await page.locator('input[type="password"]').first().fill(identity.password);
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL((url) => url.pathname === '/ja' || url.pathname === '/ja/', {
-    timeout: 15_000,
-  });
+  if (returnTo) {
+    const expected = new URL(returnTo, 'https://dayopt-preview.invalid');
+    await page.waitForURL(
+      (url) => url.pathname === expected.pathname && url.search === expected.search,
+      { timeout: 15_000 },
+    );
+  } else {
+    await page.waitForURL((url) => url.pathname === '/ja' || url.pathname === '/ja/', {
+      timeout: 15_000,
+    });
+  }
 }
 
 export async function openDay(page: Page, dateParam: string) {

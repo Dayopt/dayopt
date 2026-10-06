@@ -218,7 +218,19 @@ describeWithEnv('Critical Path: 計画 → 実績 → アクティビティ詳�
       testInfo.project.name.includes('Mobile'),
       'desktop-only（ドラッグ座標は desktop 前提）',
     );
+    if (testInfo.title.startsWith('認証後の戻り先:')) {
+      await loginAs(page, IDENTITY, '/ja/?view=day&date=' + tomorrow);
+      return;
+    }
     await loginAs(page, IDENTITY);
+  });
+
+  test('認証後の戻り先: 元の保護URLを開く', async ({ page }) => {
+    const current = new URL(page.url());
+    expect(current.pathname).toBe('/ja/');
+    expect(current.searchParams.get('view')).toBe('day');
+    expect(current.searchParams.get('date')).toBe(tomorrow);
+    await expect(page.locator('[data-calendar-grid]').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test(
