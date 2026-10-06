@@ -47,6 +47,102 @@ function fixture(mutate: (config: ReturnType<typeof parse>) => void) {
 }
 
 describe('inventory connection and capability contracts', () => {
+  it('preserves the exact item label without trimming its spaces', () => {
+    const result = fixture((config) => {
+      config.resources.human_onepassword_items.items.vercel.item = ' existing item ';
+    });
+    expect(result.resources.human_onepassword_items?.items.vercel.item).toBe(' existing item ');
+  });
+  it('rejects confirmed item presence without a confirming actor', () => {
+    expect(() =>
+      fixture((config) => {
+        delete config.resources.human_onepassword_items.confirmed_by;
+      }),
+    ).toThrow();
+  });
+  it.each(['human_onepassword_items', 'ci_onepassword_items'])(
+    'rejects a missing or impossible confirmation date in %s',
+    (group) => {
+      for (const value of [undefined, '2026-02-30', '2026-13-01']) {
+        expect(() =>
+          fixture((config) => {
+            config.resources[group].verified_at = value;
+          }),
+        ).toThrow();
+      }
+    },
+  );
+  it('rejects an incomplete complete-locator and a missing explanation', () => {
+    expect(() =>
+      fixture((config) => {
+        config.resources.human_onepassword_items.items.vercel.item = null;
+      }),
+    ).toThrow();
+    expect(() =>
+      fixture((config) => {
+        delete config.resources.human_onepassword_items.items.github.reason;
+      }),
+    ).toThrow();
+  });
+  it('rejects unknown services, contract references and duplicate ci items', () => {
+    expect(() =>
+      fixture((config) => {
+        config.resources.human_onepassword_items.items.missing =
+          config.resources.human_onepassword_items.items.vercel;
+      }),
+    ).toThrow();
+    expect(() =>
+      fixture((config) => {
+        config.resources.ci_onepassword_items.contract_refs = ['missing'];
+      }),
+    ).toThrow();
+    expect(() =>
+      fixture((config) => {
+        config.resources.ci_onepassword_items.items.push(
+          config.resources.ci_onepassword_items.items[0],
+        );
+      }),
+    ).toThrow();
+  });
+  it('rejects secret fields and personal email or URL in item labels', () => {
+    for (const value of [
+      'account person@example.test',
+      'https://example.test/item',
+      'op://human/item/password',
+    ]) {
+      expect(() =>
+        fixture((config) => {
+          config.resources.human_onepassword_items.items.vercel.item = value;
+        }),
+      ).toThrow();
+    }
+    expect(() =>
+      fixture((config) => {
+        config.resources.human_onepassword_items.items.vercel.password = 'FAKE_SECRET';
+      }),
+    ).toThrow();
+  });
+  it('accepts unknown presence without human confirmation and absent legacy locator records', () => {
+    expect(
+      fixture((config) => {
+        for (const entry of Object.values(config.resources.human_onepassword_items.items) as {
+          presence_status: string;
+        }[])
+          entry.presence_status = 'unknown';
+        delete config.resources.human_onepassword_items.confirmed_by;
+        delete config.resources.human_onepassword_items.verified_at;
+        config.resources.ci_onepassword_items.presence_status = 'unknown';
+        delete config.resources.ci_onepassword_items.confirmed_by;
+        delete config.resources.ci_onepassword_items.verified_at;
+      }),
+    ).toBeDefined();
+    expect(
+      fixture((config) => {
+        delete config.resources.human_onepassword_items;
+        delete config.resources.ci_onepassword_items;
+      }),
+    ).toBeDefined();
+  });
   it('accepts stable connections and separate capability limitations offline', () => {
     expect(fixture(() => {})).toMatchObject({
       connections: [{ id: 'github.product.release' }],

@@ -1,4 +1,5 @@
 import type { loadConfig } from './config.ts';
+import { itemLocations } from './item-locations.ts';
 import { sanitize } from './safety.ts';
 import type { Environment } from './types.ts';
 
@@ -56,6 +57,9 @@ export function designCoverage(config: Config, selection: Selection) {
     selection,
     service_count: services.length,
     check_count: checks.length,
+    item_locations: itemLocations(config.resources, selection.service),
+    item_location_verification_scope:
+      '所在の人による確認。field・権限・期限・provider設定・replica一致は別確認。',
     services,
   }) as {
     mode: string;
@@ -65,6 +69,8 @@ export function designCoverage(config: Config, selection: Selection) {
     selection: Selection;
     service_count: number;
     check_count: number;
+    item_locations: ReturnType<typeof itemLocations>;
+    item_location_verification_scope: string;
     services: typeof services;
   };
 }
@@ -79,6 +85,13 @@ export function renderCoverage(
   return [
     `Dayopt 重要設計の一覧（${report.service_count}サービス / ${report.check_count}検査定義）`,
     '台帳の宣言を表示しています。認証・通信・実設定の検証は行っていません。',
+    `1Password: ${report.item_location_verification_scope}`,
+    ...report.item_locations.map(
+      (entry) =>
+        `  所在 ${entry.service}: ${entry.vault ?? '未特定'} / ${entry.item ?? '未記録'} [${entry.presence_status}; ${entry.locator_status}]` +
+        (entry.confirmed_by ? ` 確認者=${entry.confirmed_by} 日付=${entry.verified_at}` : '') +
+        ('reason' in entry && entry.reason ? ` 理由=${entry.reason}` : ''),
+    ),
     ...report.services.flatMap((entry) => [
       `\n${entry.service}: ${entry.purpose}`,
       `  停止時の影響: ${entry.failure_impact}`,

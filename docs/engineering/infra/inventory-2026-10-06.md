@@ -69,6 +69,19 @@ ciの一覧も6件すべてを観測した。`vercel-production`、`supabase-aut
 
 ## 検証とレビュー
 
+### 11:31 JSTの再取得と所在情報のCLI対応
+
+- 所在情報のtext/JSON表示を`--coverage`に追加し、`--service onepassword`でhuman・ciの所在と確認状態を表示できる。個別serviceではそのhuman項目を表示する。
+- 設定読取時に確認者・実在する確認日、完全な所在のVault/項目名、不完全な所在の理由を検査する。未知のservice/contract、重複ci項目、項目名の個人メール/URL、未定義secret fieldを拒否する。旧台帳の未登録所在情報は許容する。
+- 確認者欠落のtestと所在表示のtestが変更前に失敗し、実装後に成功した。Node 24の`pnpm test:scripts scripts/doctor`は17ファイル178テスト成功、`pnpm typecheck:scripts`、`pnpm run doctor --offline`、`pnpm docs:check`も成功した。
+- `pnpm exec tsx scripts/doctor/cli.ts --record --format json`で全サービスを再取得。確認時刻は**2026-10-06 11:31:22 JST**。113結果、**pass 52 / drift 1 / blocked 39 / manual 21 / not_applicable 0、終了コード1**。既存の`op run`経路だけを使い、ログイン・資格情報・権限の切替はしない。
+- `pnpm run doctor --history`は全サービス履歴2件を比較でき、終了コード0。PostHogの`ingestion_aggregate`がpassからblocked（`read_failed`）へ変化した。backup runのmetadataとDBのheartbeat時刻等にも更新があるが、これだけで設定変更とは判断しない。所在情報を追加したexpected fingerprintの変更は実測driftと別に表示された。
+- Productionの公開versionはSHA `47f5d7c4`。配信SHAとcheckoutのbilling reconciliation route、heartbeat policy、migrationに差分はない。routeはStripeのsecret/account/modeがすべて未設定の場合、heartbeatの記録前に`configured:false`で終了する。一方policyはbilling reconciliationにも1560分以内の完了を要求する。今回もheartbeat欠測を再現したが、ProductionのVercel設定は取得不能で、未設定分岐に入ったかは未確定。cronを呼ばず、policyや設定を変更して差異を消していない。
+- 取得不能は従来の38件にPostHog集計失敗1件が加わったもの。所在一覧の確認をAPI権限やreplica一致の成功へ置き換えていない。次は既存の人間用読取経路でVercelのStripe設定の有無とcronの既存実行記録を確認し、heartbeat条件との関係を判定する。secret値・顧客行は不要。
+- Vercel MCPの補足読取では既存Product projectのid/name、Next.js、Node 24.xのmetadataを取得できた。env一覧は`decrypt:false`を明示した呼出しが`INVALID_ARGUMENT`で取得できず、返されたaccount IDを指定しても同じだった。CLIの13件の取得不能を成功へ置き換えず、Productの一部metadataだけの別証拠として記録する。生応答・秘密値・ログ本文は表示していない。
+
+以下は朝の機能追加・検証記録。
+
 Lunaが履歴機能を実装し、Solが追加diffを読み取りレビュー、主担当が差分と実行結果を確認した。保存JSONと画面の比較不一致、textの環境識別不足を修正した。
 
 - `pnpm test:scripts scripts/doctor`: 17ファイル166テスト成功。取得失敗・ページング・secret射影・環境分離・履歴整合/順序・保存失敗時の結果保持を含む。

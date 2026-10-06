@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
+import { ciItems, humanItems } from './item-locations.ts';
 import { isPrivateEnvironmentPath } from './provenance.ts';
 import type { Definition } from './types.ts';
 
@@ -71,7 +72,12 @@ const schema = z
     source_contracts: z.record(z.string(), z.array(z.string())),
     services: z.record(z.string(), serviceDesign),
     secret_refs: z.record(z.string(), z.unknown()),
-    resources: z.record(z.string(), z.unknown()),
+    resources: z
+      .object({
+        human_onepassword_items: humanItems.optional(),
+        ci_onepassword_items: ciItems.optional(),
+      })
+      .catchall(z.unknown()),
     advisories: z.array(z.unknown()),
     connections: z.array(connection).default([]),
     ui_only: z.array(limitation).default([]),
@@ -91,6 +97,18 @@ export function loadConfig(root: string) {
     ids.add(item.id);
   }
   const services = new Set(config.checks.map((item) => item.service));
+  if (
+    Object.keys(config.resources.human_onepassword_items?.items ?? {}).some(
+      (name) => !services.has(name),
+    )
+  )
+    throw new Error('Unknown item locator service');
+  if (
+    config.resources.ci_onepassword_items?.contract_refs.some(
+      (ref) => !(ref in config.source_contracts),
+    )
+  )
+    throw new Error('Unknown item locator contract');
   for (const name of services)
     if (!Object.hasOwn(config.services, name)) throw new Error('Missing service design');
   for (const [name, design] of Object.entries(config.services))

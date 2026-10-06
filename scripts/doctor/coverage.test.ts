@@ -5,6 +5,33 @@ import { designCoverage, renderCoverage } from './coverage.ts';
 
 const config = loadConfig(resolve(import.meta.dirname, '../..'));
 describe('design coverage', () => {
+  it.each(['text', 'json'] as const)(
+    'shows confirmed and incomplete item locations in %s',
+    (format) => {
+      const output = renderCoverage(config, format, { service: 'onepassword', environment: 'all' });
+      expect(output).toContain('vercel-login GitHub でサインイン');
+      expect(output).toContain('supabase-auth-audit');
+      expect(output).toContain('incomplete');
+      expect(output).toContain('user_confirmed');
+    },
+  );
+  it('filters locations by service and does not turn unknown presence into confirmation', () => {
+    const output = designCoverage(config, { service: 'vercel', environment: 'all' });
+    expect(output.item_locations).toHaveLength(1);
+    expect(output.item_locations[0]).toMatchObject({ service: 'vercel', confirmed_by: 'user' });
+    const resend = designCoverage(config, { service: 'resend', environment: 'all' })
+      .item_locations[0];
+    expect(resend.presence_status).toBe('unknown');
+    expect(resend.confirmed_by).toBeUndefined();
+    expect(resend.verified_at).toBeUndefined();
+    expect(output.configuration_verified).toBe(false);
+  });
+  it.each(['text', 'json'] as const)('redacts mock secrets in locator reasons in %s', (format) => {
+    const fixture = structuredClone(config);
+    fixture.resources.human_onepassword_items!.items.github.reason = 'Bearer FAKE_SECRET';
+    const output = renderCoverage(fixture, format, { service: 'onepassword', environment: 'all' });
+    expect(output).not.toContain('FAKE_SECRET');
+  });
   it('describes every registered service without claiming current provider verification', () => {
     const report = designCoverage(config, { environment: 'all' });
     expect(report).toMatchObject({

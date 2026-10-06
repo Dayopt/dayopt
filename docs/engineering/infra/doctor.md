@@ -38,6 +38,10 @@ pnpm run doctor --format json
 
 `--coverage`も認証・通信をせず、各サービスの役割・停止時の影響・再確認のきっかけ・設計正本・接続・検査方法・取得制約を一覧にする。表示は台帳の宣言であり、実設定の検証結果ではない。`metadata_or_source_only`はmetadataやソースの取得だけ、`comparison_rule`は指定条件の比較、`manual_verification`は人による確認を表す。比較規則でも実行時に取得不能・手動確認となることがある。
 
+1Passwordの所在情報も`--coverage`のtext/JSONに表示する。全サービスまたは`--service onepassword`ではhuman・ciの登録済み項目を、個別サービスではそのhuman項目を表示する。`user_confirmed`は人による項目の所在確認、`complete`はVaultと正確な項目名が揃うことを示す。field・権限・期限・provider設定・replica一致の確認とは別で、live検査の判定を変更しない。未特定・個人メールを転記していない項目は`incomplete`と理由を表示する。
+
+`--offline`を含む設定読取時に所在情報も検査する。確認済みには確認者と実在する日付、完全な所在にはVaultと項目名、不完全な所在には理由が必要。未知のサービス・正本参照、ci項目の重複、項目名のメール・URL、未定義のsecret fieldを拒否する。所在情報が未登録の旧台帳も読める。確認日の更新を自動実行せず、実際に確認した人の記録を維持する。
+
 通常のテキスト出力にも実行repoのrevision、期待値のbaseline、確認日時を表示する。期待値のbaselineは台帳の`scope.repository_baseline`であり、現在の期待値ファイルを保存したcommitとは限らない。
 
 ## 日々の確認と履歴
