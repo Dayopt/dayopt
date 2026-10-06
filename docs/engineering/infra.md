@@ -39,7 +39,7 @@ Integration は固定の非本番確認先で、通常PR Previewと同じVercel 
 
 固定Integrationには合成データとテスト専用アカウントを維持する。PR PreviewごとのAuth user IDとデータは各DBで独立する。人間の確認用とAI・E2E用のユーザーを分離し、並列runは自分が作ったデータだけ掃除する。本番データを複製しない。
 
-IntegrationとPreviewでは同じemail/passwordを使うが、DB・Auth user ID・データは別々に保持する。異なるPreview domain間のログインsession共有は保証されない。アプリ認証とVercel Deployment Protectionは別々に確認する。Previewを固定MCP OAuth issuerとして扱わない。
+Integration用とPR Preview用には別のテスト専用email/passwordを使い、Previewで入力した資格情報がIntegrationに通らないよう分ける。Auth user IDとデータも各DBで独立する。異なるPreview domain間のログインsession共有は保証されない。アプリ認証とVercel Deployment Protectionは別々に確認する。Previewを固定MCP OAuth issuerとして扱わない。
 
 本番と揃えるのはcode、migration、RLS、認証・利用権・Webhook・Cronの処理。変えてよいものは接続先、資格情報、データ、URL、外部サービスのテストaccount/mode、メール送信先、ログ環境、容量。`VERCEL_ENV=production`だけで本番と判定せず、Vercel Project・Git branch・DB ref・生成URLと外部accountを照合する。認証や課金判定を無効化して同等とみなさない。
 
@@ -55,7 +55,7 @@ IntegrationとPreviewでは同じemail/passwordを使うが、DB・Auth user ID�
 
 Product Previewは各PRの非本番Supabase branchへ接続する。`SUPABASE_SECRET_KEY` はserver-onlyで、`next.config.mjs` がbrowserへ露出するのは非秘密のidentity metadataだけ。固定Integrationの `DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_DAYOPT_ENVIRONMENT` / `NEXT_PUBLIC_APP_URL` / OAuth origin設定は `integration` branchにだけ適用し、共通Preview scopeへ設定しない。`VERCEL_PROJECT_ID` と `VERCEL_BRANCH_URL` 等のsystem valuesはVercelが供給する。Turborepoのstrict env contractでは `NEXT_PUBLIC_*` はNext.jsのframework inferenceに任せ、その他のbuild-gate入力は `turbo.json` のallowlistで渡す。実値をrepo・Issue・会話へ記録しない。
 
-IntegrationとPR Previewの非本番Supabase branchには、同じ1Password検証用ログインを環境ごとに準備する。`.github/workflows/nonproduction-login.yml` はtrusted base/Integrationのコードだけを使い、PreviewではPR番号とbranch名に一致する専用branchだけを対象にする。branch作成待ちの間もIntegrationへfallbackしない。ユーザーIDとデータは各DBで独立する。missing userだけを作成し、既存userはpassword認証で一致を確認する。Productionは明示的に拒否する。これはSupabase Auth APIでの資格情報確認であり、Vercel PreviewがそのDBへ接続したことや、UIのログイン・戻り先・CRUDが成功した証拠ではない。
+IntegrationとPR Previewの非本番Supabase branchには、異なる1Password項目の検証用ログインを準備する。Provisionerは検証済みtargetに応じて資格情報を選び、PR candidate codeには渡さない。`.github/workflows/nonproduction-login.yml` はtrusted base/Integrationのコードだけを使い、PreviewではPR番号とbranch名に一致する専用branchだけを対象にする。branch作成待ちの間もIntegrationへfallbackしない。ユーザーIDとデータは各DBで独立する。missing userだけを作成し、既存userはpassword認証で一致を確認する。Productionは明示的に拒否する。これはSupabase Auth APIでの資格情報確認であり、Vercel PreviewがそのDBへ接続したことや、UIのログイン・戻り先・CRUDが成功した証拠ではない。
 
 Vercel Projectは `product` と `web` の2つに集約し、別の `product-integration` projectや独自domainを作らない。固定Integration URL `https://product-git-integration-dayopt.vercel.app` は既存Product projectの `integration` branch deploymentに付くVercel alias。ProductのGit Fork ProtectionとDeployment Protectionは維持し、未信頼forkへ共有Preview secretを渡さない。`vercel.json` がIgnored Build Stepの正で、Dashboard overrideは設定しない。
 
@@ -63,7 +63,7 @@ Vercel Projectは `product` と `web` の2つに集約し、別の `product-inte
 
 OAuth identityのruntime検証は `get_mcp_environment_identity_v1` のread-only照会に限る。health・MCP access・token issuanceからidentityをprovisionしない。不足または不一致なら利用を停止し、明示的な環境準備で整える。IntegrationのRedis keyは `ratelimit:product:integration` namespaceへ分離し、固定IntegrationのRedis設定欠落・不一致はfail closedにする。MCP write allowlist・billing・PostHog event送信はIntegrationで閉じる。SentryはProductionまたは完全にboundされたIntegrationのみ初期化し、browserでは既存consentも要求する。
 
-2026-10-05に固定Integrationのhealth/version endpointが`tilwaprottpyhlfoggbb`を返すことを確認した。同日のPR #3024 PreviewはSupabase ref `txjcpkelxwkclihzouip` を参照し、repoとPreview branchのmigration 304件が一致した。これは全PRにPreview branchを自動作成するSupabase GitHub設定が有効である証拠ではない。そのDashboard設定とVercelへのbranch-specific接続は未確認であり、nonproduction-login workflowは対応するPR branchが見つからない時に停止する。IntegrationとPreviewのcredentialは共通でも、Auth user IDとデータはbranchごとに独立する。ProductのSSO protectionはProductionとPreviewで有効のままにし、人の確認ではSSOを使う。自動runnerの資格情報と保護バイパス方式は[`secrets.md`](../operations/secrets.md#cloud-preview-の未初期化台帳-2910)を正本とする。
+2026-10-05に固定Integrationのhealth/version endpointが`tilwaprottpyhlfoggbb`を返すことを確認した。同日のPR #3024 PreviewはSupabase ref `txjcpkelxwkclihzouip` を参照し、repoとPreview branchのmigration 304件が一致した。これは全PRにPreview branchを自動作成するSupabase GitHub設定が有効である証拠ではない。そのDashboard設定とVercelへのbranch-specific接続は未確認であり、nonproduction-login workflowは対応するPR branchが見つからない時に停止する。IntegrationとPreviewのcredential sourceは別の1Password項目で、Auth user IDとデータはbranchごとに独立する。ProductのSSO protectionはProductionとPreviewで有効のままにし、人の確認ではSSOを使う。自動runnerの資格情報と保護バイパス方式は[`secrets.md`](../operations/secrets.md#cloud-preview-の未初期化台帳-2910)を正本とする。
 
 Preview E2Eは固定したdeployment・DB branch・migration集合が一致し、healthが正常な場合にだけ実行する。2026-10-05のSupabase migration一覧では、Productionはrepoのmainと一致したが、共有Integration branchはmainと一致しなかった（Integration側298件、main側304件。mainだけのmigration 7件、Integrationだけのmigration 1件）。#2954の共有Integration freeze中のため、この差分を共有DBへ適用・rebaseしない。DB/Auth共通設定の変更はそのPR専用のPreview branchで検証し、共有branchの同期はfreeze解除後にmigration順序とrate-limit POCを照合して行う。fresh password login、認証後の戻り先、Plan/Recordの作成・編集・削除、full Cloud replayは#2910の受入れ項目で、結果が出るまで完了扱いにしない。
 

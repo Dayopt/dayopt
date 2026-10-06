@@ -103,4 +103,6 @@ fi
 # script because it is allowed from both main and integration, unlike the main-only CI environments.
 # pending-secret "Nonproduction login" NONPROD_LOGIN_EMAIL "op://ci/s3tems3afbzvvguakggydcgxni/username"
 # pending-secret "Nonproduction login" NONPROD_LOGIN_PASSWORD "op://ci/s3tems3afbzvvguakggydcgxni/password"
+# pending-secret "Nonproduction login" NONPROD_PREVIEW_LOGIN_EMAIL "op://dlmo7yfs5buvd3j3sbikjjqypa/cvac4atl7qjmjfjvottffgndae/username"
+# pending-secret "Nonproduction login" NONPROD_PREVIEW_LOGIN_PASSWORD "op://dlmo7yfs5buvd3j3sbikjjqypa/cvac4atl7qjmjfjvottffgndae/password"
 # pending-secret "Nonproduction login" SUPABASE_PREVIEW_PROVISION_TOKEN "op://ci/supabase-preview-provision/credential"

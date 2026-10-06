@@ -35,8 +35,18 @@ describe('nonproduction-login workflow trust boundary', () => {
     expect(provision).toContain('environment: Nonproduction login');
     expect(provision).toContain('ref: ${{ github.sha }}');
     expect(provision).toContain('run: node scripts/ci/nonproduction-login-provision.mjs');
-    expect(provision).toContain('secrets.NONPROD_LOGIN_EMAIL');
-    expect(provision).toContain('secrets.NONPROD_LOGIN_PASSWORD');
+    expect(provision).toContain(
+      "needs.trust.outputs.target == 'integration' && secrets.NONPROD_LOGIN_EMAIL",
+    );
+    expect(provision).toContain(
+      "needs.trust.outputs.target == 'integration' && secrets.NONPROD_LOGIN_PASSWORD",
+    );
+    expect(provision).toContain(
+      "needs.trust.outputs.target == 'preview' && secrets.NONPROD_PREVIEW_LOGIN_EMAIL",
+    );
+    expect(provision).toContain(
+      "needs.trust.outputs.target == 'preview' && secrets.NONPROD_PREVIEW_LOGIN_PASSWORD",
+    );
     expect(provision).toContain('secrets.SUPABASE_PREVIEW_PROVISION_TOKEN');
     expect(provision).not.toContain('github.event.pull_request.head.sha }}');
     expect(provision).not.toContain('NONPROD_LOGIN_DATABASE_MODE');

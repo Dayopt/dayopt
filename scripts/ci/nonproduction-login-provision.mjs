@@ -17,6 +17,20 @@ function requireCondition(condition, message) {
   if (!condition) throw new ProvisionError(`Nonproduction login: ${message}`);
 }
 
+export function resolveNonproductionLoginCredentials(targetKind, env = process.env) {
+  const prefix =
+    targetKind === 'preview'
+      ? 'NONPROD_PREVIEW_LOGIN'
+      : targetKind === 'integration'
+        ? 'NONPROD_LOGIN'
+        : null;
+  requireCondition(prefix !== null, 'target is invalid');
+  return {
+    email: env[`${prefix}_EMAIL`],
+    password: env[`${prefix}_PASSWORD`],
+  };
+}
+
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -330,10 +344,10 @@ if (isDirectExecution(import.meta.url)) {
               baseBranch: process.env.NONPROD_LOGIN_BASE_BRANCH,
             }
           : null;
+    const credentials = resolveNonproductionLoginCredentials(targetKind);
     const result = await provisionNonproductionLogin({
       target,
-      email: process.env.NONPROD_LOGIN_EMAIL,
-      password: process.env.NONPROD_LOGIN_PASSWORD,
+      ...credentials,
       supabaseToken: process.env.SUPABASE_PREVIEW_PROVISION_TOKEN,
       githubToken: process.env.GITHUB_TOKEN,
     });

@@ -7,6 +7,8 @@ set +x
 REPO='Dayopt/dayopt'
 ENVIRONMENT='Nonproduction login'
 LOGIN_ITEM_ID='s3tems3afbzvvguakggydcgxni'
+PREVIEW_LOGIN_ITEM_ID='cvac4atl7qjmjfjvottffgndae'
+PREVIEW_LOGIN_VAULT_ID='dlmo7yfs5buvd3j3sbikjjqypa'
 OP_BIN_DIR="${OP_BIN_DIR:-/workspace/.dayopt-1password/bin}"
 OP_STARTUP_CHECK="${OP_STARTUP_CHECK:-/workspace/.dayopt-1password/startup-check.py}"
 EXECUTE=false
@@ -27,7 +29,7 @@ if ! python3 "$OP_STARTUP_CHECK" >/dev/null 2>&1; then
 fi
 
 if ! $EXECUTE; then
-  echo 'Dry run: would sync the dedicated login and scoped Supabase Management PAT into the Nonproduction login environment.'
+  echo 'Dry run: would sync separate Integration and Preview logins plus the scoped Supabase Management PAT into the Nonproduction login environment.'
   exit 0
 fi
 
@@ -56,13 +58,18 @@ read_item_field() {
 }
 
 # Resolve and validate all source values before the first GitHub mutation.
-login_email="$(read_item_field "$LOGIN_ITEM_ID" username)" || exit 1
-login_password="$(read_item_field "$LOGIN_ITEM_ID" password)" || exit 1
+integration_login_email="$(read_item_field "$LOGIN_ITEM_ID" username)" || exit 1
+integration_login_password="$(read_item_field "$LOGIN_ITEM_ID" password)" || exit 1
+integration_login_vault_id="$NONPROD_LOGIN_VAULT_ID"
+NONPROD_LOGIN_VAULT_ID="$PREVIEW_LOGIN_VAULT_ID"
+preview_login_email="$(read_item_field "$PREVIEW_LOGIN_ITEM_ID" username)" || exit 1
+preview_login_password="$(read_item_field "$PREVIEW_LOGIN_ITEM_ID" password)" || exit 1
+NONPROD_LOGIN_VAULT_ID="$integration_login_vault_id"
 provision_token="$(op read "op://$provision_vault/supabase-preview-provision/credential" 2>/dev/null)" || {
   echo '1Password read failed for the scoped Supabase Management PAT; no GitHub writes made.' >&2
   exit 1
 }
-if [[ -z "$login_email" || -z "$login_password" || -z "$provision_token" ]]; then
+if [[ -z "$integration_login_email" || -z "$integration_login_password" || -z "$preview_login_email" || -z "$preview_login_password" || -z "$provision_token" ]]; then
   echo 'A required 1Password value is empty; no GitHub writes made.' >&2
   exit 1
 fi
@@ -107,8 +114,10 @@ set_secret() {
     return 1
   fi
 }
-set_secret NONPROD_LOGIN_EMAIL login_email || exit 1
-set_secret NONPROD_LOGIN_PASSWORD login_password || exit 1
+set_secret NONPROD_LOGIN_EMAIL integration_login_email || exit 1
+set_secret NONPROD_LOGIN_PASSWORD integration_login_password || exit 1
+set_secret NONPROD_PREVIEW_LOGIN_EMAIL preview_login_email || exit 1
+set_secret NONPROD_PREVIEW_LOGIN_PASSWORD preview_login_password || exit 1
 set_secret SUPABASE_PREVIEW_PROVISION_TOKEN provision_token || exit 1
-unset login_email login_password provision_token provision_vault
+unset integration_login_email integration_login_password preview_login_email preview_login_password integration_login_vault_id provision_token provision_vault
 echo 'Nonproduction login secrets synchronized; values were not displayed or written to files.'

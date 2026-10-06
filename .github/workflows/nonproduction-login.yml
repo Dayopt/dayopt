@@ -62,7 +62,7 @@ jobs:
         run: node scripts/ci/nonproduction-login-trust.mjs
 
   provision:
-    name: Prepare shared nonproduction login
+    name: Prepare target-specific nonproduction login
     needs: trust
     if: ${{ always() && needs.trust.result == 'success' }}
     runs-on: ubuntu-latest
@@ -86,7 +86,9 @@ jobs:
           NONPROD_LOGIN_SHA: ${{ needs.trust.outputs.sha }}
           NONPROD_LOGIN_BRANCH: ${{ needs.trust.outputs.branch_name }}
           NONPROD_LOGIN_BASE_BRANCH: ${{ needs.trust.outputs.base_branch }}
-          NONPROD_LOGIN_EMAIL: ${{ secrets.NONPROD_LOGIN_EMAIL }}
-          NONPROD_LOGIN_PASSWORD: ${{ secrets.NONPROD_LOGIN_PASSWORD }}
+          NONPROD_LOGIN_EMAIL: ${{ needs.trust.outputs.target == 'integration' && secrets.NONPROD_LOGIN_EMAIL || '' }}
+          NONPROD_LOGIN_PASSWORD: ${{ needs.trust.outputs.target == 'integration' && secrets.NONPROD_LOGIN_PASSWORD || '' }}
+          NONPROD_PREVIEW_LOGIN_EMAIL: ${{ needs.trust.outputs.target == 'preview' && secrets.NONPROD_PREVIEW_LOGIN_EMAIL || '' }}
+          NONPROD_PREVIEW_LOGIN_PASSWORD: ${{ needs.trust.outputs.target == 'preview' && secrets.NONPROD_PREVIEW_LOGIN_PASSWORD || '' }}
           SUPABASE_PREVIEW_PROVISION_TOKEN: ${{ secrets.SUPABASE_PREVIEW_PROVISION_TOKEN }}
         run: node scripts/ci/nonproduction-login-provision.mjs

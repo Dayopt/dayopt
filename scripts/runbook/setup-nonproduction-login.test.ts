@@ -29,10 +29,11 @@ function runFakeSetup({
     const startupPath = join(dir, 'startup-check.py');
     const callsPath = join(dir, 'calls');
     const readsPath = join(dir, 'op-reads');
+    const itemReadsPath = join(dir, 'op-item-reads');
     writeFileSync(startupPath, `import sys\nsys.exit(${startupFails ? 1 : 0})\n`);
     writeFileSync(
       opPath,
-      `#!/bin/bash\nif [[ "${'${1:-}'}" == item ]]; then\n  field=''\n  vault=''\n  while (($#)); do\n    case "$1" in --fields) field="$2"; shift 2 ;; --vault) vault="$2"; shift 2 ;; *) shift ;; esac\n  done\n  [[ "${'${OP_VAULT_REQUIRED:-0}'}" == 1 && -z "$vault" ]] && { printf 'vault required' >&2; exit 1; }\n  [[ "${'${OP_FAIL:-0}'}" == 1 && "$field" == password ]] && exit 1\n  case "$field" in username) printf 'fake@example.test' ;; password) printf 'fake-password' ;; esac\nelif [[ "${'${1:-}'}" == read ]]; then\n  printf '%s\\n' "${'${2:-}'}" >> "${'${OP_READS_FILE}'}"\n  [[ -n "${'${OP_EXPECT_PROVISION_REF:-}'}" && "${'${2:-}'}" != "$OP_EXPECT_PROVISION_REF" ]] && exit 1\n  printf 'fake-management-token'\nelse\n  exit 1\nfi\n`,
+      `#!/bin/bash\nif [[ "${'${1:-}'}" == item ]]; then\n  item="${'${3:-}'}"\n  field=''\n  vault=''\n  while (($#)); do\n    case "$1" in --fields) field="$2"; shift 2 ;; --vault) vault="$2"; shift 2 ;; *) shift ;; esac\n  done\n  printf '%s\t%s\t%s\n' "$item" "$field" "$vault" >> "${'${OP_ITEM_READS_FILE}'}"\n  [[ "${'${OP_VAULT_REQUIRED:-0}'}" == 1 && -z "$vault" ]] && { printf 'vault required' >&2; exit 1; }\n  [[ "${'${OP_FAIL:-0}'}" == 1 && "$field" == password ]] && exit 1\n  case "$field" in username) printf 'fake@example.test' ;; password) printf 'fake-password' ;; esac\nelif [[ "${'${1:-}'}" == read ]]; then\n  printf '%s\\n' "${'${2:-}'}" >> "${'${OP_READS_FILE}'}"\n  [[ -n "${'${OP_EXPECT_PROVISION_REF:-}'}" && "${'${2:-}'}" != "$OP_EXPECT_PROVISION_REF" ]] && exit 1\n  printf 'fake-management-token'\nelse\n  exit 1\nfi\n`,
     );
     writeFileSync(
       ghPath,
@@ -48,6 +49,7 @@ function runFakeSetup({
         OP_STARTUP_CHECK: startupPath,
         CALLS_FILE: callsPath,
         OP_READS_FILE: readsPath,
+        OP_ITEM_READS_FILE: itemReadsPath,
         OP_FAIL: opFails ? '1' : '0',
         OP_VAULT_REQUIRED: vaultRequired ? '1' : '0',
         OP_EXPECT_PROVISION_REF: provisionVaultId
@@ -63,6 +65,7 @@ function runFakeSetup({
       result,
       calls: existsSync(callsPath) ? readFileSync(callsPath, 'utf8') : '',
       reads: existsSync(readsPath) ? readFileSync(readsPath, 'utf8') : '',
+      itemReads: existsSync(itemReadsPath) ? readFileSync(itemReadsPath, 'utf8') : '',
     };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -71,13 +74,19 @@ function runFakeSetup({
 
 describe('setup-nonproduction-login secret sync', () => {
   it('preflights 1Password values and preserves exact existing branch policies', () => {
-    const { result, calls, reads } = runFakeSetup();
+    const { result, calls, reads, itemReads } = runFakeSetup();
     expect(result.status).toBe(0);
-    expect(calls.match(/secret set/g)).toHaveLength(3);
+    expect(calls.match(/secret set/g)).toHaveLength(5);
+    expect(calls).toContain('secret set NONPROD_PREVIEW_LOGIN_EMAIL');
+    expect(calls).toContain('secret set NONPROD_PREVIEW_LOGIN_PASSWORD');
     expect(calls.match(/deployment-branch-policies/g)).toBeNull();
     expect(calls).not.toContain('fake-password');
     expect(calls).not.toContain('fake-management-token');
     expect(reads).toBe('op://ci/supabase-preview-provision/credential\n');
+    expect(itemReads).toContain('s3tems3afbzvvguakggydcgxni\tusername\towner-managed-vault-id');
+    expect(itemReads).toContain('s3tems3afbzvvguakggydcgxni\tpassword\towner-managed-vault-id');
+    expect(itemReads).toContain('cvac4atl7qjmjfjvottffgndae\tusername\tdlmo7yfs5buvd3j3sbikjjqypa');
+    expect(itemReads).toContain('cvac4atl7qjmjfjvottffgndae\tpassword\tdlmo7yfs5buvd3j3sbikjjqypa');
   });
 
   it('stops before GitHub writes when 1Password field resolution fails', () => {
@@ -90,14 +99,14 @@ describe('setup-nonproduction-login secret sync', () => {
   it('passes the owner-supplied vault explicitly when resolving the login item', () => {
     const { result, calls } = runFakeSetup({ vaultRequired: true });
     expect(result.status).toBe(0);
-    expect(calls.match(/secret set/g)).toHaveLength(3);
+    expect(calls.match(/secret set/g)).toHaveLength(5);
     expect(calls).not.toContain('owner-managed-vault-id');
   });
 
   it('resolves the Management PAT from an owner-supplied vault when provided', () => {
     const { result, calls, reads } = runFakeSetup({ provisionVaultId: 'owner-pat-vault-id' });
     expect(result.status).toBe(0);
-    expect(calls.match(/secret set/g)).toHaveLength(3);
+    expect(calls.match(/secret set/g)).toHaveLength(5);
     expect(reads).toBe('op://owner-pat-vault-id/supabase-preview-provision/credential\n');
     expect(calls).not.toContain('owner-pat-vault-id');
   });

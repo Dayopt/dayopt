@@ -5,6 +5,7 @@ import {
   INTEGRATION_PROJECT_REF,
   PRODUCTION_PROJECT_REF,
   provisionNonproductionLogin,
+  resolveNonproductionLoginCredentials,
 } from './nonproduction-login-provision.mjs';
 
 const target = {
@@ -78,6 +79,25 @@ function buildFetch({
 }
 
 describe('nonproduction login provisioning', () => {
+  it('uses a different 1Password-backed login for Preview and Integration', () => {
+    const env = {
+      NONPROD_LOGIN_EMAIL: 'integration@example.test',
+      NONPROD_LOGIN_PASSWORD: 'integration-fake-password',
+      NONPROD_PREVIEW_LOGIN_EMAIL: 'preview@example.test',
+      NONPROD_PREVIEW_LOGIN_PASSWORD: 'preview-fake-password',
+    };
+    expect(resolveNonproductionLoginCredentials('integration', env)).toEqual({
+      email: 'integration@example.test',
+      password: 'integration-fake-password',
+    });
+    expect(resolveNonproductionLoginCredentials('preview', env)).toEqual({
+      email: 'preview@example.test',
+      password: 'preview-fake-password',
+    });
+    expect(() => resolveNonproductionLoginCredentials('production', env)).toThrow(
+      'target is invalid',
+    );
+  });
   it('creates and verifies the test account only on the exact ephemeral PR branch', async () => {
     const world = buildFetch();
     await expect(

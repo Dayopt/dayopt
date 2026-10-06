@@ -482,22 +482,34 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     githubSecret,
     githubEnvironments: ['Preview – product'],
   })),
-  // PR-local Auth user bootstrap. The login fields were verified as nonempty
-  // through the owner-provided vault locator. The PAT item and GitHub replica
-  // are still pending; setup supports an owner-managed source vault.
+  // Trusted provisioning uses distinct Integration and Preview login items. The Integration
+  // fields were verified through the owner-provided vault locator; the owner designated the
+  // separate Preview item. Neither GitHub replica has been synchronized in this work.
   ...[
-    ['NONPROD_LOGIN_EMAIL', 's3tems3afbzvvguakggydcgxni', 'username'],
-    ['NONPROD_LOGIN_PASSWORD', 's3tems3afbzvvguakggydcgxni', 'password'],
-    ['SUPABASE_PREVIEW_PROVISION_TOKEN', 'supabase-preview-provision', 'credential'],
-  ].map(([envName, item, field]) => ({
+    ['NONPROD_LOGIN_EMAIL', ci, 's3tems3afbzvvguakggydcgxni', 'username'],
+    ['NONPROD_LOGIN_PASSWORD', ci, 's3tems3afbzvvguakggydcgxni', 'password'],
+    [
+      'NONPROD_PREVIEW_LOGIN_EMAIL',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'username',
+    ],
+    [
+      'NONPROD_PREVIEW_LOGIN_PASSWORD',
+      'dlmo7yfs5buvd3j3sbikjjqypa',
+      'cvac4atl7qjmjfjvottffgndae',
+      'password',
+    ],
+    ['SUPABASE_PREVIEW_PROVISION_TOKEN', ci, 'supabase-preview-provision', 'credential'],
+  ].map(([envName, vault, item, field]) => ({
     ...pendingEnvEntry(
       envName,
       'secret',
       'staging',
-      ci,
+      vault,
       item,
-      'Scoped Management PAT item or GitHub Environment replica is not initialized',
-      envName,
+      'GitHub Environment replica has not been initialized by the controlled setup run',
+      field,
     ),
     field,
     githubSecret: envName,
