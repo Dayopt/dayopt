@@ -1,3 +1,4 @@
+export const BILLING_RECONCILIATION_ACTIVATION: 'pending' | 'active';
 export const JOB_MAX_AGE_MINUTES: Readonly<{
   'calendar-sync': 45;
   'external-connection-maintenance': 45;
@@ -15,6 +16,12 @@ export type CronHeartbeatJobName = keyof typeof JOB_MAX_AGE_MINUTES;
 export interface CronHeartbeatStatusRow {
   job_name: string;
   last_completed_at: string | null;
+  last_started_at?: string | null;
+  outcome?: string | null;
 }
 
-export function evaluateHeartbeats(rows: readonly CronHeartbeatStatusRow[], now?: number): string[];
+export function evaluateHeartbeats(
+  rows: readonly CronHeartbeatStatusRow[],
+  now?: number,
+  billingActivation?: 'pending' | 'active',
+): string[];

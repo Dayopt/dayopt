@@ -9,6 +9,7 @@ import {
 } from '@/features/settings/server';
 import { logger } from '@/lib/logger';
 import { writeCronHeartbeat } from '@/lib/ops/cron-heartbeat';
+import { BILLING_RECONCILIATION_ACTIVATION } from '@/lib/ops/cron-heartbeat-policy.mjs';
 import { captureUnexpectedError } from '@/lib/sentry';
 import { parseStripeWebhookIdentity } from '@/lib/stripe/webhook-identity';
 
@@ -46,7 +47,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const secretKey = env.STRIPE_SECRET_KEY?.trim();
   const accountId = env.STRIPE_ACCOUNT_ID?.trim();
   const livemode = env.STRIPE_LIVEMODE;
-  if (!secretKey && !accountId && !livemode) {
+  if (!secretKey && !accountId && !livemode && BILLING_RECONCILIATION_ACTIVATION === 'pending') {
+    await writeCronHeartbeat(
+      'billing-reconciliation',
+      'skipped_unconfigured',
+      new Date().toISOString(),
+    );
     return noStoreJson({ ok: true, configured: false });
   }
 

@@ -116,7 +116,8 @@
     "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
     "agent:secrets:check": "node scripts/tasks/agent-service-account.mjs check",
     "agent:run": "node scripts/tasks/agent-service-account.mjs run",
-    "storybook:collect-files-check": "tsx scripts/tasks/check-story-coverage.ts --collected-files"
+    "storybook:collect-files-check": "tsx scripts/tasks/check-story-coverage.ts --collected-files",
+    "doctor": "tsx scripts/doctor/cli.ts"
   },
   "devDependencies": {
     "@ai-sdk/gateway": "4.0.96",
@@ -176,6 +177,7 @@
     "tw-animate-css": "catalog:tooling",
     "typescript": "catalog:tooling",
     "vitest": "catalog:tooling",
+    "yaml": "2.9.0",
     "zod": "4.3.6",
     "zod-to-json-schema": "^3.25.2"
   }

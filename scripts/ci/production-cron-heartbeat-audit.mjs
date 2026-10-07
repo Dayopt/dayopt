@@ -11,7 +11,7 @@ export { evaluateHeartbeats, JOB_MAX_AGE_MINUTES };
 
 export async function auditHeartbeats(query = runReadOnlyQuery, now = Date.now()) {
   const rows = await query(
-    'SELECT job_name, last_started_at, last_completed_at FROM public.cron_heartbeats ORDER BY job_name',
+    "SELECT job_name, last_started_at, last_completed_at, CASE WHEN last_summary->>'outcome' = 'skipped_unconfigured' THEN 'skipped_unconfigured' ELSE NULL END AS outcome FROM public.cron_heartbeats ORDER BY job_name",
   );
   const failures = evaluateHeartbeats(rows, now);
   if (failures.length) throw new Error(failures.join('\n'));

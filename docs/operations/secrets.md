@@ -233,6 +233,16 @@ field 名は可能な限り current code の env 名と一致させる。`.op-en
 
 vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayopt/dayopt/issues/2086)、User 裁可）で **`agent` / `ci` / `human` の 3 箱**。軸は環境ではなく**読み手**（誰が読めるか）で、環境の区別は item 名（`stripe-test` / `stripe-live` 等）とタグ体系が担う。旧 vault との対応: `Dayopt-Staging` + `Dayopt-Shared` の AI 消費分 → `agent`、`Dayopt-Shared` の automation token → `ci`、`Dayopt-Production` + `Dayopt-Shared` の login / recovery / 個人系 → `human`。
 
+### 人間用項目の台帳参照
+
+Dashboard の手動確認に使う既存 `human` item は、人間用のまま保持し、`agent` vault へ移動・複製しない。エージェントが項目へアクセスできなくても、棚卸しには「どの項目を人が確認するか」と確認状況を残す。
+
+- `docs/engineering/infra/expected.yaml` では、確認済みなら `vault` と正確な `item` 名を記録する。値を参照する機械処理がある項目だけ、実在を確認した正確な field を `op://` 参照にする。LOGIN item など field 参照を使わない項目に架空の `op://` field を作らない。
+- 所在の確認状態は `unknown` または `user_confirmed` とし、後者には確認日と確認主体を添える。`user_confirmed` は項目の存在を人が確認したという意味で、エージェントによる読取や外部サービス設定・secret replica との値一致を意味しない。
+- `human` Vault を現在の agent 認証から解決できない場合は `unverified` と扱う。アクセスできないことを、項目が存在しない証拠にしない。
+- 1Password の open-item URL は人の画面遷移用リンクに限る。棚卸しの正本は `vault` / `item`（必要な場合のみ確認済み `field`）であり、URLだけを根拠や locator にしない。URLを台帳に保存せず、必要なら人の手元のブックマークで使う。
+- UI上の設定状態、1Password item の存在、サービスへ配布した replica との一致は別々に確認・記録する。secret 値や recovery 情報は台帳に記録しない。
+
 ### `agent`
 
 **AI が `op run` で解決してよい credentials を全部ここに置く**（「入れた瞬間 AI に漏れたとみなしても困らないもの」だけを入れる）。pre-tool-guard の vault allowlist はこの 1 vault のみを通す。
@@ -305,7 +315,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 | `domain`                 | registrar login, TOTP, recovery codes（旧 Shared）                                                                                                                                                                                                                                     |
 | `resend-support-replies` | `RESEND_SMTP_API_KEY`。Gmail Send mail as 専用（旧 Shared）                                                                                                                                                                                                                            |
 
-`google-auth` は Supabase Auth の Google provider（ソーシャルログイン）用。**アプリの env には入らず、Supabase Dashboard だけが replica** になる（Dashboard Secrets 節を参照）。GCP project は `dayopt`（`dayopt-503623`）、client 名は `Dayopt Auth (Supabase)`、redirect URI は `https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback` の 1 本だけ。
+`google-auth` は Supabase Auth の Google provider（ソーシャルログイン）用。**アプリの env には入らず、Supabase Dashboard だけが replica** になる（Dashboard Secrets 節を参照）。GCP project は `Dayopt Production`（`dayopt-503623`、旧表示名`dayopt`）、client 名は `Dayopt Auth (Supabase)`、redirect URI は `https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback` の 1 本だけ。
 
 `google-calendar` は外部カレンダー取り込み（[#1702](https://github.com/Dayopt/dayopt/issues/1702)）専用の OAuth client で、Supabase Auth の Google provider とは別 client として作る。Supabase 側の client secret を流用しない。`GOOGLE_CALENDAR_PROJECT_NUMBER` は client ID の先頭にある project number と一致させる。
 
@@ -320,6 +330,25 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 - `GOOGLE_CALENDAR_REDIRECT_URIS` は comma 区切りの allowlist。callback は request host を allowlist と完全一致で引き、一致した文字列をそのまま Google へ渡す。Production には production origin だけを入れ、localhost を混ぜない（forwarded host 経由で allowlist を通過されうる）
 - `STRIPE_ACCOUNT_ID` と `STRIPE_LIVEMODE` は、正しいStripe accountとmodeだけを変更するための固定identity。durable Billing / account deletionを有効にする前に、`STRIPE_SECRET_KEY` と3項目をまとめて設定する。test modeは `false`、live modeは `true`
 - Preview は登録しない。ephemeral hostname は Google 側に事前登録できず、`__Host-` cookie も host 固定のため、Preview では接続開始時に明示エラーを返す
+
+#### Google OAuth の本番・非本番分離
+
+2026-10-01、UserがGoogle Cloud project単位で本番と非本番を分離する方針を確定。非本番projectの中でもSupabase Auth用とCalendar用clientを分ける。本番`dayopt-503623`内の既存Calendar Integration clientをAuthと兼用する暫定案は採用しない。理由は、[Googleの環境分離方針](https://developers.google.com/identity/protocols/oauth2/policies)と、[同じproject内の全clientに及ぶ認可取消](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke)から、非本番の切断が同じGoogleユーザーの本番tokenへ波及する条件を除くため。用途別clientはcallback・secret配布先・rotationを分けるが、同一project内の認可取消まで用途別に隔離する保証ではない。
+
+移行先のproject / client / masterは実在を確認したものだけ台帳へ登録する。`human/google-auth-integration`は既存Calendar Integration clientのmasterであり、item名だけを根拠にAuth専用やproject分離済みとみなさない。既存tokenを新clientのcredentialと組み合わせず、非本番Calendarは新clientで再認可する。client移行と暗号鍵rotationは別工程とする。
+
+2026-10-01、Cloud projectの表示名を本番`Dayopt Production`（ID `dayopt-503623`）、非本番`Dayopt Nonproduction`（ID `dayopt-nonproduction`、番号`279051514343`）へ統一した。非本番projectとOAuth構成は作成済みで、公開状態はExternal / Testing。Auth / Calendarの2 clientと用途別masterも作成済み。テストユーザー・API・DB authority・replica・実認可は別工程として照合し、client作成だけで移行完了とは扱わない。
+
+非本番の2 clientはAIによる設定確認・検証に使うため、masterを`agent` vaultへ保存する。環境名だけでvaultを決めず、AIに読ませてよい非本番専用credentialであることを条件にする。2026-10-01に次の4参照を`op run`で解決し、client IDのConsole表示との一致とsecretの存在を確認した。secretの実際の認可成功・replica一致は未検証。`project_number`は公開metadataとして`279051514343`を使い、未確認の1Password fieldへの参照は作らない。
+
+| 用途           | 保存済みclient名                | master field                                                                                               | replicaの切替先                 |
+| -------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| 非本番Auth     | `Dayopt Auth Nonproduction`     | `op://agent/google-auth-nonproduction/username`、`op://agent/google-auth-nonproduction/credential`         | 非本番Supabase Google provider  |
+| 非本番Calendar | `Dayopt Calendar Nonproduction` | `op://agent/google-calendar-nonproduction/username`、`op://agent/google-calendar-nonproduction/credential` | 固定IntegrationのVercel環境変数 |
+
+非本番Auth clientには非本番SupabaseのGoogle callbackを、非本番Calendar clientには固定Integration originのCalendar callbackを登録する。Auth credentialのreplicaは非本番Supabase provider、Calendar credentialのreplicaは対応する非本番Vercel target / branchに限定する。appの`/auth/callback`とSupabaseの`/auth/v1/callback`を取り違えない。移行中の本番project・client・grantは保持し、旧grantの取消・旧client削除は本番への波及を評価した別工程にする。
+
+External / TestingでCalendarのrefresh tokenは[7日で失効](https://developers.google.com/identity/protocols/oauth2#expiration)するため、検証手順に再認可を含める。実設定と未完了工程は[棚卸し記録](../engineering/infra/triage-2026-09-30.md)に置き、この方針の確定だけでログイン・同期・環境分離を検証済みとは扱わない。
 
 ### `ci`
 

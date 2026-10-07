@@ -1,0 +1,2782 @@
+version: 1
+scope:
+  project: Dayopt
+  repository_baseline: 650f62dc733831765aa8c110e29533b532e023f2
+  mode: read_only
+  purpose: Dayoptの重要なサービス設計を人とagentが見失わず、read-only doctorで日々の実態と観測状況を追う
+  completion_criteria:
+    - 重要な接続・環境分離・権限境界と正本参照が一覧になっている
+    - 実測の差異と取得不能・手動確認が区別されている
+  environments:
+    - production
+    - preview
+    - integration
+source_contracts:
+  infrastructure:
+    - docs/engineering/infra.md
+    - docs/decisions.md
+  secrets:
+    - docs/operations/secrets.md
+    - scripts/tasks/env/schema.ts
+  vercel:
+    - scripts/ci/production-config-audit.mjs
+    - apps/product/vercel.json
+    - apps/web/vercel.json
+  release:
+    - .github/workflows/promote.yml
+    - scripts/ci/production-release.mjs
+  operations:
+    - .github/workflows/production-config-audit.yml
+    - .github/workflows/nightly.yml
+  auth:
+    - scripts/ci/production-auth-config-audit.mjs
+    - supabase/config.toml
+  storage_rls:
+    - scripts/ci/production-storage-rls-audit.mjs
+  schema:
+    - scripts/ci/production-schema-drift-audit.mjs
+    - supabase/migrations
+  cron:
+    - apps/product/src/lib/ops/cron-heartbeat-policy.mjs
+    - supabase/migrations
+  mcp:
+    - apps/product/src/lib/oauth-server
+    - apps/product/production-build-gate.mjs
+    - scripts/tasks/mcp-gate.ts
+  calendar:
+    - apps/product/src/features/external-calendar/server/authority-config.ts
+  backup:
+    - scripts/ci/storage-backup.sh
+    - docs/operations/disaster-recovery-drill.md
+  privacy:
+    - packages/observability/src/posthog-browser.ts
+    - apps/product/sentry.server.config.ts
+  password_check:
+    - apps/product/src/lib/auth/pwned-password.ts
+  billing:
+    - apps/product/src/features/settings/server/billing-mutation-service.ts
+  telemetry:
+    - apps/product/src/lib/analytics/DeferredAnalytics.tsx
+    - apps/web/src/shell/privacy/BrowserTelemetry.tsx
+  development_ai:
+    - scripts/tasks/env/schema.ts
+    - scripts/lib/jev-adapter.ts
+  contact:
+    - docs/operations/contact-email.md
+  monitoring:
+    - docs/operations/monitoring.md
+  analytics:
+    - docs/operations/product-analytics.md
+    - docs/operations/posthog-analytics.md
+services:
+  github:
+    purpose: repo・CI・review・Supabase/Vercel deployment の制御
+    failure_impact: 開発と Production deploy の経路が止まる
+    review_triggers:
+      - repository/ruleset/App権限変更
+      - workflow/release経路変更
+    contract_refs:
+      - infrastructure
+      - release
+      - operations
+      - secrets
+    expected:
+      visibility_direction: private
+      visibility_precondition: github_team
+      visibility_transition: unknown
+      environments:
+        - production-release
+        - production-ops
+      release_allowed_branch: main
+      release_required_reviewers: none
+      ruleset:
+        strict_up_to_date: true
+        resolve_threads: true
+        bypass_actors: 0
+      required_check_contract:
+        - Static_Checks
+        - Unit_Tests
+        - Integration_Tests
+        - Vercel_product
+        - Vercel_web
+      contracts:
+        - release
+        - operations
+        - infrastructure
+        - secrets
+    coverage:
+      - hooks
+      - secrets_api
+      - ruleset_details
+  vercel:
+    purpose: Product/Web の配信・domain・環境ごとの接続設定
+    failure_impact: アプリ/公開サイトの配信や Preview 分離が崩れる
+    review_triggers:
+      - project/domain/env変更
+      - 配信revision更新
+    contract_refs:
+      - vercel
+      - release
+      - infrastructure
+    expected:
+      product_and_web:
+        autoAssignCustomDomains: false
+        functionDefaultTimeout: 60
+        commandForIgnoringBuildStep: null
+        affected_project_skip: disabled
+        include_files_outside_root: true
+      integration_target: existing_product_project_preview_target_fixed_branch_origin
+      integration_contract_source: https://github.com/Dayopt/dayopt/issues/2910
+      integration_migration_status: runtime_verification_pending
+      data: synthetic_no_production_clone
+      deployment_identity: live_domain_alias_and_served_sha
+      contracts:
+        - vercel
+        - release
+        - infrastructure
+    coverage:
+      - sensitive_env_values
+      - project_settings
+      - deployed_cron_heartbeat
+  supabase:
+    purpose: DB・Auth・Storage・schema/RLS・cron の保存と強制点
+    failure_impact: 認証・ユーザーデータ・アクセス分離・定期処理へ影響する
+    review_triggers:
+      - project/branch/Auth変更
+      - migration/Storage policy変更
+    contract_refs:
+      - auth
+      - storage_rls
+      - schema
+      - cron
+      - infrastructure
+    expected:
+      contracts:
+        - auth
+        - storage_rls
+        - schema
+        - cron
+        - infrastructure
+      auth_contract: AUTH_CONFIG_CONTRACT_safe_fields_plus_hook_endpoint
+      auth_hook_endpoint: https://yvglwblxrnrenfifsnje.supabase.co/functions/v1/send-auth-email
+      edge_function:
+        name: send-auth-email
+        verify_jwt: false
+        authentication: hook_signature
+      avatars:
+        public: true
+        max_bytes: 5242880
+        mime:
+          - image/jpeg
+          - image/png
+          - image/gif
+          - image/webp
+      rls: owner_isolation_and_required_policies
+      schema: deployed_revision_migration_set
+    coverage:
+      - backups_api
+      - google_selected_client
+      - captcha_secret_match
+      - storage_rls_and_schema_live
+      - pg_cron_success
+  mcp_oauth:
+    purpose: MCP の issuer/resource/client と書込許可の契約
+    failure_impact: MCP接続または書込の認可境界が崩れる
+    review_triggers:
+      - OAuth client/callback変更
+      - write gate/Preview構成変更
+    contract_refs:
+      - mcp
+      - secrets
+    expected:
+      production:
+        issuer: https://app.dayopt.app
+        resource: https://mcp.dayopt.app
+      clients:
+        claude_ai: https://claude.ai/api/mcp/auth_callback
+        chatgpt: https://chatgpt.com/connector_platform_oauth_redirect
+        cursor: cursor://anysphere.cursor-mcp/oauth/callback
+      preview: exact_branch_origin_database_and_upstash_binding
+      gates:
+        - runtime_client_allowlist
+        - database_mutation_control
+        - billing_gate
+        - maintenance_write_fence
+      contracts:
+        - mcp
+    coverage:
+      - client_registration
+      - sensitive_upstash_binding
+      - maintenance_write_fence
+  stripe:
+    purpose: Live/Test を分離した課金と削除時customer cleanup
+    failure_impact: 課金・解約・Stripe利用者のアカウント削除へ影響する
+    review_triggers:
+      - Live有効化
+      - price/webhook/Portal/API version変更
+    contract_refs:
+      - billing
+      - secrets
+    expected:
+      production_activation_contract: apps/product/src/lib/ops/cron-heartbeat-policy.mjs#BILLING_RECONCILIATION_ACTIVATION
+      integration: test_only
+      portal_and_trial: source_contract_before_activation
+      contract_ref: billing
+    coverage:
+      - portal_settings
+      - webhook_secret_replica
+      - billing_flow
+  resend:
+    purpose: Auth・Product・Web のメール送信とbounce/complaint抑止
+    failure_impact: 認証メール/問い合わせ送信・不達/苦情の抑止記録へ影響する
+    review_triggers:
+      - domain/sender/webhook変更
+      - 送信キー/署名キーrotation
+    contract_refs:
+      - contact
+      - auth
+      - secrets
+    expected:
+      separate_webhook_signatures: true
+      auth_hook_and_contact_sender: explicit_verified_sender
+      support_replies: dedicated_smtp_key
+    coverage:
+      - sender_replicas
+      - edge_secret_replicas
+      - support_smtp
+  cloudflare:
+    purpose: 権威DNS・Email Routing・Turnstile・R2 backup の境界
+    failure_impact: 全domainの名前解決・問い合わせ受信・Bot対策・復旧へ影響する
+    review_triggers:
+      - DNS/転送先/CAPTCHA変更
+      - registrar/R2権限/retention変更
+    contract_refs:
+      - infrastructure
+      - contact
+      - backup
+      - secrets
+    expected:
+      authoritative_zone: dayopt.app
+      backup_buckets:
+        - avatars
+        - attachments
+      backup_retention_days: 35
+      rclone_sync_default_max_delete: 1000
+      turnstile:
+        widget_strategy: shared_across_environments
+        production_domains:
+          - app.dayopt.app
+          - dayopt.app
+        server_secret_matches_site_key: true
+    coverage:
+      - zone_admin_settings
+      - turnstile_domains
+      - r2_locks
+      - r2_permissions_and_retention
+      - backup_restore_evidence
+  posthog:
+    purpose: 同意に基づくProduct/Web計測と削除契約
+    failure_impact: 計測品質・プライバシー・データ削除へ影響する
+    review_triggers:
+      - 法務承認/計測有効化
+      - project/key/consent/replay設定変更
+    contract_refs:
+      - analytics
+      - privacy
+      - telemetry
+      - secrets
+    expected:
+      production_activation: legal_approval_pending
+      consent: required
+      autocapture: false
+      session_replay: false
+      person_profiles: identified_only
+      event_property_filter: required
+      deletion_credential_before_enable: true
+    coverage:
+      - project_settings
+      - public_key_project_match
+      - deletion_master_exists
+      - deletion_flow
+  sentry:
+    purpose: Product/Webのエラー監視・PII除去・build source maps
+    failure_impact: 障害の検知/調査に加えProduction buildが止まり得る
+    review_triggers:
+      - project/token/source-map/release変更
+      - PII/組織設定変更
+    contract_refs:
+      - monitoring
+      - privacy
+      - secrets
+    expected:
+      send_default_pii: false
+      pii_scrubbing: required
+      project_visibility: private
+      organization_requires_two_factor: true
+      root_trace_sample_rate: 0.1
+      source_maps_match_served_release: true
+      auth_edge_reporting: optional
+    coverage:
+      - project_settings
+      - organization_settings
+      - project_environments
+      - service_hooks
+      - source_map_application
+  google:
+    purpose: 環境を分離したAuthログイン・Calendar OAuth
+    failure_impact: Googleログイン・外部Calendar連携へ影響する
+    review_triggers:
+      - Cloud project/client/callback変更
+      - consent/test users/refresh-token鍵変更
+    contract_refs:
+      - auth
+      - calendar
+      - secrets
+    expected:
+      calendar_authority_contract: calendar
+      environment_separation_contract: docs/operations/secrets.md#google-oauth-の本番非本番分離
+      auth_callbacks:
+        production: https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback
+        nonproduction: https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback
+      calendar_callbacks:
+        production: https://app.dayopt.app/api/integrations/google-calendar/callback
+        integration: https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback
+    coverage:
+      - registered_callbacks
+      - consent_screen_and_test_users
+      - project_number_and_refresh_token_key_replicas
+  upstash:
+    purpose: rate limitとwebhookの冪等処理、非本番の隔離
+    failure_impact: operational起動・OAuth/MCP制限・webhook処理へ影響する
+    review_triggers:
+      - Redis接続先/token権限変更
+      - Preview/Integrationの利用方針変更
+    contract_refs:
+      - infrastructure
+      - mcp
+      - secrets
+    expected:
+      preview_binding: isolated_nonproduction
+    coverage:
+      - product_sensitive_url
+      - token_permissions
+  pwned_passwords:
+    purpose: SHA-1先頭5文字だけを使う漏洩パスワード検査
+    failure_impact: 漏洩パスワード検出が失われる。停止時は検査を通す契約
+    review_triggers:
+      - provider/timeout/fail-open契約変更
+    contract_refs:
+      - password_check
+    expected:
+      origin: https://api.pwnedpasswords.com
+      authentication: none
+      payload: sha1_prefix_5_characters
+      timeout_ms: 3000
+      failure: continue_without_check
+    coverage:
+      - live_availability
+  optional:
+    purpose: Jev/AI Gatewayなど任意の開発支援
+    failure_impact: 開発支援と利用予算へ影響する
+    review_triggers:
+      - project/key/budget/provider変更
+    contract_refs:
+      - development_ai
+      - secrets
+    expected: {}
+    coverage: []
+  uptimerobot:
+    purpose: 公開healthの外形監視と通知
+    failure_impact: 障害の検知や通知先への到達が失われる
+    review_triggers:
+      - monitor target/status変更
+      - 通知先変更
+    contract_refs:
+      - monitoring
+    expected: {}
+    coverage:
+      - notification_routes
+  telemetry:
+    purpose: 同意と環境境界に従うVercel Analytics/Speed Insights
+    failure_impact: 計測品質・プライバシーへ影響する
+    review_triggers:
+      - Dashboard有効化
+      - 同意/環境/build revision変更
+    contract_refs:
+      - telemetry
+      - analytics
+    expected:
+      products:
+        - product
+        - web
+      providers:
+        - analytics
+        - speed_insights
+      production_only: true
+      consent: required
+      contract_ref: telemetry
+    coverage:
+      - dashboard_enablement_and_ingestion
+  support_smtp:
+    purpose: support受信とGmailからの専用Resend SMTP返信
+    failure_impact: 問い合わせの受信・返信が失われる
+    review_triggers:
+      - Email Routing転送先変更
+      - Gmail Send mail as/専用SMTP key変更
+    contract_refs:
+      - contact
+      - secrets
+    expected:
+      receiving: Cloudflare Email Routing to the human-managed Gmail destination
+      replying: Gmail Send mail as via dedicated Resend SMTP key
+      contract_ref: contact
+    coverage:
+      - receiving_destination
+      - gmail_sender_and_smtp_replica
+  onepassword:
+    purpose: secretの正本・注入・人間のアカウント復旧手段
+    failure_impact: 資格情報rotation・replica同期元・account recoveryが失われる
+    review_triggers:
+      - item移動/名称変更/rotation
+      - Vault/Service Account権限/復旧担当変更
+    contract_refs:
+      - secrets
+      - infrastructure
+    expected:
+      master: 1Password
+      replicas:
+        - Vercel
+        - GitHub Actions
+        - Supabase Edge/Auth
+      agent_boundary: agent vault read-only; inaccessible human and ci items stay unverified
+      human_locator: Vault and exact item name; optional human bookmark
+    coverage:
+      - human_item_locations_and_confirmation
+      - service_account_vault_scope
+      - replica_match_and_recovery
+secret_refs:
+  ledger:
+    contract_ref: secrets
+    coverage: runtime_operational_backup_and_replica_fields
+    verification: field_existence_and_replica_match_not_implied
+  integration_managed_supabase:
+    owner: vercel_supabase_integration
+    op_ref: null
+    verification: integration_owned_no_invented_master
+    ownership_kind: env_injection_not_database_deployment
+  nonproduction_test_username:
+    op_ref: op://dlmo7yfs5buvd3j3sbikjjqypa/s3tems3afbzvvguakggydcgxni/username
+    usage: existing_seed_user_login_verification
+    environments: [preview, integration]
+    db_ref: tilwaprottpyhlfoggbb
+  nonproduction_test_password:
+    op_ref: op://dlmo7yfs5buvd3j3sbikjjqypa/s3tems3afbzvvguakggydcgxni/password
+    usage: existing_seed_user_login_verification
+    environments: [preview, integration]
+    db_ref: tilwaprottpyhlfoggbb
+  product_bypass:
+    op_ref: op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_PRODUCT
+    master_match: verified
+    github_replica_value: not_retrievable
+  web_bypass:
+    op_ref: op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_WEB
+    verification: unknown
+  supabase_secret:
+    op_ref: op://human/supabase/SUPABASE_SECRET_KEY
+    verification: unknown
+  auth_hook:
+    op_ref: op://human/supabase/SEND_EMAIL_HOOK_SECRET
+    verification: unknown
+  cron_secret:
+    op_ref: op://human/supabase/CRON_SECRET
+    verification: unknown
+  resend_send:
+    op_ref: op://human/resend-send/RESEND_API_KEY
+    verification: unknown
+  resend_product_hook:
+    op_ref: op://human/resend/RESEND_WEBHOOK_SECRET
+    verification: unknown
+  resend_web_hook:
+    op_ref: op://human/resend-web/RESEND_WEBHOOK_SECRET
+    verification: unknown
+  support_smtp:
+    op_ref: op://human/resend-support-replies/RESEND_SMTP_API_KEY
+    verification: unknown
+  google_auth_secret:
+    op_ref: op://human/google-auth/SUPABASE_AUTH_GOOGLE_SECRET
+    verification: unknown
+  calendar_secret:
+    op_ref: op://human/google-calendar/GOOGLE_CALENDAR_CLIENT_SECRET
+    verification: unknown
+  google_auth_nonproduction_client:
+    op_ref: op://agent/google-auth-nonproduction/username
+    intended_consumer: nonproduction_supabase_google_provider
+    verification: console_client_identity_match
+  google_auth_nonproduction_secret:
+    op_ref: op://agent/google-auth-nonproduction/credential
+    intended_consumer: nonproduction_supabase_google_provider
+    verification: field_present_replica_and_oauth_exchange_unverified
+  calendar_nonproduction_client:
+    op_ref: op://agent/google-calendar-nonproduction/username
+    intended_consumer: product_integration_calendar
+    verification: console_client_identity_match
+  calendar_nonproduction_secret:
+    op_ref: op://agent/google-calendar-nonproduction/credential
+    intended_consumer: product_integration_calendar
+    verification: field_present_replica_and_oauth_exchange_unverified
+  calendar_encryption:
+    op_ref: op://human/google-calendar/CALENDAR_TOKEN_ENCRYPTION_KEY
+    consumers:
+      - product_prod
+    integration_master: unknown
+    verification: per_environment_master_and_replica_unknown
+  recovery_pepper:
+    op_ref: op://human/app/RECOVERY_CODE_PEPPER
+    verification: unknown
+  stripe_live:
+    op_ref: op://human/stripe-live/STRIPE_SECRET_KEY
+    usage: pending_production_activation
+  stripe_test:
+    op_ref: op://agent/stripe-test/STRIPE_SECRET_KEY
+    verification: api_account_verified
+  stripe_test_hook:
+    op_ref: op://agent/stripe-integration-webhook-2867/password
+    verification: replica_match_unknown
+  posthog_delete:
+    op_ref: op://human/posthog-delete/credential
+    verification: documented_ref_existence_unknown
+  sentry_release:
+    op_ref: op://ci/sentry-release-token/SENTRY_AUTH_TOKEN
+    verification: upload_vs_runtime_release_unknown
+  backup_source:
+    op_ref: op://ci/Supabase-StorageS3-backupsource/RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY
+    consumer_operation: read
+    credential_capability: write_delete_and_rls_bypass_documented
+  backup_destination:
+    op_ref: op://ci/Cloudflare-R2-storagebackup/RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY
+    expected_capability: object_read_write_bucket_scoped
+    verification: permission_scope_unknown
+  ai_gateway:
+    op_ref: op://agent/vercel-ai-gateway/credential
+    verification: optional_unknown
+advisories:
+  - id: github.private-transition
+    desired: private_after_github_team
+    enforcement: advisory
+  - id: vercel.integration-topology
+    desired: existing_product_project_preview_target_fixed_branch_origin
+    source: https://github.com/Dayopt/dayopt/issues/2910
+    enforcement: advisory
+  - id: google.nonproduction-project-separation
+    desired: separate_cloud_project_with_distinct_auth_and_calendar_clients
+    source: docs/operations/secrets.md#google-oauth-の本番非本番分離
+    migration_status: pending
+    enforcement: advisory
+resources:
+  retired_previews:
+    - branch: codex/integration-calendar-poc-port
+      retirement_confirmed_by: user
+      retirement_confirmed_at: '2026-10-06'
+      expected_lifecycle: retired
+      cleanup_status: pending_integration_owned_resource_cleanup
+      management: vercel_supabase_integration
+      local_worktree_policy: do_not_modify
+  operations_responsibility:
+    primary_owner: Dayopt運営者（このセッションのユーザー）
+    confirmed_by: user
+    confirmed_at: '2026-10-06'
+    responsibilities:
+      - 障害通知の確認
+      - 1Password・ドメイン・バックアップの復旧判断
+    evidence: このセッションで「私を主担当として記録する」と明示確認
+    recovery_method_verified: false
+    deputy: 未確認
+    verification_boundary: 担当の引受のみ。回復手段・実通知・復元成功の証明ではない
+  repository: Dayopt/dayopt
+  vercel:
+    product: prj_hByu1DGZWiuLk0yfV4Gz1T4aIjpa
+    web: prj_saTfo2jhvayTDb3YoMSKmla6QryZ
+  supabase:
+    production: yvglwblxrnrenfifsnje
+    integration: tilwaprottpyhlfoggbb
+  posthog_project: 625917
+  manual_access_policy:
+    human_onepassword_items:
+      locator: vault_and_exact_item_name
+      field_reference: op_ref_only_when_exact_field_is_known_and_referenced
+      open_item_url: not_stored_in_expected_yaml_optional_human_bookmark
+      agent_access: unavailable_by_design
+      presence_status: [unknown, user_confirmed]
+      user_confirmation_requires: [confirmed_by, verified_at]
+      provider_configuration_and_replica_match: separate_verification
+      inaccessible_means: unverified_not_absent
+      secret_values_in_inventory: forbidden
+  ci_onepassword_items:
+    vault: ci
+    source: 1password_app_item_list_and_user_confirmation_2026-10-06
+    presence_status: user_confirmed
+    confirmed_by: user
+    verified_at: '2026-10-06'
+    confirmation_scope: item_names_and_presence_only
+    contract_refs: [secrets, operations]
+    field_presence: unverified
+    provider_permissions: unverified
+    expiry: unverified
+    replica_match: unverified
+    items:
+      - vercel-production
+      - supabase-auth-audit
+      - supabase-storage-rls-audit
+      - Supabase-StorageS3-backupsource
+      - Cloudflare-R2-storagebackup
+      - sentry-release-token
+  human_onepassword_items:
+    confirmation_scope: item_presence_and_service_use_only_not_provider_settings_or_replica_match
+    source: 1password_app_item_list_and_user_confirmation_2026-10-06
+    confirmed_by: user
+    verified_at: '2026-10-06'
+    items:
+      vercel:
+        vault: human
+        item: vercel-login GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      supabase:
+        vault: human
+        item: supabase-login t3-nico's Project
+        presence_status: user_confirmed
+        locator_status: complete
+        note: 項目名中のproject名は接続先の期待値ではない。別項目supabaseと区別する。
+      cloudflare:
+        vault: human
+        item: Cloudflare GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      sentry:
+        vault: human
+        item: sentry-login Dayopt
+        presence_status: user_confirmed
+        locator_status: complete
+      posthog:
+        vault: human
+        item: PostHog GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      upstash:
+        vault: human
+        item: upstash-login GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      uptimerobot:
+        vault: human
+        item: UptimeRobot GitHub でサインイン
+        presence_status: user_confirmed
+        locator_status: complete
+      github:
+        vault: human
+        item: null
+        presence_status: user_confirmed
+        locator_status: incomplete
+        reason: ログイン項目をUI一覧で観測。正確な項目名に個人メールを含むため転記していない。
+      stripe:
+        vault: human
+        item: null
+        presence_status: user_confirmed
+        locator_status: incomplete
+        reason: ログイン項目をUI一覧で観測。正確な項目名に個人メールを含むため転記していない。
+      resend:
+        vault: null
+        item: null
+        presence_status: unknown
+        locator_status: incomplete
+        reason: human一覧46件とdayopt/resendタグ4件でログイン項目を特定できず。API用項目の所在とは分ける。他Vaultでの不存在は未確認。
+      support_smtp:
+        vault: null
+        item: null
+        presence_status: unknown
+        locator_status: incomplete
+        reason: human/resend-support-repliesの項目名は観測したが、Gmail管理用ログイン項目は未特定。SMTP値や設定は未確認。
+connections:
+  - {
+      'id': 'github.product.release',
+      'service': 'github',
+      'environments': ['production'],
+      'from': 'Dayopt/dayopt main / production-release',
+      'to': 'Vercel product Production',
+      'type': 'release_control',
+      'expected': 'mainの承認済みSHAをrelease正本のgate経由で配信',
+      'check_ids':
+        ['github.rulesets', 'github.environments', 'github.production-release.secret_names'],
+      'contract_refs': ['release', 'secrets'],
+      'secret_refs': ['product_bypass'],
+    }
+  - {
+      'id': 'github.product.preview',
+      'service': 'vercel',
+      'environments': ['preview'],
+      'from': 'Dayopt/dayopt PR branch',
+      'to': 'Vercel product Preview',
+      'type': 'git_deployment',
+      'expected': 'GitHub repository / branch / deployment SHAを対応付ける',
+      'check_ids': ['vercel.product.settings', 'vercel.product.deployments'],
+      'contract_refs': ['vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'github.web.release',
+      'service': 'github',
+      'environments': ['production'],
+      'from': 'Dayopt/dayopt main / production-release',
+      'to': 'Vercel web Production',
+      'type': 'release_control',
+      'expected': 'mainの承認済みSHAをrelease正本のgate経由で配信',
+      'check_ids':
+        ['github.rulesets', 'github.environments', 'github.production-release.secret_names'],
+      'contract_refs': ['release', 'secrets'],
+      'secret_refs': ['web_bypass'],
+    }
+  - {
+      'id': 'github.web.preview',
+      'service': 'vercel',
+      'environments': ['preview'],
+      'from': 'Dayopt/dayopt PR branch',
+      'to': 'Vercel web Preview',
+      'type': 'git_deployment',
+      'expected': 'GitHub repository / branch / deployment SHAを対応付ける',
+      'check_ids': ['vercel.web.settings', 'vercel.web.deployments'],
+      'contract_refs': ['vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'vercel.production.supabase',
+      'service': 'vercel',
+      'environments': ['production'],
+      'from': 'Product NEXT_PUBLIC_SUPABASE_URL / server binding',
+      'to': 'Supabase yvglwblxrnrenfifsnje',
+      'type': 'database_binding',
+      'expected': 'Production正本のprojectのみ。秘密値の一致はmetadataから推測しない',
+      'check_ids': ['vercel.product.public_bindings', 'supabase.production.project'],
+      'contract_refs': ['vercel', 'auth'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'vercel.preview.supabase',
+      'service': 'vercel',
+      'environments': ['preview'],
+      'from': 'Product default Preview / branch override',
+      'to': 'Supabase tilwaprottpyhlfoggbb または明示した非本番branch',
+      'type': 'database_binding',
+      'expected': '本番refを含めず、branch overrideはアクセス可能なbranchと対応する',
+      'check_ids':
+        [
+          'vercel.preview.database_references',
+          'vercel.product.environment_metadata',
+          'supabase.branches',
+        ],
+      'contract_refs': ['vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'vercel.integration.supabase',
+      'service': 'vercel',
+      'environments': ['integration'],
+      'from': 'Product integration branch / fixed origin',
+      'to': 'Supabase tilwaprottpyhlfoggbb',
+      'type': 'database_binding',
+      'expected': '既存Product projectの固定Integration origin / synthetic DBを使う',
+      'check_ids': ['vercel.product.public_bindings', 'supabase.integration.project'],
+      'contract_refs': ['vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'stripe.integration.api',
+      'service': 'stripe',
+      'environments': ['integration'],
+      'from': 'Product Integration billing binding',
+      'to': 'Stripe Test acct_1TBpLoRRjoh5xfrs',
+      'type': 'api_request',
+      'expected': 'Test mode / 明示account・price。Live資格情報を混ぜない',
+      'check_ids':
+        ['stripe.account', 'stripe.active_prices', 'stripe.deployed_identity_and_billing_gate'],
+      'contract_refs': ['billing'],
+      'secret_refs': ['stripe_test'],
+    }
+  - {
+      'id': 'stripe.integration.webhook',
+      'service': 'stripe',
+      'environments': ['integration'],
+      'from': 'Stripe Test webhook',
+      'to': 'https://product-git-integration-dayopt.vercel.app/api/webhooks/stripe',
+      'type': 'webhook',
+      'expected': 'billing正本のevent・API version・署名。認証queryは保存しない',
+      'check_ids': ['stripe.webhooks', 'vercel.integration.public_health'],
+      'contract_refs': ['billing'],
+      'secret_refs': ['stripe_test_hook', 'product_bypass'],
+    }
+  - {
+      'id': 'stripe.production.activation',
+      'service': 'stripe',
+      'environments': ['production'],
+      'from': 'Product Production billing gate',
+      'to': 'Stripe Live acct_1TBpLgIe9fUk4fJW',
+      'type': 'activation_gate',
+      'expected': '本番有効化が承認されるまでは課金開始を要求しない',
+      'check_ids':
+        [
+          'stripe.account',
+          'stripe.active_prices',
+          'stripe.webhooks',
+          'stripe.deployed_identity_and_billing_gate',
+        ],
+      'contract_refs': ['billing'],
+      'secret_refs': ['stripe_live'],
+    }
+  - {
+      'id': 'supabase.auth.email_hook',
+      'service': 'supabase',
+      'environments': ['production'],
+      'from': 'Supabase Auth email hook',
+      'to': 'https://yvglwblxrnrenfifsnje.supabase.co/functions/v1/send-auth-email',
+      'type': 'signed_hook',
+      'expected': 'Auth正本のendpointとhook署名。verify_jwt=falseは署名認証と合わせる',
+      'check_ids': ['supabase.production.auth_audit', 'supabase.production.functions'],
+      'contract_refs': ['auth'],
+      'secret_refs': ['auth_hook'],
+    }
+  - {
+      'id': 'supabase.edge.resend',
+      'service': 'resend',
+      'environments': ['production'],
+      'from': 'send-auth-email Edge Function',
+      'to': 'Resend dayopt.app',
+      'type': 'email_send',
+      'expected': '検証済み送信元と既存送信credential。秘密replicaは別照合',
+      'check_ids': ['resend.sender_and_signature_replicas', 'supabase.production.functions'],
+      'contract_refs': ['auth', 'secrets'],
+      'secret_refs': ['resend_send'],
+    }
+  - {
+      'id': 'resend.product.send',
+      'service': 'resend',
+      'environments': ['production'],
+      'from': 'product contact sender',
+      'to': 'Resend verified dayopt.app',
+      'type': 'email_send',
+      'expected': '送信元・宛先はserver固定。送信者はReply-Toだけ',
+      'check_ids': ['resend.domain_settings', 'resend.sender_and_signature_replicas'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['resend_send'],
+    }
+  - {
+      'id': 'resend.product.webhook',
+      'service': 'resend',
+      'environments': ['production'],
+      'from': 'Resend product webhook',
+      'to': 'https://app.dayopt.app/api/webhooks/resend',
+      'type': 'webhook',
+      'expected': 'app別のevent契約と専用署名を使う',
+      'check_ids': ['resend.webhooks'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['resend_product_hook'],
+    }
+  - {
+      'id': 'resend.web.send',
+      'service': 'resend',
+      'environments': ['production'],
+      'from': 'web contact sender',
+      'to': 'Resend verified dayopt.app',
+      'type': 'email_send',
+      'expected': '送信元・宛先はserver固定。送信者はReply-Toだけ',
+      'check_ids': ['resend.domain_settings', 'resend.sender_and_signature_replicas'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['resend_send'],
+    }
+  - {
+      'id': 'resend.web.webhook',
+      'service': 'resend',
+      'environments': ['production'],
+      'from': 'Resend web webhook',
+      'to': 'https://dayopt.app/api/webhooks/resend',
+      'type': 'webhook',
+      'expected': 'app別のevent契約と専用署名を使う',
+      'check_ids': ['resend.webhooks'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['resend_web_hook'],
+    }
+  - {
+      'id': 'dns.app.vercel',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Cloudflare DNS app.dayopt.app',
+      'to': 'Vercel Product',
+      'type': 'dns_routing',
+      'expected': '権威DNSとVercel domain割当を照合。NSだけでapex Aを証明しない',
+      'check_ids': ['cloudflare.public_dns.app_cname', 'vercel.product.domains'],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'dns.mcp.vercel',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Cloudflare DNS mcp.dayopt.app',
+      'to': 'Vercel Product /api/mcp',
+      'type': 'dns_routing',
+      'expected': '権威DNSとVercel domain割当を照合。NSだけでapex Aを証明しない',
+      'check_ids': ['cloudflare.public_dns.mcp_cname', 'vercel.product.domains'],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'dns.web.vercel',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Cloudflare DNS dayopt.app',
+      'to': 'Vercel Web',
+      'type': 'dns_routing',
+      'expected': '権威DNSとVercel domain割当を照合。NSだけでapex Aを証明しない',
+      'check_ids': ['cloudflare.public_dns.ns', 'vercel.web.domains'],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'dns.resend.authentication',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Cloudflare send / resend._domainkey DNS',
+      'to': 'Resend dayopt.app / SES ap-northeast-1',
+      'type': 'mail_authentication',
+      'expected': '送信SPF・DKIM・MXを検証済みResend domainと照合',
+      'check_ids':
+        [
+          'cloudflare.public_dns.send_spf',
+          'cloudflare.public_dns.send_mx',
+          'cloudflare.public_dns.dkim',
+          'resend.domain_settings',
+        ],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'dns.email.routing',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Cloudflare apex MX / SPF',
+      'to': 'Cloudflare Email Routing → support Gmail',
+      'type': 'inbound_email',
+      'expected': '受信経路・forward先を確認。Resend receivingの有効化を要求しない',
+      'check_ids':
+        [
+          cloudflare.public_dns.apex_mx,
+          cloudflare.public_dns.apex_spf,
+          support_smtp.gmail_sender_and_smtp_replica,
+          cloudflare.email_routing,
+        ],
+      'contract_refs': [contact, infrastructure],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'dns.dmarc.policy',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Cloudflare _dmarc.dayopt.app',
+      'to': '送受信domain policy',
+      'type': 'mail_policy',
+      'expected': 'DMARC正本と照合。強化案を未承認の即時違反にしない',
+      'check_ids': ['cloudflare.public_dns.dmarc'],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'dns.registration.authority',
+      'service': 'cloudflare',
+      'environments': ['shared'],
+      'from': 'dayopt.app registrar / parent delegation',
+      'to': 'Cloudflare authoritative NS',
+      'type': 'domain_registration',
+      'expected': '登録期限・更新・所有者・DSは未確認を明示。DNS事業者とregistrarを同一視しない',
+      'check_ids':
+        [
+          'cloudflare.zone',
+          'cloudflare.public_dns.ns',
+          'cloudflare.registrar_metadata',
+          'cloudflare.registrar_operations',
+        ],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'support.gmail.resend_smtp',
+      'service': 'support_smtp',
+      'environments': ['production'],
+      'from': 'Gmail Send mail as support sender',
+      'to': 'Resend SMTP',
+      'type': 'smtp_send',
+      'expected': '問い合わせ配送キーとは別の専用SMTPキーを使う',
+      'check_ids': ['support_smtp.gmail_sender_and_smtp_replica'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['support_smtp'],
+    }
+  - {
+      'id': 'turnstile.production.browser',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Product/Web public site key',
+      'to': 'Cloudflare Turnstile production widget',
+      'type': 'captcha',
+      'expected': 'app.dayopt.app / dayopt.appの許可domainと対応するserver secret',
+      'check_ids': ['cloudflare.turnstile', 'vercel.product.environment_metadata'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'turnstile.production.auth',
+      'service': 'supabase',
+      'environments': ['production'],
+      'from': 'Supabase Auth CAPTCHA / Product validation',
+      'to': 'Cloudflare Turnstile server validation',
+      'type': 'captcha',
+      'expected': '本番site keyとsecret pairを照合。secret名だけで一致判定しない',
+      'check_ids': ['supabase.production.auth_audit', 'cloudflare.turnstile'],
+      'contract_refs': ['auth', 'secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'google.production.auth',
+      'service': 'google',
+      'environments': ['production'],
+      'from': 'Google Production Auth client',
+      'to': 'https://yvglwblxrnrenfifsnje.supabase.co/auth/v1/callback',
+      'type': 'oauth_redirect',
+      'expected': '本番providerと本番projectのAuth用client / callbackを保持',
+      'check_ids': ['google.registered_callbacks', 'supabase.production.auth_config'],
+      'contract_refs': ['auth', 'secrets'],
+      'secret_refs': ['google_auth_secret'],
+    }
+  - {
+      'id': 'google.integration.auth',
+      'service': 'google',
+      'environments': ['integration'],
+      'from': 'Google Nonproduction Auth client',
+      'to': 'https://tilwaprottpyhlfoggbb.supabase.co/auth/v1/callback',
+      'type': 'oauth_redirect',
+      'expected': '非本番projectのAuth用clientとproviderを合わせる。移行は別セッション',
+      'check_ids': ['google.registered_callbacks', 'supabase.integration.auth_config'],
+      'contract_refs': ['auth', 'secrets'],
+      'secret_refs': ['google_auth_nonproduction_client', 'google_auth_nonproduction_secret'],
+    }
+  - {
+      'id': 'google.production.calendar',
+      'service': 'google',
+      'environments': ['production'],
+      'from': 'Product Production Calendar client',
+      'to': 'https://app.dayopt.app/api/integrations/google-calendar/callback',
+      'type': 'oauth_redirect',
+      'expected': '配信revisionのCalendar authority・scope・client・project番号と一致',
+      'check_ids': ['google.registered_callbacks'],
+      'contract_refs': ['calendar', 'secrets'],
+      'secret_refs': ['calendar_secret', 'calendar_encryption'],
+    }
+  - {
+      'id': 'google.integration.calendar',
+      'service': 'google',
+      'environments': ['integration'],
+      'from': 'Google Nonproduction Calendar client',
+      'to': 'https://product-git-integration-dayopt.vercel.app/api/integrations/google-calendar/callback',
+      'type': 'oauth_redirect',
+      'expected': '別project / Calendar専用client / DB authority・暗号鍵を揃える。移行は別セッション',
+      'check_ids': ['google.registered_callbacks'],
+      'contract_refs': ['calendar', 'secrets'],
+      'secret_refs': ['calendar_nonproduction_client', 'calendar_nonproduction_secret'],
+    }
+  - {
+      'id': 'redis.product.production',
+      'service': 'upstash',
+      'environments': ['production'],
+      'from': 'Product production rate limiter',
+      'to': 'Upstash Redis binding',
+      'type': 'rate_limit',
+      'expected': '実URL / DB / namespace / 権限を環境別に照合。通常Previewのlocal化PRは配信確認まで適用済みにしない',
+      'check_ids': ['upstash.environment_isolation', 'vercel.product.environment_metadata'],
+      'contract_refs': ['secrets', 'vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'redis.product.integration',
+      'service': 'upstash',
+      'environments': ['integration'],
+      'from': 'Product integration rate limiter',
+      'to': 'Upstash Redis binding',
+      'type': 'rate_limit',
+      'expected': '実URL / DB / namespace / 権限を環境別に照合。通常Previewのlocal化PRは配信確認まで適用済みにしない',
+      'check_ids': ['upstash.environment_isolation', 'vercel.product.environment_metadata'],
+      'contract_refs': ['secrets', 'vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'redis.product.preview',
+      'service': 'upstash',
+      'environments': ['preview'],
+      'from': 'Product preview rate limiter',
+      'to': 'Upstash Redis binding',
+      'type': 'rate_limit',
+      'expected': '実URL / DB / namespace / 権限を環境別に照合。通常Previewのlocal化PRは配信確認まで適用済みにしない',
+      'check_ids': ['upstash.environment_isolation', 'vercel.product.environment_metadata'],
+      'contract_refs': ['secrets', 'vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'redis.web.production',
+      'service': 'upstash',
+      'environments': ['production'],
+      'from': 'Web server rate limiter',
+      'to': 'Upstash Redis binding',
+      'type': 'rate_limit',
+      'expected': 'Webの必要なbindingと権限を確認。Product masterのPINGから推測しない',
+      'check_ids': ['upstash.environment_isolation', 'vercel.web.environment_metadata'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'mcp.redis.binding',
+      'service': 'mcp_oauth',
+      'environments': ['production', 'preview', 'integration'],
+      'from': 'MCP OAuth token admission',
+      'to': 'Upstash Redis / explicit MCP Preview binding',
+      'type': 'rate_limit',
+      'expected': 'MCP Previewは明示origin / DB / Redis / write fenceを一緒に照合',
+      'check_ids':
+        ['mcp_oauth.deployed_identity_and_client_callbacks', 'vercel.preview.mcp_build_policy'],
+      'contract_refs': ['mcp', 'secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'mcp.discovery.identity',
+      'service': 'mcp_oauth',
+      'environments': ['production'],
+      'from': 'https://app.dayopt.app issuer',
+      'to': 'https://mcp.dayopt.app resource / Product /api/mcp',
+      'type': 'oauth_identity',
+      'expected': '公開discoveryと配信issuer / resourceを一致させる',
+      'check_ids': ['mcp_oauth.production.issuer', 'mcp_oauth.production.resource'],
+      'contract_refs': ['mcp', 'vercel'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'mcp.client.callbacks',
+      'service': 'mcp_oauth',
+      'environments': ['production', 'preview', 'integration'],
+      'from': 'Claude / ChatGPT / Cursor OAuth clients',
+      'to': 'Product OAuth authorization / token endpoints',
+      'type': 'oauth_client',
+      'expected': 'mcp_oauth.expected.clientsのcallback契約を参照。token実交換は棚卸しと区別',
+      'check_ids': ['mcp_oauth.deployed_identity_and_client_callbacks'],
+      'contract_refs': ['mcp'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'posthog.product.ingestion',
+      'service': 'posthog',
+      'environments': ['production', 'preview', 'integration'],
+      'from': 'product browser/server telemetry switches',
+      'to': 'PostHog project 625917',
+      'type': 'telemetry',
+      'expected': '有効環境は同意・property filter・replay off。Productionは法務承認前off',
+      'check_ids':
+        [
+          'posthog.settings',
+          'posthog.ingestion_aggregate',
+          'posthog.deployed_privacy_and_deletion',
+        ],
+      'contract_refs': ['privacy'],
+      'secret_refs': ['posthog_delete'],
+    }
+  - {
+      'id': 'sentry.product.runtime',
+      'service': 'sentry',
+      'environments': ['production'],
+      'from': 'product DSN / served release',
+      'to': 'Sentry dayopt',
+      'type': 'error_reporting',
+      'expected': 'PII scrub / sampling / release契約と対応。生eventやstack traceは読まない',
+      'check_ids': [sentry.projects, sentry.applied_source_maps, sentry.alert_authority],
+      'contract_refs': ['privacy', 'secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'sentry.product.build',
+      'service': 'sentry',
+      'environments': ['production'],
+      'from': 'Vercel product Production build',
+      'to': 'Sentry release / artifact bundle',
+      'type': 'source_map_upload',
+      'expected': 'ci/sentry-release-tokenはVercel build用。GitHub Actionsからの使用を仮定しない',
+      'check_ids': ['sentry.releases.dayopt', 'sentry.applied_source_maps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['sentry_release'],
+    }
+  - {
+      'id': 'telemetry.product.vercel',
+      'service': 'telemetry',
+      'environments': ['production'],
+      'from': 'product DeferredAnalytics / BrowserTelemetry',
+      'to': 'Vercel Analytics / Speed Insights',
+      'type': 'browser_telemetry',
+      'expected': '本番限定・同意契約。Dashboardの有効化と実取込を別照合',
+      'check_ids': ['telemetry.deployed_privacy_and_vercel_analytics'],
+      'contract_refs': ['telemetry'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'posthog.web.ingestion',
+      'service': 'posthog',
+      'environments': ['production', 'preview', 'integration'],
+      'from': 'web browser/server telemetry switches',
+      'to': 'PostHog project 625917',
+      'type': 'telemetry',
+      'expected': '有効環境は同意・property filter・replay off。Productionは法務承認前off',
+      'check_ids':
+        [
+          'posthog.settings',
+          'posthog.ingestion_aggregate',
+          'posthog.deployed_privacy_and_deletion',
+        ],
+      'contract_refs': ['privacy'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'sentry.web.runtime',
+      'service': 'sentry',
+      'environments': ['production'],
+      'from': 'web DSN / served release',
+      'to': 'Sentry dayopt-web',
+      'type': 'error_reporting',
+      'expected': 'PII scrub / sampling / release契約と対応。生eventやstack traceは読まない',
+      'check_ids': [sentry.projects, sentry.applied_source_maps, sentry.alert_authority],
+      'contract_refs': ['privacy', 'secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'sentry.web.build',
+      'service': 'sentry',
+      'environments': ['production'],
+      'from': 'Vercel web Production build',
+      'to': 'Sentry release / artifact bundle',
+      'type': 'source_map_upload',
+      'expected': 'ci/sentry-release-tokenはVercel build用。GitHub Actionsからの使用を仮定しない',
+      'check_ids': ['sentry.releases.dayopt-web', 'sentry.applied_source_maps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': ['sentry_release'],
+    }
+  - {
+      'id': 'telemetry.web.vercel',
+      'service': 'telemetry',
+      'environments': ['production'],
+      'from': 'web DeferredAnalytics / BrowserTelemetry',
+      'to': 'Vercel Analytics / Speed Insights',
+      'type': 'browser_telemetry',
+      'expected': '本番限定・同意契約。Dashboardの有効化と実取込を別照合',
+      'check_ids': ['telemetry.deployed_privacy_and_vercel_analytics'],
+      'contract_refs': ['telemetry'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'sentry.auth.edge',
+      'service': 'sentry',
+      'environments': ['production'],
+      'from': 'send-auth-email optional reporting',
+      'to': 'Sentry Edge DSN',
+      'type': 'error_reporting',
+      'expected': '任意設定。不在を必須違反としない',
+      'check_ids': ['sentry.applied_source_maps', 'supabase.production.functions'],
+      'contract_refs': ['auth', 'privacy'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'backup.storage.r2',
+      'service': 'cloudflare',
+      'environments': ['production'],
+      'from': 'Supabase Storage via GitHub Nightly',
+      'to': 'Cloudflare R2 avatars / attachments',
+      'type': 'backup_transfer',
+      'expected': '既存backup正本 / bucket scope / 35日locks。restore成功は別証拠',
+      'check_ids':
+        [
+          github.backup_runs,
+          cloudflare.r2_buckets,
+          cloudflare.r2_locks.avatars,
+          cloudflare.r2_locks.attachments,
+          cloudflare.backup_credential_scope,
+          cloudflare.restore_readiness,
+        ],
+      'contract_refs': ['backup', 'secrets'],
+      'secret_refs': ['backup_source', 'backup_destination'],
+    }
+  - {
+      'id': 'backup.database.supabase',
+      'service': 'supabase',
+      'environments': ['production', 'integration'],
+      'from': 'Supabase project database',
+      'to': 'Supabase managed backup',
+      'type': 'database_backup',
+      'expected': 'metadataの可視範囲・保持期間を確認。Storage backupとは別',
+      'check_ids': ['supabase.production.backup_metadata', 'supabase.integration.backup_metadata'],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'monitor.uptime.health',
+      'service': 'uptimerobot',
+      'environments': ['production'],
+      'from': 'UptimeRobot Dayopt monitor',
+      'to': 'https://app.dayopt.app/api/health',
+      'type': 'health_monitor',
+      'expected': '既存URL / interval / alert routingを照合。通知を発火しない',
+      'check_ids': ['uptimerobot.monitors'],
+      'contract_refs': ['infrastructure'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'cron.vercel.product',
+      'service': 'vercel',
+      'environments': ['production'],
+      'from': 'Vercel Product cron scheduler',
+      'to': 'Product fixed cron endpoints',
+      'type': 'scheduled_request',
+      'expected': 'vercel.jsonと配信revision / heartbeatを照合。cronを実行しない',
+      'check_ids': ['vercel.product.settings', 'supabase.production.heartbeats'],
+      'contract_refs': ['vercel', 'cron'],
+      'secret_refs': ['cron_secret'],
+    }
+  - {
+      'id': 'cron.supabase.metadata',
+      'service': 'supabase',
+      'environments': ['production', 'integration'],
+      'from': 'Supabase pg_cron jobs',
+      'to': 'Calendar retention / revoke housekeeping',
+      'type': 'database_schedule',
+      'expected': 'metadataと環境別配信migrationを照合。command / 顧客行を取得しない',
+      'check_ids':
+        [
+          'supabase.production.cron_schedule_review',
+          'supabase.production.database_metadata',
+          'supabase.integration.database_metadata',
+        ],
+      'contract_refs': ['cron'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'cron.calendar.provider',
+      'service': 'google',
+      'environments': ['production', 'integration'],
+      'from': 'Product Calendar cron',
+      'to': 'Google Calendar API',
+      'type': 'provider_sync',
+      'expected': 'authority / maintenance fence / scopeと配信revisionを照合。同期実行は別担当',
+      'check_ids': ['google.registered_callbacks', 'supabase.production.heartbeats'],
+      'contract_refs': ['calendar'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'password.hibp.range',
+      'service': 'pwned_passwords',
+      'environments': ['production', 'preview', 'integration'],
+      'from': 'Product password check',
+      'to': 'https://api.pwnedpasswords.com/range/',
+      'type': 'password_check',
+      'expected': 'SHA1 prefix5文字のみ。timeout / fail-openはpassword_check正本参照',
+      'check_ids': ['pwned_passwords.provider_and_deployed_behavior'],
+      'contract_refs': ['password_check'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'development.jev.gateway',
+      'service': 'optional',
+      'environments': ['shared'],
+      'from': 'Developer Jev CLI',
+      'to': 'Vercel AI Gateway',
+      'type': 'model_api',
+      'expected': '既存budget $4/月・90日期限の任意キー。棚卸しでモデルを呼ばない',
+      'check_ids': ['optional.jev_gateway_budget_and_credentials'],
+      'contract_refs': ['development_ai'],
+      'secret_refs': ['ai_gateway'],
+    }
+  - {
+      'id': 'github.app.codex',
+      'service': 'github',
+      'environments': ['shared'],
+      'from': 'Dayopt/dayopt installed GitHub Apps',
+      'to': 'OpenAI ChatGPT Codex Connector',
+      'type': 'repository_integration',
+      'expected': 'Dayoptの接続App・権限・対象repoを明示。現状観測を必須Appの追加方針にしない',
+      'check_ids': ['github.installed_apps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'github.app.claude',
+      'service': 'github',
+      'environments': ['shared'],
+      'from': 'Dayopt/dayopt installed GitHub Apps',
+      'to': 'Anthropic Claude',
+      'type': 'repository_integration',
+      'expected': 'Dayoptの接続App・権限・対象repoを明示。現状観測を必須Appの追加方針にしない',
+      'check_ids': ['github.installed_apps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'github.app.claude-design',
+      'service': 'github',
+      'environments': ['shared'],
+      'from': 'Dayopt/dayopt installed GitHub Apps',
+      'to': 'Anthropic Claude Design Import',
+      'type': 'repository_integration',
+      'expected': 'Dayoptの接続App・権限・対象repoを明示。現状観測を必須Appの追加方針にしない',
+      'check_ids': ['github.installed_apps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'github.app.slack',
+      'service': 'github',
+      'environments': ['shared'],
+      'from': 'Dayopt/dayopt installed GitHub Apps',
+      'to': 'GitHub Slack',
+      'type': 'repository_integration',
+      'expected': 'Dayoptの接続App・権限・対象repoを明示。現状観測を必須Appの追加方針にしない',
+      'check_ids': ['github.installed_apps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'github.app.supabase',
+      'service': 'github',
+      'environments': ['shared'],
+      'from': 'Dayopt/dayopt installed GitHub Apps',
+      'to': 'Supabase',
+      'type': 'repository_integration',
+      'expected': 'Dayoptの接続App・権限・対象repoを明示。現状観測を必須Appの追加方針にしない',
+      'check_ids': ['github.installed_apps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      'id': 'github.app.vercel',
+      'service': 'github',
+      'environments': ['shared'],
+      'from': 'Dayopt/dayopt installed GitHub Apps',
+      'to': 'Vercel',
+      'type': 'repository_integration',
+      'expected': 'Dayoptの接続App・権限・対象repoを明示。現状観測を必須Appの追加方針にしない',
+      'check_ids': ['github.installed_apps'],
+      'contract_refs': ['secrets'],
+      'secret_refs': [],
+    }
+  - {
+      id: onepassword.master.replicas,
+      service: onepassword,
+      environments: [shared],
+      from: 1Password master / human and ci item locators,
+      to: Vercel / GitHub / Supabase replicas,
+      type: secret_authority,
+      expected: secrets正本参照。item所在確認・値一致・権限と復旧を別の証拠で扱う,
+      check_ids:
+        [
+          onepassword.access_and_recovery,
+          github.production-release.secret_names,
+          vercel.product.environment_metadata,
+        ],
+      contract_refs: [secrets],
+      secret_refs: [ledger],
+    }
+  - {
+      id: github.supabase.deployment_owner,
+      service: github,
+      environments: [shared],
+      from: Supabase GitHub integration for Dayopt/dayopt,
+      to: migrations / Edge Functions / Storage bucket deployment,
+      type: deployment_ownership,
+      expected: GitHub integrationがdeployment owner。Vercel Supabase integrationのenv注入ownerと区別する,
+      check_ids:
+        [github.installed_apps, supabase.production.migrations, supabase.production.functions],
+      contract_refs: [infrastructure, schema, auth],
+      secret_refs: [],
+    }
+ui_only:
+  - {
+      'id': 'github.apps.permissions',
+      'service': 'github',
+      'category': 'collector_unavailable',
+      'items':
+        [
+          'installed Apps permissions',
+          'repository selection',
+          'Slack workspace / channel binding',
+          'pending installation / permission update details',
+        ],
+      'reason': 'Organization UIでApp名とpending request数は見えるが、個別設定はGitHub sudo reauthenticationを要求。現readerもinstallation権限を収集しない',
+      'next_step': '既存認証済みGitHub Settingsで現行権限・repo対象とpending内容を読み取る。installや権限更新の承認・変更はしない',
+      'check_ids': ['github.installed_apps'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'github.api.permissions',
+      'service': 'github',
+      'category': 'current_permission',
+      'items': ['environment secret names', 'repository hooks'],
+      'reason': 'agent PATのGETは403。environment secret名とrepo/org webhookは認証済みUIで補完したが、自動DoctorのAPI判定はblockedのまま',
+      'next_step': 'UI補完は2026-10-05棚卸しに記録済み。既存read-only credentialのscope確認以外の権限変更・credential作成はしない',
+      'check_ids':
+        [
+          'github.production-release.secret_names',
+          'github.production-ops.secret_names',
+          'github.repository_hooks',
+        ],
+      'documentation_urls': ['https://docs.github.com/en/rest/actions/secrets'],
+    }
+  - {
+      'id': 'github.secret.values',
+      'service': 'github',
+      'category': 'secret_not_redisplayable',
+      'items': ['Actions existing secret values'],
+      'reason': 'APIは名前・更新日時のみ。UIも保存済み値を再表示しない',
+      'next_step': '既存op:// masterと名前台帳を参照。値一致はunknownのまま',
+      'check_ids': ['github.production-release.secret_names', 'github.production-ops.secret_names'],
+      'documentation_urls': ['https://docs.github.com/en/rest/actions/secrets'],
+    }
+  - {
+      'id': 'vercel.reader.authentication',
+      'service': 'vercel',
+      'category': 'collector_unavailable',
+      'items': ['project settings', 'env metadata / bindings', 'domains'],
+      'reason': 'Doctorの既存op readerはcredential_or_collector_failed。read-only MCPのenv metadata GETもdecrypt=falseで403 projectEnvVars permission denied',
+      'next_step': '既存の認証済みDashboardでenv metadataだけ確認する。credential追加・権限変更・secret値の取得はしない',
+      'check_ids':
+        [
+          'vercel.product.settings',
+          'vercel.product.environment_metadata',
+          'vercel.product.public_bindings',
+          'vercel.product.domains',
+          'vercel.web.settings',
+        ],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'vercel.secret.values',
+      'service': 'vercel',
+      'category': 'secret_not_redisplayable',
+      'items': ['Secret / legacy Sensitive environment values'],
+      'reason': 'Dashboard / APIの保存済みSecretは再表示できない',
+      'next_step': 'metadata / 対象環境 / op:// masterを確認。未知の値を一致と扱わない',
+      'check_ids': ['vercel.product.environment_metadata', 'vercel.web.environment_metadata'],
+      'documentation_urls':
+        ['https://vercel.com/docs/environment-variables/sensitive-environment-variables'],
+    }
+  - {
+      'id': 'supabase.api.permissions',
+      'service': 'supabase',
+      'category': 'current_permission',
+      'items': ['branches', 'backups', 'Integration project metadata'],
+      'reason': 'GET 403 / Integration project GET404。MCP branch metadataは取得できる',
+      'next_step': '固定project refのDashboard / MCP metadataで補完。404は削除と断定しない',
+      'check_ids':
+        [
+          'supabase.branches',
+          'supabase.production.backup_metadata',
+          'supabase.integration.backup_metadata',
+          'supabase.integration.project',
+        ],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'supabase.secret.values',
+      'service': 'supabase',
+      'category': 'secret_not_redisplayable',
+      'items': ['deployed Edge secret values'],
+      'reason': 'CLI secret一覧やhashだけでは値の一致を証明できない',
+      'next_step': '既存master参照と名前metadataを使う。runtime env dumpをしない',
+      'check_ids': ['resend.sender_and_signature_replicas'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'supabase.deployed.contract',
+      'service': 'supabase',
+      'category': 'behavior_not_metadata',
+      'items': ['schema', 'heartbeat / cron schedule', 'restore success'],
+      'reason': '配信契約がcheckoutと異なる場合は基線を混ぜない。backup metadataはrestore証拠ではない',
+      'next_step': '配信SHAの契約で比較。restore / job起動は今回の棚卸しに含めない',
+      'check_ids':
+        [
+          'supabase.production.migrations',
+          'supabase.production.schema_snapshot',
+          'supabase.production.heartbeats',
+          'supabase.production.cron_schedule_review',
+        ],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'stripe.live.authentication',
+      'service': 'stripe',
+      'category': 'current_permission',
+      'items': ['Live account / prices / webhook / Portal'],
+      'reason': 'Productionの既存agent readerはcredential_or_collector_failed。Stripe MCP account discoveryも失敗し、Live accountを選択できない',
+      'next_step': '既存のread-only Live credential経路が利用可能な時だけ照合する。credential発行・scope変更・mode切替はしない',
+      'check_ids': ['stripe.account', 'stripe.active_prices', 'stripe.webhooks', 'stripe.portal'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'stripe.webhook.secret',
+      'service': 'stripe',
+      'category': 'api_secret_unavailable_ui_available',
+      'items': ['existing webhook signing secret'],
+      'reason': '既存endpoint GETの署名値は返らない。Dashboardでは署名を表示できる',
+      'next_step': '今回はRevealせず、既存op://署名参照とreplica metadataを使う',
+      'check_ids': ['stripe.webhooks'],
+      'documentation_urls': ['https://docs.stripe.com/webhooks/signature'],
+    }
+  - {
+      'id': 'resend.replica.authentication',
+      'service': 'resend',
+      'category': 'current_permission',
+      'items': ['send credential master', 'webhook replica values / Auth Edge sender'],
+      'reason': 'Doctorの既存op readerは4項目すべてcredential_or_collector_failed。2026-10-06のMCPでdomain設定・webhook接続先・event一覧、Dashboardで既存keyのSending accessとdomain制限を確認済み。Auth Edgeの配信設定・consumerとのkey対応・secret replica一致は未確認。MCP応答の項目省略をAPI未提供とは扱わない',
+      'next_step': 'inventory-2026-10-06.mdのkey scope証拠を参照し、既存の安全な照合経路でAuth Edge送信元とreplica対応を確認する。signing secretは表示・保存せず、credential発行や変更をしない',
+      'check_ids': ['resend.sender_and_signature_replicas'],
+      'documentation_urls': ['https://resend.com/docs/api-reference/webhooks/get-webhook'],
+    }
+  - {
+      'id': 'cloudflare.management.permissions',
+      'service': 'cloudflare',
+      'category': 'current_permission',
+      'items':
+        [
+          'DNSSEC / registrar renewal',
+          'Turnstile',
+          'R2 locks / lifecycle / token scope',
+          'Email Routing destination',
+        ],
+      'reason': '管理APIは存在するがDoctorの現ci token / agent境界で取得できない。2026-10-06のDashboardでDNSSEC・Email Routing・Turnstile・R2 lock / lifecycle・既存backup tokenのscope metadataを補完済み。replica一致・token期限・現在のbackupからの復元成功は別確認。過去の演習記録はbackup正本を参照',
+      'next_step': 'inventory-2026-10-06.mdの補足証拠を参照し、token期限・ci replicaとの対応・復旧担当を確認する。R2 objectやtoken値を読まず、scopeを自動変更しない',
+      'check_ids':
+        [
+          'cloudflare.zone',
+          'cloudflare.turnstile',
+          'cloudflare.r2_buckets',
+          'cloudflare.r2_locks.avatars',
+          'cloudflare.r2_locks.attachments',
+          'cloudflare.backup_credential_scope',
+        ],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'sentry.source_map.application',
+      'service': 'sentry',
+      'category': 'behavior_not_metadata',
+      'items': ['applied artifact bundle mapping'],
+      'reason': '2026-10-06のSentry UIとVercel MCPで、Product / Webそれぞれの配信SHAに対応するSource Map Uploadsを確認済み。uploadとreleaseの対応は、実際のstack traceへのsource map適用まで証明しない。legacy release file数だけで不存在とは扱わない',
+      'next_step': 'inventory-2026-10-06.mdのupload / served SHA対応を参照する。実適用の確認は顧客eventを取得しない別の検証として扱い、今回新しいeventは送らない',
+      'check_ids': ['sentry.applied_source_maps'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'sentry.hooks.permissions',
+      'service': 'sentry',
+      'category': 'current_permission',
+      'items': ['Product / Web project service hook metadata'],
+      'reason': '2026-10-05のservice hook一覧GETは両projectとも403。2026-10-06のUIでProduct / Webのlegacy webhook callbackは0件と確認したが、新しいintegration経由のhookを含むservice hook全体の件数は未確認',
+      'next_step': 'legacy callbackの再確認ではなく、新しいintegrationのhook metadataを取得できる既存読取経路を確認する。secret値やevent payloadは開かない',
+      'check_ids': ['sentry.service_hooks.dayopt', 'sentry.service_hooks.dayopt-web'],
+      'documentation_urls': ['https://docs.sentry.io/api/projects/list-a-projects-service-hooks/'],
+    }
+  - {
+      'id': 'posthog.project.permissions',
+      'service': 'posthog',
+      'category': 'behavior_not_metadata',
+      'items': ['deployed privacy switches / deletion key replica'],
+      'reason': '2026-10-06にUser承認で既存Dayopt Analytics限定keyへproject:readのみを追加し、12:53:20 JSTのDoctorでsettings / aggregateはpass、blocked 0を確認。runtime同意・削除用keyの配布と実削除は別の証拠が必要',
+      'next_step': '設定読取の403は解消済み。既存posthog_deleteの正本と実deploymentへの配布・対象環境を照合し、削除機能の検証は合成データに限定して別途準備する',
+      'check_ids': ['posthog.deployed_privacy_and_deletion'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'upstash.management.credentials',
+      'service': 'upstash',
+      'category': 'collector_unavailable',
+      'items': ['DB list / ACL / environment binding'],
+      'reason': 'REST Redis tokenはmanagement email / API keyの代替ではない。PINGは分離証拠ではない',
+      'next_step': '既存Upstash ConsoleとVercel metadataを読む。DB / key作成やRedisデータ取得なし',
+      'check_ids': ['upstash.environment_isolation'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'uptimerobot.alert.routes',
+      'service': 'uptimerobot',
+      'category': 'collector_unavailable',
+      'items': ['notification recipient / alert routing'],
+      'reason': 'getMonitors alert_contacts=1で通知metadataを読める。現readerは既定で通知列を要求しない',
+      'next_step': '既存Dayopt monitor Dashboardまたは既存資格情報で通知metadataのみ照会',
+      'check_ids': ['uptimerobot.monitors'],
+      'documentation_urls': ['https://uptimerobot.com/api/legacy/'],
+    }
+  - {
+      'id': 'google.console.contracts',
+      'service': 'google',
+      'category': 'collector_unavailable',
+      'items':
+        [
+          'standard OAuth clients / redirects',
+          'consent verification / scopes / test users',
+          'deployed provider selection',
+        ],
+      'reason': '標準Web OAuth client管理reader / 既存管理資格情報がない。API exclusivityは未立証',
+      'next_step': '既存Google Consoleの観測とSupabase / Vercelを照合。切替は別セッション',
+      'check_ids': ['google.registered_callbacks'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'mcp.runtime.clients',
+      'service': 'mcp_oauth',
+      'category': 'behavior_not_metadata',
+      'items': ['registered client callback / tokens', 'Preview write fence'],
+      'reason': '公開discoveryは登録client / 実交換 / write fence全体の成功証拠ではない',
+      'next_step': '固定metadata / 配信revisionを照合。OAuth認可やwrite gateを起動しない',
+      'check_ids': ['mcp_oauth.deployed_identity_and_client_callbacks'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'telemetry.dashboard.runtime',
+      'service': 'telemetry',
+      'category': 'behavior_not_metadata',
+      'items': ['Analytics / Speed Insights settings', 'consent before ingestion'],
+      'reason': 'UI設定とaggregateは同意制御の実ブラウザ成功を証明しない',
+      'next_step': '既存Dashboardと配信sourceを読む。customer eventを出さない',
+      'check_ids': ['telemetry.deployed_privacy_and_vercel_analytics'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'support.smtp.configuration',
+      'service': 'support_smtp',
+      'category': 'collector_unavailable',
+      'items': ['Gmail Send mail as', 'Resend dedicated SMTP replica'],
+      'reason': 'Gmail設定API / 既存read credentialはこのcollectorにない。UI専用かは未立証',
+      'next_step': '既存Gmail設定の送信元 / SMTP host / auth方式だけ。メール本文・password・送信なし',
+      'check_ids': ['support_smtp.gmail_sender_and_smtp_replica'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'password.provider.behavior',
+      'service': 'pwned_passwords',
+      'category': 'behavior_not_metadata',
+      'items': ['HIBP provider availability', 'deployed password behavior'],
+      'reason': 'public range availabilityと実password flowは別証拠',
+      'next_step': '固定public metadata / 配信revisionを確認。実passwordやaccount mutationを送らない',
+      'check_ids': ['pwned_passwords.provider_and_deployed_behavior'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'optional.gateway.metadata',
+      'service': 'optional',
+      'category': 'collector_unavailable',
+      'items': ['AI Gateway key budget / expiry', 'GitHub optional development integrations'],
+      'reason': '正本に存在する任意サービスの設定はlive metadata未取得',
+      'next_step': '既存Dashboard / Workflow metadataだけ読む。model呼出・新key発行なし',
+      'check_ids': ['optional.jev_gateway_budget_and_credentials', 'github.workflows'],
+      'documentation_urls': [],
+    }
+  - {
+      'id': 'domain.registration.account',
+      'service': 'cloudflare',
+      'category': 'collector_unavailable',
+      'items': [registrar auto-renewal / account recovery],
+      'reason': '公開RDAPは期限・registrar・NSのみ。2026-10-06のVercel MCPでdayopt.appの購入metadata・renew:true・期限・Cloudflare委譲、Billing UIで支払方法の登録を確認。更新決済の成功とアカウント復旧担当 / 回復方式は未確認',
+      'next_step': 公開RDAPのName.comとVercelの管理metadataを区別し、既存Vercel管理画面で担当・回復方式・支払い状態を確認。支払情報・個人連絡先は記録しない。,
+      'check_ids': ['cloudflare.registrar_metadata', 'cloudflare.registrar_operations'],
+      'documentation_urls': ['https://data.iana.org/rdap/dns.json'],
+    }
+  - {
+      id: onepassword.human_access,
+      service: onepassword,
+      category: current_permission,
+      items: [human/ci item locations, Vault boundary, replica equality, account recovery],
+      reason: agentから読めないitemは未確認。所在と人の存在確認、provider設定とreplica一致は別証拠。,
+      next_step: Vaultと正確なitem名だけを記録し、confirmed_by/verified_atを人の確認後に追加。権限を増やさず既存policyで追う。,
+      check_ids: [onepassword.access_and_recovery],
+      documentation_urls: [],
+    }
+  - {
+      id: cloudflare.routing_and_zone,
+      service: cloudflare,
+      category: collector_unavailable,
+      items: [Email Routing route/destination/catch-all, proxy/DNSSEC/zone ownership],
+      reason: 公開DNSと既存metadata readerは転送先やzone運用設定を返さない。,
+      next_step: 既存Dashboardでmetadataだけ確認。個人addressやメール本文を保存しない。,
+      check_ids: [cloudflare.email_routing, cloudflare.zone_operations],
+      documentation_urls: [],
+    }
+  - {
+      id: backup.restore_readiness,
+      service: cloudflare,
+      category: behavior_not_metadata,
+      items: [dated restore evidence, recovery owner],
+      reason: backup jobやlocksだけでは復元可能性を証明しない。,
+      next_step: backup正本の2026-08-20演習記録を参照し、現在のbackupに対する証跡・revision・担当の不足を確認。今回のdoctorは復元しない。,
+      check_ids: [cloudflare.restore_readiness],
+      documentation_urls: [],
+    }
+  - {
+      id: sentry.alert_and_token_authority,
+      service: sentry,
+      category: collector_unavailable,
+      items: [alert notification owner, read/edit/delete token scope],
+      reason: 2026-10-06のUIでProduct / Webのhigh priority通知ruleと動的recipient設定を確認。固定の復旧担当・実配送・token操作権限は未確認。,
+      next_step: inventory-2026-10-06.mdの通知rule証拠を参照し、固定担当とtoken scopeを既存経路で確認。通知テストやkey発行なし。,
+      check_ids: [sentry.alert_authority],
+      documentation_urls: [],
+    }
+checks:
+  - id: github.repository
+    service: github
+    environments:
+      - shared
+    rule: subset
+    expected:
+      full_name: Dayopt/dayopt
+      default_branch: main
+      archived: false
+      allow_merge_commit: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.rulesets
+    service: github
+    environments:
+      - shared
+    rule: ruleset
+    expected:
+      required_checks:
+        - 🔍 Static Checks
+        - 📦 Unit Tests
+        - 🧪 Integration Tests
+        - Vercel – product
+        - Vercel – web
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.environments
+    service: github
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - name: production-release
+        deployment_branch_policy:
+          custom_branch_policies: true
+      - name: production-ops
+        deployment_branch_policy:
+          custom_branch_policies: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.production-release.secret_names
+    service: github
+    environments:
+      - production
+    rule: ci_secrets
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.production-ops.secret_names
+    service: github
+    environments:
+      - production
+    rule: ci_secrets
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.workflows
+    service: github
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: github.repository_hooks
+    service: github
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.settings
+    service: vercel
+    environments:
+      - shared
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.environment_metadata
+    service: vercel
+    environments:
+      - all
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.public_bindings
+    service: vercel
+    environments:
+      - all
+    rule: bindings
+    expected:
+      production_ref: yvglwblxrnrenfifsnje
+      test_account: acct_1TBpLoRRjoh5xfrs
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.domains
+    service: vercel
+    environments:
+      - shared
+    rule: domains
+    expected:
+      names:
+        - app.dayopt.app
+        - mcp.dayopt.app
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.product.deployments
+    service: vercel
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.settings
+    service: vercel
+    environments:
+      - shared
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.environment_metadata
+    service: vercel
+    environments:
+      - all
+    rule: contract_errors
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.public_bindings
+    service: vercel
+    environments:
+      - all
+    rule: bindings
+    expected:
+      production_ref: yvglwblxrnrenfifsnje
+      test_account: acct_1TBpLoRRjoh5xfrs
+      require_production_db: false
+      require_posthog_deletion: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.domains
+    service: vercel
+    environments:
+      - shared
+    rule: domains
+    expected:
+      names:
+        - dayopt.app
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.web.deployments
+    service: vercel
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.production.public_health
+    service: vercel
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.integration.public_health
+    service: vercel
+    environments:
+      - integration
+    rule: subset
+    expected:
+      supabase_project_ref: tilwaprottpyhlfoggbb
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: vercel.preview.public_health
+    service: vercel
+    environments:
+      - preview
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.branches
+    service: supabase
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.project
+    service: supabase
+    environments:
+      - production
+    rule: subset
+    expected:
+      id: yvglwblxrnrenfifsnje
+      status: ACTIVE_HEALTHY
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.auth_config
+    service: supabase
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.auth_audit
+    service: supabase
+    environments:
+      - production
+    rule: passed
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.functions
+    service: supabase
+    environments:
+      - production
+    rule: subset
+    expected:
+      - slug: send-auth-email
+        verify_jwt: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.backup_metadata
+    service: supabase
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.database_metadata
+    service: supabase
+    environments:
+      - production
+    rule: database
+    expected:
+      mcp_control:
+        writes_enabled: false
+        enabled_client_ids: []
+        billing_enforced: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.project
+    service: supabase
+    environments:
+      - integration
+    rule: subset
+    expected:
+      id: tilwaprottpyhlfoggbb
+      status: ACTIVE_HEALTHY
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.auth_config
+    service: supabase
+    environments:
+      - integration
+    rule: subset
+    expected:
+      site_url: https://product-git-integration-dayopt.vercel.app
+      disable_signup: true
+      security_captcha_enabled: true
+      security_captcha_provider: turnstile
+      hook_send_email_enabled: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.auth_audit
+    service: supabase
+    environments:
+      - integration
+    rule: manual
+    required: false
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.functions
+    service: supabase
+    environments:
+      - integration
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.backup_metadata
+    service: supabase
+    environments:
+      - integration
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.integration.database_metadata
+    service: supabase
+    environments:
+      - integration
+    rule: database
+    expected:
+      mcp_control:
+        writes_enabled: false
+        enabled_client_ids: []
+        billing_enforced: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.production.storage_audit
+    service: supabase
+    environments:
+      - production
+    rule: passed
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: supabase.preview_project_selection
+    service: supabase
+    environments:
+      - preview
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: stripe.account
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: stripe_account
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+    expected:
+      production: acct_1TBpLgIe9fUk4fJW
+      integration: acct_1TBpLoRRjoh5xfrs
+  - id: stripe.active_prices
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: stripe_prices
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+    expected:
+      id: price_1UDGzDRRjoh5xfrs4MMbK2rb
+      active: true
+      livemode: false
+      currency: usd
+      unit_amount: 500
+      interval: month
+  - id: stripe.webhooks
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: stripe_webhooks
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+    expected:
+      endpoint:
+        origin: https://product-git-integration-dayopt.vercel.app
+        path: /api/webhooks/stripe
+      status: enabled
+      livemode: false
+      api_version: 2026-02-25.clover
+      events:
+        - checkout.session.completed
+        - customer.subscription.updated
+        - customer.subscription.deleted
+        - invoice.paid
+        - invoice.payment_failed
+  - id: stripe.portal
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: stripe.deployed_identity_and_billing_gate
+    service: stripe
+    environments:
+      - production
+      - integration
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.domains
+    service: resend
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.domain_settings
+    service: resend
+    environments:
+      - production
+    rule: subset
+    expected:
+      name: dayopt.app
+      status: verified
+      open_tracking: false
+      click_tracking: false
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.webhooks
+    service: resend
+    environments:
+      - production
+    rule: resend_webhooks
+    expected:
+      - endpoint:
+          origin: https://app.dayopt.app
+          path: /api/webhooks/resend
+        status: enabled
+        events:
+          - email.bounced
+          - email.complained
+          - email.delivered
+          - email.delivery_delayed
+          - email.failed
+          - email.suppressed
+      - endpoint:
+          origin: https://dayopt.app
+          path: /api/webhooks/resend
+        status: enabled
+        events:
+          - email.bounced
+          - email.complained
+          - email.failed
+          - email.suppressed
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: resend.sender_and_signature_replicas
+    service: resend
+    environments:
+      - production
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.zone
+    service: cloudflare
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.turnstile
+    service: cloudflare
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.r2_buckets
+    service: cloudflare
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.r2_locks.avatars
+    service: cloudflare
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.r2_locks.attachments
+    service: cloudflare
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.backup_credential_scope
+    service: cloudflare
+    environments:
+      - production
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.ns
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - keira.ns.cloudflare.com
+      - colin.ns.cloudflare.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.app_cname
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - cname.vercel-dns-017.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.mcp_cname
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - cname.vercel-dns-017.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.apex_mx
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - exchange: route1.mx.cloudflare.net
+      - exchange: route2.mx.cloudflare.net
+      - exchange: route3.mx.cloudflare.net
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.send_mx
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - exchange: feedback-smtp.ap-northeast-1.amazonses.com
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.apex_spf
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - v=spf1 include:_spf.mx.cloudflare.net ~all
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.send_spf
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - v=spf1 include:amazonses.com ~all
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.dkim
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - record_present: true
+        public_key_present: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: cloudflare.public_dns.dmarc
+    service: cloudflare
+    environments:
+      - shared
+    rule: subset
+    expected:
+      - policy: none
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.projects
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      - id: '4509737836412928'
+        slug: dayopt
+      - id: '4511741979394048'
+        slug: dayopt-web
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.project_settings.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      id: '4509737836412928'
+      slug: dayopt
+      is_public: false
+      allowed_domains:
+        - https://app.dayopt.app
+      data_scrubber: true
+      data_scrubber_defaults: true
+    required: true
+    next_step: 正本と既存project metadataを比較してください。secret field名とeventは取得しません。
+  - id: sentry.project_settings.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      id: '4511741979394048'
+      slug: dayopt-web
+      is_public: false
+      allowed_domains:
+        - https://dayopt.app
+      data_scrubber: true
+      data_scrubber_defaults: true
+    required: true
+    next_step: 正本と既存project metadataを比較してください。secret field名とeventは取得しません。
+  - id: sentry.organization_settings
+    service: sentry
+    environments:
+      - production
+    rule: subset
+    expected:
+      require_two_factor: true
+      allow_member_invite: false
+      allow_member_project_creation: false
+      open_membership: false
+      allow_join_requests: false
+      data_scrubber: true
+      data_scrubber_defaults: true
+      scrub_ip_addresses: true
+    required: true
+    next_step: 正本とorganization metadataを比較してください。member情報・eventは取得しません。
+  - id: sentry.environments.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: environment metadataのみを確認します。イベント流入や顧客データは読みません。
+  - id: sentry.environments.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: environment metadataのみを確認します。イベント流入や顧客データは読みません。
+  - id: sentry.service_hooks.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: hook metadataだけを確認します。403の場合は既存UIで件数・接続先hostを確認してください。
+  - id: sentry.service_hooks.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: hook metadataだけを確認します。403の場合は既存UIで件数・接続先hostを確認してください。
+  - id: sentry.releases.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.release_files.dayopt
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.releases.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.release_files.dayopt-web
+    service: sentry
+    environments:
+      - production
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: sentry.applied_source_maps
+    service: sentry
+    environments:
+      - production
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: posthog.settings
+    service: posthog
+    environments:
+      - all
+    rule: subset
+    expected:
+      id: 625917
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: posthog.ingestion_aggregate
+    service: posthog
+    environments:
+      - all
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: posthog.deployed_privacy_and_deletion
+    service: posthog
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: upstash.ping
+    service: upstash
+    environments:
+      - shared
+    rule: subset
+    expected:
+      reachable: true
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: uptimerobot.monitors
+    service: uptimerobot
+    environments:
+      - production
+    rule: subset
+    expected:
+      - endpoint:
+          origin: https://app.dayopt.app
+          path: /api/health
+        type: 1
+        interval_seconds: 300
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: google.source_contract
+    service: google
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: google.registered_callbacks
+    service: google
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: mcp_oauth.source_contract
+    service: mcp_oauth
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: mcp_oauth.deployed_identity_and_client_callbacks
+    service: mcp_oauth
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: telemetry.source_contract
+    service: telemetry
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: telemetry.deployed_privacy_and_vercel_analytics
+    service: telemetry
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: pwned_passwords.source_contract
+    service: pwned_passwords
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: pwned_passwords.provider_and_deployed_behavior
+    service: pwned_passwords
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: support_smtp.source_contract
+    service: support_smtp
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: support_smtp.gmail_sender_and_smtp_replica
+    service: support_smtp
+    environments:
+      - all
+    rule: manual
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: optional.source_contract
+    service: optional
+    environments:
+      - shared
+    rule: evidence
+    required: true
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: optional.jev_gateway_budget_and_credentials
+    service: optional
+    environments:
+      - all
+    rule: manual
+    required: false
+    next_step: 正本と既存リソースのmetadataを比較してください。doctorは設定を変更しません。
+  - id: mcp_oauth.production.issuer
+    service: mcp_oauth
+    environments:
+      - production
+    rule: subset
+    expected:
+      issuer: https://app.dayopt.app
+      code_challenge_methods_supported:
+        - S256
+    required: true
+    next_step: 公開OAuth metadataと配信revisionを確認
+  - id: mcp_oauth.production.resource
+    service: mcp_oauth
+    environments:
+      - production
+    rule: subset
+    expected:
+      resource: https://mcp.dayopt.app
+      authorization_servers:
+        - https://app.dayopt.app
+    required: true
+    next_step: 公開MCP resource metadataと配信revisionを確認
+  - id: github.backup_runs
+    service: github
+    environments:
+      - production
+    rule: evidence
+    required: true
+    expected: latest_10_scheduled_main_runs_job_metadata
+    next_step: backup jobのconclusionと時刻を確認。workflow全体の失敗をbackup失敗と解釈せずrestoreを別確認。
+  - id: vercel.preview.database_references
+    service: vercel
+    environments:
+      - preview
+    rule: evidence
+    required: true
+    expected: each_preview_ref_in_accessible_dayopt_supabase_branches
+    next_step: 取得できるSupabase一覧とVercel branch参照を比較し、未掲載を削除済みと断定しない
+
+  - id: supabase.production.migrations
+    service: supabase
+    environments: [production]
+    rule: passed
+    required: true
+    next_step: 配信revisionの既存schema/cron契約と照合。API権限不足と未配信契約を区別してください。
+
+  - id: supabase.production.heartbeats
+    service: supabase
+    environments: [production]
+    rule: passed
+    required: true
+    next_step: 配信revisionの既存schema/cron契約と照合。API権限不足と未配信契約を区別してください。
+
+  - id: supabase.production.schema_snapshot
+    service: supabase
+    environments: [production]
+    rule: passed
+    required: true
+    next_step: 配信revisionの既存schema/cron契約と照合。API権限不足と未配信契約を区別してください。
+
+  - id: supabase.production.cron_schedule_review
+    service: supabase
+    environments: [production]
+    rule: manual
+    required: true
+    next_step: database_metadataのjobname/schedule/activeを配信revisionのmigrationと比較。cronを実行しないでください。
+  - id: upstash.environment_isolation
+    service: upstash
+    environments: [all]
+    rule: manual
+    required: true
+    next_step: Vercelの環境別Redis URLと既存Upstash metadataを比較。agent masterのPINGだけでPreview分離を証明しません。
+  - id: vercel.preview.mcp_build_policy
+    service: vercel
+    environments: [preview]
+    rule: passed
+    required: true
+    next_step: 明示MCP OAuth Previewの既存build gateと取得可能なbindingを比較。Integrationとは別の契約です。
+  - id: cloudflare.registrar_metadata
+    service: cloudflare
+    environments: [shared]
+    rule: evidence
+    required: true
+    next_step: 公開RDAPのdayopt.app登録metadataを確認。登録事業者とDNS事業者を区別する。
+  - id: cloudflare.registrar_operations
+    service: cloudflare
+    environments: [shared]
+    rule: manual
+    required: true
+    next_step: 既存登録事業者Dashboardで自動更新・更新担当・回復方法を確認。支払情報・個人連絡先は記録しない。
+
+  - id: github.installed_apps
+    service: github
+    environments: [shared]
+    rule: manual
+    required: true
+    next_step: GitHub Settingsの既存App名・権限・対象repoを確認。hook一覧だけで未接続と判定しない。
+  - id: onepassword.source_contract
+    service: onepassword
+    environments:
+      - shared
+    rule: evidence
+    expected: refs_only_no_live_claim
+    required: true
+    next_step: Secrets正本とenv台帳の所在を確認。item存在やreplica一致は別確認。
+  - id: onepassword.access_and_recovery
+    service: onepassword
+    environments:
+      - shared
+    rule: manual
+    expected: human_locator_vault_boundary_replica_and_recovery
+    required: true
+    next_step: Vault・正確なitem名と人の確認日時/担当を記録。secret/TOTP/recovery codeの値は記録しない。
+  - id: cloudflare.email_routing
+    service: cloudflare
+    environments:
+      - shared
+    rule: manual
+    expected: support_route_verified_destination_catch_all_disabled
+    required: true
+    next_step: support@ route・転送先認証・catch-all無効を確認。個人メールアドレスを出力しない。
+  - id: cloudflare.zone_operations
+    service: cloudflare
+    environments:
+      - shared
+    rule: manual
+    expected: zone_dns_only_dnssec_and_account_ownership
+    required: true
+    next_step: 既存zoneのDNS only・DNSSEC・管理/復旧担当を確認。公開DNSを完全zone一覧の証拠にしない。
+  - id: cloudflare.restore_readiness
+    service: cloudflare
+    environments:
+      - shared
+    rule: manual
+    expected: dated_restore_evidence_and_recovery_owner
+    required: true
+    next_step: 復元証跡・日時・revision・結果・担当を確認。backup同期や復元はdoctorで実行しない。
+  - id: sentry.alert_authority
+    service: sentry
+    environments:
+      - shared
+    rule: manual
+    expected: notification_owner_and_read_edit_delete_authority
+    required: true
+    next_step: 既存alert/通知先とtoken権限を確認。名前だけから権限や通知到達を推測しない。

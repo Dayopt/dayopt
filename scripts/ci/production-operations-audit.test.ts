@@ -29,6 +29,37 @@ describe('production cron heartbeat evidence', () => {
       'billing-reconciliation: missing or duplicate heartbeat',
     ]);
   });
+  it('accepts only explicit fresh pre-activation skips and never calls them completed', () => {
+    const skipped = {
+      job_name: 'billing-reconciliation',
+      last_started_at: new Date(now).toISOString(),
+      last_completed_at: null,
+      outcome: 'skipped_unconfigured',
+    };
+    const other = fresh().filter((row) => row.job_name !== skipped.job_name);
+    expect(evaluateHeartbeats([...other, skipped], now, 'pending')).toEqual([]);
+    expect(evaluateHeartbeats([...other, skipped], now, 'active')).not.toEqual([]);
+    expect(
+      evaluateHeartbeats(
+        [...other, { ...skipped, last_completed_at: new Date(now).toISOString() }],
+        now,
+        'pending',
+      ),
+    ).not.toEqual([]);
+    for (const age of [1560 * 60000 + 1, -60001]) {
+      expect(
+        evaluateHeartbeats(
+          [...other, { ...skipped, last_started_at: new Date(now - age).toISOString() }],
+          now,
+          'pending',
+        ),
+      ).not.toEqual([]);
+    }
+    expect(
+      evaluateHeartbeats([...other, { ...skipped, outcome: null }], now, 'pending'),
+    ).not.toEqual([]);
+    expect(evaluateHeartbeats([...other, skipped, skipped], now, 'pending')).not.toEqual([]);
+  });
   it('requires every expected job and rejects missing completion', async () => {
     expect(evaluateHeartbeats(fresh(), now)).toEqual([]);
     await expect(auditHeartbeats(async () => fresh().slice(1), now)).rejects.toThrow('missing');

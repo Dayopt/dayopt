@@ -79,7 +79,7 @@ async function readHeartbeatRows() {
 
   const { data, error } = await client
     .from('cron_heartbeats')
-    .select('job_name,last_completed_at')
+    .select('job_name,last_started_at,last_completed_at,outcome:last_summary->>outcome')
     .in('job_name', Object.keys(JOB_MAX_AGE_MINUTES))
     .abortSignal(signal);
 
