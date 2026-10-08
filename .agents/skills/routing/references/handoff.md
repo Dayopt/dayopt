@@ -31,7 +31,7 @@ pnpm handoff:validate --context /tmp/dayopt-context.json --file /tmp/dayopt-hand
 
 ### 効果の回収
 
-最初の数件は issue / PR に「採用した層と model、再利用した根拠、調べ直した範囲、手戻り・User 介入」を短く残す。評価単位は完了 1 件あたりの総消費と再探索・手戻り。`pnpm ai:usage` の Codex は現状未収集なので、0 消費や節約済みと扱わない。Codex の利用量を実測できる経路が揃うまでは、定性的な改善と消費量の主張を分ける。
+最初の数件は issue / PR に「採用した層と model、再利用した根拠、調べ直した範囲、手戻り・User 介入」を短く残す。評価単位は完了 1 件あたりの総消費と再探索・手戻り。`pnpm ai:usage` が収集するのは Claude Code の local transcript だけなので、収集外の消費を 0 や節約済みと扱わない。
 
 ## 委譲 prompt の骨格
 

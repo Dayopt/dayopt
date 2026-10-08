@@ -41,7 +41,7 @@ pnpm dev
 
 ## Development Contract
 
-- AI / contributorの入口: [`AGENTS.md`](./AGENTS.md)（provider 共通の正本。判断層・不変条件・Codex レビュー規則・Skills 索引を持つ。[`CLAUDE.md`](./CLAUDE.md) はそれを import するだけのシム）
+- AI / contributorの入口: [`AGENTS.md`](./AGENTS.md)（provider 共通の正本。判断層・不変条件・レビュー規則・Skills 索引を持つ。[`CLAUDE.md`](./CLAUDE.md) はそれを import するだけのシム）
 - 内部docsの地図: [`docs/README.md`](./docs/README.md)
 - architecture: [`docs/engineering/architecture.md`](./docs/engineering/architecture.md)
 - coding conventions: [`docs/engineering/conventions.md`](./docs/engineering/conventions.md)
