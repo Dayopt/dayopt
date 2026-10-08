@@ -457,7 +457,12 @@ pnpm agent:run -- claude
 
 SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
 
-Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。登録済みの `OP_SERVICE_ACCOUNT_TOKEN` は User が Codex Cloud 側から削除し、同じ SA token を使い続けるなら rotation する（未確認）。
+Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。同日 User が SA token を rotation した（User 報告）ため、Codex Cloud に残る旧 token は無効。Codex Cloud 側の登録の削除は未確認。rotation 後のローカルの切替手順（2026-10-09 実測）:
+
+- **ID も変わる**。`op user get --me` の `id`（= `op whoami` の Integration ID）は Service Account 本体ではなく token ごとの ID で、rotation で変わる。`~/.config/dayopt-agent-op/config.json` の `serviceAccountId` を新しい値へ更新しないと `Agent op: IDENTITY_MISMATCH` で止まる
+- **Keychain 項目は新しい ID を account 名にして作り直す**。入口は service `dayopt-agent-service-account`・account `serviceAccountId` で探す
+- **`security add-generic-password -w` の入力プロンプトは長い token を切り詰める**（約 128 文字。SA token は 852 文字）。切れた token は `failed to DecodeSACredentials: unexpected end of JSON input` になる。値はプロンプトを通さず `security -i` へ標準入力で渡す。1Password はコピー後に clipboard を自動で消すので、コピー直後に実行する
+- 確認は agent の shell で `op vault list` が `agent` 1 件だけを返すこと
 
 token の控えの保管先は未確認。token 値や個人の ID 実値は本ページに保存しない。
 
