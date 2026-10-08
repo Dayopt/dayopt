@@ -446,7 +446,7 @@ pnpm agent:run -- claude
 2026-10-01、User の「人間はアプリ、エージェントは SA」という指定に従い、人間用 CLI で bootstrap 項目を取得する処理を廃止した。指定済み SA token を macOS login Keychain の専用項目へ暗号化して保存し、[`scripts/tasks/agent-op.mjs`](../../scripts/tasks/agent-op.mjs) は注入済み token、またはその Keychain 項目だけを使う。
 
 - 1Password アプリの CLI / SDK 連携をオフにし、MCP 統合もオフのまま、既存 MCP 認証をクリアした。元の CLI の account 一覧は 0 件で、人間用 session は存在しないことを確認した。
-- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。**2026-10-09 の Claude Code への切替時点で、Claude Code の process はこの判定に当たらない（未対応）**。Claude Code へ広げるには user-global の `~/.local/bin/op` の判定（例: Claude Code が Bash に渡す `CLAUDECODE=1`）を User が変更し、下の反映確認をやり直す。
+- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。2026-10-09、User 指示で判定に `CLAUDECODE=1`（Claude Code が Bash に渡す環境変数）を追加した。同日、Claude Code desktop の shell で `op vault list` が SA 経由で `agent` 1 件だけを返すことを実測。`CLAUDECODE` を外した process が人間用認証へ fallback しないことの確認は未実施（auto mode が当該コマンドを拒否したため、User の terminal で行う）。
 - `~/.config/dayopt-agent-op/config.json` には元の CLI の絶対 path、検証対象の SA / vault ID だけを保存する。人間用 account / vault / item の参照は除去した。
 - token は平文ファイル・コマンド引数・ログに保存しない。Keychain の service は `dayopt-agent-service-account`、account は指定 SA ID。読み出しには `/usr/bin/security` を使い、その stdout は process 内だけで受け取る。
 - 継承した `OP_*` は除去し、一時設定・生体認証無効の SA 環境で identity と絞り込みなしの vault 一覧を照合してから、要求 command を実行する。
