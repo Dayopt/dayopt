@@ -14,7 +14,7 @@ Dayopt の AI 協働では、agent に変更を書かせることを完了条件
 3. **作業の種類を選ぶ** — 調査、既知の狭い修正、通常の新機能、高影響変更のどれかを分ける。
 4. **必要な場合だけ実装する** — 調査で要件が既に満たされていれば、変更なしで完了できる。差分が必要なら最小の変更を行う。
 5. **対象の検証を行う** — 変更後の挙動を、事前に固定した成功条件と独立した検証結果で確認する。
-6. **必要な独立レビューを通す** — `protected-path-gate.mjs` が外部契約・不可逆・ガードレール変更と判定した PR だけ、required CI が通り head が安定した merge 候補時に GitHub の `@codex review` を使う。通常 PR は依頼せず、追加 reviewer も起動しない。
+6. **必要な独立レビューを通す** — `protected-path-gate.mjs` が外部契約・不可逆・ガードレール変更と判定した PR だけ、required CI が通り head が安定した merge 候補時に `@claude review` を使う。通常 PR は依頼せず、追加 reviewer も起動しない。
 7. **人間の判断を残す** — 作るべきか、製品意図、外部への約束、不可逆操作、production / release は人間が判断する。architecture / security の判断も、顧客挙動・公開契約・権限 / プライバシーなどの authority 境界に触れる場合は人間が判断し、それ以外の可逆な内部実装は `AGENTS.md` の authority level に従う。
 8. **採用した知見を昇格する** — 現在の差分だけの問題か、再利用可能な規則か、機械化できる契約か、永続的な意思決定かを分類して保存する。
 
@@ -128,7 +128,7 @@ PR summary / checklist では次を混ぜずに記録する。
 2. 実装・設定・既存契約・テストと突き合わせ、矛盾・不足・古い前提を解消する。
 3. 確定した spec と対象 SHA / path を、Issue / PR があればそこに、なければ作業報告に残して凍結する。Issue / PR を後から作成した場合は転記して以後の正本にする。凍結後の仕様変更は、先に spec を更新して再照合する。
 4. 担当 agent が実装し、固定した spec の各条件に対して検証する。
-5. 保護対象 path に一致する場合だけ GitHub の `@codex review` を依頼し、指摘を修正・根拠付き反論・Issue 化のいずれかで裁定する。通常ロジック・時間不変条件・agent 文書は対象 test / CI とセルフレビューで閉じる。
+5. 保護対象 path に一致する場合だけ `@claude review` を依頼し、指摘を修正・根拠付き反論・Issue 化のいずれかで裁定する。通常ロジック・時間不変条件・agent 文書は対象 test / CI とセルフレビューで閉じる。
 
 spec-first の draft / 凍結は agent 単独の承認ではない。顧客挙動、公開契約、権限 / プライバシーに触れる場合は `CHECKPOINT` として人間の確認を得てから凍結・実装へ進む。production mutation、release、データ削除、実課金は `EXPLICIT AUTHORITY` として、明示指示・独立レビュー・dry-run / backup が揃うまで実行しない。`AGENTS.md` の authority level と独立レビューの条件は別に満たす。
 

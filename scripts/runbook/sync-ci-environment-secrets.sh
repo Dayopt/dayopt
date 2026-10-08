@@ -66,6 +66,9 @@ secret production-release VERCEL_ORG_ID "op://ci/vercel-production/VERCEL_TEAM_I
 secret production-release VERCEL_AUTOMATION_BYPASS_PRODUCT "op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_PRODUCT"
 secret production-release VERCEL_AUTOMATION_BYPASS_WEB "op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_WEB"
 
+ensure_environment claude-review
+secret claude-review ANTHROPIC_API_KEY "op://ci/anthropic-claude-review/credential"
+
 ensure_environment production-ops
 secret production-ops VERCEL_TOKEN "op://ci/vercel-production/VERCEL_TOKEN"
 secret production-ops VERCEL_ORG_ID "op://ci/vercel-production/VERCEL_TEAM_ID"
@@ -86,7 +89,7 @@ secret production-ops RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY "op://ci/Cloudflare-R
 
 echo
 if $EXECUTE; then
-  for env in production-release production-ops; do
+  for env in production-release claude-review production-ops; do
     echo "== $env の Secret（名前だけ）"
     gh secret list --env "$env" --repo "$REPO" | awk '{print "   " $1}'
   done

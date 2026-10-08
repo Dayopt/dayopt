@@ -730,7 +730,7 @@ export function runValidationGate({
     const summary = formatValidationResult(result) + '\n' + formatReviewPolicy(review);
     output(summary);
     if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary);
-    // Codex の起動は shadow では行わない（workflow に pull-requests: write を渡していない）。
+    // Claude review の起動は shadow では行わない（workflow に pull-requests: write を渡していない）。
     // 起動要否の判定だけを log に残し、#2798 の比較材料にする。
     if (review.trigger.shouldRequest) output(`::notice::Review policy: ${review.trigger.reason}\n`);
     const outPath = env.VALIDATION_RESULT_PATH ? resolve(env.VALIDATION_RESULT_PATH) : null;

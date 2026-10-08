@@ -127,8 +127,9 @@ export const envSchema: EnvSchemaEntry[] = [
   // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
   // agent の Vercel 読み取りは CLI の読み取り系サブコマンドだけで行う（pre-tool-guard）。
 
-  // ANTHROPIC_API_KEY（consumer 無し）と webmaster verification 3 件（値が空で Vercel にも
-  // replica 無し）は、2026-09-14 に agent の item ごと削除したため entry を置かない。
+  // webmaster verification 3 件（値が空で Vercel にも replica 無し）は、2026-09-14 に agent の
+  // item ごと削除したため entry を置かない。ANTHROPIC_API_KEY も同日に削除し、2026-10 に
+  // Claude review 専用の ci entry（下の ciSecretSchema）として作り直した。
   // verification を使う時は公開値なので human/app 等の production item に足す。
 
   // 外部カレンダー取り込み用の専用 OAuth client（Supabase Auth の Google provider とは別物）。
@@ -515,6 +516,11 @@ export const ciSecretSchema: EnvSchemaEntry[] = [
     githubSecret: envName,
     githubEnvironments: ['Nonproduction login'],
   })),
+  // Claude review（.github/workflows/claude-review.yml）の Anthropic API key。PR への書き込み
+  // token とは別 job で使い、月の上限は Anthropic Console の spend limit で持つ。
+  ciEntry('ANTHROPIC_API_KEY', 'secret', 'anthropic-claude-review', ['claude-review'], {
+    field: 'credential',
+  }),
   // nightly の Storage backup（rclone）。SOURCE は Supabase Storage の S3 接続、DEST は Cloudflare R2。
   ...rcloneEntries('SOURCE', 'Supabase-StorageS3-backupsource'),
   ...rcloneEntries('DEST', 'Cloudflare-R2-storagebackup'),

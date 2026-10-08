@@ -18,6 +18,7 @@ import {
   sanitizeLabels,
   type ShadowPrEvidence,
 } from './jev-shadow-truth.ts';
+import { CLAUDE_REVIEW_MARKER } from './review-policy.mjs';
 
 const resolveGate = resolveProtectedPathGate as Parameters<typeof deriveTruth>[1]['resolveGate'];
 
@@ -154,7 +155,7 @@ describe('導出ラベル', () => {
   });
 });
 
-describe('Codex の badge 集計', () => {
+describe('レビュー bot の badge 集計', () => {
   it('bot 以外の本文は数えない', () => {
     const counts = countCodexBadges([
       { authorLogin: 'chatgpt-codex-connector[bot]', body: '![P1 Badge] a' },
@@ -162,6 +163,14 @@ describe('Codex の badge 集計', () => {
       { authorLogin: 't3-nico', body: '![P1 Badge] 引用しただけ' },
     ]);
     expect(counts).toEqual({ p1: 1, p2: 1 });
+  });
+
+  it('Claude review は marker 付きの github-actions 投稿だけを数える', () => {
+    const counts = countCodexBadges([
+      { authorLogin: 'github-actions', body: `${CLAUDE_REVIEW_MARKER}\n![P1 Badge] a` },
+      { authorLogin: 'github-actions[bot]', body: '![P2 Badge] marker の無い別 workflow' },
+    ]);
+    expect(counts).toEqual({ p1: 1, p2: 0 });
   });
 
   it('REST と GraphQL の login 表記を同じものとして扱う', () => {

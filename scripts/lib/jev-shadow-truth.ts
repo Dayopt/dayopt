@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 
 import { JEV_MAX_INPUT_BYTES, jevInputBytes, type JevJsonValue } from './jev-adapter.ts';
 import { SHADOW_QUESTION_SET_ID, SHADOW_QUESTIONS } from './jev-shadow-questions.ts';
+import { CLAUDE_REVIEW_MARKER } from './review-policy.mjs';
 import { VALIDATION_PRODUCER_DEFINITIONS } from './validation-producer-contract.mjs';
 
 /** 保護対象 glob を観点へ写像する時の分類。 */
@@ -85,6 +86,9 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'scripts/lib/validation-*.test.ts': 'guardrails',
   'scripts/lib/review-policy.mjs': 'guardrails',
   'scripts/lib/review-policy.test.ts': 'guardrails',
+  'scripts/ci/claude-review-post.mjs': 'guardrails',
+  'scripts/ci/claude-review-post.test.ts': 'guardrails',
+  '.github/workflows/claude-review.yml': 'guardrails',
   'scripts/ci/validation-*.mjs': 'guardrails',
   'scripts/ci/validation-*.test.ts': 'guardrails',
   '.github/workflows/validation-gate.yml': 'guardrails',
@@ -134,7 +138,18 @@ export function isCodexBotLogin(login: string | null | undefined): boolean {
   return String(login ?? '').replace(/\[bot\]$/, '') === CODEX_BOT_LOGIN;
 }
 
-/** `trace.mjs:409` と同じ badge 表記。Codex が本文先頭に貼る画像。 */
+/**
+ * Claude review（2026-10 以降）の inline comment か。投稿者は `github-actions` で、他 workflow と
+ * 区別するため marker を必ず含む。
+ */
+function isClaudeReviewThread(thread: ShadowReviewThread): boolean {
+  return (
+    String(thread.authorLogin ?? '').replace(/\[bot\]$/, '') === 'github-actions' &&
+    thread.body.includes(CLAUDE_REVIEW_MARKER)
+  );
+}
+
+/** `trace.mjs` と同じ badge 表記。Codex と Claude review が本文先頭に貼る画像。 */
 const P1_BADGE = /!\[P1 Badge\]/;
 const P2_BADGE = /!\[P2 Badge\]/;
 
@@ -259,7 +274,7 @@ export function countCodexBadges(threads: ShadowReviewThread[]): { p1: number; p
   let p1 = 0;
   let p2 = 0;
   for (const thread of threads) {
-    if (!isCodexBotLogin(thread.authorLogin)) continue;
+    if (!isCodexBotLogin(thread.authorLogin) && !isClaudeReviewThread(thread)) continue;
     if (P1_BADGE.test(thread.body)) p1 += 1;
     if (P2_BADGE.test(thread.body)) p2 += 1;
   }

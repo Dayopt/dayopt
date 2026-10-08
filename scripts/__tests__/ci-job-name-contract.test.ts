@@ -215,6 +215,7 @@ describe('CI job 名の契約', () => {
       'workflows/calendar-navigation-e2e.yml',
       'workflows/candidate-promotion.yml',
       'workflows/ci.yml',
+      'workflows/claude-review.yml',
       'workflows/create-release.yml',
       'workflows/nightly.yml',
       'workflows/nonproduction-login.yml',

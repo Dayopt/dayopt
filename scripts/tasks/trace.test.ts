@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { CLAUDE_REVIEW_MARKER } from '../lib/review-policy.mjs';
 import {
   buildInternalReviewSection,
   buildRevertSearchArgv,
@@ -9,10 +10,11 @@ import {
   collectDecisionLines,
   computeFindings,
   computeZeroFindingRoleNotes,
-  countCodexPriorities,
   countCommitsAfterMarker,
   countCommitsAfterReady,
   countCommitsAfterReadyFallback,
+  countReviewPriorities,
+  countReviewRequestCycles,
   countRoleFindingsHeuristic,
   extractDodExcerpt,
   filterInternalReviewMarkerComments,
@@ -288,19 +290,53 @@ describe('findReadyForReviewDate / countCommitsAfterReady / timelineLacksCommitE
   });
 });
 
-describe('countCodexPriorities', () => {
-  it('P1/P2 の言及件数を Codex bot login で絞って数える', () => {
+describe('countReviewPriorities', () => {
+  it('P1/P2 の言及件数を Codex bot login で絞って数える（過去 PR）', () => {
     const reviews = [
       { user: { login: 'chatgpt-codex-connector' }, body: 'P1: 深刻な不具合' },
       { user: { login: 'tomoya' }, body: 'P1 だが自分のコメント' },
     ];
     const comments = [{ user: { login: 'chatgpt-codex-connector[bot]' }, body: 'P2 の指摘' }];
-    expect(countCodexPriorities(reviews, comments)).toEqual({ p1: 1, p2: 1 });
+    expect(countReviewPriorities(reviews, comments)).toEqual({ p1: 1, p2: 1 });
+  });
+
+  it('Claude review は marker 付きの github-actions 投稿だけを数える', () => {
+    const comments = [
+      {
+        user: { login: 'github-actions[bot]' },
+        body: `${CLAUDE_REVIEW_MARKER}\n![P1 Badge](x) 指摘`,
+      },
+      { user: { login: 'github-actions[bot]' }, body: 'P1 を含む別 workflow の comment' },
+    ];
+    expect(countReviewPriorities([], comments)).toEqual({ p1: 1, p2: 0 });
   });
 
   it('dependabot[bot] 等の無関係な bot コメントは `[bot]` サフィックス一致だけでは誤計上しない', () => {
     const comments = [{ user: { login: 'dependabot[bot]' }, body: 'P1 のセキュリティ更新' }];
-    expect(countCodexPriorities([], comments)).toEqual({ p1: 0, p2: 0 });
+    expect(countReviewPriorities([], comments)).toEqual({ p1: 0, p2: 0 });
+  });
+});
+
+describe('countReviewRequestCycles', () => {
+  it('@claude review の依頼と Claude review の結果 comment を数える', () => {
+    const comments = [
+      { user: { login: 't3-nico' }, body: '@claude review' },
+      {
+        user: { login: 'github-actions[bot]' },
+        body: `${CLAUDE_REVIEW_MARKER}\nResult: completed\nFindings: 2`,
+      },
+      { user: { login: 't3-nico' }, body: '@claude review' },
+      {
+        user: { login: 'github-actions[bot]' },
+        body: `${CLAUDE_REVIEW_MARKER}\nResult: completed\nFindings: 0`,
+      },
+      { user: { login: 'github-actions[bot]' }, body: 'Deploy preview ready' },
+    ];
+    expect(countReviewRequestCycles(comments)).toEqual({
+      requests: 2,
+      responses: 2,
+      cleanResponses: 1,
+    });
   });
 });
 

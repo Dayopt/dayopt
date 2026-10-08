@@ -3,7 +3,7 @@
 /**
  * Protected Path Gate - determines from a changed-files list whether a PR
  * touches a protected path, used as the signal for whether
- * GitHub `@codex review` is eligible for the change (#2478,
+ * an `@claude review` (.github/workflows/claude-review.yml) is eligible for the change (#2478,
  * tempo-linked review signal; downgraded from a merge-blocking gate to an
  * advisory signal in #2596 - merge itself is blocked by the main branch
  * repository ruleset).
@@ -74,7 +74,7 @@ export const PRODUCTION_CONFIG_AUDIT_CONTRACT_PATHS = [
 
 /**
  * Protected path globs (OR'd together). If any changed file matches one of
- * these, the PR is eligible for GitHub `@codex review` at the stable
+ * these, the PR is eligible for `@claude review` at the stable
  * merge-candidate stage (#2596; no longer a merge-blocking requirement).
  * Add or remove entries only in this array (finish-branch.sh does not keep a copy).
  */
@@ -167,6 +167,11 @@ export const PROTECTED_PATH_GLOBS = [
   'scripts/lib/validation-*.test.ts',
   'scripts/lib/review-policy.mjs',
   'scripts/lib/review-policy.test.ts',
+  // Claude review は ANTHROPIC_API_KEY と PR への書き込み token を job で分けている。
+  // 境界と投稿形式（review policy が読む証拠）を同じ PR で崩せないよう自己保護する。
+  'scripts/ci/claude-review-post.mjs',
+  'scripts/ci/claude-review-post.test.ts',
+  '.github/workflows/claude-review.yml',
   'scripts/ci/validation-*.mjs',
   'scripts/ci/validation-*.test.ts',
   '.github/workflows/validation-gate.yml',

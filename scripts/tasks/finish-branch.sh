@@ -774,7 +774,7 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
   #
   # Codex / 追加 reviewer marker の hard gate は #2596 で撤回した（merge の遮断は main の
   # ruleset が全経路で行う。#2640。AGENTS.md §レビュー）。保護対象 path の判定自体は削除せず、Main が
-  # GitHub の @codex review でどこを重点的に読むかの目安として
+  # @claude review（.github/workflows/claude-review.yml）でどこを重点的に読むかの目安として
   # 残す — ここでの判定結果は merge を止めない（情報表示のみ）。
   #
   # 判定は scripts/ci/protected-path-gate.mjs（正本）へ委譲する。入力は
@@ -830,9 +830,9 @@ if [[ "$PR_STATE" == "OPEN" ]]; then
 
   if [[ "$ADVISORY_REVIEW_RECOMMENDED" == "true" ]]; then
     ADVISORY_REVIEW_REASON_JOINED="$(IFS=', '; echo "${ADVISORY_REVIEW_REASONS[*]}")"
-    echo "GitHub @codex review focus recommended (${ADVISORY_REVIEW_REASON_JOINED}) — merge は止めません" >&2
+    echo "@claude review focus recommended (${ADVISORY_REVIEW_REASON_JOINED}) — merge は止めません" >&2
   else
-    echo "GitHub @codex review focus: 保護対象 path に該当なし" >&2
+    echo "@claude review focus: 保護対象 path に該当なし" >&2
   fi
 
   # ── audit contract 変更 PR の trusted dispatch は任意の確認手段（2026-09-18、#2469）──
