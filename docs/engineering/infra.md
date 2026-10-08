@@ -15,12 +15,12 @@ Dayopt の標準リリース経路は `PR Preview → production`。Local は任
 
 ### 環境一覧
 
-| 環境               | Supabase                                     | Vercel                                     | URL                                         |
-| ------------------ | -------------------------------------------- | ------------------------------------------ | ------------------------------------------- |
-| **Preview**        | PRごとの専用非本番branch（全PR設定は未確認） | PRごとのPreview (`product`)                | `*.vercel.app`                              |
-| **Personal Local** | 開発者が任意で起動するlocal stack            | `pnpm dev`                                 | localhost:3000                              |
-| **Integration**    | 常設の非本番Supabase                         | `product` の `integration` branch Preview  | `product-git-integration-dayopt.vercel.app` |
-| **Production**     | `dayopt` main                                | main merge で自動 promote（`promote.yml`） | `app.dayopt.app`                            |
+| 環境               | Supabase                                     | Vercel                                                  | URL                                         |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------- | ------------------------------------------- |
+| **Preview**        | PRごとの専用非本番branch（全PR設定は未確認） | PRごとのPreview (`product`)                             | `*.vercel.app`                              |
+| **Personal Local** | 開発者が任意で起動するlocal stack            | `pnpm dev`                                              | localhost:3000                              |
+| **Integration**    | 常設の非本番Supabase                         | `product` の `integration` branch Preview               | `product-git-integration-dayopt.vercel.app` |
+| **Production**     | `dayopt` main                                | 毎晩 03:00 JST に main HEAD を promote（`promote.yml`） | `app.dayopt.app`                            |
 
 web（`dayopt.app`）と product（`app.dayopt.app`）は別ドメインで配信する。web から product へは絶対 URL でリンクし、path ベースの Multi-Zones（web の rewrites で `/settings` や `/app-static` を product へ proxy する構成）は使わない。production で既に 404 になっていたため 2026-09-14 に設定を撤去した（#2747）。security headers の正本は各 app の `next.config.mjs` の `headers()` で、`vercel.json` には置かない。
 
@@ -130,7 +130,7 @@ pnpm dev
 
 詳細は本ファイルの「マイグレーション & リリース チェックリスト」セクション。
 
-- 通常PR: Product Preview が常設の非本番Supabaseを参照する
+- 通常PR: Product Preview がそのPR専用の非本番Supabase branchを参照する（全PRでの自動作成と接続は上記のとおり未確認）
 - DB・Auth共通設定PR: PR専用Supabase Preview Branchへmigration/configを適用し、Product Previewも同じbranchを参照する
 - main merge: Supabase integration が production に migration を適用する
 - emergency only: 手動 `supabase db push`
@@ -152,7 +152,7 @@ main merge
   ├── Supabase main deployment
   └── Vercel Production build（domain 未割当の candidate）
         ↓
-      Production Release workflow（push: main で自動起動）
+      Production Release workflow（毎晩 03:00 JST に main HEAD で起動）
         ├── impact（各 project の live SHA からの差分で層 3 の要否を決める）
         ├── 層 3（影響のある suite だけ。E2E / Web Build & E2E）
         └── release（影響判定 / smoke / audit）
@@ -162,15 +162,17 @@ main merge
       両 production domain の smoke
 ```
 
-**promote は 2026-09-03 に merge 連動の自動実行へ戻した**（#2268 の手動 dispatch を撤回）。
-手動 dispatch の emergency run も通常の候補固定・検証・smoke・config audit を通す。`force` input は
-廃止され、指定すると release script が失敗する。候補 gate は repository variable
-`RELEASE_CANDIDATE_ENABLED=true` の明示設定時だけ有効になり、未設定時は候補向け strict gate を実行しない。
-有効化後は候補と main の内容・検証証拠が一致しない場合に fail closed で公開を止める。安全は「影響のある層 3 が
+**promote は 2026-10-09 から夜 1 回（03:00 JST、cron `0 18 * * *`）、その時点の main HEAD を対象に自動実行する。**
+2026-09-03〜10-05 は merge ごとに起動していたが、層 3 を merge ごとに走らせると Actions を月約 3,000 分使う
+（夜 1 回なら約 600 分）。急ぎは `gh workflow run promote.yml --ref main` で同じ gate を通す。
+GitHub の cron は混雑時に数時間遅れることがある。
+手動 dispatch の emergency run も通常の層 3・smoke・config audit を通す。`force` input は
+廃止され、指定すると release script が失敗する。#3009 の候補固定（`RELEASE_CANDIDATE_ENABLED`）は
+2026-10-09 に撤去した。安全は「影響のある層 3 が
 **同一 run で** green」であることで担保し、層 3 の判定は check-run 名の照合ではなく
 `needs.*.result` で行う。層 3（E2E / Web Build & E2E）は nightly.yml から promote.yml へ
 移設した — #2382 が per-merge の層 3 を廃止した根拠は「promote が手動だから赤い main は
-ユーザーへ届かない」で、merge 連動にするとその前提が反転するため。integration は
+ユーザーへ届かない」で、自動 promote にするとその前提が反転するため。integration は
 per-PR（ci.yml）へ一本化した（`branch:finish` の up-to-date gate により merge commit の
 tree は per-PR で検証済みの tree と一致する）。
 
@@ -309,7 +311,7 @@ script が Production secret 付きで動く。YAML の条件では塞げない�
 custom branch policies、許可は `main` のみ、required reviewers なし）。main 以外の ref からの dispatch は
 job 開始前に GitHub 側で拒否される。
 
-**この environment に required reviewers を付けてはいけない。** merge 連動の自動 promote が承認待ちで
+**この environment に required reviewers を付けてはいけない。** 夜間の自動 promote が承認待ちで
 timeout する。付ける必要が出た場合は promote.yml の設計ごと見直す。
 
 残る任意の追加措置: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` だけを
@@ -341,9 +343,9 @@ release script は Vercel API への read-modify-write で、API にトランザ
   層 3 を内包した workflow 全体を 1 group にすると、GitHub は group ごとに pending を 1 本しか
   保持せず新着で古い pending を cancel するため、burst（実測 1 時間に 1〜3 merge）の 2 本目が
   promote されないまま消える。層 3 の 2 job は suite 別・ref 別の group（cancel あり）を持ち、
-  新しい push が古い run の同種 job だけをキャンセルする。キャンセルされた job は
+  新しい run（夜間 run と手動 dispatch の重なり）が古い run の同種 job だけをキャンセルする。キャンセルされた job は
   `needs.<id>.result == 'cancelled'` になり、その run の release job は不成立で skip される
-  （= promote しない。次の push の run が live 基準で拾い直す）
+  （= promote しない。新しい run が live 基準で拾い直す）
 - **release run の実行中に、人手で Vercel の promote / rollback / alias 操作をしない。** 緊急時も run の完了（または cancel の完了）を待ってから [runbook](../operations/runbook.md) Playbook 2 に従う
 
 script が保証すること（コードで守る）:
