@@ -126,9 +126,9 @@ merge ごとに Production build を作るが、domain は割り当てない（A
 
 ### 6. smoke してから本番へ切り替える（GitHub Actions）
 
-release job が migration の反映を確かめ、候補を smoke してから Production domain へ promote する。candidate mode では未確認の migration 状態も公開を止める。
+release job が migration の反映を確かめ（今は advisory で warning だけ）、候補を smoke してから Production domain へ promote する。
 
-- **ここを変えると**: 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
+- **ここを変えると**: 緊急の手動実行も層 3・smoke・設定監査を通す。force による gate 迂回は廃止。
 - **コード**:
   - [`.github/workflows/promote.yml`](../../../.github/workflows/promote.yml) で `Wait, smoke, and promote Production` を探す
   - [`scripts/ci/production-release.mjs`](../../../scripts/ci/production-release.mjs) で `promote` を探す
@@ -393,8 +393,8 @@ release job が migration の反映を確かめ、候補を smoke してから P
       "id": "promote",
       "svc": "github",
       "title": "smoke してから本番へ切り替える",
-      "what": "release job が migration の反映を確かめ、候補を smoke してから Production domain へ promote する。candidate mode では未確認の migration 状態も公開を止める。",
-      "change": "緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。",
+      "what": "release job が migration の反映を確かめ（今は advisory で warning だけ）、候補を smoke してから Production domain へ promote する。",
+      "change": "緊急の手動実行も層 3・smoke・設定監査を通す。force による gate 迂回は廃止。",
       "refs": [
         {
           "path": ".github/workflows/promote.yml",

@@ -425,22 +425,6 @@ function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] 
 }
 
 export const ciSecretSchema: EnvSchemaEntry[] = [
-  // #3009: planned activation only. No master or replica is provisioned by code.
-  ...[
-    ['SUPABASE_MIGRATION_READINESS_TOKEN', 'supabase-migration-readiness'],
-    ['RELEASE_CANDIDATE_TOKEN', 'github-release-candidate'],
-  ].map(([envName, item]) => ({
-    ...pendingEnvEntry(
-      envName,
-      'secret',
-      'production',
-      ci,
-      item,
-      '#3009 release activation is not approved; master and replica remain unprovisioned',
-      'credential',
-    ),
-    githubEnvironments: ['production-release'],
-  })),
   // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
   // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
   // Production master は既存team token。project tokenも同じProduct内のProduction/Previewを分離しない。

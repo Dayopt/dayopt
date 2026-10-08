@@ -1,8 +1,6 @@
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -23,7 +21,6 @@ writeFileSync(join(root, 'supabase/migrations/README.md'), 'not a migration\n');
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const applied = (versions: string[]) => async () => versions.map((version) => ({ version }));
-const scriptPath = fileURLToPath(new URL('./production-migration-readiness.mjs', import.meta.url));
 
 describe('production migration readiness', () => {
   it('reads the candidate migration versions from the repository', () => {
@@ -101,39 +98,6 @@ describe('production migration readiness', () => {
     });
     expect(result.status).toBe('unverified');
     expect(queried).toBe(false);
-  });
-
-  it('fails the CLI when candidate mode requires evidence but the token is missing', () => {
-    const result = spawnSync(process.execPath, [scriptPath], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        MIGRATION_READINESS_REQUIRED: 'true',
-        SUPABASE_MIGRATION_READINESS_TOKEN: '',
-      },
-    });
-
-    expect(result.error).toBeUndefined();
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('Migration readiness:');
-    expect(result.stderr).toContain('migration state was not verified');
-    expect(result.stdout).not.toContain('Migration readiness verified:');
-  });
-
-  it('keeps missing migration evidence advisory when candidate mode is disabled', () => {
-    const result = spawnSync(process.execPath, [scriptPath], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        MIGRATION_READINESS_REQUIRED: '',
-        SUPABASE_MIGRATION_READINESS_TOKEN: '',
-      },
-    });
-
-    expect(result.error).toBeUndefined();
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('::warning::Migration readiness:');
-    expect(result.stderr).not.toContain('::error::Migration readiness:');
   });
 
   it('does not treat invalid metadata as applied', async () => {

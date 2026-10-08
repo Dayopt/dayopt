@@ -178,38 +178,6 @@ describe('release workflow contract', () => {
     expect(gate.length).toBeGreaterThan(0);
   });
 
-  it('checks an enabled candidate before release work and again immediately before promote', () => {
-    const impactJob = code(
-      release.slice(release.indexOf('\n  impact:'), release.indexOf('\n  e2e:')),
-    );
-    const earlyGate = impactJob.indexOf('Verify tested candidate before release work');
-    const impactResolution = impactJob.indexOf('Resolve release impact');
-    expect(earlyGate).toBeGreaterThan(-1);
-    expect(impactResolution).toBeGreaterThan(earlyGate);
-    const earlyGateStep = impactJob.slice(earlyGate, impactResolution);
-    expect(earlyGateStep).toContain("if: vars.RELEASE_CANDIDATE_ENABLED == 'true'");
-    expect(earlyGateStep).toContain('RELEASE_CANDIDATE_MAX_AGE_SECONDS');
-    expect(earlyGateStep).toContain('node scripts/ci/release-candidate-gate.mjs production');
-
-    const migrationReadiness = release.indexOf(
-      'Verify candidate migrations are applied in Production',
-    );
-    const finalGate = release.indexOf('Verify tested candidate immediately before promotion');
-    const promote = release.indexOf('Wait, smoke, and promote Production');
-    expect(migrationReadiness).toBeGreaterThan(-1);
-    expect(finalGate).toBeGreaterThan(migrationReadiness);
-    expect(promote).toBeGreaterThan(finalGate);
-
-    const readinessStep = release.slice(migrationReadiness, finalGate);
-    expect(readinessStep).toContain(
-      'MIGRATION_READINESS_REQUIRED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}',
-    );
-    const finalGateStep = release.slice(finalGate, promote);
-    expect(finalGateStep).toContain("if: vars.RELEASE_CANDIDATE_ENABLED == 'true'");
-    expect(finalGateStep).toContain('RELEASE_CANDIDATE_MAX_AGE_SECONDS');
-    expect(finalGateStep).toContain('node scripts/ci/release-candidate-gate.mjs production');
-  });
-
   it('pins the release gate expression exactly', () => {
     // **部分文字列の検査では守れない。** 必要な conjunct の存在だけを見る形だと、
     // 既存 literal を残したまま外側に選言を 1 本足すだけで gate 全体を無効化できる

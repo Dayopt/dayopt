@@ -73,8 +73,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      actions: read
-      pull-requests: read
     outputs:
       product_affected: ${{ steps.run.outputs.product_affected }}
       web_affected: ${{ steps.run.outputs.web_affected }}
@@ -94,13 +92,6 @@ jobs:
 
       # pnpm install は行わない。release-impact.mjs と production-release.mjs は
       # node 標準ライブラリしか使わない（ci.yml の impact job と同じ判断）。
-      - name: Verify tested candidate before release work
-        if: vars.RELEASE_CANDIDATE_ENABLED == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
-        run: node scripts/ci/release-candidate-gate.mjs production
-
       - name: Resolve release impact
         id: run
         env:
@@ -456,8 +447,6 @@ jobs:
     permissions:
       contents: read
       statuses: write
-      actions: read
-      pull-requests: read
     # scripts/ci/production-release.mjs の WORST_CASE_RELEASE_MS を必ず上回ること。
     # 下回ると rollback の途中で job が kill され、片方だけ promote された
     # production が手動 rollback の手掛かりごと失われる。
@@ -518,19 +507,8 @@ jobs:
       # read-only token を `production-release` environment へ置く決定（secret の境界変更、
       # User 裁可）と、`docs/operations/secrets.md` の台帳・environment 同期 script・
       # `ci-secret-ledger.test.ts` の同時更新が要る。有効化後は欠落が promote を止める。
-      # Candidate mode makes missing migration evidence a hard failure.
       - name: Verify candidate migrations are applied in Production
-        env:
-          MIGRATION_READINESS_REQUIRED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}
-          SUPABASE_MIGRATION_READINESS_TOKEN: ${{ vars.RELEASE_CANDIDATE_ENABLED == 'true' && secrets.SUPABASE_MIGRATION_READINESS_TOKEN || '' }}
         run: node scripts/ci/production-migration-readiness.mjs
-
-      - name: Verify tested candidate immediately before promotion
-        if: vars.RELEASE_CANDIDATE_ENABLED == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
-        run: node scripts/ci/release-candidate-gate.mjs production
 
       - name: Wait, smoke, and promote Production
         id: release

@@ -166,10 +166,9 @@ main merge
 2026-09-03〜10-05 は merge ごとに起動していたが、層 3 を merge ごとに走らせると Actions を月約 3,000 分使う
 （夜 1 回なら約 600 分）。急ぎは `gh workflow run promote.yml --ref main` で同じ gate を通す。
 GitHub の cron は混雑時に数時間遅れることがある。
-手動 dispatch の emergency run も通常の候補固定・検証・smoke・config audit を通す。`force` input は
-廃止され、指定すると release script が失敗する。候補 gate は repository variable
-`RELEASE_CANDIDATE_ENABLED=true` の明示設定時だけ有効になり、未設定時は候補向け strict gate を実行しない。
-有効化後は候補と main の内容・検証証拠が一致しない場合に fail closed で公開を止める。安全は「影響のある層 3 が
+手動 dispatch の emergency run も通常の層 3・smoke・config audit を通す。`force` input は
+廃止され、指定すると release script が失敗する。#3009 の候補固定（`RELEASE_CANDIDATE_ENABLED`）は
+2026-10-09 に撤去した。安全は「影響のある層 3 が
 **同一 run で** green」であることで担保し、層 3 の判定は check-run 名の照合ではなく
 `needs.*.result` で行う。層 3（E2E / Web Build & E2E）は nightly.yml から promote.yml へ
 移設した — #2382 が per-merge の層 3 を廃止した根拠は「promote が手動だから赤い main は
