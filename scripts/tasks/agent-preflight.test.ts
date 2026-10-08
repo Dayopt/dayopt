@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  collectClaudeHooks,
   collectGhIdentity,
   collectPreflight,
   parseGhAuthStatus,
@@ -109,6 +110,8 @@ describe('agent preflight', () => {
     expect(state.hooks['pre-push']).toBe(true);
     expect(state.skills).toBe(true);
     expect(state.codexHooks).toContain('unverified');
+    expect(state.claudeHooks).toBe('missing');
+    expect(renderPreflight(state)).toContain('**Claude hooks**: missing');
     expect(state.readOnlyDelegation.wrapper).toBe(false);
     expect(state.readOnlyDelegation.native).toContain('scope cannot be enforced');
     expect(renderPreflight(state)).toContain('Read-only delegation');
@@ -174,5 +177,37 @@ describe('agent preflight', () => {
     );
     expect(result.status).toBe(1);
     expect(JSON.parse(result.stdout).dependencies).toBe(false);
+  });
+  it('reports the repository Claude settings as configured', () => {
+    expect(collectClaudeHooks(resolve(__dirname, '../..'))).toBe(
+      'configured; runtime activation unverified',
+    );
+  });
+  it('names the missing Claude guard registrations', () => {
+    const root = fixture();
+    mkdirSync(join(root, '.claude'), { recursive: true });
+    writeFileSync(
+      join(root, '.claude/settings.json'),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [
+            { hooks: [{ type: 'command', command: 'scripts/hooks/session-start.sh' }] },
+          ],
+          PreToolUse: [
+            {
+              matcher: 'Bash',
+              hooks: [{ type: 'command', command: 'scripts/hooks/pre-tool-guard.sh' }],
+            },
+            {
+              matcher: 'Write',
+              hooks: [{ type: 'command', command: 'scripts/hooks/other.sh' }],
+            },
+          ],
+        },
+      }),
+    );
+    expect(collectClaudeHooks(root)).toBe(
+      'incomplete (PreToolUse:Write, PreToolUse:Edit, PreToolUse:Read)',
+    );
   });
 });

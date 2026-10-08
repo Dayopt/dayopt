@@ -441,22 +441,22 @@ BSD-2-Clause: 12 packages (1.3%)
 
 # 第3部: AI 協働ハーネス
 
-**Date**: 2026-09-07
+**Date**: 2026-10-09
 **Scope**: `AGENTS.md`、`.agents/skills/`、provider adapter、共有 hook rules
 **Status**: current
 
 ## 1. 正本と互換 adapter
 
-- 実装・調査・レビューの共通ガイダンスは `AGENTS.md` を正本とする。OpenAI / Codex が primary harness だが、判断層・Dayopt の不変条件・authority level は provider に依存しない
+- 実装・調査・レビューの共通ガイダンスは `AGENTS.md` を正本とする。Claude Code が primary harness（2026-10-09 に Codex から切替。Codex は副 runtime として adapter を維持）だが、判断層・Dayopt の不変条件・authority level は provider に依存しない
 - project skill の実体は `.agents/skills/*/SKILL.md` に置く。`.claude/skills` は Claude Code が同じ実体を見つけるための相対 symlink で、複製ではない
 - `CLAUDE.md` は `@AGENTS.md` を import する互換 adapter。provider 固有の設定を共通ガイダンスへ逆流させない
 - runtime / tool 固有の command が必要な skill は、共通の目的・scope・出力契約を先に書き、command を optional provider adapter として示す。別 runtime では同じ契約を満たす generic fallback を使う
 
 ## 2. Routing の基準
 
-通常開発は ChatGPT Chat + Codex。共通指示は `AGENTS.md`、作業方針・Issue Brief・委譲の手順は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
+通常開発は Claude Code。共通指示は `AGENTS.md`、作業方針・Issue Brief・委譲の手順は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
-Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
+Chat は product / UX・research・仕様整理、Claude Code は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
 モデルの固定割当や切替順序は設けない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
@@ -466,14 +466,14 @@ Chat は product / UX・research・仕様整理、Codex は repo に基づく判
 
 adapter の script が存在するだけでは tool call は止まらない。runtime 側で adapter が実行前 hook として登録・起動され、block 結果を尊重する必要がある。repo は user-global 設定、直接 shell、User 自身の UI 操作、未知の tool surface を強制できない。具体的な secret 境界と残余リスクは [secrets.md](./secrets.md) を正本とする。
 
-Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
+Claude Code は project の `.claude/settings.json` の hook を読み込む。副 runtime の Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Claude Code / Codex の hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
 
-### Local / Codex Cloud の実行環境
+### Local / Cloud の実行環境
 
 Node.js と package manager は実行場所ごとに暗黙で選ばせず、repository contract に揃える。
 
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
-- Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
+- Claude Code の cloud session は `scripts/hooks/session-start.sh`（`CLAUDE_CODE_REMOTE=true` の時だけ install）で依存を揃える。副 runtime の Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
 - Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
 - Codex Cloud の Secret は setup script にだけ渡り、agent phase の前に取り除かれる。Jev key を Cloud の通常 Environment Variable に置くと agent phase から読めるため設定しない。L1 を Cloud L2 に渡す時は、ローカルの認証済み `pnpm ctx <N> --post` で Issue Brief に保存し、Cloud 側は [`pnpm ctx <N> --reuse-brief-l1`](./jev.md) で入力一致とBrief投稿者・現在の `gh` 認証ユーザーの一致を検証して読む
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す

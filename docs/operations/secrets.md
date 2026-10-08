@@ -30,7 +30,7 @@ Preview E2E のログイン用アカウント資格情報は branch API credenti
 
 ## AI エージェントの env ファイル境界
 
-この境界は provider を問わず、Dayopt の workspace を読む・書く全 coding agent に適用する。OpenAI / Codex を primary harness とし、Claude Code など他 provider も同じ規約を読む。規約の正本は本節、共有判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置く。
+この境界は provider を問わず、Dayopt の workspace を読む・書く全 coding agent に適用する。Claude Code を primary harness とし、副 runtime の Codex など他 provider も同じ規約を読む。規約の正本は本節、共有判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置く。
 
 provider ごとの入口は薄い adapter として分ける。
 
@@ -38,9 +38,9 @@ provider ごとの入口は薄い adapter として分ける。
 - Codex 用の入口は `scripts/hooks/codex-pre-tool-guard.mjs`。Codex の tool-call payload を共有 rules の入力へ変換する
 - 他 runtime は共有 rules を呼ぶ adapter が登録されている場合だけ同じ機械判定を受ける。adapter が無ければ本節と `AGENTS.md` の規律だけが適用される
 
-**script が repo に存在するだけでは強制力にならない。** runtime が該当 adapter を tool 実行前に登録・起動し、block 結果を尊重する場合にだけ、その runtime 内の対象 tool call を止める。repo は user-global Codex 設定や未知の provider の hook 登録を保証しない。直接 shell、User 自身の UI 操作、adapter が受け取らない tool surface、意図的な文字列組み立てまで閉じる security boundary とは表現しない。hook は事故を減らす speed bump で、production mutation の最終境界は `AGENTS.md` の EXPLICIT AUTHORITY とサービス側の認証・承認である。
+**script が repo に存在するだけでは強制力にならない。** runtime が該当 adapter を tool 実行前に登録・起動し、block 結果を尊重する場合にだけ、その runtime 内の対象 tool call を止める。repo は user-global の Claude Code / Codex 設定や未知の provider の hook 登録を保証しない。直接 shell、User 自身の UI 操作、adapter が受け取らない tool surface、意図的な文字列組み立てまで閉じる security boundary とは表現しない。hook は事故を減らす speed bump で、production mutation の最終境界は `AGENTS.md` の EXPLICIT AUTHORITY とサービス側の認証・承認である。
 
-Codex では project 初回利用時に trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User がレビューする。`pnpm agent:preflight --json` の `codexHooks: "configured; runtime activation unverified"` は設定ファイルの存在だけを表し、runtime trust や hook の発火を証明しない。この移行は user-global Codex 設定を変更しない。
+副 runtime の Codex では project 初回利用時に trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User がレビューする。`pnpm agent:preflight --json` の `codexHooks: "configured; runtime activation unverified"` は設定ファイルの存在だけを表し、runtime trust や hook の発火を証明しない。この移行は user-global Codex 設定を変更しない。
 
 **触ってよい（読み書き可）**:
 
