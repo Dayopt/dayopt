@@ -135,7 +135,7 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/product/src/features/timeblock/server/private-timeblock-search-query.ts',
   // the guardrails themselves
   '.husky/**',
-  '.codex/**',
+  '.claude/agents/**',
   '.claude/settings.json',
   // agent adapter は child の権限・scope・credential 境界を固定するため、変更時は
   // 標準 GitHub review の重点確認対象にする。

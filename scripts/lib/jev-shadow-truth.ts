@@ -68,7 +68,7 @@ export const PROTECTED_GLOB_CATEGORIES: Record<string, ProtectedCategory> = {
   'apps/product/src/features/timeblock/server/private-timeblock-search-query.ts':
     'timeblock-highrisk',
   '.husky/**': 'guardrails',
-  '.codex/**': 'guardrails',
+  '.claude/agents/**': 'guardrails',
   '.claude/settings.json': 'guardrails',
   'scripts/agent/**': 'guardrails',
   'scripts/hooks/**': 'guardrails',

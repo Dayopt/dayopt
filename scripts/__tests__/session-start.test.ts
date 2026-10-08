@@ -202,7 +202,7 @@ describe('session-start.sh: 実行環境の報告', () => {
     expect(envIndex).toBeGreaterThan(stateIndex);
     expect(r.stdout).toMatch(/\*\*node\*\*: v\d+\.\d+\.\d+ \(\.nvmrc: 24\)/);
     expect(r.stdout).toMatch(
-      /\*\*cli\*\*: gh:no claude:no codex:no op:no supabase:no gitleaks:no vercel:no/,
+      /\*\*cli\*\*: gh:no claude:no op:no supabase:no gitleaks:no vercel:no/,
     );
   });
 

@@ -9,9 +9,9 @@ description: Sentry / Supabase(local・cloud) / Context7 / Eagle / Storybook / U
 
 通常は現在の runtime が公開する connector / MCP / CLI を使い、必要な capability が既に利用可能か先に確認する。**repo 側に MCP 定義や認証情報を置かない**。個人設定の追加・削除は利用判断とは別の明示依頼として扱う。
 
-下記の登録表と `claude mcp` コマンドは **Claude Code の互換 adapter 例**であり、Codex の通常経路の前提ではない。Claude Code で登録する場合は `~/.claude.json` の user scope に一本化し、repo と同名定義を二重管理しない。別 runtime では同じ capability・scope・認証境界を満たす既存の連携を使う。設定ファイルの存在だけで利用可能・read-only と判断せず、公開toolと実際の権限を確認する。
+下記の登録表と `claude mcp` コマンドは Claude Code（開発 harness）での登録手順。登録は `~/.claude.json` の user scope に一本化し、repo と同名定義を二重管理しない。別 runtime では同じ capability・scope・認証境界を満たす既存の連携を使う。設定ファイルの存在だけで利用可能・read-only と判断せず、公開toolと実際の権限を確認する。
 
-Claude Code 互換の9サーバーの登録例:
+Claude Code の9サーバーの登録例:
 
 | Server             | 種別                 | 登録内容                                                                                                                                                                                                                                                    |
 | ------------------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -62,13 +62,6 @@ claude mcp add supabase -s user -e SUPABASE_ACCESS_TOKEN=op://agent/supabase-age
 
 # 使い終わったら
 claude mcp remove supabase -s user
-```
-
-Codex は同じ登録内容を user-global の `~/.codex/config.toml` へ書く `codex mcp add` / `codex mcp remove` で行う（`--env KEY=VALUE` と `-- <COMMAND>` の形。stdio server だけ `--env` が使える）:
-
-```bash
-codex mcp add supabase --env SUPABASE_ACCESS_TOKEN=op://agent/supabase-agent/credential -- op run -- npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=yvglwblxrnrenfifsnje
-codex mcp remove supabase
 ```
 
 token は `agent/supabase-agent`（read 権限だけの scoped token）で、write を含む `human/supabase-cli` は使わない。`execute_sql` は `--read-only` と token の両方で読み取りに限られるが、`auth.users` などの個人情報も読める。個人情報を含む行は User の明示指示がある時だけ読む。登録後は再起動して `list_tables` で疎通確認する。`supabase-local`（http、`op` 不要）は常駐のままでよい。

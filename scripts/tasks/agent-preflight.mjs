@@ -4,8 +4,8 @@ import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectOnePasswordConfig } from './agent-service-account.mjs';
 
-// SessionStart の外側 timeout は Codex の 10 秒（.codex/hooks.json）が最短。外部 command は
-// gh と pnpm を逐次確認するため、各々に同じ短い上限を持たせて合計を内側に収める。
+// SessionStart の待ち時間を短く保つため、外部 command は gh と pnpm を逐次確認し、
+// 各々に同じ短い上限を持たせる。
 const PREFLIGHT_COMMAND_TIMEOUT_MS = 2_000;
 
 function git(args, cwd) {
@@ -171,7 +171,7 @@ export function collectPreflight(cwd = process.cwd()) {
     ]),
   );
   const cli = Object.fromEntries(
-    ['gh', 'claude', 'codex', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => [
+    ['gh', 'claude', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => [
       name,
       commandPresent(name),
     ]),
@@ -208,13 +208,8 @@ export function collectPreflight(cwd = process.cwd()) {
     skills,
     // Presence is not proof of runtime activation or trust.
     claudeHooks: collectClaudeHooks(root),
-    // Codex is a secondary runtime (2026-10-09).
-    codexHooks: existsSync(join(root, '.codex/hooks.json'))
-      ? 'configured; runtime activation unverified'
-      : 'missing',
     readOnlyDelegation: {
       wrapper: false,
-      codex: false,
       claude: false,
       native: 'unsupported; repository scope cannot be enforced at runtime',
     },
@@ -247,8 +242,7 @@ export function renderPreflight(state) {
       .join(' ')} (${state.hooksPath ?? '未設定'})`,
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
     `**Claude hooks**: ${state.claudeHooks ?? '未取得'}`,
-    `**Codex hooks (secondary)**: ${state.codexHooks}`,
-    `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} codex:${state.readOnlyDelegation?.codex ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
+    `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
     `**1Password**: ${state.onePassword?.tokenPresent ? 'Service Account 設定あり（認証・scope は未検証）' : 'Service Account 未設定'} | vault 権限:未検証 | 実行環境の分離:未検証`,
   ];

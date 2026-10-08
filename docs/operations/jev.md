@@ -53,7 +53,7 @@ L1はIssue本文・必須条件・信頼できる出典を置き換えない。�
 
 Briefは、同一の公開Issue・コメント・関連資料・決定記録から作った入力snapshotとL0が一致した時だけL1候補を表示する。対象HEADは公開済みcommitを要求する。入力不一致やL1障害時は候補を使わず、L0の収集結果で続行する。`--post` はGitHubコメントを作成・更新するため、通常のdispatch手順として実行する。
 
-Issue本文は要求・制約の正本で、briefは原文の該当節、出典、snapshot、個別PRのSHA/CI、未確認事項を短く配る補助資料。必須条件と失敗・欠測はL1の順位付けで削らない。Codex sessionはIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotを確認する。コメントが存在するだけでは取得済みとみなさない。
+Issue本文は要求・制約の正本で、briefは原文の該当節、出典、snapshot、個別PRのSHA/CI、未確認事項を短く配る補助資料。必須条件と失敗・欠測はL1の順位付けで削らない。agent sessionはIssue本文と信頼できる最新 `ctx-brief` コメントを明示取得し、Issue番号とsnapshotを確認する。コメントが存在するだけでは取得済みとみなさない。
 
 ```bash
 pnpm jev:assist context --issue 2853
@@ -114,9 +114,9 @@ pnpm jev:assist-eval report --input /absolute/path/evaluation.json
 
 `context-relevance` に30件の人手評価、holdout、baseline比較、合格閾値、定期Go/No-Goは設けない。各Issueの通常作業で具体的な誤りや不足が見つかった時に、一次資料と照合して必要な範囲を直す。shadow助言を使うためにpack評価記録を作ったり、利用件数を満たしたりする必要はない。`pnpm jev:check` は配線・schema等の静的検査で、Jevの性能や候補の正しさを証明しない。
 
-### Codex Cloud での Jev 結果の受け渡し
+### Cloud での Jev 結果の受け渡し
 
-Codex Cloud の Secret はsetup scriptにだけ提供され、agent phaseの開始前に取り除かれる。Gateway keyを通常のEnvironment Variableとして登録するとagentから読めるため登録しない（[Cloud environment documentation](https://learn.chatgpt.com/docs/environments/cloud-environment)）。Cloud task内でJevを新規実行するのでなく、dispatch担当が日常利用するL1候補をIssue Briefへ保存し、CloudのL2担当が同じ結果を読み取る。
+Gateway keyをcloud実行環境の通常のEnvironment Variableとして登録するとagentから読めるため登録しない（2026-10-09 まで使っていた Codex Cloud と同じ扱いを維持する）。Cloud task内でJevを新規実行するのでなく、dispatch担当が日常利用するL1候補をIssue Briefへ保存し、CloudのL2担当が同じ結果を読み取る。
 
 ```bash
 # ローカルの認証済み担当。GitHubコメントを作成・更新する。

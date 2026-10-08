@@ -87,20 +87,13 @@ describe('agent preflight', () => {
   });
   it('uses repository root from a subdirectory and verifies configured hook files', () => {
     const root = fixture();
-    for (const dir of [
-      'src/deep',
-      'node_modules/.pnpm',
-      '.husky/_',
-      '.agents/skills/routing',
-      '.codex',
-    ])
+    for (const dir of ['src/deep', 'node_modules/.pnpm', '.husky/_', '.agents/skills/routing'])
       mkdirSync(join(root, dir), { recursive: true });
     for (const name of ['pre-commit', 'pre-push']) {
       writeFileSync(join(root, '.husky/_', name), '#!/bin/sh\n');
       writeFileSync(join(root, '.husky', name), 'true\n');
     }
     writeFileSync(join(root, '.agents/skills/routing/SKILL.md'), 'test');
-    writeFileSync(join(root, '.codex/hooks.json'), '{}');
     expect(spawnSync('git', ['config', 'core.hooksPath', '.husky/_'], { cwd: root }).status).toBe(
       0,
     );
@@ -109,7 +102,6 @@ describe('agent preflight', () => {
     expect(state.dependencies).toBe(true);
     expect(state.hooks['pre-push']).toBe(true);
     expect(state.skills).toBe(true);
-    expect(state.codexHooks).toContain('unverified');
     expect(state.claudeHooks).toBe('missing');
     expect(renderPreflight(state)).toContain('**Claude hooks**: missing');
     expect(state.readOnlyDelegation.wrapper).toBe(false);

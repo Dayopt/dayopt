@@ -58,7 +58,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 ## PR / git 運用
 
 - 機能のまとまりで 1 PR、1 checkout = 1 branch = 1 PR。分割は不可逆 migration の隔離か独立検証・revert が必要な時だけ。
-- commit までは自律。push・PR 作成・レビュー起動は明示指示か承認済み plan の範囲で行う。branch は `<provider>/<domain>-<action>[-<issue>]`（例: `claude/…`、Codex なら `codex/…`）とする。
+- commit までは自律。push・PR 作成・レビュー起動は明示指示か承認済み plan の範囲で行う。branch は `claude/<domain>-<action>[-<issue>]` を基本にする（2026-10-09 以前の `codex/` branch はそのまま扱う）。
 - PR は draft で作成し、必要な検証後に ready 化する。`Closes #N` は Issue ごとに 1 行、部分対応は `Refs #N`。
 - merge commit のみ。merge・後処理は `pnpm branch:finish <PR番号>`。他の作業が使う checkout は切り替え・削除しない。
 
