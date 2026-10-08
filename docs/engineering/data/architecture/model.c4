@@ -1206,6 +1206,10 @@ model {
     metadata { source 'github-actions' schedule '0 21 * * *' authoritative 'true' }
     link ../../../../.github/workflows/production-config-audit.yml
   }
+  schedule cron_github-actions_promote_yml__0_18_______ 'promote.yml (0 18 * * *)' {
+    metadata { source 'github-actions' schedule '0 18 * * *' authoritative 'true' }
+    link ../../../../.github/workflows/promote.yml
+  }
   schedule cron_pg_cron_cleanup-notifications 'cleanup-notifications' {
     metadata { source 'pg_cron' schedule '20 3 * * *' authoritative 'false' }
     link ../../../../supabase/migrations/00000000000000_baseline.sql

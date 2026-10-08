@@ -95,7 +95,7 @@ merge ごとに Production build を作るが、domain は割り当てない（A
 
 ### 4. 影響判定（impact）（GitHub Actions）
 
-Production Release workflow が起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。
+毎晩 03:00 JST に Production Release workflow が main HEAD で起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。
 
 - **ここを変えると**: 影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。
 - **コード**:
@@ -116,7 +116,7 @@ Production Release workflow が起動し、product / web / storybook それぞ�
 
 - 画面: 利用者は旧版を使い続ける。
 - データ: コードは旧版のまま。migration だけ新しい。
-- 再試行: 自動ではしない。直して次の merge で走り直すか、workflow を手で起動する。
+- 再試行: 自動ではしない。直して merge すれば次の夜間 run で走り直す。急ぐなら workflow を手で起動する。
 - 痕跡: area:deployment ラベルの issue が立つ（既にあれば更新）。E2E の report が artifact に残る。
 - **最初に見る場所**: その issue → Actions の run → Upload report の artifact。
 - 根拠:
@@ -318,7 +318,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
       "id": "impact",
       "svc": "github",
       "title": "影響判定（impact）",
-      "what": "Production Release workflow が起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。",
+      "what": "毎晩 03:00 JST に Production Release workflow が main HEAD で起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。",
       "change": "影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。",
       "refs": [
         {
@@ -356,7 +356,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
           "label": "E2E が失敗",
           "screen": "利用者は旧版を使い続ける。",
           "data": "コードは旧版のまま。migration だけ新しい。",
-          "retry": "自動ではしない。直して次の merge で走り直すか、workflow を手で起動する。",
+          "retry": "自動ではしない。直して merge すれば次の夜間 run で走り直す。急ぐなら workflow を手で起動する。",
           "trace": "area:deployment ラベルの issue が立つ（既にあれば更新）。E2E の report が artifact に残る。",
           "look": "その issue → Actions の run → Upload report の artifact。",
           "refs": [

@@ -40,13 +40,13 @@ describe('release workflow contract', () => {
     releaseJob.indexOf('\n    runs-on:'),
   );
 
-  it('promotes on every push to main, with no paths filter (2026-09-03)', () => {
-    // #2268 は「merge のたびに Production が切り替わる」ことを嫌って push:main を
-    // 廃止したが、その代償として promote が人の手番になり実際に 6 日 40 merge 分
-    // 滞留した。2026-09-03 に merge 連動へ戻し、切り替えの安全は「影響のある層 3
-    // が同一 run で green」であることで担保する（層 4 gate は release job の if:）。
-    expect(onBlock).toMatch(/^\s*push:/m);
-    expect(onBlock).toMatch(/^\s*branches:\s*\[main\]\s*$/m);
+  it('promotes main HEAD once a night, with no paths filter (2026-10-09)', () => {
+    // #2268 は promote を人の手番にして 6 日 40 merge 分滞留した。2026-09-03 の merge
+    // 連動は層 3 を merge ごとに走らせ、Actions を月約 3,000 分使った。2026-10-09 から
+    // 夜 1 回（03:00 JST）に main HEAD をまとめて出す。人の手番には戻さない。
+    expect(onBlock).toMatch(/^\s*schedule:/m);
+    expect(onBlock).toMatch(/^\s*- cron: '0 18 \* \* \*'\s*$/m);
+    expect(code(onBlock)).not.toMatch(/^\s*push:/m);
     expect(onBlock).toMatch(/^\s*workflow_dispatch:/m);
 
     // **paths filter を付けない。** docs のみの merge も release job まで到達させ、

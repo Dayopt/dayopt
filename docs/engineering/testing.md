@@ -20,10 +20,10 @@ code:
 | ----------------------------- | -------------------------------------------- | --------------------------------------------------- | ----------------------------------------- |
 | Static                        | コードとして成立している                     | typecheck / lint / boundaries / knip                | pre-push、PR（ci.yml）                    |
 | Unit（Vitest）                | 小さなロジックが正しい                       | 時刻計算、重なり判定、集計、状態遷移                | PR は related、nightly で full            |
-| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | main push（promote.yml 層 3）             |
+| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | 夜間 promote（promote.yml 層 3）          |
 | Integration（local Supabase） | 部品・DB・API をつないでも正しい             | RLS、RPC、migration 契約（fresh）                   | DB を触る PR（ci.yml）                    |
 | DB upgrade（local Supabase）  | 既存データからの更新と旧アプリ互換           | base + seed → candidate、fresh との一致、契約縮小   | migration を追加した PR（ci.yml、shadow） |
-| E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | main push（promote.yml 層 3）             |
+| E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | 夜間 promote（promote.yml 層 3）          |
 | 契約 / 監査                   | 横断リスク                                   | workflow contract、production config audit          | PR / main push / 日次                     |
 | 探索（dogfooding）            | まだ知らない問題                             | 迷い、余計な一手、状態不整合                        | オンデマンド（gate にしない）             |
 
@@ -42,7 +42,7 @@ E2E は万能にしない。小さい問題は小さい層で守り、E2E は中
 1. **作業中**: 変更を証明する最小の層をローカルで回す
 2. **push**: pre-push が affected な typecheck / lint、scripts test、format を回す
 3. **ready 化した PR**: ci.yml の Static / Unit / 影響に応じた Integration。product unit は `vitest related`（変更が import graph で届く test）に絞る。graph で追えない変更（`packages/*`、設定、test setup、未知の path）を含む PR は full。src を fs で読む契約 test は毎回走る（`scripts/ci/check.mjs` の `resolveProductUnitScope`）
-4. **main push**: promote.yml の層 3（影響のある project の E2E、desktop + `@mobile`、Storybook light / dark）が green の時だけ production へ promote
+4. **夜間 promote（03:00 JST）**: main HEAD に対する promote.yml の層 3（影響のある project の E2E、desktop + `@mobile`、Storybook light / dark）が green の時だけ production へ promote
 5. **nightly / 日次**: 自分が変えなくても変わるもの（production config drift、replica、backup）と、PR で絞った product unit の full 実行（`product-unit-full`）
 
 nightly の full が落ちたら、落ちた test を直すのに加えて、PR の判定が拾えなかった依存の種類を full 側へ倒す規則に足す。

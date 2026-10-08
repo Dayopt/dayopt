@@ -13,20 +13,20 @@ last_verified: 2026-09-21
 
 ## 概念
 
-Dayopt は **merge と本番公開を分けている**。main への merge は本番候補を作るだけで、本番 domain を切り替えるのは Production Release workflow（`promote.yml`）だけ。
+Dayopt は **merge と本番公開を分けている**。main への merge は本番候補を作るだけで、本番 domain を切り替えるのは Production Release workflow（`promote.yml`）だけ。workflow は毎晩 03:00 JST に、その時点の main HEAD をまとめて出す。
 
 ```mermaid
 flowchart LR
   PR["PR<br/>Vercel Preview（migration を含む PR は Supabase Preview Branch も）"] --> M["main へ merge<br/>ruleset の required checks"]
   M --> MIG["Supabase: migration を本番へ適用<br/>（merge の時点）"]
   M --> B["Vercel: 本番候補を build<br/>（domain 未割当）"]
-  M --> I["Production Release: 影響判定"] --> L3["E2E / Web / Storybook"]
+  M -.->|"毎晩 03:00 JST"| I["Production Release: 影響判定"] --> L3["E2E / Web / Storybook"]
   B -.->|"release が build を待つ"| P
   L3 -->|"緑"| P["smoke → promote<br/>本番 domain を切り替え"]
   L3 -->|"赤"| X["公開しない<br/>area:deployment の issue"]
 ```
 
-**migration は先に入る**。merge の時点で本番 DB に適用され、コードの公開は E2E の後。その間は「新しい DB + 古いコード」が動くので、migration は古いコードでも壊れない形で書く。
+**migration は先に入る**。merge の時点で本番 DB に適用され、コードの公開は夜間 run の E2E の後（最長約 1 日）。その間は「新しい DB + 古いコード」が動くので、migration は古いコードでも壊れない形で書く。
 
 ## Dayopt ではどうなっているか
 
@@ -55,7 +55,7 @@ flowchart LR
 <details>
 <summary>1. merge して 30 分経っても本番が変わらない。最初に何を見るか</summary>
 
-`area:deployment` の issue と、Actions の Production Release の run。E2E が赤なら promote されていない。docs だけの merge でも build は作られ、影響判定で project ごとに要否が決まる。
+それは正常。promote は毎晩 03:00 JST に走る。翌朝も変わらなければ `area:deployment` の issue と、Actions の Production Release の run を見る。E2E が赤なら promote されていない。docs だけの merge でも build は作られ、影響判定で project ごとに要否が決まる。
 
 </details>
 

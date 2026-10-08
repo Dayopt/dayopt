@@ -10,6 +10,10 @@ name: Production Release
 # 2026-09-03: **merge 連動の自動 promote へ戻した**。ただし #2268 以前の
 # 「merge したら即 promote」ではなく、`impact →（影響のある層 3）→ release` の
 # 3 段にして、層 3 が green の時だけ promote する。手動 dispatch も同一 gate を通す。
+# 2026-10-09: **merge ごとではなく夜 1 回（03:00 JST）**、その時点の main HEAD を
+# まとめて promote する。merge ごとの層 3 は Actions を月約 3,000 分使い、夜 1 回なら
+# 約 600 分（1 回 17〜20 分）。gate（impact → 層 3 → release）は変えない。急ぎは
+# workflow_dispatch で同じ gate を通す。候補固定・integration staging（#3009）は採らない。
 #
 # 層 3（E2E / Web Build & E2E）は nightly.yml からこの workflow へ移設した。
 # #2382 が per-merge の層 3 を廃止した根拠は「promote が手動だから赤い main は
@@ -25,11 +29,13 @@ name: Production Release
 # kill switch: Actions 画面でこの workflow を Disable する（変数も revert も不要）。
 
 on:
-  # main への merge が promote を起動する。paths filter は付けない —— docs のみの
-  # merge でも release job まで到達させ、`unaffected` の success status を発行する
-  # 必要がある（create-release.yml の tag gate がこの status を要求する）。
-  push:
-    branches: [main]
+  # 毎晩 03:00 JST（18:00 UTC）に main HEAD を promote する。schedule の run は default
+  # branch で走るので github.ref = refs/heads/main、github.sha = その時点の main HEAD。
+  # GitHub の cron は混雑時に数時間遅れることがあり、Production Config Audit
+  # （06:00 JST）より後になる日もある。docs のみの日も release job まで到達させ、
+  # `unaffected` の success status を発行する（create-release.yml の tag gate が要求する）。
+  schedule:
+    - cron: '0 18 * * *'
   workflow_dispatch:
     inputs:
       simulate_failure:
@@ -458,7 +464,7 @@ jobs:
     # scripts/ci/release-workflow-contract.test.ts が不等式を守る。
     timeout-minutes: 80
     steps:
-      # 実行する script は常にこの run の ref（push なら main、dispatch なら
+      # 実行する script は常にこの run の ref（schedule なら main、dispatch なら
       # dispatch した ref）のもの。release 対象は常に `github.sha` で、呼び出し側が
       # 任意の SHA を指定する口は持たない（`sha` input は 2026-09-03 に廃止した。
       # 層 3 を run 内で走らせる設計では checkout と異なる SHA は検証不能で、
@@ -488,7 +494,7 @@ jobs:
             exit 1
           fi
 
-          # 常に main 包含を確認する。push:main の run では自明だが、
+          # 常に main 包含を確認する。schedule の run では自明だが、
           # workflow_dispatch は任意 ref から起動でき、その場合 github.sha は
           # dispatch した ref の tip（main 以外）になりうる。environment の
           # deployment branch policy と二重防御にする。

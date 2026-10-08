@@ -282,12 +282,11 @@ SELECT cron.unschedule(jobname) FROM cron.job WHERE active;
 
 ### 前提: mergeとProduction公開は分離されている
 
-main へ merge しても Production domain は**直接**切り替わらない。Product / Web は Auto-assign Custom Production Domains を無効化してあり、merge が作るのは **domain 未割当の Production build（candidate）** だけである。merge は `Production Release` workflow を自動で起動し、workflow は影響のある層 3（E2E / Web Build & E2E）を走らせてから、**その merge の影響を受ける project**の candidate を使う。通常の Git 連携で 5 分以内に READY にならない場合、同じ SHA の候補を再確認し、まだ無い project だけ linked Git source から staged Production build を作る。すでに QUEUED / BUILDING の候補があれば ID を固定して待つ。staged build は `Dayopt/dayopt` への Git link と Auto-assign 無効を確認し、domain を割り当てずに作る。その後も候補の smoke と Production Config Audit を通るまで promote しない。影響を受けない project は待たずに skip し、どの app にも影響しない merge は promote 0 件の success（`unaffected`）で終わる。判定仕様は [infra.md](../engineering/infra.md)。
+main へ merge しても Production domain は**直接**切り替わらない。Product / Web は Auto-assign Custom Production Domains を無効化してあり、merge が作るのは **domain 未割当の Production build（candidate）** だけである。`Production Release` workflow は毎晩 03:00 JST（cron `0 18 * * *`、2026-10-09）にその時点の main HEAD で起動し、影響のある層 3（E2E / Web Build & E2E）を走らせてから、**live からの差分で影響を受ける project**の candidate を使う。急ぎは `gh workflow run promote.yml --ref main` で同じ gate を通す。通常の Git 連携で 5 分以内に READY にならない場合、同じ SHA の候補を再確認し、まだ無い project だけ linked Git source から staged Production build を作る。すでに QUEUED / BUILDING の候補があれば ID を固定して待つ。staged build は `Dayopt/dayopt` への Git link と Auto-assign 無効を確認し、domain を割り当てずに作る。その後も候補の smoke と Production Config Audit を通るまで promote しない。影響を受けない project は待たずに skip し、どの app にも影響しない merge は promote 0 件の success（`unaffected`）で終わる。判定仕様は [infra.md](../engineering/infra.md)。
 
-このため「本番が新しくならない」ことは、それ自体では障害ではない。**現行 Production は既知の正常 deployment のまま応答し続けている**。復旧の緊急度は「本番が壊れたか」ではなく「本番が古いままか」で判断する。層 3 が赤い merge では promote が走らないので、その意味でも本番は無傷で残る。
+このため「本番が新しくならない」ことは、それ自体では障害ではない。merge した変更が本番に出るのは原則として翌朝である。**現行 Production は既知の正常 deployment のまま応答し続けている**。復旧の緊急度は「本番が壊れたか」ではなく「本番が古いままか」で判断する。層 3 が赤い merge では promote が走らないので、その意味でも本番は無傷で残る。
 
-**失敗はどう届くか**: promote は merge した本人の push で起動するため、run が失敗すると GitHub の
-既定通知でその本人へ失敗メールが届く。加えて `Production Release` の commit status が main の
+**失敗はどう届くか**: 夜間の run は schedule で起動するため、失敗メールは workflow を最後に変更した人へ届く（GitHub の schedule の既定）。加えて `Production Release` の commit status が main の
 当該 commit へ failure で付く（commit 一覧・PR 画面で赤く見える）。
 
 さらに 2026-09-07（[#2643](https://github.com/Dayopt/dayopt/issues/2643)）から、promote.yml の
@@ -312,7 +311,7 @@ production deployment がどの SHA かを Vercel Dashboard で確認する（HT
 
 ### 初動
 
-- [ ] **本番が壊れている（rollback するかもしれない）なら、まず自動 promote を止める。** promote は main merge で自動起動するため、rollback しても**その後の無関係な merge が壊れたコードを本番へ戻す**（rollback 後の live は新しい merge の祖先なので、`production-release.mjs` の superseded 判定では止まらない。層 3 もその不具合を検出できない —— 検出できていれば本番に出ていない）。Actions → Production Release → "···" → **Disable workflow**。復旧 commit を merge するまで戻さない
+- [ ] **本番が壊れている（rollback するかもしれない）なら、まず自動 promote を止める。** promote は毎晩 main HEAD で自動起動するため、rollback しても**次の夜間 run が壊れたコードを本番へ戻す**（rollback 後の live は新しい merge の祖先なので、`production-release.mjs` の superseded 判定では止まらない。層 3 もその不具合を検出できない —— 検出できていれば本番に出ていない）。Actions → Production Release → "···" → **Disable workflow**。復旧 commit を merge するまで戻さない
 - [ ] `gh run list --workflow=promote.yml --limit 3` で直近の release run を確認。**in_progress の run がある間は、手動の promote / rollback / alias 操作をしない**。release は single-writer 前提で、run 中の手動操作は run の観測・rollback と衝突する（[infra.md §release の並行性モデル](../engineering/infra.md#release-の並行性モデル)）。完了（または cancel の完了）を待ってから以降へ進む
 - [ ] run summary で「どこで止まったか」を特定: candidate build / smoke / audit / promote
 - [ ] 本番 domain が正常応答しているか確認
@@ -330,7 +329,7 @@ promote は行われていないので、**Production domain は現行 SHA の�
 
 - [ ] run summary のエラーを確認し、原因に応じてケースA / B を実施
 - [ ] candidate timeout / staged build の拒否なら、Vercel project の `Dayopt/dayopt` Git link、production branch、Auto-assign が無効であることを read-only で確認する。原因を直した後は workflow 全体を再実行し、`Re-run failed jobs` は使わない
-- [ ] **修正を main へ merge すれば release gate は自動で再実行される**（`promote.yml` は `push: main` で起動、2026-09-03）。workflow を Disable している場合は先に Enable へ戻す
+- [ ] **修正を main へ merge すれば、その夜の run で release gate が再実行される**（`promote.yml` は毎晩 03:00 JST に起動、2026-10-09）。待てない時は次の項目の dispatch を使う。workflow を Disable している場合は先に Enable へ戻す
 - [ ] main HEAD をそのまま再試行するだけなら `gh workflow run promote.yml --ref main`。**`sha` input は廃止した**（2026-09-03）ので `-f sha=` は 422 で拒否される。対象は常にその run の commit で、古い SHA を本番へ戻すのは promote ではなく rollback（ケースC）
 - [ ] smoke が Deployment Protection で止まった場合は、対象 project の Protection Bypass for Automation と repository secret（`VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB`）を確認する
 - [ ] run summary が `would go out without layer 3` で止まっている場合は manifest の `status: impact-mismatch`。production は触られていないので、ケース0-B の該当項目を見る（対処は rollback ではなく再 run）
@@ -387,12 +386,12 @@ promote 済みの deployment に問題があった場合だけ使う。
 - [ ] **壊れている project だけを戻す。** Product / Web の SHA を揃えようとしない（release は影響を受ける project だけを進めるので、SHA が違うのは正常）。無関係な側を戻すと、検証済みの build を理由なく巻き戻すことになる
 - [ ] ロールバック後: 本番サイトで動作確認。**両 domain を見る**（`dayopt.app` と `app.dayopt.app`）。web の signup CTA から product へ入れるかは片側だけ戻した時の典型的な壊れ方
 - [ ] ロールバック後: **操作した project の Auto-assign Custom Production Domains を無効へ戻す**（Settings → Git）。Instant Rollback / Promote to Production はどちらもこの設定を有効化するため、戻さないと次の main merge が release gate を通らず直接公開される
-- [ ] **`Production Release` workflow を Disable したままにする**（初動で止めていない場合はここで止める）。止めないと、次に誰かが無関係な PR を merge した時点で自動 promote が走り、rollback で外したはずのコードが本番へ戻る
-- [ ] 落ち着いて原因調査 → 修正（revert でも fix でも良い）→ main へ merge → **workflow を Enable へ戻す** → その merge の run が promote するのを確認する
+- [ ] **`Production Release` workflow を Disable したままにする**（初動で止めていない場合はここで止める）。止めないと、次の夜間 run で自動 promote が走り、rollback で外したはずのコードが本番へ戻る
+- [ ] 落ち着いて原因調査 → 修正（revert でも fix でも良い）→ main へ merge → **workflow を Enable へ戻す** → `gh workflow run promote.yml --ref main`（または夜間 run）が promote するのを確認する
 
 Vercel の rollback はビルド成果物だけを戻す。**DB migration と変更済み環境変数は戻らない**。migration を含むリリースでは、直前 deployment がそのまま動く後方互換期間（expand/contract）を事前に確保しておく。
 
-通常のProduction公開は `main` merge → `Production Release` workflow（自動起動）の promote だけを使う。
+通常のProduction公開は `main` merge → `Production Release` workflow（毎晩の自動起動、または手動 dispatch）の promote だけを使う。
 `Instant Rollback` / `Promote to Production` は正常な既存deploymentへ戻す緊急操作で、新規buildの作成経路ではない。
 
 #### ケースD: 緊急の前進リリース
@@ -770,9 +769,9 @@ ORDER BY created_at DESC;
 
 ### 1.2 Production promote の完了を確認する
 
-main merge が `promote.yml` を自動起動する（`push: main`、2026-09-03）。タグを打つ前に、その run が promote を終えたことを確認する。
+`promote.yml` は毎晩 03:00 JST に main HEAD で起動する（2026-10-09）。タグを打つ SHA に `Production Release` の success が付いていることを確認する。夜間 run の後に merge した commit には status が無いので、翌朝まで待つか `gh workflow run promote.yml --ref main` で出す。
 
-- [ ] **merge が起動した `Production Release` が promote を終えている**
+- [ ] **タグを打つ SHA で `Production Release` が promote を終えている**
 
   ```bash
   gh run list --workflow=promote.yml --branch main --limit 3
@@ -1191,7 +1190,7 @@ git log -5 --oneline
 node -p "require('./package.json').version"  # → ${VERSION} になっているはず
 ```
 
-> main マージは domain 未割当の Production build を作り、`Production Release` workflow を自動起動する（`push: main`、2026-09-03）。公開はその workflow の promote が、影響のある層 3 を通した後に行う。タグはデプロイトリガーではなく、promote と観察が終わった後の証跡。
+> main マージは domain 未割当の Production build を作る。`Production Release` workflow は毎晩 03:00 JST に main HEAD で起動する（2026-10-09）。公開はその workflow の promote が、影響のある層 3 を通した後に行う。タグはデプロイトリガーではなく、promote と観察が終わった後の証跡。
 
 ### Phase 2: リリースノート作成
 
@@ -1267,7 +1266,7 @@ git tag --list | tail -5
 git push origin v${VERSION}
 ```
 
-タグ push により GitHub Actions（`.github/workflows/create-release.yml`）が **GitHub Release を自動作成**する（auto-generated notes 付き）。この workflow はデプロイしない。公開は main merge が自動起動した `Production Release` workflow が promote 済みのはずで（Phase 1.2）、create-release はタグ SHA の `Production Release` status が success であることを確認してから Release を作る。
+タグ push により GitHub Actions（`.github/workflows/create-release.yml`）が **GitHub Release を自動作成**する（auto-generated notes 付き）。この workflow はデプロイしない。公開は夜間（または手動 dispatch）の `Production Release` workflow が promote 済みのはずで（Phase 1.2）、create-release はタグ SHA の `Production Release` status が success であることを確認してから Release を作る。
 
 #### 4.2 プッシュ確認
 
@@ -1636,7 +1635,7 @@ git commit -am "chore(release): v${VERSION} へ version bump"
    ↓
 3. CI・品質チェック (Quality Gate)
    ↓
-4. PR マージ (merge commit / ブランチ削除) → Vercel が Production build → `Production Release` が自動起動し、層 3 green で promote
+4. PR マージ (merge commit / ブランチ削除) → Vercel が Production build → 夜間（03:00 JST）の `Production Release` が層 3 green で promote
    ↓
 5. main でタグ作成 & push
    ↓
@@ -1848,7 +1847,7 @@ agent が実際に踏んだ事例を、再発条件と最短の対処だけ残�
 - **Vercel flake は 2 型**（2026-08-12）。型 1: 特定 branch だけ deployment が作られず required status が expected のまま。空 commit でも直らず、Vercel Dashboard の Create Deployment で手動指定する（User 操作）。型 2: `next/font/google` の build 時フェッチ不安定（`NextFontGoogleFontFileReplacer` / font module-not-found）。同一 commit の `vercel redeploy dpl_<id>` で通る。まず deployment が「存在して失敗」か「そもそも存在しない」かを分け、コード修正に走らない
 - **Vercel Preview は Protection Bypass for Automation で実測できる**（両 project 有効済み）。`x-vercel-protection-bypass` と `x-vercel-set-bypass-cookie: false` の 2 header、または `vercel curl <path> --deployment <url> --yes`。性能比較は同じ branch の連続 2 commit を交互に叩く（時間帯と環境の交絡が消える）。runtime-logs API は live tail 専用で履歴は取れない
 - **Supabase Preview が `Configurations ❌ ... storage config 404` で止まったら先に status page**。`curl -s https://status.supabase.com/api/v2/incidents/unresolved.json` で lifecycle 系 incident を見る。障害なら close / reopen せず、解決後の次の push で自動再試行される（2026-09-04 PR #2594）
-- **migration は main merge で即 production へ適用されるが、promote は層 3 が green になるまで待つ**。DB は forward-only なので Instant Rollback でも戻せず、旧ビルドが新スキーマを踏む窓は E2E の完走時間だけ続く。破壊的 migration は code 先行 merge → promote → migration merge の 2 段に分ける（AGENTS.md が許す不可逆 migration の隔離。2026-09-03 #2175）
+- **migration は main merge で即 production へ適用されるが、promote は夜間 run の層 3 が green になるまで待つ**。DB は forward-only なので Instant Rollback でも戻せず、旧ビルドが新スキーマを踏む窓は次の夜間 promote まで（最長約 1 日）続く。破壊的 migration は code 先行 merge → promote → migration merge の 2 段に分ける（AGENTS.md が許す不可逆 migration の隔離。2026-09-03 #2175）
 
 ## 状態の確定
 
