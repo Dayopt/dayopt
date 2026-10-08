@@ -58,7 +58,7 @@ export PATH=/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/s
 read -r -s -p 'SA token: ' OP_SERVICE_ACCOUNT_TOKEN
 printf '\n'
 export OP_SERVICE_ACCOUNT_TOKEN
-export DAYOPT_AGENT_SERVICE_ACCOUNT_ID=UARSP4VEVJGXBLSKW427LZJN74
+export DAYOPT_AGENT_SERVICE_ACCOUNT_ID=TASEK47N7FBEBPVBTZVYTFVSSQ  # token の ID。rotation で変わる（secrets.md）
 export DAYOPT_AGENT_VAULT_ID=dlmo7yfs5buvd3j3sbikjjqypa
 node /Users/Shared/dayopt-agent-bootstrap/agent-service-account.mjs check --json
 ```

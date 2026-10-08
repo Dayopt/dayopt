@@ -419,11 +419,11 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 実装は [`scripts/tasks/agent-service-account.mjs`](../../scripts/tasks/agent-service-account.mjs)。CLI が確認する metadata と platform 側で確認する隔離を区別する。
 
-| 入力                              | 扱い                                                                                                                                     |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない |
-| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | 管理画面で確認した SA の user ID。秘密ではない。起動する identity を pin する                                                            |
-| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                        |
+| 入力                              | 扱い                                                                                                                                                             |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない                         |
+| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | `op user get --me` の `id`（= `op whoami` の Integration ID）。SA 本体ではなく token ごとの ID で rotation で変わる。秘密ではない。起動する identity を pin する |
+| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                                                |
 
 起動前に token と ID の存在を検査する。`OP_CONNECT_*`（SA より認証の優先順位が高い）、`OP_SESSION*`、`OP_ACCOUNT` を継承せず、private な一時 `OP_CONFIG_DIR`、`OP_BIOMETRIC_UNLOCK_ENABLED=false`、cache / debug 無効を設定する（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)、[環境変数](https://www.1password.dev/cli/environment-variables)）。
 
