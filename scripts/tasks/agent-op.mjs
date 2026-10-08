@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, isAbsolute } from 'node:path';
 import { main } from './agent-service-account.mjs';
 
-// Convenience entry point for ordinary Codex op calls, not an OS isolation boundary.
+// Convenience entry point for ordinary agent op calls, not an OS isolation boundary.
 // Only an injected SA token or the dedicated macOS Keychain item is accepted.
 export async function runAgentOp(args, config, env = process.env) {
   const opArgs = args.slice(0, args.indexOf('--') < 0 ? args.length : args.indexOf('--'));

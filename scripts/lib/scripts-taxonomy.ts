@@ -245,8 +245,8 @@ export function buildScanContext(repoRoot: string, scriptsDir = 'scripts'): Scan
   const allScriptFiles = listNonTestScriptFiles(repoRoot, scriptsDir);
   const huskyFiles = walkFiles(repoRoot, '.husky');
   const claudeHookFiles = walkFiles(repoRoot, '.claude/hooks');
-  const settingsFiles = ['.claude/settings.json', '.codex/hooks.json', '.codex/config.toml'].filter(
-    (file) => fs.existsSync(path.join(repoRoot, file)),
+  const settingsFiles = ['.claude/settings.json'].filter((file) =>
+    fs.existsSync(path.join(repoRoot, file)),
   );
   const hookLauncherFiles = collectHookLauncherFiles(repoRoot, allScriptFiles, [
     ...huskyFiles,

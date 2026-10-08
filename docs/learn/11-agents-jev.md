@@ -7,7 +7,7 @@ last_verified: 2026-09-21
 
 ## この章で答えられるようになる問い
 
-- Dayopt の開発で AI（Claude Code / Codex / Jev）はどこまで任されていて、どこで止まるか
+- Dayopt の開発で AI（Claude Code / Jev）はどこまで任されていて、どこで止まるか
 - AI の判断が間違っても、何が最後の砦になっているか
 - AI の作業を人が検証する時、何を見ればよいか
 
@@ -29,7 +29,7 @@ flowchart LR
 
 **機械の gate**（AI が間違えても止まる場所）:
 
-- `scripts/hooks/pre-tool-guard.sh` — Claude Code のツール実行の前に危険なコマンドを止める（Codex は `codex-pre-tool-guard.sh` が同じ規則で止める）
+- `scripts/hooks/pre-tool-guard.sh` — Claude Code のツール実行の前に危険なコマンドを止める
 - `.husky/pre-push` — push の前の確認（DO-CONFIRM）と、影響範囲の typecheck / lint
 - main の repository ruleset — required checks と review thread の解決が揃わないと merge できない。bypass できる人はいない
 - `scripts/ci/protected-path-gate.mjs` — 外部契約・不可逆の path に触った変更を、レビューで重点的に読む範囲として示す（`pnpm branch:finish` が merge の直前に表示する）。merge は止めない

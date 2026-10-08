@@ -30,17 +30,14 @@ Preview E2E のログイン用アカウント資格情報は branch API credenti
 
 ## AI エージェントの env ファイル境界
 
-この境界は provider を問わず、Dayopt の workspace を読む・書く全 coding agent に適用する。OpenAI / Codex を primary harness とし、Claude Code など他 provider も同じ規約を読む。規約の正本は本節、共有判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置く。
+この境界は provider を問わず、Dayopt の workspace を読む・書く全 coding agent に適用する。開発 harness は Claude Code（2026-10-09 に Codex から切替）。他 provider を使う場合も同じ規約を読む。規約の正本は本節、共有判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置く。
 
 provider ごとの入口は薄い adapter として分ける。
 
 - Claude Code は `.claude/settings.json` から `scripts/hooks/pre-tool-guard.mjs` を呼ぶ
-- Codex 用の入口は `scripts/hooks/codex-pre-tool-guard.mjs`。Codex の tool-call payload を共有 rules の入力へ変換する
 - 他 runtime は共有 rules を呼ぶ adapter が登録されている場合だけ同じ機械判定を受ける。adapter が無ければ本節と `AGENTS.md` の規律だけが適用される
 
-**script が repo に存在するだけでは強制力にならない。** runtime が該当 adapter を tool 実行前に登録・起動し、block 結果を尊重する場合にだけ、その runtime 内の対象 tool call を止める。repo は user-global Codex 設定や未知の provider の hook 登録を保証しない。直接 shell、User 自身の UI 操作、adapter が受け取らない tool surface、意図的な文字列組み立てまで閉じる security boundary とは表現しない。hook は事故を減らす speed bump で、production mutation の最終境界は `AGENTS.md` の EXPLICIT AUTHORITY とサービス側の認証・承認である。
-
-Codex では project 初回利用時に trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User がレビューする。`pnpm agent:preflight --json` の `codexHooks: "configured; runtime activation unverified"` は設定ファイルの存在だけを表し、runtime trust や hook の発火を証明しない。この移行は user-global Codex 設定を変更しない。
+**script が repo に存在するだけでは強制力にならない。** runtime が該当 adapter を tool 実行前に登録・起動し、block 結果を尊重する場合にだけ、その runtime 内の対象 tool call を止める。repo は user-global の Claude Code 設定や未知の provider の hook 登録を保証しない。直接 shell、User 自身の UI 操作、adapter が受け取らない tool surface、意図的な文字列組み立てまで閉じる security boundary とは表現しない。hook は事故を減らす speed bump で、production mutation の最終境界は `AGENTS.md` の EXPLICIT AUTHORITY とサービス側の認証・承認である。
 
 **触ってよい（読み書き可）**:
 
@@ -358,7 +355,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 2. 1Password GUI: vault `agent` に API Credential item `github-agent`、field `credential` に値、`expires` に期限、タグ `dayopt/github`
 3. `mkdir -p ~/.config/gh-agent && chmod 700 ~/.config/gh-agent`
 4. `op read "op://agent/github-agent/credential" | GH_CONFIG_DIR=~/.config/gh-agent gh auth login --hostname github.com --git-protocol https --with-token --insecure-storage`（pipe で渡すので値は表示されない。agent の Bash tool では `op read` が block されるため User の terminal で行う）
-5. Agent セッションへ `GH_CONFIG_DIR=<絶対パス>/.config/gh-agent` を渡す。Claude Code は `.claude/settings.local.json`（gitignored）の `env`、Codex は `~/.codex/config.toml` の `[shell_environment_policy.set]`。tracked の `.claude/settings.json` には機種依存の絶対パスを書かない
+5. Agent セッションへ `GH_CONFIG_DIR=<絶対パス>/.config/gh-agent` を渡す。Claude Code は `.claude/settings.local.json`（gitignored）の `env`。tracked の `.claude/settings.json` には機種依存の絶対パスを書かない
 
 **検証**: Agent セッションで `gh auth status` に `admin:org` / `delete_repo` が出ないこと、`gh api repos/Dayopt/dayopt/rulesets` が読めること、`gh api orgs/Dayopt/actions/secrets` が 403 / 404 になること（admin 不在の証明。書き込みは試さない）。`pnpm agent:preflight` の `gh identity` 行が classic scope を検出すると警告を出す（speed bump、fail はしない）。`pnpm 1password:check` は `agent/github-agent` の実在を検査する（`operationalItems`）。
 
@@ -422,11 +419,11 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 
 実装は [`scripts/tasks/agent-service-account.mjs`](../../scripts/tasks/agent-service-account.mjs)。CLI が確認する metadata と platform 側で確認する隔離を区別する。
 
-| 入力                              | 扱い                                                                                                                                     |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない |
-| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | 管理画面で確認した SA の user ID。秘密ではない。起動する identity を pin する                                                            |
-| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                        |
+| 入力                              | 扱い                                                                                                                                                             |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない                         |
+| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | `op user get --me` の `id`（= `op whoami` の Integration ID）。SA 本体ではなく token ごとの ID で rotation で変わる。秘密ではない。起動する identity を pin する |
+| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                                                |
 
 起動前に token と ID の存在を検査する。`OP_CONNECT_*`（SA より認証の優先順位が高い）、`OP_SESSION*`、`OP_ACCOUNT` を継承せず、private な一時 `OP_CONFIG_DIR`、`OP_BIOMETRIC_UNLOCK_ENABLED=false`、cache / debug 無効を設定する（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)、[環境変数](https://www.1password.dev/cli/environment-variables)）。
 
@@ -437,7 +434,6 @@ AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:
 ```bash
 # 専用クラウド側で秘密ストアから token を注入した後に実行する
 pnpm agent:secrets:check --json
-pnpm agent:run -- codex
 pnpm agent:run -- claude
 ```
 
@@ -445,26 +441,28 @@ pnpm agent:run -- claude
 
 ### Bootstrap と移行
 
-#### ローカル Codex の通常の `op` 呼び出し
+#### ローカル agent の通常の `op` 呼び出し
 
 2026-10-01、User の「人間はアプリ、エージェントは SA」という指定に従い、人間用 CLI で bootstrap 項目を取得する処理を廃止した。指定済み SA token を macOS login Keychain の専用項目へ暗号化して保存し、[`scripts/tasks/agent-op.mjs`](../../scripts/tasks/agent-op.mjs) は注入済み token、またはその Keychain 項目だけを使う。
 
 - 1Password アプリの CLI / SDK 連携をオフにし、MCP 統合もオフのまま、既存 MCP 認証をクリアした。元の CLI の account 一覧は 0 件で、人間用 session は存在しないことを確認した。
-- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。
+- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。2026-10-09、User 指示で判定に `CLAUDECODE=1`（Claude Code が Bash に渡す環境変数）を追加した。同日、Claude Code desktop の shell で `op vault list` が SA 経由で `agent` 1 件だけを返すことを実測。`CLAUDECODE` を外した process が人間用認証へ fallback しないことの確認は未実施（auto mode が当該コマンドを拒否したため、User の terminal で行う）。
 - `~/.config/dayopt-agent-op/config.json` には元の CLI の絶対 path、検証対象の SA / vault ID だけを保存する。人間用 account / vault / item の参照は除去した。
 - token は平文ファイル・コマンド引数・ログに保存しない。Keychain の service は `dayopt-agent-service-account`、account は指定 SA ID。読み出しには `/usr/bin/security` を使い、その stdout は process 内だけで受け取る。
 - 継承した `OP_*` は除去し、一時設定・生体認証無効の SA 環境で identity と絞り込みなしの vault 一覧を照合してから、要求 command を実行する。
 - token 取得 / SA 検証に失敗した場合は停止する。人間用認証へ fallback しない。`--account` / `--session` / `--config` / `--debug` と `signin` / `signout` は入口で拒否する。
 - **これは CLI / SDK の認証経路の整理であり、OS / UI の隔離ではない。** 同じ OS ユーザーの全権限がある process に、設定の再変更や人間用アプリ・ブラウザーの画面操作を禁止する境界はない。
-- 反映確認は Codex の実際の shell で `op vault list` を実行する。元の CLI に SA token を渡さない別 process は認証失敗となることを確認する。別の実行環境・PATH・MCP にも適用されるとは推測しない。
+- 反映確認は agent の実際の shell で `op vault list` を実行する。元の CLI に SA token を渡さない別 process は認証失敗となることを確認する。別の実行環境・PATH・MCP にも適用されるとは推測しない。
 - 解除は今回作成した `~/.local/bin/op` を削除する。Keychain の SA 項目を削除すると、この入口は token 未注入時に停止する。
 
 SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
 
-| 登録先                        | 登録内容                                                                       | 確認状況                                                                                                                                                                                                               |
-| ----------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex Cloud の Personal vault | `OP_SERVICE_ACCOUNT_TOKEN`。専用の `dayopt` 環境が個人の値を要求する           | 2026-10-01 に適用先を dayopt のみに限定して保存。編集環境では画面から開始した turn の注入・SA認証・agent 1件を実測。CLI と起動手順を再公開済み。新しい通常 task でも token 注入・agent 1件・token なしの認証失敗を実測 |
-| Codex Cloud の `dayopt` 環境  | `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` / `DAYOPT_AGENT_VAULT_ID`。ID は秘密ではない | 2026-09-30 に User が登録・公開を報告。2026-10-01 に指定値一致を実測                                                                                                                                                   |
+Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。同日 User が SA token を rotation した（User 報告）ため、Codex Cloud に残る旧 token は無効。Codex Cloud 側の登録の削除は未確認。rotation 後のローカルの切替手順（2026-10-09 実測）:
+
+- **ID も変わる**。`op user get --me` の `id`（= `op whoami` の Integration ID）は Service Account 本体ではなく token ごとの ID で、rotation で変わる。`~/.config/dayopt-agent-op/config.json` の `serviceAccountId` を新しい値へ更新しないと `Agent op: IDENTITY_MISMATCH` で止まる
+- **Keychain 項目は新しい ID を account 名にして作り直す**。入口は service `dayopt-agent-service-account`・account `serviceAccountId` で探す
+- **`security add-generic-password -w` の入力プロンプトは長い token を切り詰める**（約 128 文字。SA token は 852 文字）。切れた token は `failed to DecodeSACredentials: unexpected end of JSON input` になる。値はプロンプトを通さず `security -i` へ標準入力で渡す。1Password はコピー後に clipboard を自動で消すので、コピー直後に実行する
+- 確認は agent の shell で `op vault list` が `agent` 1 件だけを返すこと
 
 token の控えの保管先は未確認。token 値や個人の ID 実値は本ページに保存しない。
 
@@ -474,22 +472,7 @@ token の控えの保管先は未確認。token 値や個人の ID 実値は本�
 4. token 無し・無効で起動が失敗し、人間用認証の prompt / fallback が起きないことを確認する。Mac の home / 1Password / browser / 接続済み tool への到達経路が無いことも確認する。
 5. 1Password を使う対話・無人の agent 起動を `agent:run` に統一し、旧セッションを停止する。撤去対象の credential replica があれば記録してから処置する。障害時は専用環境を停止し、人間用の認証を agent に戻して復旧しない。
 
-### Codex Cloud を使う場合の登録
-
-現行の [Codex Cloud 公式手順](https://learn.chatgpt.com/docs/environments/cloud-environments#supply-personal-values)では、**Personal vault の Environment variable** を task 内の process へ渡せる。アカウントの画面にこの項目があるか確認してから登録する。1Password の vault と Codex の Personal vault は別の保管先である。
-
-1. **Settings → Codex Cloud → Environments** で専用環境を作成・編集する。**Privacy → Who can use** は **Only me** とし、**Environment variables → Manage** で上記 3 key を要求するよう設定する。人間用の 1Password 認証や Mac の tool 接続は追加しない。
-2. **Settings → Codex Cloud → Personal vault → Add** を開く。**Type: Environment variable**、**Key: OP_SERVICE_ACCOUNT_TOKEN** とし、User が **Value** に SA token を直接入力する。**Applies to: Selected environments** で専用環境だけを選び、保存する。同様に 2 つの ID をそれぞれの key で登録する。**All environments** は選ばない。
-3. SA の user ID が不明な場合は、token を注入済みの専用クラウドで `op user get --me` の `ID` を確認する。`Type: SERVICE_ACCOUNT` と `State: ACTIVE` を確認し、`op vault list --format=json` が `agent` 1 件だけであることとその `id` を管理画面の設定と照合して登録する。これらは metadata だけを取得する。item の値や token を表示するコマンドは使わない。
-4. 必要な 1Password 接続先を環境の network policy に許可し、Node.js / pnpm / 1Password CLI と検査 script を配置する。保存・Publish / Republish 後の新しい task で `pnpm agent:secrets:check --json` を実行する。既存 task は独自の状態を保持するため、環境更新だけで移行済みと扱わない。
-
-専用クラウドの CLI は `/workspace/.dayopt-1password/bin/op` に配置する。`/workspace/AGENTS.md` から `/workspace/.dayopt-1password/START.md` と `startup-check.py` を参照し、SA 認証・vault 範囲と token なしの認証失敗を検証する。未注入なら停止する。標準 PATH のディレクトリは書き込み不可のため、各 shell でこのディレクトリを PATH の先頭に加えるか、launcher の絶対パスを使う。launcher は SA token 以外の `OP_*` を除去し、専用の CLI 設定を使う。秘密や人間用 account/session は image に保存しない。
-
-status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill の本文・参照先は通常 task の取得経路では得られなかったため、手順を環境 image 内の上記ファイルにも保存した。同日に再公開後の新しい通常 task「1Password利用前の確認」で、場所・コマンドを含めない依頼から `START.md` の読み取り、shell の PATH 設定、`startup-check.py` の実行まで自律的に進み、終了コード 0 を実測した。これは案内の読み取りと使用前確認の成功であり、task 起動時に script が無条件で実行される保証ではない。検査には SA 認証・agent 1件・token なしの認証失敗が含まれるため、status API が `unknown` でも実アクセスの検査成功を未確認へ戻さない。専用設定の `op-daemon.sock` は自身所有・0700 の Unix socket の場合だけ許容し、JSON 内の token・人間用 account/session がないことを検査する。
-
-**Network secret は使わない。** Network secret は proxy が置換する placeholder を process に渡す方式であり、1Password CLI が必要とする実 token を直接読めない。Personal vault の Environment variable は保存後の UI では値が隠れるが、実行する task は実値を読める。アクセス範囲は SA の権限と専用クラウドの分離で制限する。
-
-Personal vault が無く、Secret が setup phase のみに渡る旧構成では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。Jev など作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--codex-cloud-の実行環境)）。
+Secret が setup phase のみに渡る cloud 実行先では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。Jev など作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--cloud-の実行環境)）。
 
 移行完了には platform 設定、SA 権限確認、live の正負検証、旧起動経路の停止の証跡が必要。fixture test の成功だけで完了と扱わない。
 
@@ -756,7 +739,7 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 - **credential の発行は最初から User 手作業として計画に書く**。key の値が画面に出る操作へ到達する browser 操作は自動化の分類器に止められる（2026-09-18 #2827）。agent がやってよいのは読み取りでの現況確認（残高・既存 key 件数・プラン）と、秘密でない欄の入力まで
 - **agent の gh は fine-grained PAT（`GH_CONFIG_DIR=~/.config/gh-agent`）**。`.github/workflows/` を含む commit の push は拒否される（`refusing to allow a Personal Access Token to create or update workflow`）。agent は commit まで作り、push は User の terminal で行う。identity を切り替える形の push は自動化側でも止まるので、コマンドを渡すところまでが agent の仕事。`gh` が 403 / `Resource not accessible` を返したら scope 外なので User へ依頼する（2026-09-14 PR #2761）
 - **Sentry の読み取りは `SENTRY_AUTH_TOKEN="op://agent/sentry-cli-readonly/credential" op run -- sentry issue list dayopt/`**（CLI 名は `sentry`。`sentry-cli` は別物の build tool）。build 用 token の正本は `ci/sentry-release-token`。2026-09-07 の「agent から Sentry を読む経路が無い」は item 名の取り違えによる誤診だった
-- **MCP 定義は user-global にだけ置く**（Claude は `~/.claude.json`、Codex は `~/.codex/config.toml` の `[mcp_servers.*]`）。repo に同名定義を足すとキー単位でマージされ `invalid configuration: url is not supported for stdio` で MCP 全体が起動しなくなる（2026-07-23 に 2 回）。詳細は `mcp-usage` skill
+- **MCP 定義は user-global にだけ置く**（Claude は `~/.claude.json`）。repo に同名定義を足すとキー単位でマージされ `invalid configuration: url is not supported for stdio` で MCP 全体が起動しなくなる（2026-07-23 に 2 回）。詳細は `mcp-usage` skill
 
 ---
 
