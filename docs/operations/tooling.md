@@ -477,7 +477,17 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 - `pnpm branch:finish` はlinked worktreeなら従来どおり削除する。Cloud等の通常checkoutは未保存差分がなく、local/remoteの先端がPRのheadと一致しorigin/mainへ到達していることを確認してdetachし、ディレクトリを保持する。mainと別branchのcheckoutは切り替えない。残存remote branchはPRのheadに対するlease付き削除で後続pushを保護する。GitHubのmerge条件は実行場所で変えない
 - 手元のUI確認は `pnpm storybook`、静的buildは `pnpm build-storybook`。既存mockを使い、アプリSecret・1Password・Local Supabaseを要求しない。これは実際の認証や外部連携の確認とは区別する
-- DB型取得は `pnpm types:generate --target preview --project-ref <ref>` 等で対象を指定する。省略時に本番へ接続しない。環境構成・終了時のDB費用・未移行項目は [infra.md](../engineering/infra.md#cloud-firstへの移行契約2910構築中) を参照
+- DB型取得は `pnpm types:generate --target preview --project-ref <ref>` 等で対象を指定する。省略時に本番へ接続しない。環境構成・終了時のDB費用・未移行項目は [infra.md](../engineering/infra.md#cloud-firstへの移行契約2910継続中) を参照
+
+### Claude Code Cloud の実行環境（未実測）
+
+Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）は Codex Cloud と同じ repository contract に従う。以下は 2026-10-09 時点の公式 docs（code.claude.com の cloud-environments / claude-code-on-the-web）と repo の実装から読んだ前提で、Dayopt の session での実測はまだない。実測したら結果で置き換える。
+
+- **Node.js**: 既定 image は Node 20 / 21 / 22（`/opt/node22` が PATH 上）で、`.nvmrc` の 24 を含まない。`scripts/hooks/session-start.sh` は Node を選ばずに `pnpm install --frozen-lockfile` を実行するため、setup script（claude.ai の環境設定側にあり repo には置かれない）で Node 24 を用意しない限り、`pnpm agent:preflight` は MISMATCH を返す。install が失敗すると husky の `prepare` が走らず、pre-commit / pre-push hook も無効になる。session 開始時の `**deps**:` 行と `git config core.hooksPath` を確認してから commit する
+- **GitHub**: `gh` は GitHub proxy 経由で認証済み。ただし proxy は GraphQL（`gh pr` / `gh issue` を含む）、branch 削除、tag push を拒否する。`pnpm ctx` は REST で取れる issue 本文を読み、GraphQL のセクションは「未取得」として続行する。`pnpm branch:finish` は GraphQL と remote branch 削除に依存するため、Cloud では実行せず local で実行する
+- **Network**: 既定の Trusted allowlist は GitHub・npm・nodejs.org 等を含み、`*.vercel.app` / `*.supabase.co` は含まない。Preview や非本番 Supabase を Cloud から確認するには、環境の network を Custom にして必要な非本番 host だけを追加する。本番 host は追加しない
+- **Secret**: 環境変数は環境の利用者全員が読めるため、Secret を置かない。必要な検証は CI または local の証跡で残す（上の Codex Cloud と同じ扱い）
+- **Docker**: image には Docker と Postgres があるが、[infra.md](../engineering/infra.md#codex-work-と任意の-local-development) の方針どおり Cloud 作業環境では `supabase start` を使わない
 
 ### 実行経路ごとの保護範囲
 

@@ -288,21 +288,21 @@
   },
   {
     "name": "@modelcontextprotocol/sdk",
-    "version": "1.30.1",
+    "version": "1.31.0",
     "license": "MIT",
     "repository": "https://github.com/modelcontextprotocol/typescript-sdk.git",
     "publisher": "Anthropic, PBC (https://anthropic.com)"
   },
   {
     "name": "@next/env",
-    "version": "16.3.6",
+    "version": "16.4.0",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js",
     "publisher": "Next.js Team <support@vercel.com>"
   },
   {
     "name": "@next/swc-linux-x64-gnu",
-    "version": "16.3.6",
+    "version": "16.4.0",
     "license": "MIT",
     "repository": "https://github.com/vercel/next.js"
   },
@@ -1324,12 +1324,6 @@
   },
   {
     "name": "baseline-browser-mapping",
-    "version": "2.11.12",
-    "license": "Apache-2.0",
-    "repository": "https://github.com/web-platform-dx/baseline-browser-mapping.git"
-  },
-  {
-    "name": "baseline-browser-mapping",
     "version": "2.11.23",
     "license": "Apache-2.0",
     "repository": "https://github.com/web-platform-dx/baseline-browser-mapping.git"
@@ -1386,13 +1380,6 @@
     "license": "MIT",
     "repository": "sindresorhus/camelcase",
     "publisher": "Sindre Sorhus"
-  },
-  {
-    "name": "caniuse-lite",
-    "version": "1.0.30001806",
-    "license": "CC-BY-4.0",
-    "repository": "browserslist/caniuse-lite",
-    "publisher": "Ben Briggs"
   },
   {
     "name": "caniuse-lite",
@@ -2512,7 +2499,7 @@
   },
   {
     "name": "next",
-    "version": "16.3.6",
+    "version": "16.4.0",
     "license": "MIT",
     "repository": "vercel/next.js"
   },

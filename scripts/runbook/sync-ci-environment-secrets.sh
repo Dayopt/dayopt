@@ -58,9 +58,6 @@ secret() {
 }
 
 ensure_environment production-release
-# #3009 activation requires independent approval; leave these unprovisioned.
-# pending-secret production-release SUPABASE_MIGRATION_READINESS_TOKEN "op://ci/supabase-migration-readiness/credential"
-# pending-secret production-release RELEASE_CANDIDATE_TOKEN "op://ci/github-release-candidate/credential"
 secret production-release VERCEL_TOKEN "op://ci/vercel-production/VERCEL_TOKEN"
 secret production-release VERCEL_ORG_ID "op://ci/vercel-production/VERCEL_TEAM_ID"
 secret production-release VERCEL_AUTOMATION_BYPASS_PRODUCT "op://ci/vercel-production/VERCEL_AUTOMATION_BYPASS_PRODUCT"

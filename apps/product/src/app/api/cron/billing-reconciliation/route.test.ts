@@ -78,7 +78,7 @@ describe('billing reconciliation cron', () => {
     expect(writeCronHeartbeat).not.toHaveBeenCalled();
   });
 
-  it('Stripeが全て未設定なら正常にskipする', async () => {
+  it('Stripeが全て未設定なら照合せずにheartbeatだけ完了させる', async () => {
     envMock.STRIPE_SECRET_KEY = undefined;
     envMock.STRIPE_ACCOUNT_ID = undefined;
     envMock.STRIPE_LIVEMODE = undefined;
@@ -88,7 +88,21 @@ describe('billing reconciliation cron', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, configured: false });
     expect(reconcileBillingWebhookEvents).not.toHaveBeenCalled();
-    expect(writeCronHeartbeat).not.toHaveBeenCalled();
+    // 監査は完了時刻を見るので、started と completed が同じ startedAt で対になること。
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      1,
+      'billing-reconciliation',
+      'started',
+      expect.any(String),
+    );
+    const startedAt = vi.mocked(writeCronHeartbeat).mock.calls[0]?.[2];
+    expect(writeCronHeartbeat).toHaveBeenNthCalledWith(
+      2,
+      'billing-reconciliation',
+      'completed',
+      startedAt,
+    );
+    expect(writeCronHeartbeat).toHaveBeenCalledTimes(2);
   });
 
   it('Stripe設定が一部だけなら503とSentry通知を返す', async () => {
