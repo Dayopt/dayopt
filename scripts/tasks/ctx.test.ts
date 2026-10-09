@@ -265,7 +265,6 @@ describe('mapSkills', () => {
   it('ファイル種別ごとに正しい skill を対応付ける', () => {
     expect(mapSkills(['supabase/migrations/0001_x.sql'], false)).toEqual(['supabase']);
     expect(mapSkills(['apps/product/src/features/foo/server/router.ts'], false)).toEqual([
-      'trpc-router-creating',
       'security',
     ]);
     expect(mapSkills(['packages/components/Button.stories.tsx'], false)).toEqual(['storybook']);

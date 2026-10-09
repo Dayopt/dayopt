@@ -322,7 +322,7 @@ function ComponentB() {
 }
 ```
 
-新規 store 作成時の devtools / persist / 型安全パターンは `store-creating` skill を参照。
+新規 store は上の Zustand 使用例（`createSelectors`、devtools、persist は `@/lib/zustand/storage.ts`）に従う。
 
 ---
 
@@ -476,7 +476,7 @@ export function useCreateActivity() {
 }
 ```
 
-キャッシュ操作・ロールバック・Realtime 競合対策の詳細は `optimistic-update` skill を参照。
+キャッシュ操作とロールバックの helper は `apps/product/src/lib/tanstack-query/optimistic-mutation.ts`（`createSnapshot` / `addToList` / `removeFromList` / `updateList`）。
 
 ### テスト方法
 

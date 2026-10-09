@@ -825,7 +825,7 @@ describe('computeZeroFindingRoleNotes', () => {
       ],
     };
     expect(computeZeroFindingRoleNotes(internalReview, true)).toEqual([
-      'risk-reviewer: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする（gardening 手順 4）',
+      'risk-reviewer: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする',
     ]);
   });
 

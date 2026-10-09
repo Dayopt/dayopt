@@ -188,7 +188,6 @@ Node 24 と pnpm がある checkout では、ローカル・SSH 先・クラウ�
 
 - featureの振る舞いを変えたら同じ変更で該当specを更新する
 - 意思決定はstock更新と `decisions.md` への1行追記を同じ変更に含める
-- 月次 `/gardening` は journal を持たない。判断は `decisions.md`、所見は issue（数値は `pnpm ai:usage` で再計算できる）
 - `pnpm docs:check` はlink、metadata、path、naming、`decisions.md` の append-only 契約を検証する
 
 テンプレートは [`_templates/`](./_templates/)、AIの自発的な更新責務はroot [`AGENTS.md`](../AGENTS.md)を参照する（`CLAUDE.md` は AGENTS.md を import するだけの adapter）。

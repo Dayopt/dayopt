@@ -560,10 +560,6 @@ const SKILL_RULES = [
     test: (f) => f.startsWith('supabase/migrations/') || f.startsWith('supabase/functions/'),
     skill: 'supabase',
   },
-  {
-    test: (f) => /^apps\/product\/src\/features\/[^/]+\/server\//.test(f),
-    skill: 'trpc-router-creating',
-  },
   { test: (f) => /^apps\/product\/src\/features\/[^/]+\/server\//.test(f), skill: 'security' },
   {
     test: (f) =>

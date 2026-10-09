@@ -318,4 +318,4 @@ scope を切れるサービスでは permission を最小にし、期限を付�
 4. **発行元の「Last used」が更新されたことを確かめてから**旧 token を revoke する。疎通の 200 は、ローカルに古い値が残っていると旧 token で返るので証拠にしない。
 5. 旧 token を revoke する。
 
-期限の自動リマインダーは無い。`pnpm 1password:check` の `EXPIRES_SOON` と月次の gardening で期限の近い token を拾う。
+期限の自動リマインダーは無い。`pnpm 1password:check` の `EXPIRES_SOON` で期限の近い token を拾う。

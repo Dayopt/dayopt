@@ -36,7 +36,7 @@ Dayoptでの Supabase 運用パターンを支援するスキル。
 
 ## When NOT to Use
 
-- アプリケーション層のみの変更(tRPC router 内部ロジック、`trpc-router-creating` skill の領域、DB 未変更)
+- アプリケーション層のみの変更(tRPC router 内部ロジック、[conventions.md](../../../docs/engineering/conventions.md) §API層、DB 未変更)
 - 認証フローのみの変更で DB schema が変わらない時(`security` skill の領域)
 - 型生成結果(`apps/product/src/lib/database/generated/database.types.ts`)のみの更新(`types:generate` 後の自動反映)
 
@@ -346,7 +346,7 @@ export function useEntityRealtime(onUpdate: () => void) {
 
 ### 楽観的更新との競合防止
 
-詳細は `/optimistic-update` skill を参照。
+詳細は [conventions-frontend.md](../../../docs/engineering/conventions-frontend.md) §楽観的更新 を参照。
 
 ## Edge Functions
 
@@ -390,13 +390,15 @@ npx supabase functions deploy send-auth-email --use-api --project-ref=<PROD_REF>
 
 #### マトリクス
 
-| Secret                   | Preview           | Staging               | Production               | 備考                            |
-| ------------------------ | ----------------- | --------------------- | ------------------------ | ------------------------------- |
-| `RESEND_API_KEY`         | test key          | test key              | **live key**             | Resend は test/live の2分割     |
-| `RESEND_FROM_EMAIL`      | `noreply-dev@...` | `noreply-staging@...` | `noreply@dayopt.app`     | 環境別                          |
-| `NEXT_PUBLIC_APP_URL`    | preview URL       | staging URL           | `https://app.dayopt.app` | 環境別                          |
-| `CRON_SECRET`            | (不要)            | UUID-staging          | UUID-production          | `openssl rand -hex 32`          |
-| `SEND_EMAIL_HOOK_SECRET` | test値            | staging値             | production値             | Supabase Auth hook 設定時に発行 |
+Staging 環境は無い（環境は PR Preview / 固定 Integration / Production / Local）。
+
+| Secret                   | Preview           | Production               | 備考                            |
+| ------------------------ | ----------------- | ------------------------ | ------------------------------- |
+| `RESEND_API_KEY`         | test key          | **live key**             | Resend は test/live の2分割     |
+| `RESEND_FROM_EMAIL`      | `noreply-dev@...` | `noreply@dayopt.app`     | 環境別                          |
+| `NEXT_PUBLIC_APP_URL`    | preview URL       | `https://app.dayopt.app` | 環境別                          |
+| `CRON_SECRET`            | (不要)            | UUID-production          | `openssl rand -hex 32`          |
+| `SEND_EMAIL_HOOK_SECRET` | test値            | production値             | Supabase Auth hook 設定時に発行 |
 
 **Supabase platform 自動注入(触らない):**
 
@@ -413,11 +415,11 @@ npx supabase secrets set KEY=value --project-ref=<REF>
 npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 ```
 
-`.env.edge.production` / `.env.edge.staging` / `.env.edge.preview` は **`.gitignore` 必須**。
+`.env.edge.production` / `.env.edge.preview` は **`.gitignore` 必須**。
 
 #### Resend key の切り分け
 
-- **test key**: preview / staging で共用。Resend test mode なので実メール送信されない
+- **test key**: preview で使う。Resend test mode なので実メール送信されない
 - **live key**: production 専用。実ユーザーにメール送信する
 
 ## 絶対ルール
@@ -455,7 +457,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 ### Edge Functions
 
 - デプロイは必ず `--use-api` フラグ付きで実行
-- production の secrets を preview / staging にコピーしない
+- production の secrets を preview / Integration にコピーしない
 - `RESEND_API_KEY` の live key は production のみ
 - cron function は preview にデプロイしない（現状そのような function は無い）
 
@@ -467,9 +469,8 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ### 環境操作
 
-- Staging と Production は同時に触らない（`AGENTS.md` §Deploy / Release）
+- 本番と非本番（Preview / Integration）を同時に触らない（`AGENTS.md` §Deploy / Release）
 - production への変更は必ず preview branch での検証を経る
-- staging は「Stripe検証 / hotfix / closed beta」以外の目的では触らない
 
 ## 実測で分かった罠（local DB / 生成物 / PostgREST）
 
@@ -502,6 +503,4 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ## 関連スキル
 
-- `/optimistic-update` - Realtime 競合対策
 - `/security` - 認証/認可パターン
-- `/trpc-router-creating` - Service 層での Supabase 使用

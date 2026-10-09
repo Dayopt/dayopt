@@ -5,7 +5,7 @@ last_verified: 2026-09-20
 
 # Threat Model
 
-`security` skill が実装前に既往を照合する時と、`/gardening` §5 の月次 sweep が scope を決める時の参照先。
+`security` skill が実装前に既往を照合する時と、同 skill §オンデマンド sweep が scope を決める時の参照先。
 
 **このファイルは全体の脅威モデルではない。** 1 つの信頼境界ずつ、実際に sweep を回した範囲だけを書く。
 書かれていない境界は「安全」ではなく **未着手**。所見ゼロを clean と読む前に §未検査の境界 を見る。

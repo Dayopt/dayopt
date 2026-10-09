@@ -12,7 +12,7 @@ tags: ['timeboxing', 'productivity', 'plans', 'tips']
 category: 'Product' # Product / Technology / Tips / Update
 author: 'Dayopt Team'
 authorAvatar: '/avatars/dayopt-team.jpg'
-coverImage: '/images/blog/timeboxing-tips.jpg'
+coverImage: '' # 空なら /api/og が OGP 画像を生成する
 featured: false
 draft: true # レビュー後に false に変更して公開
 
@@ -39,7 +39,7 @@ ai:
 | `category`     | string   | ✅   | カテゴリ                                       |
 | `author`       | string   | ✅   | 著者名                                         |
 | `authorAvatar` | string   | ❌   | アバター画像パス                               |
-| `coverImage`   | string   | ❌   | カバー画像パス（`/images/blog/*`）             |
+| `coverImage`   | string   | ❌   | カバー画像パス。通常は空（`/api/og` が生成）   |
 | `featured`     | boolean  | ❌   | トップページ表示（デフォルト: `false`）        |
 | `draft`        | boolean  | ❌   | 下書き（デフォルト: `false`、`true` で非公開） |
 | `ai`           | object   | ❌   | AI/RAGメタデータ                               |

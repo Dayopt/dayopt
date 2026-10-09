@@ -93,7 +93,7 @@ flowchart TD
 
 - **なぜ必要か**: 通信を待つ間も画面を止めないため。失敗した時に元へ戻せるよう、差し込む前の状態を持っておく。
 - **入力 → 出力**: 作成の入力 → 一時 ID の行が入ったキャッシュと操作ごとの変更記録
-- **ここを変えると**: キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。
+- **ここを変えると**: キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は conventions-frontend.md §楽観的更新 に従う。
 - **コード**:
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `const createPlan = api.planCommands.create.useMutation` を探す
   - [`apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`](../../../apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts) で `snapshotTimeblockLists` を探す
@@ -240,7 +240,7 @@ Router が zod で入力を検証して Service を呼ぶ。Service は command 
 
 - **なぜ必要か**: 入力の検証（Router）と業務の処理（Service）を分け、MCP など別の入口からも同じ Service を使えるようにするため。
 - **入力 → 出力**: 検証前の入力 → command client への呼び出しと利用記録
-- **ここを変えると**: 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
+- **ここを変えると**: 業務ロジックは Service に置き、Router に書かない（conventions.md §API層）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - **コード**:
   - [`apps/product/src/features/timeblock/server/plan-commands-router.ts`](../../../apps/product/src/features/timeblock/server/plan-commands-router.ts) で `handleServiceError` を探す
   - [`apps/product/src/features/timeblock/server/timeblock-command-service.ts`](../../../apps/product/src/features/timeblock/server/timeblock-command-service.ts) で `plan_created` を探す
@@ -503,7 +503,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
         "in": "作成の入力",
         "out": "一時 ID の行が入ったキャッシュと操作ごとの変更記録"
       },
-      "change": "キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。",
+      "change": "キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は conventions-frontend.md §楽観的更新 に従う。",
       "refs": [
         {
           "path": "apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts",
@@ -903,7 +903,7 @@ service role の client で create_plan_command_v1 を呼び、user_id を引数
         "in": "検証前の入力",
         "out": "command client への呼び出しと利用記録"
       },
-      "change": "業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。",
+      "change": "業務ロジックは Service に置き、Router に書かない（conventions.md §API層）。利用記録は best-effort で、失敗しても保存は取り消さない。",
       "refs": [
         {
           "path": "apps/product/src/features/timeblock/server/plan-commands-router.ts",
