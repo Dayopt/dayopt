@@ -7,9 +7,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { runReadOnlyQuery, scalarResult } from '../lib/production-db-readonly.mjs';
 import {
+  EXPECTED_JOB_MODES,
   JOB_MAX_AGE_MINUTES,
   auditHeartbeats,
   evaluateHeartbeats,
+  listInactiveJobs,
 } from './production-cron-heartbeat-audit.mjs';
 import { auditSchema, compareMigrationVersions } from './production-schema-drift-audit.mjs';
 
@@ -21,19 +23,69 @@ const fresh = () =>
   }));
 
 describe('production cron heartbeat evidence', () => {
-  it('audits daily billing reconciliation with a 1560 minute completion budget', async () => {
+  const enabled = { 'billing-reconciliation': 'enabled' } as const;
+  const withoutBilling = () => fresh().filter((row) => row.job_name !== 'billing-reconciliation');
+
+  it('declares billing reconciliation inactive until the production billing rollout', () => {
+    expect(EXPECTED_JOB_MODES).toEqual({ 'billing-reconciliation': 'inactive' });
+    expect(listInactiveJobs()).toEqual(['billing-reconciliation']);
+  });
+  it('accepts a declared inactive job without heartbeat and keeps auditing the others', async () => {
+    await expect(auditHeartbeats(async () => withoutBilling(), now)).resolves.toBe(8);
+    const stale = withoutBilling().map((row) =>
+      row.job_name === 'calendar-sync'
+        ? { ...row, last_completed_at: new Date(now - 46 * 60_000).toISOString() }
+        : row,
+    );
+    expect(evaluateHeartbeats(stale, now)).toEqual([
+      'calendar-sync: last completion exceeds 45 minutes or is invalid',
+    ]);
+  });
+  it('fails when a declared inactive job actually ran recently', () => {
+    const billing = (patch: Record<string, string | null>) =>
+      fresh().map((row) =>
+        row.job_name === 'billing-reconciliation' ? { ...row, ...patch } : row,
+      );
+    const old = new Date(now - 1561 * 60_000).toISOString();
+    const recent = new Date(now - 60_000).toISOString();
+    const mismatch = ['billing-reconciliation: declared inactive but ran within 1560 minutes'];
+
+    expect(evaluateHeartbeats(fresh(), now)).toEqual(mismatch);
+    // 照合が始まったが失敗し続ける（完了なし）も、宣言と実態のずれとして落とす。
+    expect(evaluateHeartbeats(billing({ last_completed_at: null }), now)).toEqual(mismatch);
+    expect(
+      evaluateHeartbeats(billing({ last_completed_at: old, last_started_at: recent }), now),
+    ).toEqual(mismatch);
+    expect(
+      evaluateHeartbeats(billing({ last_completed_at: old, last_started_at: old }), now),
+    ).toEqual([]);
+  });
+  it('fails on an unknown expected mode instead of treating it as inactive', () => {
+    expect(
+      evaluateHeartbeats(withoutBilling(), now, { 'billing-reconciliation': 'disabled' }),
+    ).toEqual(['billing-reconciliation: unknown expected mode']);
+    expect(evaluateHeartbeats(fresh(), now, { 'billing-reconciliation': undefined })).toEqual([
+      'billing-reconciliation: unknown expected mode',
+    ]);
+  });
+  it('audits enabled billing reconciliation with a 1560 minute completion budget', async () => {
     expect(JOB_MAX_AGE_MINUTES['billing-reconciliation']).toBe(1560);
-    await expect(auditHeartbeats(async () => fresh(), now)).resolves.toBe(9);
-    const rows = fresh().filter((row) => row.job_name !== 'billing-reconciliation');
-    expect(evaluateHeartbeats(rows, now)).toEqual([
+    await expect(auditHeartbeats(async () => fresh(), now, enabled)).resolves.toBe(9);
+    expect(evaluateHeartbeats(withoutBilling(), now, enabled)).toEqual([
       'billing-reconciliation: missing or duplicate heartbeat',
     ]);
   });
   it('requires every expected job and rejects missing completion', async () => {
-    expect(evaluateHeartbeats(fresh(), now)).toEqual([]);
-    await expect(auditHeartbeats(async () => fresh().slice(1), now)).rejects.toThrow('missing');
+    expect(evaluateHeartbeats(fresh(), now, enabled)).toEqual([]);
+    await expect(auditHeartbeats(async () => fresh().slice(1), now, enabled)).rejects.toThrow(
+      'missing',
+    );
     expect(
-      evaluateHeartbeats([{ ...fresh()[0], last_completed_at: null }, ...fresh().slice(1)], now),
+      evaluateHeartbeats(
+        [{ ...fresh()[0], last_completed_at: null }, ...fresh().slice(1)],
+        now,
+        enabled,
+      ),
     ).not.toEqual([]);
   });
   it.each(Object.entries(JOB_MAX_AGE_MINUTES))(
@@ -42,9 +94,9 @@ describe('production cron heartbeat evidence', () => {
       const rows = fresh();
       const row = rows.find((row) => row.job_name === name)!;
       row.last_completed_at = new Date(now - minutes * 60_000).toISOString();
-      expect(evaluateHeartbeats(rows, now)).toEqual([]);
+      expect(evaluateHeartbeats(rows, now, enabled)).toEqual([]);
       row.last_completed_at = new Date(now - minutes * 60_000 - 1).toISOString();
-      expect(evaluateHeartbeats(rows, now)).toEqual([expect.stringContaining(name)]);
+      expect(evaluateHeartbeats(rows, now, enabled)).toEqual([expect.stringContaining(name)]);
     },
   );
   it('does not turn API failure or future timestamps into healthy evidence', async () => {
@@ -55,7 +107,7 @@ describe('production cron heartbeat evidence', () => {
     ).rejects.toThrow('offline');
     const rows = fresh();
     rows[0]!.last_completed_at = new Date(now + 60_001).toISOString();
-    expect(evaluateHeartbeats(rows, now)).not.toEqual([]);
+    expect(evaluateHeartbeats(rows, now, enabled)).not.toEqual([]);
   });
 });
 

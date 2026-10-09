@@ -34,13 +34,16 @@ vi.mock('@/lib/rate-limit/upstash', () => ({
 }));
 vi.mock('@/lib/logger', () => ({ logger: { error: mocks.loggerError } }));
 
-import { JOB_MAX_AGE_MINUTES } from '@/lib/ops/cron-heartbeat-policy.mjs';
+import { JOB_MAX_AGE_MINUTES, listInactiveJobs } from '@/lib/ops/cron-heartbeat-policy.mjs';
 
 function freshRows() {
-  return Object.keys(JOB_MAX_AGE_MINUTES).map((job_name) => ({
-    job_name,
-    last_completed_at: new Date(Date.now() - 30_000).toISOString(),
-  }));
+  const inactive = new Set<string>(listInactiveJobs());
+  return Object.keys(JOB_MAX_AGE_MINUTES)
+    .filter((job_name) => !inactive.has(job_name))
+    .map((job_name) => ({
+      job_name,
+      last_completed_at: new Date(Date.now() - 30_000).toISOString(),
+    }));
 }
 
 async function getRoute() {

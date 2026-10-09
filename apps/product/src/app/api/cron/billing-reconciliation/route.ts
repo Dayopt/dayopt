@@ -47,10 +47,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const accountId = env.STRIPE_ACCOUNT_ID?.trim();
   const livemode = env.STRIPE_LIVEMODE;
   if (!secretKey && !accountId && !livemode) {
-    // 課金未有効でもcron自体は正常に走った。heartbeatが無いと日次監査が毎日赤になる。
-    const skippedAt = new Date().toISOString();
-    await writeCronHeartbeat('billing-reconciliation', 'started', skippedAt);
-    await writeCronHeartbeat('billing-reconciliation', 'completed', skippedAt);
+    // 照合していないので完了を記録しない。inactive かどうかは env ではなく
+    // cron-heartbeat-policy の EXPECTED_JOB_MODES が決める（#3010）。
     return noStoreJson({ ok: true, configured: false });
   }
 
