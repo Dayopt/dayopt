@@ -17,6 +17,7 @@
  */
 
 import { useBillingAccess } from '@/lib/billing/BillingAccessProvider';
+import { differenceInCalendarDays } from 'date-fns';
 import { useCallback, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
@@ -33,7 +34,7 @@ import {
   type TimeblockDestination,
   type TimeModelEditorValue,
 } from '@/features/timeblock';
-import { convertFromTimezone } from '@/lib/date/timezone';
+import { convertFromTimezone, convertToTimezone } from '@/lib/date/timezone';
 import { useUserPreferences } from '@/lib/hooks/useUserPreferences';
 import { useHapticFeedback } from '../../hooks/accessibility/useHapticFeedback';
 import { formatRemainingDuration } from '../../lib/remaining-day-minutes';
@@ -77,20 +78,20 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
   // #2096: 予定を置く瞬間だけ、その日の残り時間を静かに示す
   const remainingMinutes = useRemainingDayMinutes(pendingSelection);
 
-  // TimeblockEditor は Date で値を持つ。選択範囲（日付 + 時・分）へ落として store を更新する
+  // Editorの実時刻を設定タイムゾーンの選択範囲（日付 + 時・分）へ戻す。
   const handleDateTimeChange = useCallback(
     (next: TimeModelEditorValue) => {
-      setSelectionDate(
-        new Date(next.startAt.getFullYear(), next.startAt.getMonth(), next.startAt.getDate()),
-      );
+      const start = convertToTimezone(next.startAt, timezone);
+      const end = convertToTimezone(next.endAt, timezone);
+      setSelectionDate(new Date(start.getFullYear(), start.getMonth(), start.getDate()));
       updateSelectionTimes({
-        startHour: next.startAt.getHours(),
-        startMinute: next.startAt.getMinutes(),
-        endHour: next.endAt.getHours(),
-        endMinute: next.endAt.getMinutes(),
+        startHour: start.getHours(),
+        startMinute: start.getMinutes(),
+        endHour: end.getHours() + 24 * differenceInCalendarDays(end, start),
+        endMinute: end.getMinutes(),
       });
     },
-    [setSelectionDate, updateSelectionTimes],
+    [setSelectionDate, updateSelectionTimes, timezone],
   );
 
   if (!pendingSelection) return null;
@@ -128,7 +129,12 @@ export function InlineCreatePanel({ onClose }: InlineCreatePanelProps) {
     startMinute,
   );
   const endAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endHour, endMinute);
-  const editorValue: TimeModelEditorValue = { note, activityId: null, startAt, endAt };
+  const editorValue: TimeModelEditorValue = {
+    note,
+    activityId: null,
+    startAt: convertFromTimezone(startAt, timezone),
+    endAt: convertFromTimezone(endAt, timezone),
+  };
   const dateTimeError = hasConflict ? t('timeblock.errors.timeOverlap') : undefined;
 
   if (!canUseProduct)
