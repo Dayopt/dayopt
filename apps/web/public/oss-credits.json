@@ -1234,7 +1234,7 @@
   },
   {
     "name": "brace-expansion",
-    "version": "5.0.9",
+    "version": "5.0.12",
     "license": "MIT",
     "repository": "https://github.com/juliangruber/brace-expansion.git"
   },
