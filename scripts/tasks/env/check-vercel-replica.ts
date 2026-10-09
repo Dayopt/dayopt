@@ -12,11 +12,11 @@ import { onePasswordEnvSchema } from './schema';
  * （scripts/tasks/env/schema.ts の onePasswordEnvSchema）に無い key を検出する。
  * 既存の production-config-audit.mjs が「台帳側の必須 key が Vercel に揃って
  * いるか」（台帳 → replica）を見るのに対し、こちらは逆方向 —「Vercel にあるが
- * 台帳に無い値の存在」= docs/operations/secrets.md 基本方針 7
+ * 台帳に無い値の存在」= docs/operations/secrets.md 基本方針 1
  * 「値がどこに存在していようと、必ず 1Password にもある」の違反を検出する。
  *
  * 値は一切取得・保持・表示しない。API 応答は key / target のみに即時射影し、
- * value プロパティには触れない（secrets.md §API 経由の設定読戻し）。
+ * value プロパティには触れない（secrets.md §値を表示しない操作）。
  *
  * fetch / 射影は production-config-audit.mjs と同型だが import しない。
  * あちらは audit contract 保護対象（変更すると PR ごとに trusted dispatch が
@@ -233,7 +233,7 @@ if (isDirectExecution()) {
         console.log(`NG ${finding}`);
       }
       console.log(
-        '対応: master（1Password）へ登録して scripts/tasks/env/schema.ts に entry を足すか、Vercel 側から撤去する（docs/operations/secrets.md §External Replicas）',
+        '対応: master（1Password）へ登録して scripts/tasks/env/schema.ts に entry を足すか、Vercel 側から撤去する（docs/operations/secrets-ledger.md §Replica 台帳）',
       );
       process.exitCode = 1;
     })

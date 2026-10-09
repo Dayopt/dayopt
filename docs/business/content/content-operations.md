@@ -76,9 +76,9 @@ Storybook は公開ヘルプ化しない。ヘルプページの役割は `apps/
 
 blog まで両言語必須にすると solo 運用で執筆が止まる。書けることが最優先で、翻訳は価値が確認できた記事から追加する。docs も同じ理由で ja 先行にする。書きかけの ja を追いかけて en を訳すと、本文が動くたびに 2 倍の修正になる。en の抜けは `pnpm docs:coverage` が常に一覧するので、追いつく対象を見失うことはない。
 
-## 月次ガーデニング
+## 公開 docs の監査
 
-四半期の `/gardening`（1 / 4 / 7 / 10 月）で `docs-audit` skill を実行し、機能 ↔ 公開 docs のギャップ・鮮度乖離・en/ja 非対称を Issue 化する。ギャップと非対称の一次情報は `pnpm docs:coverage` の出力を使い、目視の棚卸しから始めない。翌月のコンテンツバックログはここから補充する。Search Console / Vercel Analytics の数字（指名検索・docs/blog 流入・上位クエリ）は各ツールが時系列を持つので docs には転記しない。
+依頼時に `docs-audit` skill を実行し、機能 ↔ 公開 docs のギャップ・鮮度乖離・en/ja 非対称を Issue 化する。ギャップと非対称の一次情報は `pnpm docs:coverage` の出力を使い、目視の棚卸しから始めない。翌月のコンテンツバックログはここから補充する。Search Console / Vercel Analytics の数字（指名検索・docs/blog 流入・上位クエリ）は各ツールが時系列を持つので docs には転記しない。
 
 ## SEO 方針
 

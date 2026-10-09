@@ -1,7 +1,7 @@
 # 非同期・データ取得の規則（async）
 
 出典: vercel-labs/agent-skills @ 063bee94c3f4df8453406c830b0a7df0f2860278（取得 2026-09-17）の `skills/react-best-practices/rules/`。上流は LICENSE ファイルを持たず、README と SKILL.md frontmatter で MIT を宣言している。転記すべき著作権表示は存在しない。
-上流の原文を Dayopt 向けに抜粋・再構成したもので、公式原文そのままではない。更新は `docs/operations/tooling.md` の外部 skill 導入一覧に従う。
+上流の原文を Dayopt 向けに抜粋・再構成したもので、公式原文そのままではない。更新は `docs/operations/ai-harness.md` の外部 skill 導入一覧に従う。
 
 適用順は上から。**指摘する前に、その経路が実際に直列化しているかをコードで確認する**。上流の impact 表記（CRITICAL / HIGH）は Dayopt の P1 / P2 ではない。
 
@@ -105,7 +105,7 @@ async function updateResource(resourceId: string, userId: string) {
 
 This optimization is especially valuable when the skipped branch is frequently taken, or when the deferred operation is expensive.
 
-For `await getFlag()` combined with a cheap synchronous guard (`flag && someCondition`), see [Check Cheap Conditions Before Async Flags](./async-cheap-condition-before-await.md).
+For `await getFlag()` combined with a cheap synchronous guard (`flag && someCondition`), see [Check Cheap Conditions Before Async Flags](#check-cheap-conditions-before-async-flags).
 
 ---
 
@@ -202,7 +202,7 @@ For operations with more complex dependency chains, use `better-all` to automati
 
 When a branch uses `await` for a flag or remote value and also requires a **cheap synchronous** condition (local props, request metadata, already-loaded state), evaluate the cheap condition **first**. Otherwise you pay for the async call even when the compound condition can never be true.
 
-This is a specialization of [Defer Await Until Needed](./async-defer-await.md) for `flag && cheapCondition` style checks.
+This is a specialization of [Defer Await Until Needed](#defer-await-until-needed) for `flag && cheapCondition` style checks.
 
 **Incorrect:**
 

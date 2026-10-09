@@ -48,7 +48,7 @@ const nextConfig = {
   //   2. 誰も書いていない指示ファイルが指示として読み込まれる。repo が意図して置いた
   //      nested な AGENTS.md（apps/product/src/AGENTS.md 等）とは別物で、内容は
   //      next の version 次第。provider や framework が書いた指示を正本へ逆流させない
-  //      （docs/operations/tooling.md）
+  //      （docs/operations/ai-harness.md §1）
   // env での無効化手段は無く、この top-level flag が唯一の opt-out。
   agentRules: false,
 

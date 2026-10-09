@@ -28,9 +28,8 @@ maxTurns: 15
 
 1. **セマンティックトークンのみ**。直接カラー禁止。これだけでダークモード対応完了
 2. **全Storyファイルに AllPatterns Story 必須**
-3. **Storybook MCP の出力とこのスキルが矛盾したらこのスキルが正**
-4. **Canvas にテキスト説明を入れない**（AllPatterns含む。Foundations/Patterns 除く）
-5. **play 関数はユーザー操作で状態が変わるコンポーネントにのみ書く**
+3. **Canvas にテキスト説明を入れない**（AllPatterns含む。Foundations/Patterns 除く）
+4. **play 関数はユーザー操作で状態が変わるコンポーネントにのみ書く**
 
 ---
 
@@ -80,23 +79,9 @@ export const ClickTest: Story = {
 
 ---
 
-## 運用ルール
+## 運用ルールとチェックリスト
 
-| 変更                   | Story側の対応                 |
-| ---------------------- | ----------------------------- |
-| コンポーネント新規作成 | 同時にStoryも作成             |
-| props追加              | argTypes追加、Story使用例追加 |
-| variant追加            | AllPatternsに追加             |
-| コンポーネント削除     | Storyも削除                   |
+コンポーネントの追加・props / variant 変更時の Story 同期と、作成後のチェックリストは [storybook.md](../../../docs/engineering/storybook.md) §同期ルール・§チェックリスト を正本とする。docs に無い 2 点だけここで補う:
 
----
-
-## チェックリスト
-
-- [ ] `satisfies Meta<typeof Component>` + `StoryObj<typeof meta>`
-- [ ] `AllPatterns` Story 含む
-- [ ] JSDoc は1行・句点つき
-- [ ] セマンティックトークンのみ（直接カラー・hex 禁止）
-- [ ] アイコンボタンに `aria-label`
-- [ ] Canvas にテキストなし（AllPatterns含む。Foundations/Patterns除く）
-- [ ] layout がレイヤーのデフォルトと一致（UI=centered, Feature=padded, Foundation/Pattern=fullscreen）
+- `satisfies Meta<typeof Component>` + `StoryObj<typeof meta>`
+- layout はレイヤーの既定に合わせる（UI=centered, Feature=padded, Foundation/Pattern=fullscreen）

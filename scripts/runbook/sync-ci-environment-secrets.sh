@@ -2,7 +2,7 @@
 # CI の GitHub Secret を 1Password ci vault から main 限定の environment へ同期する。
 #
 # 使う場面: environment の初回作成（2026-09-14、ci vault 整理）と、ci vault の token を
-# rotation した後の replica 更新（docs/operations/secrets.md §GitHub Secrets）。
+# rotation した後の replica 更新（docs/operations/secrets-services.md §GitHub Actions の Secret）。
 # 一覧は scripts/tasks/env/schema.ts の ciSecretSchema と 1:1 で、
 # scripts/__tests__/ci-secret-ledger.test.ts が一致を検査する。
 #

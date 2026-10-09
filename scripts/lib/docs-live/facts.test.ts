@@ -24,15 +24,15 @@ it('許可式と禁止識別子の矛盾を勝手に解消せず、変更を次�
       warning: { licenses: [] },
     }),
   );
-  const output = renderFacts(root, 'docs/operations/tooling.md');
+  const output = renderFacts(root, 'docs/engineering/license-compliance.md');
   expect(output.match(/LGPL-3.0-or-later/g)).toHaveLength(2);
   put(
     path,
     JSON.stringify({ onlyAllow: 'MIT', prohibited: { licenses: [] }, warning: { licenses: [] } }),
   );
-  expect(renderFacts(root, 'docs/operations/tooling.md')).not.toContain('LGPL');
+  expect(renderFacts(root, 'docs/engineering/license-compliance.md')).not.toContain('LGPL');
   put(path, '{}');
-  expect(() => renderFacts(root, 'docs/operations/tooling.md')).toThrow('onlyAllow');
+  expect(() => renderFacts(root, 'docs/engineering/license-compliance.md')).toThrow('onlyAllow');
 });
 
 it('permissionsの実値を展開せず件数を取得し、skill追加を毎回発見する', () => {

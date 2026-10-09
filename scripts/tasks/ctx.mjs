@@ -9,19 +9,6 @@ import { REPO, runGh, runGhJson } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 
 /**
- * Codex GitHub 連携 bot の login。GraphQL の `author.login` は
- * `chatgpt-codex-connector`、REST の `user.login` は `chatgpt-codex-connector[bot]`
- * と表記が割れる。bot コメント除外の例外判定専用で、merge を gate する用途では
- * 使わない（#2596 で issue-review-core.mjs を削除したため、この表示用途だけを
- * ここへ複製する）。
- */
-const CODEX_BOT_LOGIN = 'chatgpt-codex-connector';
-
-function isCodexBotLogin(login) {
-  return String(login ?? '').replace(/\[bot\]$/, '') === CODEX_BOT_LOGIN;
-}
-
-/**
  * `pnpm ctx <N>` — L0 の機械収集（Issue / PR 本文、関連、CI、判断の記録）をまとめた Brief を出す。
  * `--post` は Brief を Issue / PR コメントへ配達する（idempotent）。`--reuse-brief-l1` は旧 L1 助言の
  * 互換 flag で、指定しても挙動は変わらない。
@@ -56,12 +43,7 @@ export const CTX_MARKER = '<!-- ctx-brief -->';
 // （gate は読まない情報コメント）。旧 `[internal-review]` は過去 PR に残るため
 // 併記する。ここは「Main 自身が書いた marker コメントを ctx から除外する」ための
 // 一覧で、gate の判定材料ではない。
-const OWN_MARKER_PREFIXES = [
-  CTX_MARKER,
-  '[review-summary]',
-  '[internal-review]',
-  '[codex-issue-review]',
-];
+const OWN_MARKER_PREFIXES = [CTX_MARKER, '[review-summary]', '[internal-review]'];
 
 /** body が Main 自身の marker / brief コメントで始まるか。 */
 function isOwnMarkerComment(body) {
@@ -475,12 +457,6 @@ export function buildJudgmentHint(records) {
  * `isOwnMarkerComment`）は `allComments` の指定に関わらず常に除外する ──
  * これらが reviewer への ctx pack に混入すると独立レビューの前提が崩れるため、
  * bot 除外とは別の懸念として無条件に適用する。
- *
- * **Codex（`isCodexBotLogin`）は bot 除外の対象外にする** ── `[codex-issue-review]`
- * 実装前レビューは Codex 本体（login が `[bot]` で終わる）のコメントとして
- * issue に残るため、bot を一律除外すると次に着手する Main が直前の Codex 指摘を
- * 見落とす（`[internal-review]` / ctx-brief / `[codex-issue-review]` marker 自体は
- * 上の `isOwnMarkerComment` で別枠除外済みなので、ここで通しても二重計上にならない）。
  */
 export function selectComments(comments, k, allComments) {
   const list = Array.isArray(comments) ? comments : [];
@@ -489,7 +465,7 @@ export function selectComments(comments, k, allComments) {
       return !isTrustedMarkerComment(c);
     if (isOwnMarkerComment(c.body)) return false;
     if (allComments) return true;
-    return !isBotLogin(c.user?.login) || isCodexBotLogin(c.user?.login);
+    return !isBotLogin(c.user?.login);
   });
   return k > 0 ? filtered.slice(-k) : [];
 }
@@ -583,10 +559,6 @@ const SKILL_RULES = [
   {
     test: (f) => f.startsWith('supabase/migrations/') || f.startsWith('supabase/functions/'),
     skill: 'supabase',
-  },
-  {
-    test: (f) => /^apps\/product\/src\/features\/[^/]+\/server\//.test(f),
-    skill: 'trpc-router-creating',
   },
   { test: (f) => /^apps\/product\/src\/features\/[^/]+\/server\//.test(f), skill: 'security' },
   {

@@ -63,7 +63,7 @@ Vercel Projectは `product` と `web` の2つに集約し、別の `product-inte
 
 OAuth identityのruntime検証は `get_mcp_environment_identity_v1` のread-only照会に限る。health・MCP access・token issuanceからidentityをprovisionしない。不足または不一致なら利用を停止し、明示的な環境準備で整える。IntegrationのRedis keyは `ratelimit:product:integration` namespaceへ分離し、固定IntegrationのRedis設定欠落・不一致はfail closedにする。MCP write allowlist・billing・PostHog event送信はIntegrationで閉じる。SentryはProductionまたは完全にboundされたIntegrationのみ初期化し、browserでは既存consentも要求する。
 
-2026-10-05に固定Integrationのhealth/version endpointが`tilwaprottpyhlfoggbb`を返すことを確認した。同日のPR #3024 PreviewはSupabase ref `txjcpkelxwkclihzouip` を参照し、repoとPreview branchのmigration 304件が一致した。Supabase の PR 専用 branch は `supabase/` に変更がある PR だけに作られる（User の設定）。nonproduction-login workflow も同じ条件（`paths: ['supabase/**']`）でだけ PR から起動し、対応する PR branch が見つからない時は停止する。変更のない PR の Preview はこの workflow の対象外で、required check でもないため merge は止まらない（[#3060](https://github.com/Dayopt/dayopt/issues/3060)）。Vercel への branch-specific 接続は未確認。IntegrationとPreviewのcredential sourceは別の1Password項目で、Previewのログイン資格情報は全Preview PRで共通利用する。Auth user IDとデータはbranchごとに独立する。ProductのSSO protectionはProductionとPreviewで有効のままにし、人の確認ではSSOを使う。自動runnerの資格情報と保護バイパス方式は[`secrets.md`](../operations/secrets.md#cloud-preview-の未初期化台帳-2910)を正本とする。
+2026-10-05に固定Integrationのhealth/version endpointが`tilwaprottpyhlfoggbb`を返すことを確認した。同日のPR #3024 PreviewはSupabase ref `txjcpkelxwkclihzouip` を参照し、repoとPreview branchのmigration 304件が一致した。Supabase の PR 専用 branch は `supabase/` に変更がある PR だけに作られる（User の設定）。nonproduction-login workflow も同じ条件（`paths: ['supabase/**']`）でだけ PR から起動し、対応する PR branch が見つからない時は停止する。変更のない PR の Preview はこの workflow の対象外で、required check でもないため merge は止まらない（[#3060](https://github.com/Dayopt/dayopt/issues/3060)）。Vercel への branch-specific 接続は未確認。IntegrationとPreviewのcredential sourceは別の1Password項目で、Previewのログイン資格情報は全Preview PRで共通利用する。Auth user IDとデータはbranchごとに独立する。ProductのSSO protectionはProductionとPreviewで有効のままにし、人の確認ではSSOを使う。自動runnerの資格情報と保護バイパス方式は[`secrets-ledger.md`](../operations/secrets-ledger.md#cloud-preview-の未初期化台帳-2910)を正本とする。
 
 Preview E2Eは固定したdeployment・DB branch・migration集合が一致し、healthが正常な場合にだけ実行する。2026-10-05のSupabase migration一覧では、Productionはrepoのmainと一致したが、共有Integration branchはmainと一致しなかった（Integration側298件、main側304件。mainだけのmigration 7件、Integrationだけのmigration 1件）。#2954の共有Integration freeze中のため、この差分を共有DBへ適用・rebaseしない。DB/Auth共通設定の変更はそのPR専用のPreview branchで検証し、共有branchの同期はfreeze解除後にmigration順序とrate-limit POCを照合して行う。fresh password login、認証後の戻り先、Plan/Recordの作成・編集・削除、full Cloud replayは#2910の受入れ項目で、結果が出るまで完了扱いにしない。
 
@@ -124,7 +124,7 @@ pnpm dev
 
 **Next.js が生成する `apps/*/AGENTS.md` / `CLAUDE.md` は指示の正本ではない。** Next.js 16 は `next dev` が AI coding agent を検出すると app 直下へこの 2 ファイル（`<!-- BEGIN:nextjs-agent-rules -->` ブロック）を書き出す。untracked のまま残ると `pnpm branch:finish` の worktree dirty 判定を止め、誰も書いていない指示が読み込まれる。両 app の `next.config.mjs` で `agentRules: false` にして生成を止め、`.gitignore` にも app 直下だけを対象にした保険を置いてある（[#2693](https://github.com/Dayopt/dayopt/issues/2693)）。既に生えてしまった分は `rm` してよい。`apps/product/src/AGENTS.md` のように repo が意図して置いた nested な指示ファイルとは別物なので、消す前に `git ls-files` で tracked かどうかを見る。
 
-個人端末での`pnpm dev`はlocal Supabaseを既定にし、接続先の暗黙切替はしない。かつて存在した`DAYOPT_SUPABASE_TARGET=op`はproductionを参照していたため廃止した（[#1929](https://github.com/Dayopt/dayopt/issues/1929)）。Codex環境はこのLocal手順を使わず、PreviewとCIを使う。
+個人端末での`pnpm dev`はlocal Supabaseを既定にし、接続先の暗黙切替はしない。かつて存在した`DAYOPT_SUPABASE_TARGET=op`はproductionを参照していたため廃止した（[#1929](https://github.com/Dayopt/dayopt/issues/1929)）。Claude Code cloud はこのLocal手順を使わず、PreviewとCIを使う。
 
 ### Migration
 
@@ -510,7 +510,7 @@ upgrade 成功の代用にしない。適用済み migration の編集・削除�
 反映を最大 6 回 × 30 秒だけ待つ。適用・再試行はしない。writer は Supabase integration のまま）。
 **現状は token を渡しておらず常に advisory（warning）。**
 有効化は別変更で、read-only token を `production-release` environment へ置く決定（secret の
-境界変更、User 裁可）と台帳（`docs/operations/secrets.md`）・同期 script・
+境界変更、User 裁可）と台帳（`docs/operations/secrets-ledger.md`）・同期 script・
 `ci-secret-ledger.test.ts` の同時更新を伴う。有効化後は欠落が promote を止める（force では飛ばす）。
 
 同じ controller が Review policy（#2796）も評価する: 計画の `review` 要件と PR の review /
@@ -519,7 +519,7 @@ comment / thread（GraphQL の resolve 状態）から `not-required` / `not-sta
 `Review policy (shadow)` に出す。状態の定義と完了証拠は `pr-cross-review` skill §Review policy。
 追加 reviewer は停止中。`protected-path-gate.mjs` に一致する PR だけ現 head の GitHub レビューと指摘の裁定を読み、
 固定差分レビューの欠落・古さ・partial を別の停止条件にしない。既存証跡の読み取り互換は維持する。
-通常ロジック・時間不変条件・agent 文書は `not-required`。shadow 中は Codex を自動起動せず、
+通常ロジック・時間不変条件・agent 文書は `not-required`。shadow 中は独立レビューを自動起動せず、
 required check へ切り替えない（workflow に `pull-requests: write` を渡していない）。
 review evidence の保証境界: review の submit と thread の resolve は issue_comment を出さないため、
 その直後は再評価されない。通常は修正 push → CI 完了の `workflow_run` で再評価される。
@@ -644,7 +644,7 @@ rollback 入力ではない）:
 
 - 公開前 migration 反映確認は promote.yml に advisory で配線済み。有効化は read-only token を
   `production-release` environment へ置く決定（secret の境界変更）と台帳更新を伴う別変更
-- Codex の自動起動（Review policy の trigger）は log のみ。実起動は `pull-requests: write` を
+- 独立レビューの自動起動（Review policy の trigger）は log のみ。実起動は `pull-requests: write` を
   controller へ渡す判断を伴う別変更
 - controller の status 発行元の分離（専用 GitHub App）は未実施。段階 2 の前提（上記）
 - release 差分基準の回帰（前回公開失敗後の docs-only merge、同一 SHA の再 deployment、片方だけ
@@ -1173,7 +1173,7 @@ flip 忘れ・後日の戻しを検知する仕組みは **#1966** で `producti
 
 ### 関連ドキュメント
 
-- tRPC procedure 設計: `.agents/skills/trpc-router-creating/SKILL.md`（`trpc-router-creating` skill）
+- tRPC procedure 設計: [conventions.md](./conventions.md) §API層、[conventions-api.md](./conventions-api.md)
 - Supabase Branching 運用: `.agents/skills/supabase/SKILL.md`（`supabase` skill）
 - 問い合わせメール運用: `docs/operations/contact-email.md`
 
@@ -2193,7 +2193,7 @@ WHERE version = '20260319090000';  -- 該当バージョンに置き換え
 | **Sentry**                                  | エラー監視（runtime capture / sanitizer / CSP report）+ **production build gate**（`assertProductionSentryBuildEnv` が資格情報欠落で build を失敗させる。product / web 両方）                                                                                                                                                                                                                                             | 監視に加え、**次の production build が止まる**                                                                                                                         | 代替 APM への移植は build 配線・sanitizer・CSP・運用 runbook を含むため日単位。履歴は持ち出さない割り切り                                                                                                                                                                        | 価格改定、無料枠の縮小              |
 | **Resend**                                  | メール送信 + **bounce / complaint webhook**（svix 署名検証 → `email_suppressions` 更新）                                                                                                                                                                                                                                                                                                                                  | 送信に加え、**新規 bounce / complaint が記録されなくなり、抑止対象へ送り続ける**                                                                                       | 代替 SMTP / API へ切替。suppression list の持ち出しに加え、**webhook 署名検証・イベント変換・冪等性の再実装**が要る                                                                                                                                                              | 価格改定、到達率の劣化              |
 | **1Password**                               | 長寿命 secret の **master**（Vercel / GitHub / Supabase は replica）、`op run` 注入、GitHub SSH 鍵、各サービスの password / TOTP / recovery code、ドメイン管理情報                                                                                                                                                                                                                                                        | secret の rotation 元と**アカウント復旧手段**（TOTP / recovery code / SSH 鍵）                                                                                         | `.op-env` スキーマだけでなく、**master secret・外部 replica の同期元・SSH agent・login / recovery item** をまとめて別 manager へ移す必要がある（`docs/operations/secrets.md`）                                                                                                   | 価格改定、desktop 統合の劣化        |
-| **Anthropic / Claude Code**（開発プロセス） | 通常開発の主担当（2026-10-09 に Codex から切替）。保護対象 PR の独立レビューは移行中（`@codex review` → Claude）                                                                                                                                                                                                                                                                                                          | 開発テンポ（プロダクトは無傷）。独立レビューは required ではないので merge は止まらない                                                                                | 規約は provider 非依存の `AGENTS.md` と `.agents/skills/` に plain markdown で置き、Claude Code は `CLAUDE.md` / `.claude/skills` symlink / 共有 guard rules の adapter で同じ正本を読む。出口は adapter を別 runtime へ足すだけで、規約の移植は要らない。model 名には固定しない | 価格・品質・提供条件の変化          |
+| **Anthropic / Claude Code**（開発プロセス） | 通常開発の主担当（2026-10-09 に Codex から切替）。保護対象 PR の独立レビューは Claude review（`@claude review`）                                                                                                                                                                                                                                                                                                          | 開発テンポ（プロダクトは無傷）。独立レビューは required ではないので merge は止まらない                                                                                | 規約は provider 非依存の `AGENTS.md` と `.agents/skills/` に plain markdown で置き、Claude Code は `CLAUDE.md` / `.claude/skills` symlink / 共有 guard rules の adapter で同じ正本を読む。出口は adapter を別 runtime へ足すだけで、規約の移植は要らない。model 名には固定しない | 価格・品質・提供条件の変化          |
 
 ### 浅い（乗り換えは時間単位、単機能で代替容易）
 

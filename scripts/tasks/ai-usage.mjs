@@ -14,7 +14,7 @@ import { isDirectExecution } from '../lib/is-direct-execution.mjs';
  *
  * Claude Code の local transcript `~/.claude/projects/**\/*.jsonl` だけを 1 パスで
  * walk し、指定期間（既定は前月の
- * 暦月。gardening 手順 0 が前月分を見るため）について以下を集計する:
+ * 暦月。月次の振り返りで前月分を見るため）について以下を集計する:
  *
  *   A. 消費 — model 別 requests / output / input / cache_read / cache_creation、
  *      output 構成比、subagent 比（isSidechain）、cache TTL（1h/5m）内訳、

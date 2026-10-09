@@ -1,6 +1,6 @@
 ---
 name: docs-audit
-description: 公開 docs（apps/web/content/docs）の監査の明示依頼時と月次ガーデニングの公開コンテンツ監査で発動。プロダクトの実機能と公開 docs を突き合わせ、未カバー機能・鮮度乖離・en/ja 非対称を検出して報告し、承認後に area:docs ラベルで起票する。docs 本文の生成や内部 docs/ の監査では発動しない。
+description: 公開 docs（apps/web/content/docs）の監査の明示依頼時に発動。プロダクトの実機能と公開 docs を突き合わせ、未カバー機能・鮮度乖離・en/ja 非対称を検出して報告し、承認後に area:docs ラベルで起票する。docs 本文の生成や内部 docs/ の監査では発動しない。
 user_invocable: true
 ---
 
@@ -13,7 +13,6 @@ user_invocable: true
 **明示発動型** — explicit な監査依頼のみを契機とする。
 
 - `/docs-audit` で手動実行する時
-- 月次ガーデニング（`/gardening`）の公開コンテンツ監査ステップから呼ばれる時
 - リリース後に docs 更新漏れを確認したい時
 - en/ja の翻訳対称性だけを確認したい時
 
@@ -59,7 +58,7 @@ user_invocable: true
 
 ```bash
 git log --oneline -5 -- apps/product/src/features/<feature>/
-git log --oneline -5 -- apps/web/content/docs/ja/<section>/<feature>.mdx  # section = getting-started / plan / track / review / organize / data / faq / troubleshooting
+git log --oneline -5 -- apps/web/content/docs/ja/<section>/<feature>.mdx  # section = getting-started / plan / track / organize / calendar / data / faq / troubleshooting
 ```
 
 docs の最終更新と product 側の最終コミットを比較し、乖離が大きいものをフラグする。

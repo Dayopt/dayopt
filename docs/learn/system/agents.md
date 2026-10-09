@@ -31,7 +31,7 @@ flowchart LR
   end
   subgraph S5["PR"]
     E1["CI の required checks"]
-    E3["@codex review"]
+    E3["@claude review"]
     E4["main の ruleset<br/>merge を止める"]
   end
   subgraph S6["merge"]
@@ -96,7 +96,7 @@ flowchart LR
 
 - **場所**: repo の外（`~/.claude/projects/<repo のパス>/memory/`）。`MEMORY.md` が索引で、1 件 1 ファイル。2026-09-22 時点で 109 件
 - **誰が読むか**: Claude Code だけ。毎セッションの最初に索引が読み込まれ、関係しそうなものだけ本文を読む。repo に入っていないので、`pnpm docs:check` も他の人も見ない
-- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[tooling.md](../../operations/tooling.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
+- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[ai-harness.md](../../operations/ai-harness.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
 - **使い分け**: どの AI にも効かせたい規則は、memory ではなく `AGENTS.md` か skill か上記の doc に書く。memory に置くのは、Claude が繰り返し踏む罠の回避と、repo に書くまでもない作業の癖だけ
 
 ## AI にこうさせたい時、どこを触るか
@@ -121,9 +121,9 @@ flowchart LR
 </details>
 
 <details>
-<summary>2. Codex のレビューだけが、ある観点を毎回見落とす。どこを直すか</summary>
+<summary>2. 独立レビュー（Claude review）だけが、ある観点を毎回見落とす。どこを直すか</summary>
 
-`AGENTS.md` のレビュー規則か、該当ディレクトリの入れ子の `AGENTS.md`（`apps/product/src/` / `supabase/`）。memory に書いても Codex は読まない。
+`AGENTS.md` のレビュー規則か、該当ディレクトリの入れ子の `AGENTS.md`（`apps/product/src/` / `supabase/`）。memory に書いても review workflow は読まない。
 
 </details>
 
@@ -173,20 +173,12 @@ flowchart LR
     "find": "name: error-handling"
   },
   {
-    "path": ".agents/skills/gardening/SKILL.md",
-    "find": "name: gardening"
-  },
-  {
     "path": ".agents/skills/i18n/SKILL.md",
     "find": "name: i18n"
   },
   {
     "path": ".agents/skills/mcp-usage/SKILL.md",
     "find": "name: mcp-usage"
-  },
-  {
-    "path": ".agents/skills/optimistic-update/SKILL.md",
-    "find": "name: optimistic-update"
   },
   {
     "path": ".agents/skills/pr-cross-review/SKILL.md",
@@ -213,10 +205,6 @@ flowchart LR
     "find": "name: skill-design"
   },
   {
-    "path": ".agents/skills/store-creating/SKILL.md",
-    "find": "name: store-creating"
-  },
-  {
     "path": ".agents/skills/storybook/SKILL.md",
     "find": "name: storybook"
   },
@@ -227,10 +215,6 @@ flowchart LR
   {
     "path": ".agents/skills/test/SKILL.md",
     "find": "name: test"
-  },
-  {
-    "path": ".agents/skills/trpc-router-creating/SKILL.md",
-    "find": "name: trpc-router-creating"
   },
   {
     "path": ".agents/skills/ui-audit/SKILL.md",

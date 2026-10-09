@@ -71,17 +71,9 @@ try {
 }
 ```
 
-自動復旧（リトライ）は呼び出し側が opt-in するラッパー関数ではなく、`QueryClient`（`apps/product/src/lib/trpc/query-client.ts`）に一元設定されている:
+自動復旧（リトライ）は呼び出し側が opt-in するラッパー関数ではなく、`QueryClient`（`apps/product/src/lib/trpc/query-client.ts`）に一元設定されている。
 
-```typescript
-// apps/product/src/lib/trpc/query-client.ts（抜粋）
-retry: (failureCount, error) => {
-  if (isAuthError(error)) return false; // 認証エラーはリトライしない
-  if (error && 'status' in error && error.status === 404) return false;
-  return failureCount < 3;
-},
-retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-```
+query は認証・キャンセル・課金失効・rate limit・404 を retry せず最大 3 回、mutation は同じ除外で最大 1 回。条件の正本は同ファイルの `queries.retry` / `mutations.retry`。
 
 ## エラーコード
 
@@ -111,130 +103,9 @@ retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
 
 **ポイント**: 機能単位で分離し、部分的な復旧を可能にする
 
-### 実装パターン
+### 実装
 
-```tsx
-// components/ErrorBoundary.tsx
-'use client';
-
-import { Component, ErrorInfo, ReactNode } from 'react';
-import { handleReactError } from '@/lib/sentry';
-
-interface Props {
-  children: ReactNode;
-  fallback: ReactNode;
-  onError?: (error: Error) => void;
-}
-
-interface State {
-  hasError: boolean;
-  error: Error | null;
-}
-
-export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null };
-
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // グローバルエラーハンドラーに報告
-    handleReactError(error, errorInfo, {
-      source: 'ErrorBoundary',
-    });
-
-    this.props.onError?.(error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
-}
-```
-
-```tsx
-// 使用例
-<ErrorBoundary fallback={<ErrorFallback onRetry={() => window.location.reload()} />}>
-  <ActivityList />
-</ErrorBoundary>
-```
-
-### ErrorFallback コンポーネント
-
-```tsx
-interface ErrorFallbackProps {
-  title?: string;
-  description?: string;
-  onRetry?: () => void;
-}
-
-export function ErrorFallback({
-  title = t('error.fallback.title'),
-  description = t('error.fallback.description'),
-  onRetry,
-}: ErrorFallbackProps) {
-  return (
-    <div className="flex flex-col items-center justify-center p-8 text-center">
-      <AlertCircle className="text-destructive mb-4 h-12 w-12" />
-      <h2 className="text-lg font-medium">{title}</h2>
-      <p className="text-muted-foreground mt-2">{description}</p>
-      {onRetry && (
-        <Button onClick={onRetry} className="mt-4">
-          再試行
-        </Button>
-      )}
-    </div>
-  );
-}
-```
-
-## tRPCエラー → UIエラー変換
-
-```typescript
-// hooks/useErrorToast.ts
-import { TRPCClientError } from '@trpc/client';
-import { toast } from '@/lib/toast';
-
-export function useErrorToast() {
-  return (error: unknown) => {
-    if (error instanceof TRPCClientError) {
-      const code = error.data?.code;
-
-      switch (code) {
-        case 'UNAUTHORIZED':
-          toast.error(t('error.unauthorized'));
-          break;
-        case 'FORBIDDEN':
-          toast.error(t('error.forbidden'));
-          break;
-        case 'NOT_FOUND':
-          toast.error(t('error.notFound'));
-          break;
-        case 'BAD_REQUEST':
-          toast.error(error.message || t('error.badRequest'));
-          break;
-        default:
-          toast.error(t('error.generic'));
-      }
-    } else {
-      toast.error(t('error.unexpected'));
-    }
-  };
-}
-```
-
-```typescript
-// 使用例
-const showErrorToast = useErrorToast();
-
-const mutation = api.activities.createActivity.useMutation({
-  onError: showErrorToast,
-});
-```
+実体は `apps/product/src/components/ui/feedback/error-boundary.tsx`（`componentDidCatch` で `handleReactError` に報告）と `ErrorState.tsx`。新しい境界はこれを使い、自前の class を書かない。tRPC エラーの通知は `toast.error` を呼び出し側の `onError` で組み合わせる（共通の変換 hook は無い）。
 
 ## Sentry連携
 
@@ -286,20 +157,6 @@ toast.error('保存に失敗しました', {
 });
 ```
 
-### モーダル（重要なエラー）
-
-```typescript
-// セッション期限切れなど
-showErrorModal({
-  title: 'セッションが期限切れです',
-  description: '再ログインしてください',
-  action: {
-    label: 'ログイン',
-    onClick: () => router.push('/login'),
-  },
-});
-```
-
 ### インライン（フォームエラー）
 
 ```tsx
@@ -335,5 +192,4 @@ apps/product/src/lib/tanstack-query/          # TanStack Queryキャッシュ・
 
 ## 関連スキル
 
-- `/trpc-router-creating` - tRPCエラーコード
 - `/security` - 認証エラー処理

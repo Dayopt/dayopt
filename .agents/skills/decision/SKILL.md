@@ -23,7 +23,6 @@ description: ユーザーが継続して適用する判断を明示確定・変�
 - 質問、選択肢の比較、agent の提案、反対しなかったこと。採用か不明なら未決として扱う
 - コードが変わっただけの場合や、単発の作業指示・検証結果。永続原則へ自動昇格しない
 - 時点ものの調査・実験・feedback・incidentの記録 → GitHub issue（`dispatch` skill の既存ラベル体系に従う）
-- 月次の docs 鮮度・一貫性の保守 → `gardening` skill
 
 ## 手順
 

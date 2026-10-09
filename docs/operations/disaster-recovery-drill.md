@@ -164,7 +164,7 @@ supabase db dump --db-url "$PROD_DB_URL" --data-only --use-copy -f data.sql
 
 </details>
 
-> **credential を標準出力へ出さない。** 接続文字列は環境変数へ直接読み込み、値を echo しない。Management API / CLI の出力を見る時は [secrets.md §API 経由の設定読戻し](./secrets.md) の **allowlist 射影**に従う。denylist（危なそうな名前を隠す）方式は 2026-08-11 に実際に破綻している（判定語が `password` で実キー名が `db_pass` だった）。`supabase branches get` は credential を JSON で返す command なので、状態確認には `branches list` を使う。
+> **credential を標準出力へ出さない。** 接続文字列は環境変数へ直接読み込み、値を echo しない。Management API / CLI の出力を見る時は [secrets.md §値を表示しない操作](./secrets.md#値を表示しない操作) の **allowlist 射影**に従う。denylist（危なそうな名前を隠す）方式は 2026-08-11 に実際に破綻している（判定語が `password` で実キー名が `db_pass` だった）。`supabase branches get` は credential を JSON で返す command なので、状態確認には `branches list` を使う。
 
 ### 1-2. 復元先を用意する（**`pnpm db:reset` は使わない**）
 

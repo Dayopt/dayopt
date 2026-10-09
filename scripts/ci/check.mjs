@@ -340,7 +340,6 @@ function isProductUnitNeutral(file) {
     'docs/',
     '.claude/',
     '.agents/',
-    '.codex/',
     '.husky/',
     '.vscode/',
     '.github/',

@@ -21,7 +21,7 @@ maxTurns: 20
 
 - 実装や push 前のセルフレビュー（`AGENTS.md` に従う）
 - 保護対象に一致しない通常 PR（対象 test / CI とセルフレビューで閉じる）
-- repository 全体や特定境界の security sweep（明示依頼は `security` skill §オンデマンド sweep の手順、月次は `gardening` skill §5。`docs/operations/security.md` の cadence 表が正本）
+- repository 全体や特定境界の security sweep（明示依頼時に `security` skill §オンデマンド sweep の手順。`docs/operations/security.md` の cadence 表が正本）
 
 ## 保護対象 PR
 

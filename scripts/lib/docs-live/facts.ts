@@ -15,7 +15,7 @@ export const FACT_DOCUMENT_SOURCES: Readonly<Record<string, readonly Source[]>> 
     { path: 'apps/product/src/lib/analytics/product-events.ts', symbols: ['PRODUCT_EVENT_NAMES'] },
   ],
   'docs/operations/security.md': [{ path: '.github/workflows/*.{yml,yaml}' }],
-  'docs/operations/tooling.md': [
+  'docs/engineering/license-compliance.md': [
     { path: 'apps/product/.licensrc.json', keys: ['onlyAllow', 'prohibited', 'warning'] },
   ],
   'docs/learn/system/agents.md': [

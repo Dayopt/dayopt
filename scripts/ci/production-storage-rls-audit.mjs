@@ -108,11 +108,11 @@ async function runReadOnlyQuery({ projectRef, token, query, fetchImpl }) {
   // （production-auth-config-audit.mjs と同じ不変条件）。
   if (!response.ok) {
     // 401 は「token が invalid」以外に「token の 90 日期限切れ」でも起こる
-    // （docs/operations/secrets.md の supabase-storage-rls-audit item 参照）。
+    // （docs/operations/secrets-ledger.md の supabase-storage-rls-audit item 参照）。
     // 呼び出し元が rotation を疑うべきタイミングを明示するヒントを添える。
     const hint =
       response.status === 401
-        ? ' — SUPABASE_STORAGE_RLS_AUDIT_TOKEN の期限切れ（90日）または失効の可能性。docs/operations/secrets.md 参照'
+        ? ' — SUPABASE_STORAGE_RLS_AUDIT_TOKEN の期限切れ（90日）または失効の可能性。docs/operations/secrets-ledger.md 参照'
         : '';
     throw new Error(
       `Supabase database query request failed for project: ${projectRef} (status ${response.status})${hint}`,
