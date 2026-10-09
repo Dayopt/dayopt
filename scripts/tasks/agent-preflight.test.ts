@@ -43,8 +43,6 @@ describe('agent preflight', () => {
     expect(state.pnpmMatches).toBe(false);
     expect(state.expectedPnpm).toBe(null);
     expect(state.hooks['pre-push']).toBe(false);
-    expect(state.readOnlyDelegation.wrapper).toBe(false);
-    expect(state.readOnlyDelegation.native).toContain('unsupported');
     expect(renderPreflight(state)).toContain('commit / push 前に');
   });
   it('flags a Node.js mismatch independently of the test runner version', () => {
@@ -131,9 +129,7 @@ describe('agent preflight', () => {
     expect(state.skills).toBe(true);
     expect(state.claudeHooks).toBe('missing');
     expect(renderPreflight(state)).toContain('**Claude hooks**: missing');
-    expect(state.readOnlyDelegation.wrapper).toBe(false);
-    expect(state.readOnlyDelegation.native).toContain('scope cannot be enforced');
-    expect(renderPreflight(state)).toContain('Read-only delegation');
+    expect(renderPreflight(state)).not.toContain('Read-only delegation');
   });
   it('flags a User OAuth token (classic broad scopes) as an un-isolated gh identity', () => {
     // 監査 P1-1 の実測形。token 行は parse 対象にしない

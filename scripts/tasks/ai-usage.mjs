@@ -41,7 +41,7 @@ import { isDirectExecution } from '../lib/is-direct-execution.mjs';
  *
  * deferred（次回以降）: 円 / ドル換算（per-token 価格がローカルに無い）、
  * push 回数・review round・MTTR（PR ごと timeline API が N 回必要）、
- * Codex P1 件数、F1、`effort` / `attributionSkill` 別内訳、16 アンチパターンの
+ * review bot の P1 件数、F1、`effort` / `attributionSkill` 別内訳、16 アンチパターンの
  * 自動 flag（数値だけ出し判定は人間パートへ）、Human intervention 回数の自動計測
  * （AskUserQuestion 件数を jsonl から数える案。今回は未計測）。
  */
@@ -49,7 +49,7 @@ import { isDirectExecution } from '../lib/is-direct-execution.mjs';
 export const PROJECTS_DIR = join(homedir(), '.claude', 'projects');
 export const SESSION_TELEMETRY_COVERAGE = Object.freeze({
   source: 'claude-code-local-jsonl',
-  providers: Object.freeze({ claudeCode: 'collected', codex: null, antigravity: null }),
+  providers: Object.freeze({ claudeCode: 'collected', antigravity: null }),
   missingMeans: 'unknown-not-zero',
 });
 const MODEL_LABELS = ['haiku', 'sonnet', 'opus', 'fable', 'mythos'];
@@ -766,7 +766,7 @@ export function renderMarkdown({ since, until, agg, prStats }) {
   lines.push(`### AI 経済メトリクス（${since}〜${until}）`);
   lines.push('');
   lines.push(
-    '**session telemetry**: Claude Code の local transcript のみ。Codex / Antigravity は未収集（不明であり 0 ではない）。',
+    '**session telemetry**: Claude Code の local transcript のみ。Antigravity は未収集（不明であり 0 ではない）。',
   );
   lines.push('');
 
@@ -1044,7 +1044,7 @@ async function main() {
       );
     } else {
       process.stdout.write(
-        `### AI 経済メトリクス（${options.since}〜${options.until}）\n\n**session telemetry**: Claude Code の local transcript のみ。Codex / Antigravity は未収集（不明であり 0 ではない）。\n\n未取得（~/.claude/projects が存在しない）\n`,
+        `### AI 経済メトリクス（${options.since}〜${options.until}）\n\n**session telemetry**: Claude Code の local transcript のみ。Antigravity は未収集（不明であり 0 ではない）。\n\n未取得（~/.claude/projects が存在しない）\n`,
       );
     }
     return;
