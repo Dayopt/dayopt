@@ -16,11 +16,11 @@ const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 const env = {
   GITHUB_REPOSITORY: 'Dayopt/dayopt',
-  GITHUB_REF: 'refs/heads/integration',
+  GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch',
   GITHUB_SHA: 'b'.repeat(40),
   GITHUB_TOKEN: 'PRIVATE_GITHUB_TOKEN',
-  GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration',
+  GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/main',
   GITHUB_RUN_ID: '36405214644',
   GITHUB_RUN_ATTEMPT: '1',
   SUPABASE_SECRET_KEY: 'PRIVATE_SUPABASE_KEY',
@@ -163,6 +163,15 @@ describe('Cloud recovery plan intake', () => {
       expect(s.download).not.toHaveBeenCalled();
     },
   );
+  it.each([
+    { GITHUB_REF: 'refs/heads/integration' },
+    { GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration' },
+  ])('rejects the retired Integration workflow ref before download: %j', async (override) => {
+    const s = prepare();
+    await expect(prepareCloudRecovery({ ...s, env: { ...env, ...override } })).rejects.toThrow();
+    expect(s.fetchImpl).not.toHaveBeenCalled();
+    expect(s.download).not.toHaveBeenCalled();
+  });
   it.each(['expired', 'oversize', 'partial', 'duplicate'])(
     'refuses unsafe archive metadata before extraction: %s',
     async (mode) => {

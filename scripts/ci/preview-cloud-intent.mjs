@@ -9,7 +9,7 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const SEED = '00000000-0000-0000-0000-000000000001';
 const WORKFLOW = '.github/workflows/ci.yml';
 const REPOSITORY = 'Dayopt/dayopt';
-const REF = 'refs/heads/integration';
+const REF = 'refs/heads/main';
 const KEYS = [
   'schemaVersion',
   'repository',
