@@ -67,10 +67,6 @@ const CATEGORY_DIR: Record<string, string> = {
  * #2476 Phase B/C の issue コメントで都度説明済み（各行にコメントを付す）。
  */
 const KNOWN_PLACEMENT_EXCEPTIONS = new Set<string>([
-  // agent-op.mjs: インストール済みのローカル op launcher から import する
-  // agent-service-account.mjs の adapter。repo 内の importer がなく docs 参照で
-  // runbook 判定になるが、起動 task と同じ unit・既存 launcher の参照先を保つ。
-  'scripts/tasks/agent-op.mjs',
   // boundaries/: check.ts が root package.json "lint:boundaries" を持つ tasks unit。
   // budget.ts / checks/*.ts / config.ts は内部 lib・runbook 判定だが分割しない。
   'scripts/tasks/boundaries/budget.ts',

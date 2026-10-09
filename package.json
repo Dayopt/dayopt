@@ -108,8 +108,6 @@
     "build:web": "pnpm --filter @dayopt/web build",
     "test:web": "pnpm --filter @dayopt/web test",
     "agent:preflight": "node scripts/tasks/agent-preflight.mjs",
-    "agent:secrets:check": "node scripts/tasks/agent-service-account.mjs check",
-    "agent:run": "node scripts/tasks/agent-service-account.mjs run",
     "storybook:collect-files-check": "tsx scripts/tasks/check-story-coverage.ts --collected-files"
   },
   "devDependencies": {

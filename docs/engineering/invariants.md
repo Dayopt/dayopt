@@ -27,10 +27,9 @@ docs へ残している。
 
 ## Agent の 1Password 起動契約
 
-- 秘密注入を使う専用環境の agent 起動は、確認済みの active Service Account と `agent` vault の ID・名前・全件数を照合し、token 未設定 / 認証失敗 / 許可外 vault では作業 command を起動しない（2026-09-30、`scripts/tasks/agent-service-account.mjs`）。
-- ローカルの通常の `op` 用 entry point は、注入済み token または専用 Keychain 項目からの取得と SA 検証に成功した場合だけ要求 command を SA で実行する。人間用 CLI による bootstrap を使わず、取得失敗時に人間用認証へ fallback させない。この entry point は OS / MCP / UI の隔離を保証しない（2026-09-30、`scripts/tasks/agent-op.mjs`）。
-- Connect / 人間用 CLI session / desktop 統合を起動 process に継承せず、検査の raw stdout / stderr を記録しない。SA は 1Password 側で `agent` read-only に限定し、人間用の認証・UI・ファイルへの別経路は専用クラウド、または人間用ホームへのアクセスを拒否した専用の標準 Mac ユーザーで閉じる。
-- wrapper / preflight の存在や fixture test の成功を実環境の隔離完了と扱わない。CLI の vault 一覧は書き込み・共有・vault 作成・Environments 権限を証明しない。権限と platform の検証・移行状態の正本は [secrets.md](../operations/secrets.md#service-account)。
+- agent の 1Password 入口は `OP_SERVICE_ACCOUNT_TOKEN` 1 個。`agent` vault を read-only で読む Service Account の token だけを Claude Code の環境に置き、素の `op` CLI に認証させる。wrapper や人間用 CLI session を経由しない（2026-10-09、#3052）。
+- 境界は token の到達範囲で作る。`agent` vault には漏れても困らない値（read-only か非本番 scope）だけを置き、本番の書き込みは token が無いので行えない状態にする。同じ OS ユーザーの人間用アプリ・ファイルへの到達は閉じない前提で運用する。
+- `agent:preflight` は token の有無だけを表示する。identity と vault の範囲は `op whoami` / `op vault list` で確認し、値は表示しない。正本は [secrets.md](../operations/secrets.md#service-account)。
 
 ## 課金・entitlement
 
