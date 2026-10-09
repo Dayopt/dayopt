@@ -124,6 +124,80 @@ describe('Preview Cloud trust gate', () => {
   });
 
   it.each([
+    [
+      'both empty recovery fields as in the manual UI',
+      ['preview_recover_run', 'preview_recover_attempt'],
+    ],
+    ['only recovery run', ['preview_recover_run']],
+    ['only recovery attempt', ['preview_recover_attempt']],
+  ])('accepts omitted %s without weakening the trust checks', async (_label, omitted) => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    for (const key of omitted) delete inputs[key];
+    expect(Object.keys(inputs)).toHaveLength(9 - omitted.length);
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).resolves.toEqual({
+      prNumber: 2910,
+      sha,
+      deploymentId: 'dpl_abc123XYZ',
+      branchName: 'codex/cloud-preview-test-2910',
+      supabaseProjectRef: persistentRef,
+      supabaseBranchId: persistentBranchId,
+      databaseMode: 'shared',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
+  });
+
+  it.each([
+    'preview_e2e',
+    'preview_pr',
+    'preview_sha',
+    'preview_deployment',
+    'preview_db_ref',
+    'preview_db_branch',
+    'preview_db_mode',
+  ])('rejects omitted required field %s before API access', async (key) => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    delete inputs.preview_recover_run;
+    delete inputs.preview_recover_attempt;
+    delete inputs[key];
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).rejects.toThrow('unexpected workflow input fields');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(
+    ['preview_recover_run', 'preview_recover_attempt'].flatMap((key) =>
+      [null, 0, false, '123', ' ', [], {}].map((value) => ({ key, value })),
+    ),
+  )('rejects explicit recovery input $key=$value before API access', async ({ key, value }) => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    delete inputs.preview_recover_run;
+    delete inputs.preview_recover_attempt;
+    inputs[key] = value;
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).rejects.toThrow('recovery inputs cannot be used for Preview E2E');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown fields in the seven-field manual UI request before API access', async () => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    delete inputs.preview_recover_run;
+    delete inputs.preview_recover_attempt;
+    inputs.preview_unknown = '';
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).rejects.toThrow('unexpected workflow input fields');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
     ['wrong event', { eventName: 'pull_request' }],
     ['wrong repository', { repository: 'attacker/repo' }],
     ['wrong ref', { ref: 'refs/heads/integration' }],
