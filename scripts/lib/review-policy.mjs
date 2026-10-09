@@ -3,17 +3,21 @@
  * evidence から「指定 scope の独立レビューが最新 head について成立しているか」を返す。
  * ネットワーク・環境変数には触れない。
  *
- * 実測した Codex（GitHub 連携）の応答形（2026-09-16、PR #2799 / #2800 / #2802）:
- * - 指摘あり: `chatgpt-codex-connector[bot]` の PR review（state COMMENTED、commit_id = 対象 head、
- *   body に `**Reviewed commit:** \`<short sha>\``）+ inline comment（P1 / P2 badge）
- * - 指摘なし: 同 bot の issue comment「Codex Review: Didn't find any major issues.」+ Reviewed commit
- * - 進捗表: 同 bot の issue comment `<!-- codex-pull-request-review-summary -->` の表
- *   （Review / Status / Commit / trigger。Completed と short sha）
- * - 依頼: 人間の `@codex review` comment。bot は実行中に 👀、指摘なし完了で 👍 を付ける
+ * 独立レビューは `.github/workflows/claude-review.yml`（`@claude review` で起動）が担う。
+ * 応答の形は workflow 内の決定的な投稿 step（`scripts/ci/claude-review-post.mjs`）が固定する。
+ * モデルは GitHub への書き込み権限を持たず、形式も対象 commit も決めない:
+ * - 指摘: `github-actions[bot]` の PR review（state COMMENTED、commit_id = 対象 head、body に
+ *   `CLAUDE_REVIEW_MARKER` と `**Reviewed commit:** \`<sha>\``）+ inline comment（marker と P1 / P2 badge）
+ * - 完了 / 失敗: 同 bot の issue comment（marker + Reviewed commit + `Result: completed|failed`）。
+ *   issue comment は validation-gate を再評価させる（review の submit では再評価されない）
+ * - 依頼: 人間の `@claude review` comment
+ * 2026-10 まで使った Codex（`chatgpt-codex-connector[bot]`）の応答は、旧 head の証跡として
+ * しか残らないため読まない。
  *
  * 判定の原則:
- * - 完了証拠は bot 名義の review / no-findings comment で、対象 commit が現 head と一致するもの。
- *   依頼 comment の投稿成功・👀 / 👍 反応・summary 表だけでは完了にしない
+ * - 完了証拠は bot 名義かつ marker 付きの review / completed comment で、対象 commit が現 head と
+ *   一致するもの。依頼 comment の投稿成功だけでは完了にしない。marker の無い github-actions の
+ *   投稿（他 workflow）は証拠にしない
  * - 指摘は「裁定の存在」を機械確認する: thread が resolve 済みで、bot 以外の返信がある。
  *   黙って resolve した thread、未解決 thread は合格にしない。裁定内容の正しさは証明しない
  * - 古い head の review は stale。head / policy が動いたら再評価する
@@ -21,14 +25,17 @@
  * - EXPLICIT AUTHORITY（本番操作）は本文 checkbox や label から推定しない。常に未承認として表示する
  */
 
-export const CODEX_LOGIN = 'chatgpt-codex-connector[bot]';
+export const REVIEWER_LOGIN = 'github-actions[bot]';
+/** Claude review の投稿（review / inline comment / issue comment）すべてに入る marker。 */
+export const CLAUDE_REVIEW_MARKER = '<!-- claude-pull-request-review -->';
 export const REVIEW_STATUS_CONTEXT = 'Review policy (shadow)';
-export const REVIEW_REQUEST_PATTERN = /^\s*@codex\s+review\b/im;
-const SUMMARY_MARKER = '<!-- codex-pull-request-review-summary -->';
+/** workflow の `startsWith(comment.body, '@claude review')` と同じ条件（先頭行だけ）。 */
+export const REVIEW_REQUEST_PATTERN = /^@claude review\b/i;
 const REVIEWED_COMMIT = /\*\*Reviewed commit:?\*\*:?\s*`([0-9a-f]{7,40})`/i;
+const RESULT_LINE = /^Result:\s*(completed|failed)\s*$/im;
 const HIGH_RISK_MARKER = /^\[review-summary\]\s*$/m;
 const SHA = /^[a-f0-9]{40}$/;
-/** 依頼から応答が無いまま経過したら unknown（Codex 障害 / 上限）とみなす時間。 */
+/** 依頼から応答が無いまま経過したら unknown（workflow の起動失敗 / 残高切れ）とみなす時間。 */
 export const REVIEW_RESPONSE_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
@@ -45,9 +52,13 @@ export const REVIEW_RESPONSE_TIMEOUT_MS = 30 * 60 * 1000;
  *   reviewNodeIds?: Record<string, string> }} ReviewPolicyEvidence
  */
 
-/** REST は `name[bot]`、GraphQL の author.login は `name`。suffix を正規化して照合する（Codex P2）。 */
+/** REST は `name[bot]`、GraphQL の author.login は `name`。suffix を正規化して照合する。 */
 const normalizeLogin = (login) => (login ?? '').replace(/\[bot\]$/, '');
-const isBot = (entry) => normalizeLogin(entry.authorLogin) === normalizeLogin(CODEX_LOGIN);
+const isReviewerLogin = (entry) =>
+  normalizeLogin(entry.authorLogin) === normalizeLogin(REVIEWER_LOGIN);
+/** reviewer の投稿か。github-actions は他 workflow も使うので marker まで要求する。 */
+export const isReviewerPost = (entry) =>
+  isReviewerLogin(entry) && (entry.body ?? '').includes(CLAUDE_REVIEW_MARKER);
 /** 高リスク契約の投稿者として受理する author_association（公開 PR では第三者も comment できる）。 */
 export const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 /** 完了証拠として受理する submitted review の state（PENDING / DISMISSED は除外）。 */
@@ -63,11 +74,14 @@ function headAtOf(evidence) {
       : NaN;
 }
 
-/** bot の完了証拠（review または no-findings comment）を集める。target は対象 commit（不明は null）。 */
-export function collectCodexCompletions(evidence) {
+/**
+ * reviewer の完了証拠（marker 付きの review、または `Result: completed` の comment）を集める。
+ * target は対象 commit（不明は null）。
+ */
+export function collectReviewCompletions(evidence) {
   const completions = [];
   for (const review of evidence.reviews ?? []) {
-    if (!isBot(review) || !SUBMITTED_STATES.has(review.state)) continue;
+    if (!isReviewerPost(review) || !SUBMITTED_STATES.has(review.state)) continue;
     const short = review.body?.match(REVIEWED_COMMIT)?.[1]?.toLowerCase() ?? null;
     const target = SHA.test(review.commitId ?? '') ? review.commitId : null;
     completions.push({
@@ -79,10 +93,11 @@ export function collectCodexCompletions(evidence) {
     });
   }
   for (const comment of evidence.comments ?? []) {
-    if (!isBot(comment) || !/^\s*Codex Review:/i.test(comment.body ?? '')) continue;
+    if (!isReviewerPost(comment)) continue;
+    if (comment.body.match(RESULT_LINE)?.[1]?.toLowerCase() !== 'completed') continue;
     const short = comment.body.match(REVIEWED_COMMIT)?.[1]?.toLowerCase() ?? null;
     completions.push({
-      kind: 'no-findings',
+      kind: 'comment',
       id: comment.id,
       target: short,
       url: comment.htmlUrl,
@@ -92,38 +107,32 @@ export function collectCodexCompletions(evidence) {
   return completions;
 }
 
-/** summary 表から現 head の行を読む（完了証拠ではなく、実行中 / 失敗の検出用）。 */
-export function readCodexSummaryRow(evidence, headSha) {
-  const summary = (evidence.comments ?? []).find(
-    (comment) => isBot(comment) && comment.body?.includes(SUMMARY_MARKER),
+/** 現 head について workflow が `Result: failed` を投稿したか（実行失敗の検出用）。 */
+export function readReviewFailure(evidence, headSha) {
+  return (
+    (evidence.comments ?? []).find((comment) => {
+      if (!isReviewerPost(comment)) return false;
+      if (comment.body.match(RESULT_LINE)?.[1]?.toLowerCase() !== 'failed') return false;
+      return matchesHead(comment.body.match(REVIEWED_COMMIT)?.[1]?.toLowerCase(), headSha);
+    }) ?? null
   );
-  if (!summary) return null;
-  const rows = summary.body
-    .split('\n')
-    .filter((line) => /^\|/.test(line) && !/^\|\s*-/.test(line) && !/^\|\s*Review\s*\|/i.test(line))
-    .map((line) => line.split('|').map((cell) => cell.trim()))
-    .map((cells) => ({
-      status: cells[2] ?? '',
-      commit: cells[3]?.match(/`([0-9a-f]{7,40})`/)?.[1]?.toLowerCase() ?? null,
-    }));
-  return rows.find((row) => row.commit && matchesHead(row.commit, headSha)) ?? null;
 }
 
 /**
- * 裁定状況。**class ごと閉じる**: 現 head の Codex review に属する thread だけでなく、PR の全
+ * 裁定状況。**class ごと閉じる**: 現 head の Claude review に属する thread だけでなく、PR の全
  * review thread（代替レビューの指摘・対象不明の応答・第三者の thread を含む）を対象にし、
  * 「resolve 済みで、信頼済み人間（OWNER / MEMBER / COLLABORATOR、bot ではない）の返信がある」
- * 以外は裁定済みと数えない。`findings` は現 head の Codex review に属する thread 数。
+ * 以外は裁定済みと数えない。`findings` は現 head の Claude review に属する thread 数。
  */
 function adjudicationOf(evidence, headReviewIds) {
   const threads = (evidence.threads ?? []).filter((thread) => thread.comments.length > 0);
   const findings = threads.filter(
     (thread) =>
-      isBot(thread.comments[0]) &&
+      isReviewerPost(thread.comments[0]) &&
       thread.comments.some((comment) => headReviewIds.has(comment.reviewId ?? '')),
   );
   const adjudicated = (comment) =>
-    !isBot(comment) &&
+    !isReviewerLogin(comment) &&
     comment.authorType !== 'Bot' &&
     TRUSTED_ASSOCIATIONS.has(comment.authorAssociation ?? '');
   const unresolved = threads.filter((thread) => !thread.isResolved);
@@ -138,7 +147,7 @@ export function readHighRiskSummary(evidence, headSha) {
   const parsed = (evidence.comments ?? [])
     .filter(
       (comment) =>
-        !isBot(comment) &&
+        !isReviewerLogin(comment) &&
         comment.authorType !== 'Bot' &&
         TRUSTED_ASSOCIATIONS.has(comment.authorAssociation ?? '') &&
         HIGH_RISK_MARKER.test(comment.body ?? ''),
@@ -211,10 +220,10 @@ export function evaluateReviewPolicy({
   if (required === 'not-applicable')
     return { ...base, state: 'not-required', verdict: 'not-required', reason: plan.review.reason };
 
-  const completions = collectCodexCompletions(evidence);
+  const completions = collectReviewCompletions(evidence);
   const forHead = completions.filter((entry) => entry.target && matchesHead(entry.target, headSha));
   const stale = completions.filter((entry) => entry.target && !matchesHead(entry.target, headSha));
-  // 対象不明の応答は、今回の head 切替後に投稿されたものだけを現 head の障害と数える（Codex P2）。
+  // 対象不明の応答は、今回の head 切替後に投稿されたものだけを現 head の障害と数える。
   const unknownTarget = completions.filter(
     (entry) =>
       entry.target === null &&
@@ -223,7 +232,7 @@ export function evaluateReviewPolicy({
   // 依頼も信頼済み投稿者だけ数える（第三者の応答されない依頼で unknown へ落とされない。Codex P2）。
   const requests = (evidence.comments ?? []).filter(
     (comment) =>
-      !isBot(comment) &&
+      !isReviewerLogin(comment) &&
       TRUSTED_ASSOCIATIONS.has(comment.authorAssociation ?? '') &&
       REVIEW_REQUEST_PATTERN.test(comment.body ?? ''),
   );
@@ -234,7 +243,7 @@ export function evaluateReviewPolicy({
   const openRequests = requests.filter(
     (request) => Number.isNaN(headAt) || Date.parse(request.createdAt) >= headAt,
   );
-  const summaryRow = readCodexSummaryRow(evidence, headSha);
+  const failure = readReviewFailure(evidence, headSha);
   const prOpen = evidence.pr?.state === 'open' && !evidence.pr?.draft;
 
   let state;
@@ -249,33 +258,33 @@ export function evaluateReviewPolicy({
     adjudication = adjudicationOf(evidence, headReviewIds);
     if (adjudication.unresolved > 0) {
       state = 'pending-adjudication';
-      reason = `${adjudication.unresolved} Codex thread(s) unresolved for this head`;
+      reason = `${adjudication.unresolved} review thread(s) unresolved for this head`;
     } else if (adjudication.silent > 0) {
       state = 'pending-adjudication';
-      reason = `${adjudication.silent} Codex thread(s) resolved without a reply (fix / rebuttal / issue)`;
+      reason = `${adjudication.silent} review thread(s) resolved without a reply (fix / rebuttal / issue)`;
     } else {
       state = 'complete';
-      reason = `Codex reviewed ${headSha.slice(0, 9)} (${adjudication.findings} finding(s), all adjudicated)`;
+      reason = `Claude reviewed ${headSha.slice(0, 9)} (${adjudication.findings} finding(s), all adjudicated)`;
     }
-  } else if (summaryRow && !/completed/i.test(summaryRow.status)) {
-    state = /fail|error/i.test(summaryRow.status) ? 'failed' : 'pending';
-    reason = `Codex summary reports "${summaryRow.status}" for this head`;
+  } else if (failure) {
+    state = 'failed';
+    reason = 'Claude review workflow reported a failure for this head';
   } else if (openRequests.length > 0) {
     const latest = openRequests[openRequests.length - 1];
     const waited = now.getTime() - Date.parse(latest.createdAt);
     if (waited > REVIEW_RESPONSE_TIMEOUT_MS) {
       state = 'unknown';
-      reason = `No Codex response ${Math.round(waited / 60000)} min after the request; use only already-recorded review evidence if available`;
+      reason = `No Claude review response ${Math.round(waited / 60000)} min after the request; use only already-recorded review evidence if available`;
     } else {
       state = 'pending';
-      reason = 'Codex review requested; awaiting a response for this head';
+      reason = 'Claude review requested; awaiting a response for this head';
     }
   } else if (unknownTarget.length > 0) {
     state = 'unknown';
-    reason = 'Codex response found but its target revision could not be determined';
+    reason = 'Claude review response found but its target revision could not be determined';
   } else if (stale.length > 0) {
     state = 'stale';
-    reason = `Codex reviewed ${stale[stale.length - 1].target.slice(0, 9)}, not the current head`;
+    reason = `Claude reviewed ${stale[stale.length - 1].target.slice(0, 9)}, not the current head`;
   } else {
     state = 'not-started';
     reason = 'No independent review for this head';
@@ -302,7 +311,7 @@ export function evaluateReviewPolicy({
       reason = `${adjudication.unresolved + adjudication.silent} thread(s) not adjudicated by a trusted human reply`;
     } else {
       state = 'complete';
-      reason = `Existing fixed-diff review evidence recorded for ${headSha.slice(0, 9)} (Codex: ${reason})`;
+      reason = `Existing fixed-diff review evidence recorded for ${headSha.slice(0, 9)} (Claude review: ${reason})`;
     }
   }
 
@@ -314,7 +323,7 @@ export function evaluateReviewPolicy({
   const trigger = {
     shouldRequest,
     reason: shouldRequest
-      ? `Request @codex review for ${headSha.slice(0, 9)} (${state})`
+      ? `Request @claude review for ${headSha.slice(0, 9)} (${state})`
       : !prOpen
         ? 'PR is not ready for review'
         : state === 'stale'

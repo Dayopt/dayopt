@@ -14,7 +14,7 @@ last_verified: 2026-09-25
 更新経路は 3 つ:
 
 1. 実装側 — security skill（Dayopt 固有ルール 4）が、前提を作った PR での更新を義務付ける
-2. レビュー側 — 全 PR のセルフレビューと、保護対象 PR に限る GitHub の `@codex review` で、
+2. レビュー側 — 全 PR のセルフレビューと、保護対象 PR に限る `@claude review` で、
    カタログに無い新しい前提を見つけたら追記を提案する。差分の実際の failure scenario と一次情報を添えて判断する
 3. 月次ガーデニング — 鮮度を見る
 

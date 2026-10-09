@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { REPO, runGh, runGhJson } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
+import { CLAUDE_REVIEW_MARKER } from '../lib/review-policy.mjs';
 import {
   computeExplorationBeforeEdit,
   cwdPrefixToProjectDirSegment,
@@ -317,16 +318,18 @@ export function extractDodExcerpt(text) {
 // --- Part 4 レビュー ---------------------------------------------------------
 
 /**
- * Codex GitHub 連携 bot の login。GraphQL の `author.login` は
- * `chatgpt-codex-connector`、REST の `user.login` は `chatgpt-codex-connector[bot]`
- * と表記が割れる。過去 PR の履歴を遡って読む集計・表示専用の判定であり、merge を
- * gate する用途では使わない（#2596 で issue-review-core.mjs を削除したため、この
- * 表示用途だけをここへ複製する）。
+ * レビュー bot の投稿か。2026-10 から Claude review（`claude-review.yml`）が担い、
+ * 投稿者は `github-actions[bot]` で marker を必ず含む。それ以前の PR は Codex
+ * （`chatgpt-codex-connector`）なので、過去の履歴を読むために両方を数える。
+ * GraphQL の `author.login` と REST の `user.login` で `[bot]` の有無が割れるので
+ * 正規化する。集計・表示専用で、merge を gate する用途では使わない。
  */
 const CODEX_BOT_LOGIN = 'chatgpt-codex-connector';
 
-function isCodexBotLogin(login) {
-  return String(login ?? '').replace(/\[bot\]$/, '') === CODEX_BOT_LOGIN;
+function isReviewBotItem(item) {
+  const login = String(item?.user?.login ?? '').replace(/\[bot\]$/, '');
+  if (login === CODEX_BOT_LOGIN) return true;
+  return login === 'github-actions' && String(item?.body ?? '').includes(CLAUDE_REVIEW_MARKER);
 }
 
 /** timeline event 配列から `ready_for_review` の日時（無ければ null）。 */
@@ -361,16 +364,15 @@ export function countCommitsAfterReadyFallback(commits, readyDate) {
   }).length;
 }
 
-/** Codex（`reviews` + `pulls/N/comments`）の P1/P2 言及件数を数える。 */
-export function countCodexPriorities(reviews, comments) {
+/** レビュー bot（`reviews` + `pulls/N/comments`）の P1/P2 言及件数を数える。 */
+export function countReviewPriorities(reviews, comments) {
   const items = [...(reviews ?? []), ...(comments ?? [])];
   let p1 = 0;
   let p2 = 0;
   for (const item of items) {
     // `[bot]` サフィックス一致だけで判定すると dependabot[bot] 等の無関係な bot
-    // コメントに "P1" という文字列が含まれるだけで誤計上する（#2530 実装済みの
-    // `isCodexBotLogin` を再利用し、Codex 本体の login とだけ一致させる）。
-    if (!isCodexBotLogin(item?.user?.login)) continue;
+    // コメントに "P1" という文字列が含まれるだけで誤計上する（#2530）。
+    if (!isReviewBotItem(item)) continue;
     const body = item?.body ?? '';
     if (/\bP1\b/.test(body)) p1 += 1;
     if (/\bP2\b/.test(body)) p2 += 1;
@@ -388,29 +390,31 @@ export function hasInternalReviewMarker(comments) {
 }
 
 /**
- * `@codex review` の投稿回数・Codex の応答回数・そのうち「問題なし」だった回数を数える
- * （#2558 手順 6）。
+ * レビュー依頼（`@claude review`、過去分は `@codex review`）の投稿回数・bot の応答回数・
+ * そのうち「問題なし」だった回数を数える（#2558 手順 6）。
  *
  * 無駄の構造は「レビューの有効性を HEAD で判定していた」ことにあり、その症状は
  * 「投げた回数のわりに指摘が出ない」という形で現れる（PR #2554 実測: 投稿 8 /
  * 応答 7 / 問題なし 6）。月次 gardening でこの 3 数字を読めるようにする。
  */
-export function countCodexRequestCycles(comments) {
+export function countReviewRequestCycles(comments) {
   let requests = 0;
   let responses = 0;
   let cleanResponses = 0;
   for (const comment of comments ?? []) {
     const body = comment?.body ?? '';
-    if (isCodexBotLogin(comment?.user?.login)) {
+    if (isReviewBotItem(comment)) {
       responses += 1;
-      // 指摘は badge markup か `P1: <非ゼロ>` の形で出る。どちらも無ければ
+      // 指摘は badge markup か `P1: <非ゼロ>` / `Findings: <非ゼロ>` の形で出る。どれも無ければ
       // 「問題なし」とみなす（表示用の概算。gate の判定とは別物）。
       const claimsFindings =
-        /!\[P[12] Badge\]/.test(body) || /P[12][*_ \t]*[：:][*_ \t]*[1-9]/.test(body);
+        /!\[P[12] Badge\]/.test(body) ||
+        /P[12][*_ \t]*[：:][*_ \t]*[1-9]/.test(body) ||
+        /^Findings:\s*[1-9]/m.test(body);
       if (!claimsFindings) cleanResponses += 1;
       continue;
     }
-    if (body.includes('@codex review')) requests += 1;
+    if (body.includes('@claude review') || body.includes('@codex review')) requests += 1;
   }
   return { requests, responses, cleanResponses };
 }
@@ -889,7 +893,7 @@ export function renderMarkdown(pack) {
       `ready 後の commit 数: ${r.commitsAfterReady === null ? '未取得' : r.commitsAfterReady}`,
     );
     lines.push(
-      `Codex 指摘: ${r.codex === null ? '未取得' : `P1 ${r.codex.p1} / P2 ${r.codex.p2}`}`,
+      `レビュー bot 指摘: ${r.codex === null ? '未取得' : `P1 ${r.codex.p1} / P2 ${r.codex.p2}`}`,
     );
     lines.push(
       `未解決 thread: ${r.unresolvedThreads === null || r.unresolvedThreads === undefined ? '未取得' : r.unresolvedThreads}`,
@@ -899,7 +903,7 @@ export function renderMarkdown(pack) {
     );
     // 「投げた回数のわりに指摘が出ない」を月次で見るための 3 数字（#2558 手順 6）。
     lines.push(
-      `@codex 起動: ${
+      `レビュー起動: ${
         r.codexCycles === null || r.codexCycles === undefined
           ? '未取得'
           : `投稿 ${r.codexCycles.requests} / 応答 ${r.codexCycles.responses} / 問題なし ${r.codexCycles.cleanResponses}`
@@ -1077,7 +1081,7 @@ export function buildTracePack(options, deps = {}) {
   const codex =
     codexReviews === null && codexComments === null
       ? null
-      : countCodexPriorities(codexReviews ?? [], codexComments ?? []);
+      : countReviewPriorities(codexReviews ?? [], codexComments ?? []);
 
   const threadNodes = tryOr(() => {
     const raw = runGh(
@@ -1122,7 +1126,7 @@ export function buildTracePack(options, deps = {}) {
     readyDate,
     commitsAfterReady,
     codex,
-    codexCycles: issueComments === null ? null : countCodexRequestCycles(issueComments),
+    codexCycles: issueComments === null ? null : countReviewRequestCycles(issueComments),
     unresolvedThreads,
     hasMarker,
     internalReview,
