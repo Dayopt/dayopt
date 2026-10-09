@@ -29,7 +29,7 @@ description: ユーザーが月次の改善ループの実施を明示依頼し�
    - 検証前の探索 turn と、User が補う必要のあった判断・権限確認は減ったか
    - no が複数あっても **変えるのは 1 つ**。変えたら `decisions.md` に `結果(未):`（翌月または翌々月の判定条件）付きで 1 行追記する（`decision` skill）
 2. **前月の `結果(未):` を回収する**。判定材料が揃っていれば `結果(YYYY-MM-DD):` 行を追記して恒久化 / 撤回を明記する。揃っていなければ期限を 1 行で延ばす
-3. **判断層の検証**（`AGENTS.md` §シンプルルール）: ①今月このルールに戻った場面はあったか（1 度も戻らないルールは削る候補）②無言で破られたルールは無いか ③先月触らなかった機能はどれか（ルール 5。削除候補は `dispatch` intake で起票）
+3. **判断層の検証**（`AGENTS.md` §シンプルルール）: ①今月このルールに戻った場面はあったか（1 度も戻らないルールは削る候補）②無言で破られたルールは無いか ③先月触らなかった機能はどれか（使われない機能・規則は削除候補。起票は `dispatch` skill）
 4. **レビューの歩留まり**: provider を問わず P1 / P2 で同じ構造の指摘が当月 2 回以上、または通算 2 回以上なら機械化（test / lint / CI）の issue を起票する。指摘ゼロが続く reviewer / provider は、費用と独立性を再評価し、縮小か廃止の候補にする
    - 外部知見や複数 finding の再利用可否を判断する時は、[`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md)の知見カードで出典・Dayoptへの適用根拠・既存の行き先を分ける。単発で明確な不具合の修正を月次や複数回の発生まで待たせない
 5. **security sweep**: Supabase の security advisors（Dashboard または Management API。経路は `mcp-usage` skill）、あわせて `pnpm security:check`。所見は issue。深掘りが要る月は `/claude-security` を 1 境界だけ回す（任意の加速器で、無くても完走する）
@@ -40,7 +40,7 @@ description: ユーザーが月次の改善ループの実施を明示依頼し�
 
 ## When NOT to Use
 
-- 日次の作業判断・issue の起票・sweep（`dispatch` skill の領域）
+- 日次の作業判断（担当が直接行う）、issue の起票（`dispatch` skill の領域）
 - 自動実行の設計や cron の追加（本 skill は engine を持たない設計）
 - リリース作業（`releasing` skill の領域）
 

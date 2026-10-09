@@ -216,8 +216,8 @@ t('items', { count: 5 }); // → "5 items"
 // ❌ 禁止 — "保存" を activities.json に定義して使う
 t('activities.category.save');
 
-// ✅ 正しい — actions.save を再利用
-t('actions.save');
+// ✅ 正しい — common.actions.save を再利用
+t('common.actions.save');
 ```
 
 ### ❌ 禁止語を使う

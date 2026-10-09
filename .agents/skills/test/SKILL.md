@@ -257,7 +257,7 @@ describe('ActivitiesService', () => {
 ```typescript
 // ドラッグ操作のテストは複雑なため、
 // ユニットテストは状態管理に集中
-describe('useCalendarDrag', () => {
+describe('useCalendarDragStore', () => {
   it('ドラッグ開始で状態が更新される', () => { ... });
   it('ドラッグ終了で状態がリセットされる', () => { ... });
 });

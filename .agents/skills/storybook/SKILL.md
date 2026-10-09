@@ -28,9 +28,8 @@ maxTurns: 15
 
 1. **セマンティックトークンのみ**。直接カラー禁止。これだけでダークモード対応完了
 2. **全Storyファイルに AllPatterns Story 必須**
-3. **Storybook MCP の出力とこのスキルが矛盾したらこのスキルが正**
-4. **Canvas にテキスト説明を入れない**（AllPatterns含む。Foundations/Patterns 除く）
-5. **play 関数はユーザー操作で状態が変わるコンポーネントにのみ書く**
+3. **Canvas にテキスト説明を入れない**（AllPatterns含む。Foundations/Patterns 除く）
+4. **play 関数はユーザー操作で状態が変わるコンポーネントにのみ書く**
 
 ---
 

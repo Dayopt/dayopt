@@ -198,7 +198,7 @@ export const {feature}Router = createTRPCRouter({
 ### 3. メインルーターに登録
 
 ```typescript
-// apps/product/src/lib/trpc/root.ts
+// apps/product/src/app/api/trpc/_server/app-router.ts（lib/trpc/root.ts は re-export のみ）
 import { {feature}Router } from '@/features/{feature}/server/router';
 
 export const appRouter = createTRPCRouter({
@@ -236,7 +236,7 @@ import type { Database } from '@/lib/database';
 - [ ] `handleServiceError` でエラーハンドリング
 - [ ] `user_id` でフィルタリング（マルチテナント）
 - [ ] テストファイル作成
-- [ ] `apps/product/src/lib/trpc/root.ts` に登録
+- [ ] `apps/product/src/app/api/trpc/_server/app-router.ts` に登録
 
 ## 既存ルーター参考
 
@@ -246,11 +246,11 @@ apps/product/src/features/
 ├── activities/server/        # 標準的なCRUD例（query / mutation / archive / delete を service 分割）
 ├── auth/server/              # ユーザー管理
 ├── settings/server/          # billing-router / mcp-connections-router を含む複数ルーター
-├── external-calendar/server/ # 外部 provider 連携（sync / token / revoke の service 群）
-└── review/server/            # 集計・分析 service
+├── contact/server/           # 小さな単一 router の例
+└── external-calendar/server/ # 外部 provider 連携（sync / token / revoke の service 群）
 ```
 
-現行 feature は `activities / auth / calendar / contact / external-calendar / review / settings / timeblock` のみ。ここに無い feature 名（entry / notifications 等）は廃止済みなので参考にしない。
+現行 feature は `activities / auth / calendar / contact / external-calendar / settings / timeblock` のみ（`calendar` は server を持たない）。ここに無い feature 名（entry / notifications 等）は廃止済みなので参考にしない。
 
 ## 関連スキル
 

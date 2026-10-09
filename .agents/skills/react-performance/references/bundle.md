@@ -65,7 +65,7 @@ Reference: [How we optimized package imports in Next.js](https://vercel.com/blog
 
 ---
 
-> **Dayopt 注記**: **Dayopt の feature barrel（`features/*/index.ts`）には適用しない**。第三者 package は `apps/product/next.config.ts` の `optimizePackageImports` で扱い、未登録の重い package があればそこへ足す。`features/` や `@dayopt/components` の deep import を提案しない。
+> **Dayopt 注記**: **Dayopt の feature barrel（`features/*/index.ts`）には適用しない**。第三者 package は `apps/product/next.config.mjs` の `optimizePackageImports` で扱い、未登録の重い package があればそこへ足す。`features/` や `@dayopt/components` の deep import を提案しない。
 
 ---
 

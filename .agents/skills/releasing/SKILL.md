@@ -24,7 +24,7 @@ Dayoptプロジェクトのリリース作業を安全かつ確実に実行す�
 
 - 単なる `main` への merge（tag / release を伴わない）→ 通常の git 操作
 - commit 作成のみで version bump を含まない時 → 通常の development flow
-- Breaking change を含む変更が release 作業と分離されている時 → `docs-writing` skill で ADR / 技術ドキュメント更新を先行
+- Breaking change を含む変更が release 作業と分離されている時 → `docs-writing` skill で技術ドキュメント更新を先行
 
 ## 状態自動判定
 
@@ -117,7 +117,7 @@ npm version ${VERSION} --no-git-tag-version
 ### Phase 0.3: コード品質
 
 ```bash
-pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
+pnpm check && pnpm build
 ```
 
 ### Phase 1.1: mainブランチ最新取得
@@ -223,7 +223,7 @@ done
 
 **粒度の基準**: 第三者が見ても「何が変わったか」がわかるレベル
 
-**構造テンプレート**: `docs/operations/runbook.md` を参照
+**構造テンプレート**: `docs/operations/runbook.md` 第4部「リリースノート執筆規約」を参照
 
 **❌ 悪い例（抽象的）**:
 
@@ -316,7 +316,7 @@ gh api repos/Dayopt/dayopt/milestones -f title="vX.Y+1"
 | リリースノートが抽象的 | 各PRのコミットを取得して具体的な変更内容を記載 |
 | 破壊的変更の記載漏れ   | DB変更、削除コンポーネントを明記               |
 | 一部PRのみ記載         | `gh pr list --state merged` で全件取得         |
-| Full Changelog抜け     | template.mdの構造を参考にする                  |
+| Full Changelog抜け     | runbook.md 第4部の構造を参考にする             |
 | version bump忘れ       | Phase 0.2でPRに含める（タグ前に完了）          |
 
 ## スクリプト
