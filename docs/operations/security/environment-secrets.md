@@ -49,7 +49,7 @@ SUPABASE_STORAGE_RLS_AUDIT_TOKEN="op://ci/supabase-storage-rls-audit/credential"
   op run -- node scripts/ci/production-storage-rls-audit.mjs
 ```
 
-- token は `ci` vault にある（`human` vault ではない）。agent の vault allowlist は `agent` のみのため、**この実行自体は agent 単独では行えず、User の明示指示（1Password 承認）を経由する**
+- token は `ci` vault にある（`human` vault ではない）。agent の Service Account は `agent` vault しか読めないため、**この実行自体は agent 単独では行えず、User の明示指示（1Password 承認）を経由する**
 - script の標準出力は pass/fail のメッセージのみで生の query 結果を出さないため、出力をそのまま issue / PR へ貼ってよい（jq 射影は不要）
 - CI 経路（`push:main` / 日次 cron）が本来の継続監視であり、この単発実行は「merge 前に前倒しで 1 回確認したい」時の例外的な手段
 

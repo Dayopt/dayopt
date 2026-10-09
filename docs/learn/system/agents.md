@@ -80,16 +80,17 @@ flowchart LR
 | `protected-path-gate`               | `pnpm branch:finish`（merge の直前）                                         | 外部契約・不可逆の path に触ったかを示し、レビューで重点的に読む範囲の目安にする。CI では shadow 検査（Validation (shadow)）の計画の入力にも使われる                                                                  | **止めない**（示すだけ） | `scripts/ci/protected-path-gate.mjs`                                              |
 | main の ruleset                     | merge                                                                        | required checks の成功と review thread の全解決を求める。bypass できる人はいない                                                                                                                                      | 止める                   | GitHub の repository ruleset（[infra.md](../../engineering/infra.md)）            |
 
-`pre-tool-guard` が止めるもの（`scripts/hooks/pre-tool-guard-rules.mjs` の `BLOCKED:` の要約）:
+`pre-tool-guard` が止めるもの（`scripts/hooks/pre-tool-guard-rules.mjs` の `BLOCKED:` の要約。2026-10-09 に 5 規則へ縮小、#3053）:
 
-- **secret**: `.env` 系の読み書き、1Password の実値を出す使い方（`op read`、`op item get --reveal`、人用の `.op-env.human` を渡すこと）、許可外 vault の参照
-- **取り返しのつかない git 操作**: 強制 push（`--force-with-lease` は可）、作業ツリーを捨てる reset、`--no-verify` で hook を飛ばすこと
-- **共有の状態**: local Supabase の reset の直接実行（local Supabase は全 worktree で共有）、origin/main に載った migration ファイルの編集
-- **worktree の越境**: 自分の worktree の外への書き込みと `rm -r`、別件のチップ起票（main checkout の session だけが可）
-- **外部サービス**: vercel CLI の書き込み系と `--token`、Supabase の credential を含む出力
-- **コスト**: 大きなファイルを範囲指定なしで Read すること
+1. **`.env` 系の読み書き**
+2. **取り返しのつかない git 操作**: 強制 push（`--force-with-lease` は可）、作業ツリーを捨てる reset、`--no-verify` で hook を飛ばすこと
+3. **worktree の越境**: 自分の worktree の外への書き込みと `rm -r`（自分の worktree は hook 入力の `cwd` で決める）
+4. **secret 値の表示**: 1Password の実値を出す使い方（`op read`、`op item get --reveal` など）、Supabase Management API の secret を含む endpoint
+5. **DB の保護**: origin/main に載った migration ファイルの編集、Supabase の reset の直接実行（local Supabase は全 worktree で共有。`--linked` はリモート DB を消す）
 
-強制 push・`--no-verify`・`op read`・local Supabase の reset など多くの規則は、コマンドの文字列で判定する。そのため、禁止されたコマンドを**説明する文章をコマンドに含めただけ**でも止まる（vercel CLI や `rm -r` のように、引数を解釈してから判定する規則もある）。commit message や PR 本文に書く時は、ファイルに書いてから `-F` / `--body-file` で渡す。
+境界の本体は token の到達範囲で、agent の 1Password は `agent` vault しか読めない（[secrets.md](../../operations/secrets.md) §Service Account）。guard はその手前の speed bump。
+
+強制 push・`--no-verify`・`op read`・Supabase の reset など多くの規則は、コマンドの文字列で判定する。そのため、禁止されたコマンドを**説明する文章をコマンドに含めただけ**でも止まる。commit message や PR 本文に書く時は、ファイルに書いてから `-F` / `--body-file` で渡す。
 
 ## memory（Claude Code の覚え書き）
 

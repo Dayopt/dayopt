@@ -37,16 +37,6 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const loaderPath = resolve(rootDir, 'scripts/hooks/pre-tool-guard.mjs');
 const rulesPath = resolve(rootDir, 'scripts/hooks/pre-tool-guard-rules.mjs');
 
-// path を組み立てるのは、この test file 自体を編集する Write が
-// guard の file path 検査に引っかからないようにするため。
-const HUMAN = `.op-env${'.'}human`;
-const ADMIN_EXAMPLE = `${HUMAN}.example`;
-const AGENT = `.op-env${'.'}agent`;
-const LOCAL_EXAMPLE = `${AGENT}.example`;
-
-const PROD_REF = `op://human/supabase/SUPABASE_SECRET_KEY`;
-const AGENT_REF = `op://agent/supabase/SUPABASE_ACCESS_TOKEN`;
-
 type Decision = 'block' | 'allow';
 
 function runGuard(
@@ -67,23 +57,8 @@ function bash(command: string): Record<string, unknown> {
   return { tool_name: 'Bash', tool_input: { command } };
 }
 
-function mcp(toolName: string): Record<string, unknown> {
-  return { tool_name: toolName, tool_input: { title: 'x', prompt: 'y' } };
-}
-
-// R1/R2（Agent の model 明示 + 探索への opus/fable 使用ガード）用ヘルパー。
-function agentCall(
-  input: Partial<{ model: string; subagent_type: string; prompt: string; description: string }>,
-): Record<string, unknown> {
-  return { tool_name: 'Agent', tool_input: { ...input } };
-}
-
-// R3（Read の範囲指定なし大規模ファイル読み込みガード）用ヘルパー。
-function readTool(
-  filePath: string,
-  opts?: { offset?: number; limit?: number },
-): Record<string, unknown> {
-  return { tool_name: 'Read', tool_input: { file_path: filePath, ...opts } };
+function readTool(filePath: string): Record<string, unknown> {
+  return { tool_name: 'Read', tool_input: { file_path: filePath } };
 }
 
 // setup が黙って失敗すると、以降の assert が「たまたま通る」形で緑になる。
@@ -335,207 +310,6 @@ describe('pre-tool-guard.mjs: loader/rules 分離（#1961 の Node 移植）', (
   });
 });
 
-describe('pre-tool-guard.mjs: .op-env.human', () => {
-  // .op-env.human は op:// 参照だけで実秘密を含まない。2026-08-13、User 決定
-  // （#1993）で境界を「読み書き可・消費のみ禁止」へ変更した。作成・Write/Edit は
-  // 解禁し、op run で production の service role key を解決する消費だけを止める。
-  it.each([
-    ['雛形からのコピー', `cp ${ADMIN_EXAMPLE} ${HUMAN}`],
-    ['リダイレクトでの作成', `cat > ${HUMAN}`],
-    ['追記', `echo x >> ${HUMAN}`],
-    ['touch', `touch ${HUMAN}`],
-    ['セパレータ後の cp', `pnpm i && cp a ${HUMAN}`],
-  ])('作成は通す（#1993）: %s', (_label, command) => {
-    expect(runGuard(bash(command))).toBe('allow');
-  });
-
-  it('Write / Edit でも作成・編集を通す（#1993）', () => {
-    expect(runGuard(write(`/x/${HUMAN}`))).toBe('allow');
-    expect(runGuard(edit(`/x/${HUMAN}`))).toBe('allow');
-  });
-
-  // 作成を解禁しても、雛形をそのまま op run に渡せば同じ権限が解決される。
-  // コマンド名ではなく --env-file の指す先で判定するので、op をどう起動しても落ちる。
-  it.each([
-    [
-      '雛形の直接実行',
-      `op run --env-file=${ADMIN_EXAMPLE} -- bash scripts/runbook/admin-delete-user.sh`,
-    ],
-    ['実ファイル', `op run --env-file=${HUMAN} -- bash scripts/runbook/admin-show-user.sh`],
-    ['空白区切りの --env-file', `op run --env-file ${ADMIN_EXAMPLE} -- sh -c true`],
-    ['セパレータ後の op run', `cd /tmp && op run --env-file=${ADMIN_EXAMPLE} -- sh -c true`],
-    [
-      'env 経由',
-      `env op run --env-file=${ADMIN_EXAMPLE} -- bash scripts/runbook/admin-delete-user.sh`,
-    ],
-    ['command 経由', `command op run --env-file=${ADMIN_EXAMPLE} -- sh -c true`],
-    ['絶対パス', `/opt/homebrew/bin/op run --env-file=${ADMIN_EXAMPLE} -- sh -c true`],
-    ['sh -c でくるむ', `sh -c "op run --env-file=${ADMIN_EXAMPLE} -- sh -c true"`],
-    ['環境変数代入を前置', `FOO=1 op run --env-file=${ADMIN_EXAMPLE} -- sh -c true`],
-    ['xargs 経由', `echo x | xargs -I{} op run --env-file=${ADMIN_EXAMPLE} -- sh -c true`],
-  ])('op run による消費を止める: %s', (_label, command) => {
-    expect(runGuard(bash(command))).toBe('block');
-  });
-
-  it.each([
-    ['通常 local dev の op run', `op run --env-file=${AGENT} -- pnpm env:check`],
-    ['雛形の読み取り', `cat ${ADMIN_EXAMPLE}`],
-    ['名前の grep', `rg -n ${HUMAN} docs/`],
-    ['local の作り直し', `cp ${LOCAL_EXAMPLE} ${AGENT}`],
-    ['無関係コマンド', 'git status'],
-  ])('正当な操作は通す: %s', (_label, command) => {
-    expect(runGuard(bash(command))).toBe('allow');
-  });
-
-  it('雛形と local の編集は通す', () => {
-    expect(runGuard(write(`/x/${ADMIN_EXAMPLE}`))).toBe('allow');
-    expect(runGuard(edit(`/x/${AGENT}`))).toBe('allow');
-  });
-
-  // 引数で判定する代償として、この flag と path を並べた文字列を Bash 引数へ
-  // 含めるだけでも落ちる。docs に書く時は Write/Edit で file に書いてから渡す。
-  // 迂回形を数え上げる方式では env / command / 絶対パス / sh -c と際限がないため、
-  // 誤検知を受け入れて class ごと閉じる方を選んでいる。
-  it('flag と path を並べた文字列は、引用符の中でも落とす', () => {
-    const mention = `gh pr edit 1935 --body 'op run --env-file=${ADMIN_EXAMPLE} -- bash x.sh で本番権限が解決される'`;
-    expect(runGuard(bash(mention))).toBe('block');
-  });
-
-  // 禁止 path を数え上げる方式は、雛形を別名へ複製されると破れる
-  // （cp .op-env.human.example /tmp/foo → その別名を op run へ）。
-  // path 名から中身は判別できないので allowlist にして、中身を問わず落とす。
-  it.each([
-    [
-      '別名へ複製した env-file',
-      'op run --env-file=/tmp/foo -- bash scripts/runbook/admin-delete-user.sh',
-    ],
-    ['相対の別名', 'op run --env-file=./tmp-env -- sh -c true'],
-    ['変数展開', 'op run --env-file="$OP_ENV_PATH" -- sh -c true'],
-    ['local の雛形', `op run --env-file=${LOCAL_EXAMPLE} -- sh -c true`],
-    // 「path らしくない token は無視する」例外を置くと、escape を含む path が
-    // 検査対象から外れて空白入りの別名で迂回できた。分類せず落とす。
-    [
-      '空白を escape した別名',
-      'op run --env-file=/tmp/foo\\ bar -- bash scripts/runbook/admin-delete-user.sh',
-    ],
-    ['引用符で囲んだ別名', 'op run --env-file="/tmp/foo bar" -- sh -c true'],
-    // basename で判定すると、任意ディレクトリに同名で置くだけで通ってしまう。
-    // path 文字列そのものを allowlist にして塞ぐ。
-    [
-      '別ディレクトリの同名ファイル',
-      'op run --env-file=/tmp/.op-env.agent -- bash scripts/runbook/admin-delete-user.sh',
-    ],
-    ['home 配下の同名ファイル', 'op run --env-file=~/.op-env.agent -- sh -c true'],
-    ['深い相対 path の同名ファイル', 'op run --env-file=../../../tmp/.op-env.agent -- sh -c true'],
-    // 許可形を optional group で組み立てると区切りの / が任意になり、
-    // 下のような類似名まで通る。省略記法を使わず選択肢で列挙する。
-    [
-      '区切りなしの類似名',
-      'op run --env-file=..op-env.agent -- bash scripts/runbook/admin-delete-user.sh',
-    ],
-    ['ドットを増やした類似名', 'op run --env-file=../...op-env.agent -- sh -c true'],
-    ['1 階層だけ上の同名ファイル', 'op run --env-file=../.op-env.agent -- sh -c true'],
-    // 旧名は移行猶予中 disk に残りうるが、消費は改名時点で許可 literal から
-    // 外れている。この block を契約として固定する（#2095 クロスレビュー P2）
-    ['旧名 .op-env.local の消費', `op run --env-file=.op-env${'.'}local -- pnpm env:check`],
-    ['旧名 .op-env.admin の消費', `op run --env-file=.op-env${'.'}admin -- sh -c true`],
-    // bash は実行前に `\` + 改行を除去するため、複数行に整形しただけで
-    // 行単位の grep は分断される。敵対的な回避ではなく通常の整形で起きる。
-    [
-      '行継続で分断した flag',
-      `op run --env-file\\\n=${ADMIN_EXAMPLE} -- bash scripts/runbook/admin-delete-user.sh`,
-    ],
-    ['行継続で分断した path', `op run --env-file=\\\n${ADMIN_EXAMPLE} -- sh -c true`],
-  ])('許可外の env-file を落とす: %s', (_label, command) => {
-    expect(runGuard(bash(command))).toBe('block');
-  });
-
-  it.each([
-    ['repo root の local', `op run --env-file=${AGENT} -- pnpm typecheck`],
-    ['明示的な ./ 付き', `op run --env-file=./${AGENT} -- pnpm typecheck`],
-    ['workspace からの相対 local', `op run --env-file=../../${AGENT} -- pnpm typecheck`],
-  ])('許可された env-file は通す: %s', (_label, command) => {
-    expect(runGuard(bash(command))).toBe('allow');
-  });
-
-  // 判定は fail closed。token を分類して例外を作ると、そこが穴になる
-  // （escape を含む path が「path らしくない」として素通りした）。
-  // 代償として散文も落ちる。docs に書く時は Write/Edit で file へ書いてから渡す。
-  it('散文で flag に言及しただけでも落とす（fail closed の代償）', () => {
-    const prose = 'git commit -m "--env-file に渡してよいのは通常の local だけにする"';
-    expect(runGuard(bash(prose))).toBe('block');
-  });
-
-  it('flag を伴わない名前の言及は通す', () => {
-    expect(
-      runGuard(bash(`gh pr edit 1935 --body '${ADMIN_EXAMPLE} は production を参照する'`)),
-    ).toBe('allow');
-  });
-
-  // #1993 の受け入れ条件: 「agent が admin ファイルに書ける = 消費できる」では
-  // ないことを、書いた直後の消費が落ちることで固定する。
-  it('書いた直後の消費は落ちる（作成解禁は消費解禁ではない）', () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-admin-'));
-    try {
-      expect(runGuard(write(join(fixtureRoot, HUMAN), `A=${PROD_REF}`))).toBe('allow');
-      writeFileSync(join(fixtureRoot, HUMAN), `A=${PROD_REF}`);
-      expect(runGuard(bash(`op run --env-file=${HUMAN} -- sh -c true`), fixtureRoot)).toBe('block');
-    } finally {
-      rmSync(fixtureRoot, { recursive: true, force: true });
-    }
-  });
-});
-
-// #1953: regex でコマンド文字列を見る限り shell の引数解釈は再現できない。
-// 「flag に一致したら後続 token を照合する」2 段構えは、トリガーに一致しない
-// 書き方が照合にすら入らず素通りする。判定を「-env-file の言及が **すべて**
-// 許可形か」に変え、変形を個別に数え上げるのをやめた。
-describe('pre-tool-guard.mjs: flag 自体の書き換え', () => {
-  it.each([
-    // quote は shell が引数から取り除くので、= の前後どこへ刺しても argv は同じ。
-    // 旧実装はトリガーの --env-file[=空白] に一致せず素通りしていた。
-    [
-      '= の前に二重引用符',
-      `op run --env-file"=${HUMAN}" -- bash scripts/runbook/admin-delete-user.sh`,
-    ],
-    ['= の前に単引用符', `op run --env-file'='${HUMAN} -- bash scripts/runbook/admin-show-user.sh`],
-    ['= を backslash escape', `op run --env-file\\=${HUMAN} -- sh -c true`],
-    // flag 名の内側に刺す形は生の文字列に -env-file が現れない。
-    // quote / backslash を除いた写しでのみ捕まる。
-    ['flag 名の内側に二重引用符', `op run --env-f"ile"=${HUMAN} -- sh -c true`],
-    ['flag 名の内側に単引用符', `op run --env-'file'=${HUMAN} -- sh -c true`],
-    // ANSI-C / locale 形式の quote も shell が引数から取り除く。導入の $ を
-    // 落としてから通常の quote 除去に合流させないと、どちらの写しにも
-    // -env-file が現れない。
-    ['ANSI-C quote で flag を分断', `op run --env-fi$'le'=${HUMAN} -- sh -c true`],
-    ['locale quote で flag を分断', `op run --env-fi$"le"=${HUMAN} -- sh -c true`],
-    // = が無い形・変数が挟まる形も「許可形ではない言及」として落ちる。
-    [
-      'flag と = の間に変数',
-      'op run --env-file${X}=/tmp/evil -- bash scripts/runbook/admin-delete-user.sh',
-    ],
-    // 許可形が 1 つあっても、許可外の言及が混ざれば落ちる。
-    [
-      '許可形のあとに許可外の flag',
-      `op run --env-file=${AGENT} --env-file=/tmp/evil -- sh -c true`,
-    ],
-    // 引用符を挟んで token の途中に空白を作る形。生の文字列側の検査で落ちる。
-    ['許可 literal に引用符を混ぜる', `op run --env-file="${AGENT}"" /tmp/evil" -- sh -c true`],
-  ])('落とす: %s', (_label, command) => {
-    expect(runGuard(bash(command))).toBe('block');
-  });
-
-  // 受け入れる代償。閉じ引用符が続く形を除外する例外は置かない
-  // （同型の例外が過去 2 回穴になっている）。回避策は leading dash を外すこと。
-  it('flag の直後に引用符が来る自己検索も落ちる（受け入れる誤検知）', () => {
-    expect(runGuard(bash(`rg -- '--env-file' scripts/hooks/`))).toBe('block');
-  });
-
-  it('leading dash を外した検索は通る（誤検知の回避策）', () => {
-    expect(runGuard(bash('rg env-file scripts/hooks/'))).toBe('allow');
-  });
-});
-
 // #1944: heredoc 本文も危険コマンド検査の対象に**残す**（誤検知を受け入れる）。
 //
 // 「本文はデータだから外す」を実装したが、**どの行が本当に heredoc を開いていて
@@ -600,272 +374,16 @@ describe('pre-tool-guard.mjs: heredoc 本文と危険コマンド', () => {
   it('--force-with-lease は通す', () => {
     expect(runGuard(bash('git push --force-with-lease origin main'))).toBe('allow');
   });
-});
 
-// #1949: path の allowlist は「どのファイルか」しか見ない。許可 path の中身へ
-// production 参照を書き足せば、path トリックなしで production credential に届く。
-// 中身は op:// の vault で判定し、許可 vault 以外を落とす。
-describe('pre-tool-guard.mjs: env-file の中身', () => {
-  let fixtureRoot: string;
-  let cleanDir: string;
-  let prodDir: string;
-  let emptyDir: string;
-  let nestedDir: string;
-
-  beforeAll(() => {
-    // fixture を tmp に置くのは、実環境の .op-env.agent の有無で結果が変わらない
-    // ようにするため（main checkout には実ファイルがあり、worktree には無い）。
-    fixtureRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-'));
-    cleanDir = join(fixtureRoot, 'clean');
-    prodDir = join(fixtureRoot, 'prod');
-    emptyDir = join(fixtureRoot, 'empty');
-    nestedDir = join(prodDir, 'apps', 'product');
-    mkdirSync(cleanDir);
-    mkdirSync(prodDir);
-    mkdirSync(emptyDir);
-    mkdirSync(nestedDir, { recursive: true });
-    writeFileSync(
-      join(cleanDir, AGENT),
-      ['A=' + AGENT_REF, 'B=op://agent/resend/RESEND_API_KEY', 'C=op://agent/supabase/URL'].join(
-        '\n',
-      ),
-    );
-    writeFileSync(join(prodDir, AGENT), ['A=' + AGENT_REF, 'B=' + PROD_REF].join('\n'));
-  });
-
-  afterAll(() => {
-    rmSync(fixtureRoot, { recursive: true, force: true });
-  });
-
-  it('許可 vault だけの env-file は通す', () => {
-    expect(runGuard(bash(`op run --env-file=${AGENT} -- pnpm typecheck`), cleanDir)).toBe('allow');
-  });
-
-  it('production 参照を含む env-file は落とす', () => {
-    expect(runGuard(bash(`op run --env-file=${AGENT} -- pnpm typecheck`), prodDir)).toBe('block');
-  });
-
-  it('./ 形でも中身を見る', () => {
-    expect(runGuard(bash(`op run --env-file=./${AGENT} -- sh -c true`), prodDir)).toBe('block');
-  });
-
-  it('workspace からの相対形でも中身を見る', () => {
-    expect(runGuard(bash(`op run --env-file=../../${AGENT} -- pnpm typecheck`), nestedDir)).toBe(
-      'block',
-    );
-  });
-
-  // quote を除いた写しにしか -env-file が現れない形。path の抽出も言及の検出も
-  // 生の写しだけを見ていた時、この形は中身検査にも単一コマンド制約にも載らず、
-  // production 参照を持つ env-file をそのまま解決できていた。
-  it('flag 名の内側に引用符があっても中身を見る', () => {
-    expect(runGuard(bash(`op run --env-f"ile"=${AGENT} -- sh -c true`), prodDir)).toBe('block');
-  });
-
-  // ANSI-C quote は生の写しにも通常の quote 除去後の写しにも -env-file を
-  // 残さない。$ を落としてから合流させないと、中身検査まで素通りする。
-  it('ANSI-C quote で分断された flag でも中身を見る', () => {
-    expect(runGuard(bash(`op run --env-fi$'le'=${AGENT} -- sh -c true`), prodDir)).toBe('block');
-  });
-
-  // 存在しない file は「解決される参照が無い」ので通す。op run 側が失敗する。
-  it('env-file が存在しなければ通す', () => {
-    expect(runGuard(bash(`op run --env-file=${AGENT} -- pnpm typecheck`), emptyDir)).toBe('allow');
-  });
-
-  // hook は Bash 呼び出しごとに実行前 1 回しか発火しないので、同一コマンド内で
-  // 書き換えられると上の中身検査は書き換え前を読む。検査した中身と実際に解決
-  // される中身が別物になるため、そういう余地のあるコマンド形自体を落とす。
-  //
-  // 書き手を列挙する方式では閉じない。列挙（cp / mv / tee / sed / リダイレクト）を
-  // 実装した時点で python3 / node / `>|` がすり抜けることを実測した。区切りと
-  // コマンド置換という「別のことが起きる余地」の方を落とす。
-  it.each([
-    [
-      '追記してから消費',
-      `echo 'X=${PROD_REF}' >> ${AGENT} && op run --env-file=${AGENT} -- sh -c true`,
-    ],
-    [
-      '雛形コピー直後に消費',
-      `cp ${LOCAL_EXAMPLE} ${AGENT} && op run --env-file=${AGENT} -- pnpm typecheck`,
-    ],
-    ['sed -i してから消費', `sed -i '' s/a/b/ ${AGENT}; op run --env-file=${AGENT} -- sh -c true`],
-    ['tee してから消費', `echo x | tee ${AGENT} && op run --env-file=${AGENT} -- sh -c true`],
-    // 列挙方式をすり抜けた書き手たち
-    [
-      'python3 で追記してから消費',
-      `python3 -c "open('${AGENT}','a').write('X=${PROD_REF}')" && op run --env-file=${AGENT} -- sh -c true`,
-    ],
-    [
-      'node で追記してから消費',
-      `node -e "require('fs').appendFileSync('${AGENT}','X=${PROD_REF}')" && op run --env-file=${AGENT} -- sh -c true`,
-    ],
-    [
-      'awk で書いてから消費',
-      `awk 'BEGIN{print "X" > "${AGENT}"}' && op run --env-file=${AGENT} -- sh -c true`,
-    ],
-    // >| は > の別形。除外文字クラスに | を入れていたリダイレクト検出をすり抜けた
-    [
-      '>| で上書きしてから消費',
-      `echo 'X=${PROD_REF}' >| ${AGENT} && op run --env-file=${AGENT} -- sh -c true`,
-    ],
-    // 改行も区切り。COMMAND_JOINED は改行を空白へ寄せるので、生の文字列側で見る
-    [
-      '改行で繋いだ書き換え + 消費',
-      `echo 'X=${PROD_REF}' >> ${AGENT}\nop run --env-file=${AGENT} -- sh -c true`,
-    ],
-    // コマンド置換の中に書き手を隠す形
-    ['コマンド置換を含む消費', `op run --env-file=${AGENT} -- sh -c "$(printf x)"`],
-    // cd は中身検査の path 解決をずらす。同じ規則で落ちる
-    ['cd してから消費', `cd /tmp && op run --env-file=${AGENT} -- sh -c true`],
-    // 言及の検出を生の写しだけで行っていた時、この形は制約から外れていた
-    ['flag 名の内側に引用符 + 区切り', `cd /tmp && op run --env-f"ile"=${AGENT} -- sh -c true`],
-    ['プロセス置換を含む消費', `op run --env-file=${AGENT} -- diff <(echo a) <(echo b)`],
-  ])('env-file の消費は単一の単純コマンドに限る: %s', (_label, command) => {
-    expect(runGuard(bash(command), cleanDir)).toBe('block');
-  });
-
-  it('書き換えだけなら通す（消費は次のコマンドで検査される）', () => {
-    expect(runGuard(bash(`echo 'X=${AGENT_REF}' >> ${AGENT}`), cleanDir)).toBe('allow');
-  });
-
-  // 発生源でも止める。実行時の検査は agent が op run を直接打つ場面でしか
-  // 発火しない（pnpm typecheck:op などは npm script の内側で op run するので
-  // hook からは見えない）ため、書き足し自体をここで落とす。
-  it.each([
-    ['Write に production 参照', write(`/x/${AGENT}`, `A=${PROD_REF}`)],
-    ['Edit に production 参照', edit(`/x/${AGENT}`, `A=${PROD_REF}`)],
-    ['雛形へ production 参照', write(`/x/${LOCAL_EXAMPLE}`, `A=${PROD_REF}`)],
-    ['未知の vault', write(`/x/${AGENT}`, 'A=op://Dayopt-Prod/supabase/KEY')],
-    // 旧名は User の手動移行まで disk に残りうる。消費は allowlist で落ちるが、
-    // 書き込みの発生源検査も移行猶予として旧名を対象に残す（#2086 反証レビュー）
-    ['旧名 .op-env.local への許可外 vault 参照', write(`/x/.op-env${'.'}local`, `A=${PROD_REF}`)],
-    // #2334（同乗タスク、P3）: MultiEdit/NotebookEdit を判定対象に含めた時点
-    // （非ブロッキング Codex レビュー P1 是正）で、抽出 jq（WRITTEN 変数）に
-    // edits[].new_string / new_source を足さないと「未検査で通る新経路」に
-    // なる。ロジックは実装済みだが、これまで block 側の回帰テストが無かった
-    // （手動トレースのみで正当性確認していた）ため固定する。
-    ['MultiEdit に production 参照', multiEdit(`/x/${AGENT}`, [`A=${PROD_REF}`])],
-    ['NotebookEdit に production 参照', notebookEdit(`/x/${AGENT}`, `A=${PROD_REF}`)],
-  ])('書き込み時にも落とす: %s', (_label, input) => {
-    expect(runGuard(input)).toBe('block');
-  });
-
-  it.each([
-    ['Write に staging 参照', write(`/x/${AGENT}`, `A=${AGENT_REF}`)],
-    ['Edit に local 参照', edit(`/x/${AGENT}`, 'A=op://agent/supabase/URL')],
-    // admin 雛形は設計上 production を参照する。ここを落とすと schema 更新ができない。
-    ['admin 雛形への production 参照', write(`/x/${ADMIN_EXAMPLE}`, `A=${PROD_REF}`)],
-    // env-file 以外への言及は対象外（docs に vault 名を書けなくなる）
-    ['docs への言及', write('/x/notes.md', `${PROD_REF} を参照する運用`)],
-  ])('正当な書き込みは通す: %s', (_label, input) => {
-    expect(runGuard(input)).toBe('allow');
-  });
-});
-
-// #1986: 書き込み時検査は「書き込まれるテキスト」だけを見る。op:// を含まない
-// 部分置換の Edit（vault 名だけの差し替え）はこの層をすり抜ける。
-//
-// これは regression ではなく、既知の受け入れ済みギャップとして固定する。権威は
-// 実行時層（op run 直前に実ファイルを読む）で、書き込み時はあくまで early
-// feedback の best-effort。境界は docs/operations/secrets.md L58 に記載済み。
-// (a) 適用後の文字列再構成、(b) PostToolUse での事後検査はどちらも見送った
-// （(a) は bash の literal 置換が壊れやすく静かな fail open になりうる、
-// (b) は権威層が既にこのケースを捕まえるため複雑さに見合わない）。
-describe('pre-tool-guard.mjs: 部分置換の Edit（#1986、受け入れる既知のギャップ）', () => {
-  it('op:// を含まない部分置換 Edit は書き込み時検査を通る（権威は実行時層）', () => {
-    expect(runGuard(edit(`/x/${AGENT}`, 'human'))).toBe('allow');
-  });
-});
-
-// #1987: 単一コマンド判定は文字単位なので、引用済み引数の中の区切り記号でも
-// 落ちる。「env-file 言及より前だけを判定範囲にする」narrowing 案は、
-// コマンド置換が位置によらず先に評価される点は分離できても、区切り文字が
-// quote の中かどうかは追えないままで、#1944（heredoc）と同型の
-// 「shell の引用状態は regex で再現できない」という結論に当たる。
-// 確信が持てない narrowing は行わず、過剰ブロックを維持する。
-describe('pre-tool-guard.mjs: 引用済み引数内の区切り記号（#1987、受け入れる誤検知）', () => {
-  it('op run の子プロセス引数に quote された | があっても落ちる', () => {
-    expect(runGuard(bash(`op run --env-file=${AGENT} -- node -e "console.log('a|b')"`))).toBe(
-      'block',
-    );
-  });
-});
-
-// #1959: チップ起票（spawn_task）は Main（main checkout の session）の専権。レーンが直接 User へ
-// チップを出すと triage の判断が User に飛ぶ。レーンは issue 化 + Main へ
-// send_message に一本化する。Issue の起票には dispatch skill を使う。
-describe('pre-tool-guard.mjs: レーンからのチップ起票', () => {
-  const SPAWN = 'mcp__ccd_session__spawn_task';
-  let fixtureRoot: string;
-  let mainDir: string;
-  let worktreeDir: string;
-  let plainDir: string;
-
-  beforeAll(() => {
-    // 判定は git の linked worktree かどうか。実環境の worktree に依存させると
-    // CI（plain clone）で結果が変わるので、fixture で両方を作る。
-    fixtureRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-git-'));
-    mainDir = join(fixtureRoot, 'main');
-    worktreeDir = join(fixtureRoot, 'lane');
-    plainDir = join(fixtureRoot, 'plain');
-    mkdirSync(mainDir);
-    mkdirSync(plainDir);
-    git(['init', '-q', '.'], mainDir);
-    git(
-      [
-        '-c',
-        'user.email=t@example.com',
-        '-c',
-        'user.name=t',
-        'commit',
-        '-q',
-        '--allow-empty',
-        '-m',
-        'init',
-      ],
-      mainDir,
-    );
-    git(['worktree', 'add', '-q', worktreeDir, '-b', 'lane'], mainDir);
-  });
-
-  afterAll(() => {
-    rmSync(fixtureRoot, { recursive: true, force: true });
-  });
-
-  it('linked worktree からは落とす', () => {
-    expect(runGuard(mcp(SPAWN), worktreeDir)).toBe('block');
-  });
-
-  it('main checkout からは通す（Main の着手する issue の選択は正規手段）', () => {
-    expect(runGuard(mcp(SPAWN), mainDir)).toBe('allow');
-  });
-
-  // 判定は「Main だと言い切れた時だけ通す」allowlist。git が使えない・repo 外は
-  // 落とす。`cd ""` は bash では成功してカレントに留まるため、空値を素通りさせると
-  // 両者が同じ cwd に解決されて「一致＝Main」と誤判定する（実装中に踏んだ）。
-  it('git 管理外のディレクトリからは落とす（fail closed）', () => {
-    expect(runGuard(mcp(SPAWN), plainDir)).toBe('block');
-  });
-
-  // path の慣習（.claude/worktrees/ 配下）で判定していないことの裏取り。
-  // fixture の worktree は慣習の外にあるが、それでも落ちる。
-  it('慣習外の場所にある worktree でも落とす', () => {
-    expect(worktreeDir).not.toContain('.claude/worktrees');
-    expect(runGuard(mcp(SPAWN), worktreeDir)).toBe('block');
-  });
-
-  it.each([
-    ['章立て', 'mcp__ccd_session__mark_chapter'],
-    ['Main への連絡', 'mcp__ccd_session_mgmt__send_message'],
-  ])('worktree でも他の tool は通す: %s', (_label, toolName) => {
-    expect(runGuard(mcp(toolName), worktreeDir)).toBe('allow');
+  it('--hard 以外の reset は通す', () => {
+    expect(runGuard(bash('git reset --soft HEAD~1'))).toBe('allow');
+    expect(runGuard(bash('git reset HEAD -- notes.md'))).toBe('allow');
   });
 });
 
 // worktree 外ファイル編集ガード（2026-08-24, #2359）。
 // レーンは自分の worktree 外を書き換えない（AGENTS.md §委任・報告の作法
-// の writer 4 条件）。判定は guard_resolve_roots()（spawn_task 判定と共用）を
+// の writer 4 条件）。判定は resolveRoots() を
 // working tree root ベースで行うため、fixture は main + 2 linked worktree で組む。
 describe('pre-tool-guard.mjs: worktree 外ファイル編集ガード（#2359）', () => {
   let fixtureRoot: string;
@@ -996,7 +514,6 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     // 実体（保護対象）
     writeFileSync(join(repoDir, '.env'), 'SECRET=1\n');
     writeFileSync(join(repoDir, '.env.local'), 'SECRET=2\n');
-    writeFileSync(join(repoDir, AGENT), '');
     writeFileSync(join(repoDir, 'notes.md'), '');
     mkdirSync(join(repoDir, 'supabase', 'migrations'), { recursive: true });
     migrationPath = join(repoDir, 'supabase', 'migrations', '20260101000000_init.sql');
@@ -1007,13 +524,19 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     mkdirSync(join(repoDir, 'tmp'));
     symlinkSync(join(repoDir, '.env'), join(repoDir, 'tmp', 'alias-a'), 'file');
     symlinkSync(join(repoDir, '.env.local'), join(repoDir, 'tmp', 'alias-b'), 'file');
-    symlinkSync(join(repoDir, AGENT), join(repoDir, 'tmp', 'alias-c'), 'file');
     symlinkSync(migrationPath, join(repoDir, 'tmp', 'alias-d'), 'file');
     symlinkSync(join(repoDir, 'notes.md'), join(repoDir, 'tmp', 'alias-e'), 'file');
   });
 
   afterAll(() => {
     rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('.env / .env.local の Read は block し、通常ファイルの Read は通す', () => {
+    expect(runGuard(readTool(join(repoDir, '.env')), repoDir)).toBe('block');
+    expect(runGuard(readTool(join(repoDir, '.env.local')), repoDir)).toBe('block');
+    expect(runGuard(readTool(join(repoDir, 'tmp', 'alias-a')), repoDir)).toBe('block');
+    expect(runGuard(readTool(join(repoDir, 'notes.md')), repoDir)).toBe('allow');
   });
 
   it('直接 path での .env / .env.local への Write は従来どおり block（回帰確認）', () => {
@@ -1034,13 +557,6 @@ describe('pre-tool-guard.mjs: symlink 経由の保護ファイル判定（#2566�
     expect(runGuard(edit(alias), repoDir)).toBe('block');
     expect(runGuard(multiEdit(alias, ['x']), repoDir)).toBe('block');
     expect(runGuard(notebookEdit(alias, 'x'), repoDir)).toBe('block');
-  });
-
-  it('local dev env-file を指す symlink でも許可外 vault の op:// 参照は block する', () => {
-    const alias = join(repoDir, 'tmp', 'alias-c');
-    // 直接 path と同じ挙動になること（許可 vault なら通り、production 参照なら落ちる）
-    expect(runGuard(write(alias, `A=${AGENT_REF}\n`), repoDir)).toBe('allow');
-    expect(runGuard(write(alias, `A=${PROD_REF}\n`), repoDir)).toBe('block');
   });
 
   it('origin/main に載っている migration を指す symlink への Write も block する', () => {
@@ -1282,6 +798,30 @@ describe('pre-tool-guard.mjs: rm -rf の絶対パス target（家系判定、#23
   it('レーンから main への絶対パス rm -rf は block する', () => {
     expect(runGuard(bash(`rm -rf ${mainDir}`), laneBDir)).toBe('block');
   });
+
+  // desktop app の worktree session では hook の process が main checkout を cwd に起動し、
+  // session の作業先は入力の cwd にだけ現れる（2026-10-09 実測、#3053）。
+  describe('hook 入力の cwd が process の cwd より優先される', () => {
+    const withCwd = (input: Record<string, unknown>, cwd: string) => ({ ...input, cwd });
+
+    it('入力の cwd の worktree への Write と rm -r は通す', () => {
+      expect(runGuard(withCwd(write(join(laneBDir, 'notes.md')), laneBDir), mainDir)).toBe('allow');
+      expect(runGuard(withCwd(bash(`rm -rf ${laneBDir}/node_modules`), laneBDir), mainDir)).toBe(
+        'allow',
+      );
+    });
+
+    it('入力の cwd から見た他の worktree への Write と rm -r は block する', () => {
+      expect(runGuard(withCwd(write(join(mainDir, 'notes.md')), laneBDir), mainDir)).toBe('block');
+      expect(runGuard(withCwd(bash(`rm -rf ${mainDir}/.claude`), laneBDir), mainDir)).toBe('block');
+    });
+
+    it('入力の cwd が実在しない時は process の cwd で判定する', () => {
+      expect(
+        runGuard(withCwd(write(join(laneBDir, 'notes.md')), '/nonexistent/dir'), mainDir),
+      ).toBe('block');
+    });
+  });
 });
 
 // supabase db reset の生呼び出し block（2026-08-24, #2359）。ローカル Supabase
@@ -1370,129 +910,6 @@ describe('pre-tool-guard.mjs: #2293 op item get の --reveal / --format=json', (
 
   it('存在確認（--vault のみ）は通す', () => {
     expect(runGuard(bash('op item get "human/supabase" --vault human'))).toBe('allow');
-  });
-});
-
-describe('pre-tool-guard.mjs: #2293 supabase branches get（08-11 incident 再現）', () => {
-  it('08-11 incident の実行形（--experimental branches get）は落ちる', () => {
-    expect(runGuard(bash('supabase --experimental branches get efqkuihquhzhuhnwvffk'))).toBe(
-      'block',
-    );
-  });
-
-  it('安全な代替（branches list）は通す', () => {
-    expect(runGuard(bash('supabase --experimental branches list'))).toBe('allow');
-  });
-});
-
-describe('pre-tool-guard.mjs: #2293 vercel --token / -t（07-22 incident 再現）', () => {
-  it('--token に値を伴う vercel 呼び出しは落ちる', () => {
-    expect(runGuard(bash('vercel ls --token abc123'))).toBe('block');
-  });
-
-  it('短縮形 -t でも落ちる', () => {
-    expect(runGuard(bash('vercel ls -t abc123'))).toBe('block');
-  });
-
-  it('等号結合形（--token=）でも落ちる', () => {
-    expect(runGuard(bash('vercel ls --token=abc123'))).toBe('block');
-  });
-
-  it('&& で連結した先でも落ちる（コマンド先頭以外の位置）', () => {
-    expect(runGuard(bash('echo hi && vercel ls --token abc123'))).toBe('block');
-  });
-
-  it('token を渡さない vercel 呼び出しは通す', () => {
-    expect(runGuard(bash('vercel ls'))).toBe('allow');
-  });
-
-  it('無関係なコマンドの -t flag は落とさない（vercel 呼び出しでない）', () => {
-    expect(runGuard(bash('tar -t -f archive.tar'))).toBe('allow');
-  });
-});
-
-describe('pre-tool-guard.mjs: vercel CLI は読み取り系だけを通す（2026-09-14 監査 P1-2）', () => {
-  const V = 'vercel';
-
-  it.each([
-    `${V} ls`,
-    `${V} list --scope dayopt`,
-    `${V} inspect https://x.vercel.app`,
-    `${V} inspect --logs https://x.vercel.app`,
-    `${V} logs https://x.vercel.app --json`,
-    `${V} whoami`,
-    `${V} --version`,
-    `${V} teams ls`,
-    `${V} project ls`,
-    `${V} env ls`,
-    `${V} env ls production`,
-    `${V} domains ls`,
-    `${V} api /v5/user/tokens`,
-    `${V} api /v9/projects/product -X GET`,
-    `npx ${V} ls`,
-    `pnpm exec ${V} env ls`,
-    `/opt/homebrew/bin/${V} whoami`,
-    `${V} ls | head -20`,
-    `${V} api /v5/user/tokens | jq .tokens`,
-  ])('読み取り系は通す: %s', (command) => {
-    expect(runGuard(bash(command))).toBe('allow');
-  });
-
-  it.each([
-    [`${V}`, '引数なしは deploy'],
-    [`${V} --prod`, 'flag だけでも deploy'],
-    [`${V} deploy --prod`, 'deploy'],
-    [`${V} promote https://x.vercel.app`, 'promote'],
-    [`${V} rollback`, 'rollback'],
-    [`${V} redeploy https://x.vercel.app`, 'redeploy'],
-    [`${V} env add SUPABASE_SECRET_KEY production`, 'env 追加'],
-    [`${V} env rm SUPABASE_SECRET_KEY production --yes`, 'env 削除'],
-    [`${V} env pull .env.local`, '実値を file へ引き出す'],
-    [`${V} pull --environment production`, '実値を file へ引き出す'],
-    [`${V} dev`, '実値を process へ引き出す'],
-    [`${V} domains rm dayopt.app`, 'domain 削除'],
-    [`${V} certs issue dayopt.app`, 'cert'],
-    [`${V} project rm product`, 'project 削除'],
-    [`${V} remove product --yes`, 'deployment 削除'],
-    [`${V} link --yes`, 'link'],
-    [`${V} api /v10/projects/product/env -X POST`, 'api の非 GET'],
-    [`${V} api /v9/projects/product --method=DELETE`, 'api の非 GET（= 形）'],
-    [`${V} api /v10/projects/product/env -d x`, 'api に body'],
-    [`${V} --scope dayopt env rm X production`, 'value flag を読み飛ばした後の書き込み'],
-  ])('書き込み系は落とす: %s（%s）', (command) => {
-    expect(runGuard(bash(command))).toBe('block');
-  });
-
-  it.each([
-    `npx --yes ${V} env rm X production`,
-    `pnpm dlx ${V} promote https://x.vercel.app`,
-    `env FOO=1 ${V} env rm X production`,
-    `FOO=1 ${V} deploy`,
-    `command ${V} rollback`,
-    `op run -- ${V} env add X production`,
-    `sh -c "${V} env rm X production"`,
-    `echo hi && ${V} domains rm dayopt.app`,
-    `true; ${V} deploy`,
-    `echo x | xargs ${V} env rm`,
-    `(${V} deploy)`,
-    `echo $(${V} env rm X production)`,
-    `bash -c '${V} promote https://x.vercel.app'`,
-    `true\n${V} deploy`,
-    `cd apps/product\n${V} env rm X production`,
-  ])('前置きや区切りを挟んでも書き込み系は落とす: %s', (command) => {
-    expect(runGuard(bash(command))).toBe('block');
-  });
-
-  it.each([
-    `rg ${V} docs/operations`,
-    `git log --oneline -- ${V}.json`,
-    `ls apps/product/${V}.json`,
-    `echo ${V} deploy`,
-    `rg -n "VERCEL|${V}" scripts/__tests__/check-1password.test.ts`,
-    `grep -E 'deploy|${V} env rm' docs/operations/secrets.md`,
-    `git commit -m "docs: ${V} env rm は User が行う"`,
-  ])('コマンド位置にない vercel の言及は落とさない: %s', (command) => {
-    expect(runGuard(bash(command))).toBe('allow');
   });
 });
 
@@ -1595,19 +1012,6 @@ describe('pre-tool-guard.mjs: #2293 Supabase Management API secret endpoint（08
     expect(
       runGuard(bash('/usr/bin/curl -s https://api.supabase.com/v1/projects/ref/config/auth')),
     ).toBe('block');
-  });
-});
-
-describe('pre-tool-guard.mjs: #2293 vercel invoke anchor の抜け穴修正（push前反証レビュー・merge前クロスレビュー）', () => {
-  it('op run -- の後ろに空白1つで置かれた vercel --token も落ちる', () => {
-    expect(runGuard(bash('op run -- vercel ls --token abc123'))).toBe('block');
-  });
-
-  // merge前クロスレビューで発見: 絶対パス起動（/opt/homebrew/bin/vercel 等）は
-  // 直前の文字が `/` で境界集合 [[:space:];&|] のどれにも一致せず素通りした。
-  // 境界集合に `/` を追加して修正した。
-  it('絶対パス起動（/opt/homebrew/bin/vercel）でも --token は落ちる', () => {
-    expect(runGuard(bash('/opt/homebrew/bin/vercel ls --token abc123'))).toBe('block');
   });
 });
 
@@ -1812,91 +1216,6 @@ describe('pre-tool-guard.mjs: migration の適用済み判定は origin/main 基
   });
 });
 
-// R1/R2: Agent の model 明示 + 探索への opus/fable 使用ガード（cost guard）。
-// security guard ではないため、jq parse エラー等は fail-open にする設計だが、
-// 通常の JSON 入力ではその分岐は踏まない。ここでは正規の判定ロジックを固定する。
-describe('pre-tool-guard.mjs: model choice does not grant or remove permissions', () => {
-  it.each(['', 'sonnet', 'opus', 'gpt-6-astra', 'gemini'])(
-    'allows delegation with model %s',
-    (model) => {
-      expect(runGuard(agentCall({ model, prompt: '調査' }))).toBe('allow');
-    },
-  );
-});
-
-describe('pre-tool-guard.mjs: R3 Read の範囲指定なし大規模ファイル読み込み', () => {
-  let fixtureRoot: string;
-  let bigFile: string;
-  let smallFile: string;
-  let pngFile: string;
-
-  beforeAll(() => {
-    fixtureRoot = mkdtempSync(join(tmpdir(), 'pre-tool-guard-read-'));
-    bigFile = join(fixtureRoot, 'big.ts');
-    smallFile = join(fixtureRoot, 'small.ts');
-    pngFile = join(fixtureRoot, 'image.png');
-    writeFileSync(bigFile, Array.from({ length: 700 }, (_, i) => `// line ${i}`).join('\n'));
-    writeFileSync(smallFile, Array.from({ length: 50 }, (_, i) => `// line ${i}`).join('\n'));
-    writeFileSync(pngFile, 'not a real png, contents irrelevant');
-  });
-
-  afterAll(() => {
-    rmSync(fixtureRoot, { recursive: true, force: true });
-  });
-
-  it('700 行のファイルを offset/limit なしで Read しようとすると block する', () => {
-    expect(runGuard(readTool(bigFile))).toBe('block');
-  });
-
-  it('limit を付ければ通す', () => {
-    expect(runGuard(readTool(bigFile, { limit: 100 }))).toBe('allow');
-  });
-
-  it('offset を付ければ通す', () => {
-    expect(runGuard(readTool(bigFile, { offset: 500 }))).toBe('allow');
-  });
-
-  it('50 行のファイルは範囲指定なしでも通す', () => {
-    expect(runGuard(readTool(smallFile))).toBe('allow');
-  });
-
-  it('.png のような非テキスト拡張子は行数に関わらず通す', () => {
-    expect(runGuard(readTool(pngFile))).toBe('allow');
-  });
-
-  it('存在しないパスは通す（fail-open）', () => {
-    expect(runGuard(readTool(join(fixtureRoot, 'does-not-exist.ts')))).toBe('allow');
-  });
-});
-
-// JS の \s は U+00A0（NBSP）等の Unicode 空白も区切りとして受理するが、bash の IFS は
-// ASCII 空白だけを単語区切りにする。許可名の直後に NBSP を置いた別ファイル名は shell では
-// 1 語のまま渡り、guard が「許可名 + 区切り」と誤認すると別ファイルが消費される
-// （Codex review P2、PR #2563。旧 bash 版の [[:space:]] は NBSP を含まなかった）。
-describe('pre-tool-guard.mjs: env-file 名の直後の非 ASCII 空白（NBSP）', () => {
-  let dir: string;
-
-  beforeAll(() => {
-    dir = mkdtempSync(join(tmpdir(), 'pre-tool-guard-nbsp-'));
-    writeFileSync(join(dir, '.op-env.agent'), 'A=op://agent/x/y\n');
-    writeFileSync(join(dir, '.op-env.agent\u00a0x'), 'B=op://human/x/y\n');
-  });
-
-  afterAll(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it('許可名 + NBSP + 別名 を許可形と誤認せず block する', () => {
-    expect(runGuard(bash('op run --env-file=.op-env.agent\u00a0x -- pnpm typecheck'), dir)).toBe(
-      'block',
-    );
-  });
-
-  it('許可名だけの通常形は引き続き通る', () => {
-    expect(runGuard(bash('op run --env-file=.op-env.agent -- pnpm typecheck'), dir)).toBe('allow');
-  });
-});
-
 // =====================================================================
 // merge の直接実行は block しない（2026-09-13、#2640）
 // =====================================================================
@@ -1928,7 +1247,7 @@ describe('pre-tool-guard.mjs: merge の直接実行は ruleset に任せる（#2
 // Claude Code は PreToolUse hook の **exit 2 だけ**を block と解釈し、それ以外の
 // 非 0（not found = 127 を含む）は non-blocking error として tool 実行を続行する。
 // settings.json に `node scripts/hooks/pre-tool-guard.mjs` と書いていた頃は hook の
-// 起動が `node` の PATH 解決に依存し、解決できない実行コンテキストでは 8 matcher が
+// 起動が `node` の PATH 解決に依存し、解決できない実行コンテキストでは全 matcher が
 // すべて無言で fail-open していた（実測: 旧 command は node 不在 PATH で exit 127）。
 //
 // launcher は shell 経由でも argv 直渡しでも動く必要がある（harness の実行
@@ -1990,15 +1309,17 @@ describe('pre-tool-guard.sh: launcher の fail-closed（#2565）', () => {
     expect(runLauncher(bash('git status'), opts).status).toBe(0);
   });
 
-  it('settings.json の 8 matcher すべてが launcher を指している', () => {
-    // node を直接指す形へ戻すと fail-open が復活する。8 箇所とも launcher であること
-    // を固定する（1 箇所だけ戻す差分をレビューで見落とさないため）。
+  it('settings.json の PreToolUse matcher すべてが launcher を指している', () => {
+    // node を直接指す形へ戻すと fail-open が復活する。全箇所が launcher であること
+    // を固定する（1 箇所だけ戻す差分をレビューで見落とさないため）。matcher は
+    // Write / Edit / MultiEdit / NotebookEdit / Bash / Read の 6 本（#3053 で
+    // no-op の Agent と撤去した spawn_task を外した）。
     const settings = JSON.parse(readFileSync(resolve(rootDir, '.claude/settings.json'), 'utf8'));
     const commands = settings.hooks.PreToolUse.flatMap((group: { hooks: { command: string }[] }) =>
       group.hooks.map((hook) => hook.command),
     );
 
-    expect(commands).toHaveLength(8);
+    expect(commands).toHaveLength(6);
     expect(new Set(commands)).toEqual(new Set(['scripts/hooks/pre-tool-guard.sh']));
   });
 });
