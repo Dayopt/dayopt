@@ -1173,7 +1173,7 @@ flip 忘れ・後日の戻しを検知する仕組みは **#1966** で `producti
 
 ### 関連ドキュメント
 
-- tRPC procedure 設計: `.agents/skills/trpc-router-creating/SKILL.md`（`trpc-router-creating` skill）
+- tRPC procedure 設計: [conventions.md](./conventions.md) §API層、[conventions-api.md](./conventions-api.md)
 - Supabase Branching 運用: `.agents/skills/supabase/SKILL.md`（`supabase` skill）
 - 問い合わせメール運用: `docs/operations/contact-email.md`
 

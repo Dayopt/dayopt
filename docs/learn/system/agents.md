@@ -173,20 +173,12 @@ flowchart LR
     "find": "name: error-handling"
   },
   {
-    "path": ".agents/skills/gardening/SKILL.md",
-    "find": "name: gardening"
-  },
-  {
     "path": ".agents/skills/i18n/SKILL.md",
     "find": "name: i18n"
   },
   {
     "path": ".agents/skills/mcp-usage/SKILL.md",
     "find": "name: mcp-usage"
-  },
-  {
-    "path": ".agents/skills/optimistic-update/SKILL.md",
-    "find": "name: optimistic-update"
   },
   {
     "path": ".agents/skills/pr-cross-review/SKILL.md",
@@ -213,10 +205,6 @@ flowchart LR
     "find": "name: skill-design"
   },
   {
-    "path": ".agents/skills/store-creating/SKILL.md",
-    "find": "name: store-creating"
-  },
-  {
     "path": ".agents/skills/storybook/SKILL.md",
     "find": "name: storybook"
   },
@@ -227,10 +215,6 @@ flowchart LR
   {
     "path": ".agents/skills/test/SKILL.md",
     "find": "name: test"
-  },
-  {
-    "path": ".agents/skills/trpc-router-creating/SKILL.md",
-    "find": "name: trpc-router-creating"
   },
   {
     "path": ".agents/skills/ui-audit/SKILL.md",

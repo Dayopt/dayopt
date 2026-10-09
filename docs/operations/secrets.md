@@ -625,7 +625,7 @@ op item get supabase --vault human --fields SUPABASE_SECRET_KEY
 4. **新 token の provider 側「Last used」表示が Never から更新されたことを Dashboard で確認してから**、旧 token を revoke する。**疎通確認の 200 は false positive になりうる**: 1Password への保存が実際には反映されていない状態でも、ローカルの env 解決が古い値のまま残っていれば旧 token で 200 が返る。「疎通 200」だけを新 token 動作の証拠にしない — Last used の更新だけが新 token が実際に使われたことの証明になる（2026-08-17、Supabase `cli` token ローテーションで実際に発生: 疎通 200 ×2 が旧値で通り、旧 revoke 後に 401 が顕在化した。詳細は [#2086 の 2026-08-17 コメント](https://github.com/Dayopt/dayopt/issues/2086#issuecomment-5311036784)）
 5. 旧 token を revoke する（4 の Last used 確認が終わるまで revoke しない — 旧 token が生きている間に新 token の動作確認を済ませる）
 
-**期限管理**: 現状 1Password / 発行元サービスのいずれにも自動リマインダー機構は無い。次回ローテーション（または期限切れによる動作確認）は月次ガーデニングの棚卸し対象に含め、期限が近い token を検出したらこの手順で再発行する。
+**期限管理**: 現状 1Password / 発行元サービスのいずれにも自動リマインダー機構は無い。次回ローテーション（または期限切れによる動作確認）は item の `expires` を見て、期限が近い token を検出したらこの手順で再発行する。
 
 初事例は Supabase legacy `cli` token（Never expire・full access、[#2112](https://github.com/Dayopt/dayopt/issues/2112)）。当初裁可時点では消費者（cloud supabase MCP の `--read-only` 起動、`scripts/runbook/enable-auth-hook.sh` の Auth config write）のうち後者が write を要求するため read-only scoped token への完全置換はできないと判断していたが、作業中に scoped project token UI を発見し、**scoped token（`dayopt-cli-2026-08b`、90 日期限、Auth Config Write / Advisors・Logs Read / Database・Migrations Read の個別 permission）への切替**へ変更した。`dayopt-auth-config-audit`（[#1951](https://github.com/Dayopt/dayopt/issues/1951)）も次回 rotation 時に scoped + expiry へ寄せる選択肢がある。
 

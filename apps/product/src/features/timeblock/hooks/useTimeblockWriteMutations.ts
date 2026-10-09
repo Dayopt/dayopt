@@ -548,7 +548,7 @@ export interface TimeblockOverlapUpdateInput {
 /**
  * Plan / Record の書き込み mutation 群。
  *
- * optimistic-update skill に従い、create は temp 行 insert、update は該当行 patch、
+ * 楽観的更新（conventions-frontend.md §楽観的更新）に従い、create は temp 行 insert、update は該当行 patch、
  * delete は行除去を onMutate で行い、onError で snapshot rollback、onSettled で再検証する。
  */
 export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOptions = {}) {

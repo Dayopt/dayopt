@@ -173,8 +173,7 @@ pnpm security:check
 ## 関連する検査経路
 
 - **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@claude review` と裁定
-- **`gardening` skill §5** — 月次の sweep（Supabase の security advisors + `pnpm security:check`）。所見は issue へ、既往は `docs/engineering/threat-model.md` へ戻る
-- **オンデマンド sweep** — 月次以外に「repository 全体 / この境界を sweep して」と明示依頼された時の手順（下記）。provider を問わず同じ順序で回す
+- **オンデマンド sweep** — 「repository 全体 / この境界を sweep して」と明示依頼された時の手順（下記）。定期の sweep は持たない（2026-10-09）。provider を問わず同じ順序で回す
 - **`/claude-security`** — 既存コードの深掘りスキャン。上の手順の **任意の加速器**で、無くても完走する（Claude 以外の runtime では使えない）
 
 ### オンデマンド sweep の手順（provider 非依存）
@@ -189,5 +188,4 @@ pnpm security:check
 
 ## 関連スキル
 
-- `/trpc-router-creating` - 認証付きエンドポイント作成
 - `/test` - セキュリティテストの作成

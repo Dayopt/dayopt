@@ -395,7 +395,7 @@ export function hasInternalReviewMarker(comments) {
  *
  * 無駄の構造は「レビューの有効性を HEAD で判定していた」ことにあり、その症状は
  * 「投げた回数のわりに指摘が出ない」という形で現れる（PR #2554 実測: 投稿 8 /
- * 応答 7 / 問題なし 6）。月次 gardening でこの 3 数字を読めるようにする。
+ * 応答 7 / 問題なし 6）。月次の振り返りでこの 3 数字を読めるようにする。
  */
 export function countReviewRequestCycles(comments) {
   let requests = 0;
@@ -682,7 +682,7 @@ export function buildInternalReviewSection({
         findingsSource,
         totalFindings,
         // 推定が混ざったかを表示側が区別できるようにする（marker 由来の実数だけを
-        // 見たい月次 gardening 用。#2560 項目 4）。
+        // 見たい月次の振り返り用。#2560 項目 4）。
         totalFindingsEstimated: markersMissingField > 0,
         commitsAfterMarker,
       };
@@ -710,7 +710,7 @@ export function computeZeroFindingRoleNotes(internalReview, merged) {
     )
     .map(
       (r) =>
-        `${r.role}: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする（gardening 手順 4）`,
+        `${r.role}: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする`,
     );
 }
 

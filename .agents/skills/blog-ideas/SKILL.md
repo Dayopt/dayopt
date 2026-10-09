@@ -14,7 +14,6 @@ user_invocable: true
 
 - `/blog-ideas` で手動実行する時
 - リリース後にブログ候補を洗い出したい時（`docs/business/content/content-operations.md` のリリース駆動フロー）
-- 月次ガーデニングでコンテンツバックログを補充する時
 - ネタの重複確認だけを依頼された時
 
 ## When NOT to Use

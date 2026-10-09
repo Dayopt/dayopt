@@ -36,7 +36,7 @@ Dayoptでの Supabase 運用パターンを支援するスキル。
 
 ## When NOT to Use
 
-- アプリケーション層のみの変更(tRPC router 内部ロジック、`trpc-router-creating` skill の領域、DB 未変更)
+- アプリケーション層のみの変更(tRPC router 内部ロジック、[conventions.md](../../../docs/engineering/conventions.md) §API層、DB 未変更)
 - 認証フローのみの変更で DB schema が変わらない時(`security` skill の領域)
 - 型生成結果(`apps/product/src/lib/database/generated/database.types.ts`)のみの更新(`types:generate` 後の自動反映)
 
@@ -346,7 +346,7 @@ export function useEntityRealtime(onUpdate: () => void) {
 
 ### 楽観的更新との競合防止
 
-詳細は `/optimistic-update` skill を参照。
+詳細は [conventions-frontend.md](../../../docs/engineering/conventions-frontend.md) §楽観的更新 を参照。
 
 ## Edge Functions
 
@@ -502,6 +502,4 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 
 ## 関連スキル
 
-- `/optimistic-update` - Realtime 競合対策
 - `/security` - 認証/認可パターン
-- `/trpc-router-creating` - Service 層での Supabase 使用

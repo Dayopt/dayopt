@@ -58,4 +58,4 @@ maxTurns: 15
 
 - `ui-audit` - 操作性・アクセシビリティの監査
 - `diagnosing-bugs` - 原因不明の regression の切り分け
-- `trpc-router-creating` - service 層の構造
+- [conventions.md](../../../docs/engineering/conventions.md) §API層 - service 層の構造

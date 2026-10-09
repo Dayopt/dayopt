@@ -40,7 +40,7 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 
 - 依存は `features/ → lib/` の一方向。feature 間は barrel 経由。新規 API は feature-colocated な tRPC（Router → Service → Supabase）、REST は既存 allowlist のみ。
 - 新規ビジネスロジックは TS service 層。既存 PL/pgSQL は bug fix のみ。UI は `@dayopt/components` と semantic token を使い、未登録パターンは先に Story を追加する。
-- ユーザー操作 mutation は不可逆操作以外、楽観的更新を実装する。zod は product が v3、web が v4。詳細は技術規約と該当 skill に従う。
+- ユーザー操作 mutation は不可逆操作以外、楽観的更新を実装する。zod は product が v3、web が v4。詳細は技術規約に従う。
 
 ## 実装 Plan
 
@@ -85,32 +85,28 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 
 `.agents/skills/*/SKILL.md` が正本。`.claude/skills` は相対 symlink、CLAUDE.md は共通指示の互換入口。該当する作業の skill だけ読む。
 
-| skill                  | 使う場面                       |
-| ---------------------- | ------------------------------ |
-| `routing`              | 作業方針・委譲の判断           |
-| `dispatch`             | Issue 起票・担当への引き渡し   |
-| `mcp-usage`            | 外部ツールの利用               |
-| `skill-design`         | skill の作成・整理             |
-| `supabase`             | migration・RLS・DB             |
-| `trpc-router-creating` | router / service 新設          |
-| `store-creating`       | Zustand 新設                   |
-| `storybook`            | Story・token 選択              |
-| `i18n`                 | UI 文言・翻訳                  |
-| `error-handling`       | エラー処理                     |
-| `optimistic-update`    | 楽観的更新                     |
-| `security`             | 認証・認可・外部入力           |
-| `test`                 | 挙動変更の検証                 |
-| `diagnosing-bugs`      | 原因未特定の不具合             |
-| `react-performance`    | 性能調査                       |
-| `ui-audit`             | UI 監査の明示依頼              |
-| `pr-cross-review`      | 保護対象 PR の独立レビュー     |
-| `docs-writing`         | docs 執筆                      |
-| `docs-audit`           | 公開 docs の監査               |
-| `releasing`            | release の明示依頼             |
-| `gardening`            | 月次改善の明示依頼             |
-| `audit-ai-config`      | AI 設定整理の明示依頼          |
-| `blog-ideas`           | ブログ提案・起票の明示依頼     |
-| `decision`             | 判断の明示確定・変更・記録依頼 |
+| skill               | 使う場面                       |
+| ------------------- | ------------------------------ |
+| `routing`           | 作業方針・委譲の判断           |
+| `dispatch`          | Issue 起票・担当への引き渡し   |
+| `mcp-usage`         | 外部ツールの利用               |
+| `skill-design`      | skill の作成・整理             |
+| `supabase`          | migration・RLS・DB             |
+| `storybook`         | Story・token 選択              |
+| `i18n`              | UI 文言・翻訳                  |
+| `error-handling`    | エラー処理                     |
+| `security`          | 認証・認可・外部入力           |
+| `test`              | 挙動変更の検証                 |
+| `diagnosing-bugs`   | 原因未特定の不具合             |
+| `react-performance` | 性能調査                       |
+| `ui-audit`          | UI 監査の明示依頼              |
+| `pr-cross-review`   | 保護対象 PR の独立レビュー     |
+| `docs-writing`      | docs 執筆                      |
+| `docs-audit`        | 公開 docs の監査               |
+| `releasing`         | release の明示依頼             |
+| `audit-ai-config`   | AI 設定整理の明示依頼          |
+| `blog-ideas`        | ブログ提案・起票の明示依頼     |
+| `decision`          | 判断の明示確定・変更・記録依頼 |
 
 ## Deploy / Release
 
