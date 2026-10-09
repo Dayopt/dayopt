@@ -1,7 +1,7 @@
 ---
 title: 'Security'
-description: 'Dayopt implements the highest standards of security to protect your information.'
-lastUpdated: 'Last Updated: September 14, 2026'
+description: 'Security practices and vulnerability reporting for Dayopt'
+lastUpdated: 'Review draft: 2026-09-17'
 ---
 
 <SecurityDocument
@@ -12,21 +12,25 @@ lastUpdated: 'Last Updated: September 14, 2026'
         title: 'Supported Versions',
         version: 'Version',
         status: 'Status',
-        v1: '1.x.x',
-        v1Status: '✅ Security updates provided',
-        v0: '< 1.0',
-        v0Status: '❌ No longer supported',
+        v1: 'Currently hosted Dayopt service',
+        v1Status: 'Maintained and updated',
+        v0: 'Archived releases or self-hosted copies',
+        v0Status: 'No separate support commitment',
       },
       measures: {
         title: 'Security Measures Implemented',
-        transportEncryption: 'HTTPS Enforcement: All communications encrypted with TLS 1.3',
+        transportEncryption:
+          'HTTPS/TLS protects connections in transit; supported protocol versions depend on the endpoint.',
         mfa: 'Multi-Factor Authentication (MFA): TOTP (Time-based One-Time Password) support',
         rateLimit: 'Rate Limiting: Brute force attack prevention',
-        sqlInjection: 'SQL Injection Protection: Prisma ORM + parameterized queries',
+        sqlInjection:
+          'Database access through Supabase/Postgres, parameterized operations and row-level access policies.',
         xss: 'XSS Protection: React automatic escaping + Content Security Policy',
-        csrf: 'CSRF Protection: SameSite Cookie + token verification',
-        dependencies: 'Dependency Management: Weekly checks with Dependabot',
-        monitoring: 'Error Monitoring: Real-time monitoring with Sentry',
+        csrf: 'Request-origin checks, session cookie controls and authorization checks on protected operations.',
+        dependencies:
+          'Automated dependency checks and code review; this is not a claim of independent security certification.',
+        monitoring:
+          'Filtered production server and edge error monitoring; browser telemetry only with analytics consent. Session Replay is disabled.',
       },
     },
     vulnerability: {
@@ -51,35 +55,22 @@ lastUpdated: 'Last Updated: September 14, 2026'
         fix: 'Recommended fix (optional)',
       },
       timeline: {
-        title: 'Response Timeline',
-        severity: 'Severity',
-        initialResponse: 'Initial Response',
-        fixRelease: 'Fix Release',
-        critical: 'Critical',
-        criticalResponse: 'Within 24 hours',
-        criticalFix: 'Within 48 hours',
-        high: 'High',
-        highResponse: 'Within 48 hours',
-        highFix: 'Within 1 week',
-        medium: 'Medium',
-        mediumResponse: 'Within 1 week',
-        mediumFix: 'Within 2 weeks',
-        low: 'Low',
-        lowResponse: 'Within 2 weeks',
-        lowFix: 'Next release',
+        title: 'Handling reports',
+        content:
+          'We assess reports by impact and work to contain and fix confirmed issues. Response and repair times depend on severity and available information; we do not guarantee fixed deadlines. [HUMAN-06: confirm monitoring of security@dayopt.app and the incident owner before publication.]',
       },
     },
     disclosure: {
       title: 'Responsible Disclosure',
       safeHarbor: {
-        title: 'Safe Harbor',
+        title: 'Coordinated security research',
         description:
-          'We will not take legal action against security research activities conducted in accordance with these guidelines.',
+          'Contact security@dayopt.app before testing and agree on the scope. Use only accounts and data you control; stop and report if you encounter another person’s information. This page does not authorize unrestricted testing or promise immunity from applicable law.',
         allowed: {
-          title: '✅ Allowed Activities',
-          ownAccount: '• Testing using your own account',
-          research: '• Investigating and reporting vulnerabilities',
-          poc: '• Creating proof of concept code',
+          title: 'Within an agreed scope',
+          ownAccount: 'Testing with your own accounts and data',
+          research: 'Privately reporting reproducible findings',
+          poc: 'Minimal proof of concept without service disruption',
         },
         prohibited: {
           title: '❌ Prohibited Activities',

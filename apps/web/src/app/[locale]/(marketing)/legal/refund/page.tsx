@@ -34,7 +34,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
   const { locale = 'en' } = await params;
   const t = await getTranslations({ locale });
 
-  const lastUpdated = '2026-03-17';
+  const lastUpdated = t('legal.refund.lastUpdated');
 
   return (
     <div className="bg-background container mx-auto min-h-screen max-w-4xl px-4 py-12 md:px-8 md:py-16">

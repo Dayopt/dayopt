@@ -1,7 +1,7 @@
 ---
 status: current
 issue: 2875
-last_verified: 2026-09-24
+last_verified: 2026-10-04
 code:
   - packages/observability/src/posthog-browser.ts
   - apps/product/src/lib/analytics/posthog-server.ts
@@ -23,9 +23,10 @@ Dayopt の Web 流入、登録、初回利用、初回支払いを、分析に�
 - PostHog US Cloud、`Dayopt Analytics`（project ID `625917`）。Web と Product は同じプロジェクトで、`surface` と `environment` を全イベントに付ける。ブラウザ送信には `$geoip_disable=true` を付け、IP から市区町村・座標等を付与させない（PostHog の「Discard client IP」だけでは GeoIP enrichment を止められないことを Preview の初回イベントで確認）。
 - 無料枠は Product Analytics 月 100 万イベント。支払い方法を登録せず、PostHog の Usage で当月のイベント数を確認する。増え方を確認してから送信範囲を広げる。Session Replay、ヒートマップ、自動クリック、Web Vitals、例外自動取得、feature flags は使わない。
 - `NEXT_PUBLIC_POSTHOG_PROJECT_KEY` は PostHog の公開 project key。`NEXT_PUBLIC_POSTHOG_BROWSER_ENABLED=true` と `POSTHOG_SERVER_ENABLED=true` は独立した送信スイッチ。未設定なら送信しない。Preview と Production の設定・承認を分ける。
+- Product server events は Dayopt environment を明示解決し、`integration` / `unknown` では送らない。送信時の `environment` 値は `production` / `preview` / `development` に限る。
 - 有効な計測を停止した後も既存データを削除できるよう、Project 625917 に限定した `person:write` Personal API key を `POSTHOG_PERSONAL_API_KEY` として Product の server runtime に保持する。キーが無い時に計測が有効なら削除要求を失敗させ、PostHog の削除が抜けたまま Dayopt の削除を完了しない。PostHog の scope は Person 更新と削除の両方を許す。
 - PostHog の Web analytics domains には `dayopt.app`、`app.dayopt.app` と、PR #2896 の Web / Product Preview の具体的な Vercel ドメインを登録済み（2026-09-24）。ワイルドカードは使わない。SDK は米国の `https://us.i.posthog.com` を使う。別の Preview URL で検証する場合は、そのドメインを個別に登録する。
-- PR #2896 の Vercel Preview ブランチには両サイトの公開 project key とブラウザ送信スイッチ、Product にはサーバー送信スイッチを設定済み。Web の `NEXT_PUBLIC_PRODUCT_ORIGIN` は対応する Product Preview を指す。本番環境にはこれらの送信スイッチを設定していない。環境変数の変更は既存デプロイに反映されないため、Preview を再デプロイしてから検証する。
+- 2026-09-24 の read-only 確認では、PR #2896 の Vercel Preview に両サイトの公開 project key とブラウザ送信スイッチ、Product にサーバー送信スイッチが設定され、Web の `NEXT_PUBLIC_PRODUCT_ORIGIN` は対応する Product Preview を指していた。同日の確認では本番にこれらの送信スイッチは無かった。2026-10-04 の再照合ではVercel環境変数を読み直していないため、現在値として扱わず、送信設定の変更・報告前に再確認する。環境変数の変更は既存デプロイに反映されないため、Preview を再デプロイしてから検証する。
 
 ## 同意と識別
 
@@ -128,7 +129,7 @@ LEFT JOIN first_paid AS p ON p.distinct_id = s.distinct_id
 
 ## 保持・削除・エクスポート
 
-PostHog Cloud の Free plan は、公式の[イベント保持規則](https://posthog.com/docs/data/events-retention)で events table の保持期間が **1 年**とされる。保持期間は削除手段ではなく、短縮もできない。Data Warehouse に別途取り込んだ表にはこの規則を適用できないため、この導入では取り込みをしない。本番送信前に管理画面の plan と法務文面を再照合する。
+PostHog の[Events API reference](https://posthog.com/docs/api/events-retention)では、プロジェクトの参照可能な event window は組織プラン由来の読み取り専用値とされている。現行公開資料から「Free plan は 1 年」という一般値を確認できないため、固定期間を契約事実や法務文面に転記しない。project 625917 の契約プランと現在の `retention_months` / `retained_from` は、PostHog 管理権限を持つ担当が確認して記録する。参照可能期間は削除手段でも削除期限でもない。Data Warehouse に別途取り込んだ表にはこの設定を適用できないため、この導入では取り込みをしない。
 
 アカウント削除では、既存の account-deletion coordinator が Supabase user UUID を `distinct_id` に指定して `POST /api/projects/625917/persons/bulk_delete/` に `delete_events: true` を送る。PostHog は person / event の削除を非同期でキューに入れる。Dayopt は PostHog が要求を受理してから identity 削除へ進み、API の拒否・timeout・未設定キーでは fail closed となる。匿名 Web 履歴は identify により当該 person へ統合された範囲が削除対象となる。削除依頼後は PostHog の deletion status で完了を確認する。削除 API は `person:write` が必要なため、MCP 読み取り用 key と分離する。集計データが必要な時は PostHog SQL editor で環境と期間を限定したクエリを実行し、結果メニューの `.csv` または `.xlsx` からエクスポートする。保管先と削除期限を記録する。
 
@@ -139,7 +140,7 @@ PostHog Cloud の Free plan は、公式の[イベント保持規則](https://po
 3. MCP の OAuth 権限と利用可能なツールを確認し、読み取りに必要な範囲だけで AI クエリを実行する。結果・SQL・母数を照合する。
 4. 本番送信は法務文面、人間のプライバシー確認、独立レビュー、送信 payload と削除手順の実測が終わってから別途承認する。
 
-法務レビューでは、Web の日英 Privacy / Cookies に **PostHog が新しい受領者であること**、ブラウザとアカウントの同意が独立すること、送信する識別子・イベント区分、US Cloud、Free plan の 1 年保持、本人からの削除依頼時の非同期削除を反映する。現行の法的原稿は [#2833](https://github.com/Dayopt/dayopt/pull/2833) で人間レビュー待ちのため、#2875 の計測を本番で有効化する前にその正本との整合と既存の新規サブプロセッサー通知条項を判断する。原稿への追記だけで法務承認や通知済みとは扱わない。
+法務レビューでは、Web の日英 Privacy / Cookies に **PostHog が新しい受領者であること**、ブラウザとアカウントの同意が独立すること、送信する識別子・イベント区分、US Cloud、実プロジェクトのプラン由来 query window、本人からの削除依頼時の非同期削除を反映する。現行の法的原稿は [#2833](https://github.com/Dayopt/dayopt/pull/2833) で人間レビュー待ちのため、#2875 の計測を本番で有効化する前にその正本との整合と既存の新規サブプロセッサー通知条項を判断する。原稿への追記だけで法務承認や通知済みとは扱わない。契約プラン・実プロジェクトの保持値は本番から再取得していない。
 
 2026-09-24 に project `625917` 限定の読み取り専用キーを発行し、1Password の `agent` vault に保存した。MCP の通常接続で `Query: Read`、`User: Read`、`Insight: Read` が必要だった。削除用 `person:write` credential は別に管理し、AI の MCP 接続へ渡さない。
 

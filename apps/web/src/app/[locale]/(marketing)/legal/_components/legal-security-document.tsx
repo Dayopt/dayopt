@@ -123,33 +123,7 @@ export function SecurityDocument({ data }: { data: LegalContentTree }) {
           </ul>
 
           <h3 className="mt-6 text-lg font-medium">{readLegalText(timeline, 'title')}</h3>
-          <table className="border-border w-full border">
-            <thead className="bg-container">
-              <tr>
-                {['severity', 'initialResponse', 'fixRelease'].map((key) => (
-                  <th key={key} className="border-border border p-4 text-left">
-                    {readLegalText(timeline, key)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(
-                [
-                  ['critical', 'criticalResponse', 'criticalFix'],
-                  ['high', 'highResponse', 'highFix'],
-                  ['medium', 'mediumResponse', 'mediumFix'],
-                  ['low', 'lowResponse', 'lowFix'],
-                ] as const
-              ).map(([severity, response, fix]) => (
-                <tr key={severity}>
-                  <SecurityTableCell>{readLegalText(timeline, severity)}</SecurityTableCell>
-                  <SecurityTableCell>{readLegalText(timeline, response)}</SecurityTableCell>
-                  <SecurityTableCell>{readLegalText(timeline, fix)}</SecurityTableCell>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <p>{readLegalText(timeline, 'content')}</p>
         </div>
       </section>
 
