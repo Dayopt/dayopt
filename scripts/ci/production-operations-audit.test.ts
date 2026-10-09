@@ -41,16 +41,24 @@ describe('production cron heartbeat evidence', () => {
       'calendar-sync: last completion exceeds 45 minutes or is invalid',
     ]);
   });
-  it('fails when a declared inactive job actually completed recently', () => {
-    expect(evaluateHeartbeats(fresh(), now)).toEqual([
-      'billing-reconciliation: declared inactive but completed within 1560 minutes',
-    ]);
-    const old = fresh().map((row) =>
-      row.job_name === 'billing-reconciliation'
-        ? { ...row, last_completed_at: new Date(now - 1561 * 60_000).toISOString() }
-        : row,
-    );
-    expect(evaluateHeartbeats(old, now)).toEqual([]);
+  it('fails when a declared inactive job actually ran recently', () => {
+    const billing = (patch: Record<string, string | null>) =>
+      fresh().map((row) =>
+        row.job_name === 'billing-reconciliation' ? { ...row, ...patch } : row,
+      );
+    const old = new Date(now - 1561 * 60_000).toISOString();
+    const recent = new Date(now - 60_000).toISOString();
+    const mismatch = ['billing-reconciliation: declared inactive but ran within 1560 minutes'];
+
+    expect(evaluateHeartbeats(fresh(), now)).toEqual(mismatch);
+    // 照合が始まったが失敗し続ける（完了なし）も、宣言と実態のずれとして落とす。
+    expect(evaluateHeartbeats(billing({ last_completed_at: null }), now)).toEqual(mismatch);
+    expect(
+      evaluateHeartbeats(billing({ last_completed_at: old, last_started_at: recent }), now),
+    ).toEqual(mismatch);
+    expect(
+      evaluateHeartbeats(billing({ last_completed_at: old, last_started_at: old }), now),
+    ).toEqual([]);
   });
   it('fails on an unknown expected mode instead of treating it as inactive', () => {
     expect(

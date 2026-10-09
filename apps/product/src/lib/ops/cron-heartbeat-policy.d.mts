@@ -24,6 +24,7 @@ export function listInactiveJobs(
 
 export interface CronHeartbeatStatusRow {
   job_name: string;
+  last_started_at?: string | null;
   last_completed_at: string | null;
 }
 

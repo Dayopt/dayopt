@@ -32,9 +32,20 @@ export function listInactiveJobs(modes = EXPECTED_JOB_MODES) {
   );
 }
 
+function isRecent(timestamp, now, maxAge) {
+  const at = Date.parse(timestamp ?? '');
+  return Number.isFinite(at) && at <= now + 60_000 && now - at <= maxAge * 60_000;
+}
+
+function isOlderThan(timestamp, now, maxAge) {
+  const at = Date.parse(timestamp ?? '');
+  return Number.isFinite(at) && now - at > maxAge * 60_000;
+}
+
 /**
- * Enabled jobs need exactly one recent completion. Inactive jobs must not have one:
- * a recent completion means the job really runs and the declaration is stale.
+ * Enabled jobs need exactly one recent completion. An inactive job passes only without a row
+ * or with a row whose start and completion are both stale: any newer run, including a failed
+ * one that never completed, means the job really runs and the declaration is stale.
  */
 export function evaluateHeartbeats(rows, now = Date.now(), modes = EXPECTED_JOB_MODES) {
   const failures = [];
@@ -50,14 +61,17 @@ export function evaluateHeartbeats(rows, now = Date.now(), modes = EXPECTED_JOB_
       continue;
     }
     if (matches.length === 0) continue;
-    const completed = Date.parse(matches[0].last_completed_at ?? '');
-    const recent =
-      Number.isFinite(completed) && completed <= now + 60_000 && now - completed <= maxAge * 60_000;
-    if (mode === 'enabled' && !recent) {
+    const row = matches[0];
+    if (mode === 'enabled' && !isRecent(row.last_completed_at, now, maxAge)) {
       failures.push(`${name}: last completion exceeds ${maxAge} minutes or is invalid`);
     }
-    if (mode === 'inactive' && recent) {
-      failures.push(`${name}: declared inactive but completed within ${maxAge} minutes`);
+    const startedIsStale =
+      row.last_started_at === undefined || isOlderThan(row.last_started_at, now, maxAge);
+    if (
+      mode === 'inactive' &&
+      !(isOlderThan(row.last_completed_at, now, maxAge) && startedIsStale)
+    ) {
+      failures.push(`${name}: declared inactive but ran within ${maxAge} minutes`);
     }
   }
   return failures;
