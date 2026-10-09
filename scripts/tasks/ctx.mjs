@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,7 +7,6 @@ import { resolveProtectedPathGate } from '../ci/protected-path-gate.mjs';
 import { resolveFactoryRoute } from '../lib/factory-routing.mjs';
 import { REPO, runGh, runGhJson } from '../lib/gh.mjs';
 import { isDirectExecution } from '../lib/is-direct-execution.mjs';
-import { buildContextInput } from '../lib/jev-assist-context.mjs';
 
 /**
  * Codex GitHub 連携 bot の login。GraphQL の `author.login` は
@@ -24,15 +22,13 @@ function isCodexBotLogin(login) {
 }
 
 /**
- * `pnpm ctx <N>` — L0 の機械収集に、同一入力snapshotを確認したBriefのJev L1助言を添える。
- * 通常の読み取りはJev APIを呼ばず、信頼済みBriefから一致するL1だけを再利用する。
- * `--post` はdispatch用にJev L1を生成してBriefへ配達する。
- * `--l1-shadow` は明示的なローカルpreview用。`--reuse-brief-l1` は通常読取の意図を明示する。
+ * `pnpm ctx <N>` — L0 の機械収集（Issue / PR 本文、関連、CI、判断の記録）をまとめた Brief を出す。
+ * `--post` は Brief を Issue / PR コメントへ配達する（idempotent）。`--reuse-brief-l1` は旧 L1 助言の
+ * 互換 flag で、指定しても挙動は変わらない。
  *
  * Uber 原則⑤「AI が考える前に機械的に集められる文脈はここで終える」の Dayopt 写像。
  * AI セッションが issue / PR に着手する前に行う `gh issue view` / `gh pr list` /
- * `rg` / `Read` の 5〜10 手番を、L0の機械収集とBrief内L1の出典付き候補にまとめる。
- * Jev assistはdispatch時の `--post` か明示的な `--l1-shadow` previewでだけ実行する。
+ * `rg` / `Read` の 5〜10 手番を、L0 の機械収集にまとめる。
  * 出力は 150 行以内の markdown、判断そのものはしない（判断材料の収集で止める）。
  *
  * 呼び出し予算: issue は最大 7 回、PR は最大 9 回の gh 呼び出しに収める
@@ -51,7 +47,6 @@ const [REPO_OWNER, REPO_NAME] = REPO.split('/');
  * ファイル先頭で定義する（元は --post セクションにあったが、独立性ガード（F2）で
  * 上流の selectComments からも参照するようになった）。 */
 export const CTX_MARKER = '<!-- ctx-brief -->';
-const CTX_L1_MARKER_PREFIX = '<!-- ctx-l1-v1:';
 
 // F2（独立性ガード）: Main 自身が書いた marker / brief コメントが reviewer への
 // ctx pack へ紛れ込むと、Main の判断が「独立レビュー」を経由せず reviewer の入力へ
@@ -118,483 +113,6 @@ export function computeContextSnapshotId(sourceMaterial) {
     .digest('hex');
 }
 
-const BRIEF_L1_CATEGORIES = new Set([
-  'decision',
-  'constraint',
-  'open_question',
-  'verification_result',
-  'status_only',
-]);
-const BRIEF_L1_FAILURES = new Set([
-  'auth_failed',
-  'balance_below_floor',
-  'balance_unknown',
-  'budget_exceeded',
-  'customer_verification_required',
-  'deferred_after_failure',
-  'deferred_after_live',
-  'disabled',
-  'free_tier_restricted',
-  'insufficient_credits',
-  'input_too_large',
-  'invalid_response',
-  'invalid_request',
-  'missing_credentials',
-  'not_cached',
-  'provider_error',
-  'rate_limited',
-  'timeout',
-  'budget_unavailable',
-  'budget_below_floor',
-  'cooldown',
-  'rate_locked',
-  'rate_state_invalid',
-  'rate_state_unreadable',
-  'rate_state_unwritable',
-  'budget_exhausted',
-  'low_confidence',
-  'cache_invalid',
-  'incomplete',
-]);
-
-function isCanonicalBriefSourceUrl(value) {
-  try {
-    const url = new URL(value);
-    return (
-      url.origin === 'https://github.com' &&
-      !url.username &&
-      !url.password &&
-      url.pathname.startsWith('/Dayopt/dayopt/')
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Makes a bounded L1 annotation view from an already available report. An adoption record, complete
- * evaluation, sufficient confidence, and an L0 source reference are all required. Model-authored
- * prose, URLs, SHAs, and verification claims are intentionally discarded.
- * @param {{packId: string, adoptedPackIds?: string[], complete?: boolean, failure?: string,
- * rows?: Array<{id: string, relevance: number, category: string, evaluatedAt: string, confidence: number}>,
- * sources?: Array<{id: string, url: string}>, minimumConfidence?: number}} input
- */
-export function buildBriefAnnotations({
-  packId,
-  adoptedPackIds = [],
-  complete = false,
-  failure = 'incomplete',
-  rows = [],
-  sources = [],
-  minimumConfidence = 0.7,
-}) {
-  if (!adoptedPackIds.includes(packId)) return { status: 'not_adopted', rows: [] };
-  if (!complete || !Array.isArray(rows) || !Array.isArray(sources)) {
-    const reason = BRIEF_L1_FAILURES.has(failure) ? failure : 'incomplete';
-    return { status: 'unevaluated', reason, rows: [] };
-  }
-
-  const sourceById = new Map(sources.map((source) => [source.id, source]));
-  const normalized = [];
-  for (const row of rows) {
-    const confidence = row?.confidence;
-    if (
-      typeof confidence !== 'number' ||
-      !Number.isFinite(confidence) ||
-      confidence < minimumConfidence ||
-      confidence > 1
-    )
-      return { status: 'unevaluated', reason: 'low_confidence', rows: [] };
-    const source = sourceById.get(row?.id);
-    if (
-      !source ||
-      typeof source.url !== 'string' ||
-      !isCanonicalBriefSourceUrl(source.url) ||
-      !Number.isFinite(row?.relevance) ||
-      row.relevance < 0 ||
-      row.relevance > 1 ||
-      !BRIEF_L1_CATEGORIES.has(row?.category) ||
-      typeof row?.evaluatedAt !== 'string' ||
-      !Number.isFinite(Date.parse(row.evaluatedAt))
-    )
-      return { status: 'unevaluated', reason: 'incomplete', rows: [] };
-    normalized.push({
-      sourceId: row.id,
-      url: source.url,
-      category: row.category,
-      relevance: row.relevance,
-      evaluatedAt: row.evaluatedAt,
-    });
-  }
-  return { status: 'adopted', rows: normalized };
-}
-
-const L1_CATEGORY_LABELS = {
-  constraint: '制約',
-  decision: '決定',
-  open_question: '未解決の問い',
-  verification_result: '検証結果',
-  status_only: '進捗',
-};
-const L1_CATEGORY_WEIGHT = {
-  constraint: 4,
-  decision: 3,
-  open_question: 2,
-  verification_result: 1,
-  status_only: 0,
-};
-
-/**
- * Creates non-authoritative L1 advice after confirming the Jev report used the exact context
- * input collected for this L0 run. The result is included in explicit previews and --post briefs.
- */
-export function buildL1ShadowPreview(report, expectedInput) {
-  if (
-    report?.packId !== 'context-relevance' ||
-    report?.mode !== 'shadow' ||
-    report?.target?.number !== expectedInput?.number ||
-    report?.target?.sha !== expectedInput?.sha ||
-    report?.target?.url !== expectedInput?.url ||
-    !report?.input ||
-    computeContextSnapshotId(report.input) !== computeContextSnapshotId(expectedInput) ||
-    !Array.isArray(report.rows) ||
-    !Array.isArray(report.omitted) ||
-    !Array.isArray(report.missing)
-  )
-    return {
-      status: 'snapshot_mismatch',
-      evaluatedCount: 0,
-      selectedCount: 0,
-      omittedCount: 0,
-      candidates: [],
-    };
-
-  const sourceById = new Map(
-    expectedInput.candidates.map((candidate) => [candidate.id, candidate]),
-  );
-  const rows = [];
-  let invalidCount = 0;
-  for (const row of report.rows) {
-    const source = sourceById.get(row?.id);
-    const valid =
-      source &&
-      typeof source.id === 'string' &&
-      /^[a-zA-Z0-9_-]{1,80}$/.test(source.id) &&
-      isCanonicalBriefSourceUrl(source.url) &&
-      typeof row?.relevance === 'number' &&
-      Number.isFinite(row.relevance) &&
-      row.relevance >= 0 &&
-      row.relevance <= 1 &&
-      typeof row?.category === 'string' &&
-      Object.hasOwn(L1_CATEGORY_LABELS, row.category) &&
-      typeof row?.evaluatedAt === 'string' &&
-      Number.isFinite(Date.parse(row.evaluatedAt));
-    if (!valid) {
-      invalidCount += 1;
-      continue;
-    }
-    rows.push({
-      id: source.id,
-      url: source.url,
-      updatedAt: source.updatedAt,
-      category: row.category,
-      categoryLabel: L1_CATEGORY_LABELS[row.category],
-      evaluatedAt: row.evaluatedAt,
-      relevance: row.relevance,
-    });
-  }
-  rows.sort(
-    (a, b) =>
-      b.relevance - a.relevance ||
-      (L1_CATEGORY_WEIGHT[b.category] ?? 0) - (L1_CATEGORY_WEIGHT[a.category] ?? 0) ||
-      b.updatedAt.localeCompare(a.updatedAt) ||
-      a.id.localeCompare(b.id),
-  );
-
-  const complete = report.complete === true && report.missing.length === 0 && invalidCount === 0;
-  const evaluatedCount = rows.length;
-  return {
-    status: complete ? 'complete' : evaluatedCount > 0 ? 'partial' : 'unevaluated',
-    reason: complete
-      ? null
-      : BRIEF_L1_FAILURES.has(report.rows.find((row) => row?.reason)?.reason)
-        ? report.rows.find((row) => row?.reason)?.reason
-        : 'incomplete',
-    evaluatedCount,
-    selectedCount: report.rows.length,
-    omittedCount: report.omitted.length,
-    candidates: rows.slice(0, 5).map(({ relevance: _relevance, ...candidate }) => candidate),
-  };
-}
-
-/**
- * Calls the existing Jev shadow entrypoint with argv (never a shell) and parses its JSON report.
- * @param {number} number
- * @param {{cwd?: string, execFileImpl?: (file: string, args: string[], options: import('node:child_process').ExecFileSyncOptionsWithStringEncoding) => string}} [options]
- */
-export function runContextL1ShadowAssist(
-  number,
-  { cwd = process.cwd(), execFileImpl = execFileSync } = {},
-) {
-  const stdout = execFileImpl(
-    join(cwd, 'node_modules', '.bin', 'tsx'),
-    ['scripts/tasks/jev/assist.ts', 'context', '--issue', String(number), '--json'],
-    { cwd, encoding: 'utf8', maxBuffer: 2_000_000 },
-  );
-  return JSON.parse(stdout);
-}
-
-function l1ShadowUnavailable(reason = 'assist_unavailable') {
-  return {
-    status: 'unavailable',
-    reason,
-    evaluatedCount: 0,
-    selectedCount: 0,
-    omittedCount: 0,
-    candidates: [],
-  };
-}
-
-function renderL1ShadowPreview(preview) {
-  const lines = [
-    '',
-    '#### L1 Jev 候補（shadow助言）',
-    '',
-    'Codexの作業入力へ渡す助言情報（shadow）。Issueの要求・必須条件・policy・検証条件を変更せず、最終判断もしません。候補から外れた資料を無関係とはみなしません。',
-  ];
-  if (preview.source === 'trusted_brief')
-    lines.push(
-      '信頼済みctx-briefから再利用（Issue入力snapshotと公開HEADの一致を確認済み。Jev APIは呼び出していません）。',
-    );
-  if (preview.status === 'complete') {
-    lines.push(
-      `Jevが選択した ${preview.selectedCount} 件を整理。候補を最大5件表示（別枠の対象外 ${preview.omittedCount} 件は未整理）。`,
-    );
-  } else if (preview.status === 'partial') {
-    lines.push(
-      `部分評価 ${preview.evaluatedCount}/${preview.selectedCount} 件。以下は暫定候補で、全体順位ではありません（対象外 ${preview.omittedCount} 件）。`,
-    );
-  } else if (preview.status === 'unevaluated') {
-    lines.push(`未評価（${preview.reason ?? 'incomplete'}）。候補順位を表示していません。`);
-  } else if (preview.status === 'snapshot_mismatch') {
-    lines.push(
-      'L0とJevの入力snapshotが一致しないため、候補を表示していません。再実行してください。',
-    );
-  } else {
-    lines.push(
-      `Jevのshadow結果を取得できません（${preview.reason ?? 'assist_unavailable'}）。L0の結果はそのまま利用できます。`,
-    );
-  }
-  if (preview.reason === 'trusted_brief_missing_or_stale')
-    lines.push(
-      'dispatch担当が同じ公開HEADで `pnpm ctx <Issue番号> --post` を更新し、workerは `pnpm ctx <Issue番号> --reuse-brief-l1` で再取得してください。旧形式・入力snapshot・HEAD・投稿者の不一致では再利用できません。workerへGateway keyを渡す必要はありません。',
-    );
-  for (const row of preview.candidates ?? [])
-    lines.push(`- [${row.id}](${row.url}) | ${row.categoryLabel} | 読む候補（shadow）`);
-  if (preview.status === 'complete' && preview.evaluatedCount === 0)
-    lines.push('候補はありません。これは問題や関連資料が無いことの証明ではありません。');
-  return lines;
-}
-
-function briefL1MetadataForPack(pack) {
-  const preview = pack?.l1ShadowPreview;
-  const target = preview?.target;
-  const candidates = preview?.candidates;
-  if (
-    !pack?.snapshotId ||
-    !Number.isSafeInteger(pack.number) ||
-    !/^[a-f0-9]{64}$/.test(pack.snapshotId) ||
-    !Number.isSafeInteger(target?.number) ||
-    target.number !== pack.number ||
-    !/^[a-f0-9]{40}$/.test(target?.sha ?? '') ||
-    !isCanonicalBriefSourceUrl(target?.url) ||
-    !['complete', 'partial', 'unevaluated'].includes(preview?.status) ||
-    !Number.isSafeInteger(preview.evaluatedCount) ||
-    preview.evaluatedCount < 0 ||
-    !Number.isSafeInteger(preview.selectedCount) ||
-    preview.selectedCount < preview.evaluatedCount ||
-    preview.selectedCount > 24 ||
-    !Number.isSafeInteger(preview.omittedCount) ||
-    preview.omittedCount < 0 ||
-    preview.omittedCount > 10_000 ||
-    !Array.isArray(candidates) ||
-    candidates.length > 5 ||
-    candidates.length > preview.evaluatedCount ||
-    (preview.status === 'complete' && preview.evaluatedCount !== preview.selectedCount) ||
-    (preview.status === 'partial' && preview.evaluatedCount >= preview.selectedCount) ||
-    (preview.status === 'unevaluated' && preview.evaluatedCount !== 0) ||
-    (preview.reason !== null &&
-      preview.reason !== undefined &&
-      !BRIEF_L1_FAILURES.has(preview.reason))
-  )
-    return null;
-
-  const safeCandidates = [];
-  for (const candidate of candidates) {
-    if (
-      !/^[a-zA-Z0-9_-]{1,80}$/.test(candidate?.id ?? '') ||
-      !isCanonicalBriefSourceUrl(candidate?.url) ||
-      !Object.hasOwn(L1_CATEGORY_LABELS, candidate?.category) ||
-      typeof candidate?.evaluatedAt !== 'string' ||
-      !isIsoTimestamp(candidate.evaluatedAt)
-    )
-      return null;
-    safeCandidates.push({
-      id: candidate.id,
-      url: candidate.url,
-      updatedAt: candidate.updatedAt,
-      category: candidate.category,
-      evaluatedAt: candidate.evaluatedAt,
-    });
-  }
-
-  return {
-    schemaVersion: 1,
-    issueNumber: pack.number,
-    snapshotId: pack.snapshotId,
-    target: { number: target.number, sha: target.sha, url: target.url },
-    preview: {
-      status: preview.status,
-      reason: preview.reason ?? null,
-      evaluatedCount: preview.evaluatedCount,
-      selectedCount: preview.selectedCount,
-      omittedCount: preview.omittedCount,
-      candidates: safeCandidates,
-    },
-  };
-}
-
-function isIsoTimestamp(value) {
-  return (
-    typeof value === 'string' &&
-    value.length <= 40 &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
-    Number.isFinite(Date.parse(value))
-  );
-}
-
-function encodeBriefL1Metadata(pack) {
-  const metadata = briefL1MetadataForPack(pack);
-  if (!metadata) return null;
-  return `${CTX_L1_MARKER_PREFIX}${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`;
-}
-
-function decodeBriefL1Metadata(body) {
-  if (typeof body !== 'string') return null;
-  const match = body.match(/^<!-- ctx-l1-v1:([A-Za-z0-9_-]{8,12000}) -->$/m);
-  if (!match) return null;
-  try {
-    const json = Buffer.from(match[1], 'base64url').toString('utf8');
-    if (Buffer.from(json).toString('base64url') !== match[1]) return null;
-    const value = JSON.parse(json);
-    return value && typeof value === 'object' ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Reuses L1 only from the current GitHub user when its issue, snapshot, URL and HEAD match. */
-export function findReusableBriefL1Preview(comments, expected) {
-  if (
-    !Array.isArray(comments) ||
-    !Number.isSafeInteger(expected?.number) ||
-    typeof expected?.authLogin !== 'string' ||
-    expected.authLogin.length === 0 ||
-    !/^[a-f0-9]{64}$/.test(expected?.snapshotId ?? '') ||
-    !/^[a-f0-9]{40}$/.test(expected?.sha ?? '') ||
-    !isCanonicalBriefSourceUrl(expected?.url) ||
-    !Array.isArray(expected?.candidates)
-  )
-    return null;
-
-  const sourceById = new Map(expected.candidates.map((candidate) => [candidate.id, candidate]));
-  for (const comment of [...comments].reverse()) {
-    if (
-      !isTrustedMarkerComment(comment) ||
-      comment.user?.login?.toLowerCase() !== expected.authLogin.toLowerCase()
-    )
-      continue;
-    const metadata = decodeBriefL1Metadata(comment.body);
-    if (
-      metadata?.schemaVersion !== 1 ||
-      metadata?.issueNumber !== expected.number ||
-      metadata?.snapshotId !== expected.snapshotId ||
-      metadata?.target?.number !== expected.number ||
-      metadata?.target?.sha !== expected.sha ||
-      metadata?.target?.url !== expected.url
-    )
-      continue;
-
-    const preview = metadata.preview;
-    if (
-      !['complete', 'partial', 'unevaluated'].includes(preview?.status) ||
-      !Number.isSafeInteger(preview.evaluatedCount) ||
-      preview.evaluatedCount < 0 ||
-      !Number.isSafeInteger(preview.selectedCount) ||
-      preview.selectedCount < preview.evaluatedCount ||
-      preview.selectedCount > 24 ||
-      !Number.isSafeInteger(preview.omittedCount) ||
-      preview.omittedCount < 0 ||
-      preview.omittedCount > 10_000 ||
-      !Array.isArray(preview.candidates) ||
-      preview.candidates.length > 5 ||
-      preview.candidates.length > preview.evaluatedCount ||
-      (preview.status === 'complete' && preview.evaluatedCount !== preview.selectedCount) ||
-      (preview.status === 'partial' && preview.evaluatedCount >= preview.selectedCount) ||
-      (preview.status === 'unevaluated' && preview.evaluatedCount !== 0) ||
-      (preview.reason !== null &&
-        preview.reason !== undefined &&
-        !BRIEF_L1_FAILURES.has(preview.reason))
-    )
-      continue;
-
-    const candidates = [];
-    const seenIds = new Set();
-    let invalid = false;
-    for (const candidate of preview.candidates) {
-      const source = sourceById.get(candidate?.id);
-      if (
-        !source ||
-        seenIds.has(candidate.id) ||
-        source.url !== candidate.url ||
-        !isCanonicalBriefSourceUrl(source.url) ||
-        !Object.hasOwn(L1_CATEGORY_LABELS, candidate.category) ||
-        !isIsoTimestamp(candidate.evaluatedAt)
-      ) {
-        invalid = true;
-        break;
-      }
-      seenIds.add(candidate.id);
-      candidates.push({
-        id: source.id,
-        url: source.url,
-        updatedAt: source.updatedAt,
-        category: candidate.category,
-        categoryLabel: L1_CATEGORY_LABELS[candidate.category],
-        evaluatedAt: candidate.evaluatedAt,
-      });
-    }
-    if (invalid) continue;
-
-    return {
-      status: preview.status,
-      reason: preview.reason ?? null,
-      evaluatedCount: preview.evaluatedCount,
-      selectedCount: preview.selectedCount,
-      omittedCount: preview.omittedCount,
-      candidates,
-      source: 'trusted_brief',
-      snapshotId: metadata.snapshotId,
-      target: {
-        number: metadata.target.number,
-        sha: metadata.target.sha,
-        url: metadata.target.url,
-      },
-    };
-  }
-  return null;
-}
-
 // --- 純関数群（test 対象） -------------------------------------------------
 
 /** CLI 引数を解釈する。位置引数は issue/PR 番号 1 つのみ。 */
@@ -606,8 +124,6 @@ export function parseArgs(argv) {
     bodyLines: 60,
     allComments: false,
     post: false,
-    l1Shadow: false,
-    reuseBriefL1: false,
   };
   const positionals = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -618,10 +134,8 @@ export function parseArgs(argv) {
       options.allComments = true;
     } else if (arg === '--post') {
       options.post = true;
-    } else if (arg === '--l1-shadow') {
-      options.l1Shadow = true;
     } else if (arg === '--reuse-brief-l1') {
-      options.reuseBriefL1 = true;
+      // 互換用の no-op。AGENTS.md / routing が示す起動形 `pnpm ctx <N> --reuse-brief-l1` を維持する。
     } else if (arg === '--comments') {
       options.comments = Number(argv[i + 1]);
       i += 1;
@@ -630,7 +144,7 @@ export function parseArgs(argv) {
       i += 1;
     } else if (arg.startsWith('--')) {
       throw new Error(
-        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post / --l1-shadow / --reuse-brief-l1 のみ）`,
+        `未知の引数です: ${arg}（--json / --comments / --body-lines / --all-comments / --post / --reuse-brief-l1 のみ）`,
       );
     } else {
       positionals.push(arg);
@@ -651,14 +165,6 @@ export function parseArgs(argv) {
   }
   options.number = number;
   return options;
-}
-
-/** Resolve the CLI default to API-free Brief reuse; generation is explicit at dispatch. */
-export function resolveContextL1Mode(options) {
-  if (options.post || options.l1Shadow) {
-    return { ...options, reuseBriefL1: false };
-  }
-  return { ...options, reuseBriefL1: true };
 }
 
 /** `gh api repos/.../issues/N` の応答が PR かどうか（`pull_request` キーの有無）。 */
@@ -873,7 +379,7 @@ export function extractAcceptanceCriteriaText(body) {
   return acceptanceLines.join('\n').trim();
 }
 
-/** Keep the canonical request, scope, constraints, and verification text visible outside ranked L1. */
+/** Keep the canonical request, scope, constraints, and verification text visible in the brief. */
 function extractBriefRequiredSections(body) {
   const wanted = new Map([
     ['goal', '要求（Goal）'],
@@ -1494,25 +1000,6 @@ function buildMarkdownLines(
     }
   }
 
-  const l1 = pack.l1Annotations;
-  if (l1) {
-    lines.push('', '#### L1注釈（補助情報）', '');
-    if (l1.status === 'adopted') {
-      lines.push('採用済みpackの完全評価結果。Issue本文の要求、必須条件、検証を置き換えない。');
-      if (l1.rows.length === 0) lines.push('採用済み注釈に表示候補はありません。');
-      for (const row of l1.rows)
-        lines.push(
-          `- [${row.sourceId}](${row.url}) | ${row.category} | 関連度 ${row.relevance.toFixed(2)} | 評価 ${row.evaluatedAt}`,
-        );
-    } else if (l1.status === 'unevaluated') {
-      lines.push(`L1: 未評価（${l1.reason}）。候補順位を表示していません。`);
-    } else {
-      lines.push('保存済み注釈はありません。Issue補助用のJev L1候補は次節に表示。');
-    }
-  }
-
-  if (pack.l1ShadowPreview) lines.push(...renderL1ShadowPreview(pack.l1ShadowPreview));
-
   lines.push('', '#### 未確認事項', '');
   if (pack.missingSources?.length) {
     for (const missing of pack.missingSources) lines.push(`- ${missing}`);
@@ -1673,9 +1160,6 @@ export function buildContextPack(options, deps = {}) {
     readFileImpl = readFileSync,
     cwd = process.cwd(),
     now = () => new Date(),
-    adoptedPackIds = [],
-    l1Report = null,
-    includeTrustedBriefComments = false,
   } = deps;
   const { number, comments: commentsK, bodyLines, allComments } = options;
 
@@ -1770,7 +1254,6 @@ export function buildContextPack(options, deps = {}) {
 
   // --- 関連 ---
   const related = { parentEpic: null, prs: null, linkedIssues: null };
-  const assistRelated = [];
   let linkedNumbers = [];
 
   if (kind === 'issue') {
@@ -1778,7 +1261,6 @@ export function buildContextPack(options, deps = {}) {
       const epicNumber = extractParentEpic(rawBody);
       if (!epicNumber) return null;
       const epic = runGhJson(['api', `repos/${REPO}/issues/${epicNumber}`], { execFileImpl });
-      assistRelated.push(epic);
       return { number: epicNumber, state: epic.state, title: epic.title };
     }, null);
 
@@ -1801,7 +1283,6 @@ export function buildContextPack(options, deps = {}) {
     }, null);
 
     if (matchedPrs !== null) {
-      assistRelated.push(...matchedPrs);
       // 触るファイル用に上位 3 件だけ headRefName + files を追加取得する。
       const enriched = matchedPrs.slice(0, 3).map((pr) =>
         tryOr(
@@ -1900,7 +1381,6 @@ export function buildContextPack(options, deps = {}) {
         tryOr(
           () => {
             const issue = runGhJson(['api', `repos/${REPO}/issues/${n}`], { execFileImpl });
-            assistRelated.push(issue);
             return {
               number: n,
               state: issue.state,
@@ -1985,16 +1465,6 @@ export function buildContextPack(options, deps = {}) {
     missingSources,
   };
   const snapshotId = computeContextSnapshotId(snapshotMaterial);
-  const l1Annotations = buildBriefAnnotations(
-    l1Report ?? {
-      packId: 'context-relevance',
-      adoptedPackIds,
-      complete: false,
-      failure: 'not_cached',
-      rows: [],
-      sources: [],
-    },
-  );
 
   // closed/merged PR は「関連」には出すが、次の一手を駆動しない ── 別の
   // linked PR がまだ open で進行中の可能性や、closed PR が issue を解決しなかった
@@ -2045,43 +1515,11 @@ export function buildContextPack(options, deps = {}) {
   return {
     number,
     kind,
-    ...(options.assist
-      ? {
-          assistSource: {
-            title: header.title,
-            body: rawBody,
-            url: header.url,
-            // GitHub may advance Issue updated_at when this brief comment is posted. Use created_at
-            // for this body candidate; body edits still change the candidate text/cache key.
-            updatedAt: base?.created_at ?? null,
-            comments:
-              commentsRaw === null
-                ? null
-                : selectComments(commentsRaw, Number.MAX_SAFE_INTEGER, allComments),
-            related: assistRelated,
-            decisions: decisionLinesFull,
-            missing: missingSources,
-          },
-        }
-      : {}),
-    ...(includeTrustedBriefComments
-      ? {
-          trustedBriefComments:
-            commentsRaw === null
-              ? null
-              : commentsRaw.filter(isTrustedMarkerComment).map((comment) => ({
-                  body: comment.body,
-                  author_association: comment.author_association,
-                  user: { login: comment.user?.login },
-                })),
-        }
-      : {}),
     bodySha256: createHash('sha256').update(rawBody).digest('hex'),
     snapshotId,
     generatedAt: now().toISOString(),
     requiredSections: kind === 'issue' ? extractBriefRequiredSections(rawBody) : [],
     missingSources,
-    l1Annotations,
     header,
     body: bodyResult,
     comments,
@@ -2101,17 +1539,9 @@ export function buildContextPack(options, deps = {}) {
 // CTX_MARKER の定義はファイル先頭（selectComments / detectJudgmentRecords と共用）。
 
 /** コメント本文を組み立てる。1 行目は必ずマーカー（idempotent 判定の唯一の根拠）。 */
-export function buildCommentBody({
-  number,
-  date,
-  generatedAt,
-  snapshotId,
-  markdown,
-  l1Metadata = null,
-}) {
+export function buildCommentBody({ number, date, generatedAt, snapshotId, markdown }) {
   const timestamp = generatedAt ?? `${date ?? '未取得'}T00:00:00.000Z`;
-  const metadataLine = typeof l1Metadata === 'string' ? `\n${l1Metadata}` : '';
-  return `${CTX_MARKER}\n**Issue Context Brief（\`pnpm ctx ${number}\`）**\n生成: ${timestamp} | snapshot: ${snapshotId ?? '未取得'}${metadataLine}\n\n${markdown}\n`;
+  return `${CTX_MARKER}\n**Issue Context Brief（\`pnpm ctx ${number}\`）**\n生成: ${timestamp} | snapshot: ${snapshotId ?? '未取得'}\n\n${markdown}\n`;
 }
 
 function sameBriefContentIgnoringGeneratedTime(current, candidate) {
@@ -2213,7 +1643,6 @@ export function postContextBrief(pack, markdown, deps = {}) {
     generatedAt: pack.generatedAt ?? now().toISOString(),
     snapshotId: pack.snapshotId,
     markdown,
-    l1Metadata: encodeBriefL1Metadata(pack),
   });
 
   if (existing && sameBriefContentIgnoringGeneratedTime(existing.body, body)) {
@@ -2247,7 +1676,7 @@ export function postContextBrief(pack, markdown, deps = {}) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const pack = buildContextPackWithL1(resolveContextL1Mode(options));
+  const pack = buildContextPack(options);
   if (options.post) {
     const markdown = renderMarkdown(pack);
     const result = postContextBrief(pack, markdown, {
@@ -2256,7 +1685,6 @@ function main() {
     process.stdout.write(
       `${result.mode === 'update' ? '更新' : result.mode === 'unchanged' ? '変更なし' : '作成'}: ${result.url ?? '（URL 未取得）'}\n`,
     );
-    process.stdout.write(`${renderL1ShadowPreview(pack.l1ShadowPreview).join('\n')}\n`);
     return;
   }
   if (options.json) {
@@ -2264,94 +1692,6 @@ function main() {
   } else {
     process.stdout.write(`${renderMarkdown(pack)}\n`);
   }
-}
-
-/**
- * Adds advisory L1 output to the L0 pack. Reuse mode reads only a matching Brief; generation is
- * used by dispatch (`--post`) or an explicit preview (`--l1-shadow`). Jev failure leaves the L0
- * result usable. Dependencies are injectable for offline delivery tests.
- */
-export function buildContextPackWithL1(
-  options,
-  {
-    cwd = process.cwd(),
-    getHeadSha = () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim(),
-    getAuthLogin = () => tryOr(() => runGh(['api', 'user', '--jq', '.login']).trim(), null),
-    readDecisionAtHead = (headSha) =>
-      execFileSync('git', ['show', `${headSha}:${DECISIONS_PATH}`], {
-        cwd,
-        encoding: 'utf8',
-      }),
-    buildPack = buildContextPack,
-    runAssist = runContextL1ShadowAssist,
-  } = {},
-) {
-  let headSha = null;
-  try {
-    headSha = getHeadSha();
-  } catch {
-    // L0 remains usable even when Git metadata is unavailable for L1 advice.
-  }
-  if (!headSha) {
-    const pack = buildPack(options, { cwd });
-    pack.l1ShadowPreview = l1ShadowUnavailable('public_commit_required');
-    return pack;
-  }
-
-  const l0WithAssistInput = buildPack(
-    { ...options, assist: true },
-    {
-      cwd,
-      includeTrustedBriefComments: true,
-      readFileImpl: (path) => {
-        if (!path.endsWith(DECISIONS_PATH)) throw new Error('対象外の資料');
-        return readDecisionAtHead(headSha, path, cwd);
-      },
-    },
-  );
-  let reusablePreview = null;
-  try {
-    const expectedInput = buildContextInput(
-      options.number,
-      headSha,
-      l0WithAssistInput.assistSource,
-    );
-    const expectedBrief = {
-      ...expectedInput,
-      snapshotId: l0WithAssistInput.snapshotId,
-      authLogin: tryOr(() => getAuthLogin(), null),
-    };
-    reusablePreview = findReusableBriefL1Preview(
-      l0WithAssistInput.trustedBriefComments,
-      expectedBrief,
-    );
-    if (options.reuseBriefL1) {
-      l0WithAssistInput.l1ShadowPreview =
-        reusablePreview ?? l1ShadowUnavailable('trusted_brief_missing_or_stale');
-    } else {
-      const report = runAssist(options.number, { cwd });
-      const currentPreview = buildL1ShadowPreview(report, expectedInput);
-      if (currentPreview.status === 'complete' || !reusablePreview) {
-        l0WithAssistInput.l1ShadowPreview = currentPreview;
-        if (['complete', 'partial', 'unevaluated'].includes(currentPreview.status)) {
-          l0WithAssistInput.l1ShadowPreview.snapshotId = l0WithAssistInput.snapshotId;
-          l0WithAssistInput.l1ShadowPreview.target = {
-            number: expectedInput.number,
-            sha: expectedInput.sha,
-            url: expectedInput.url,
-          };
-        }
-      } else {
-        l0WithAssistInput.l1ShadowPreview = reusablePreview;
-      }
-    }
-  } catch {
-    l0WithAssistInput.l1ShadowPreview =
-      reusablePreview ?? l1ShadowUnavailable('assist_unavailable');
-  }
-  delete l0WithAssistInput.assistSource;
-  delete l0WithAssistInput.trustedBriefComments;
-  return l0WithAssistInput;
 }
 
 if (isDirectExecution(import.meta.url)) {

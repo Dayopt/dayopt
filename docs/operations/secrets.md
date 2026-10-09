@@ -249,7 +249,6 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 | `github-agent`        | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity）                                                                             |
 | `supabase-agent`      | `credential`（Supabase scoped access token、read 権限だけ、90 日期限）, `expires`                                                                                                                                                                                                                                                                    | Agent の production Supabase 読み取り（supabase MCP `--read-only`、`supabase-mgmt-safe-get.mjs`）。下記 §Agent の Supabase 読み取り token                                                                       |
 | `sentry-cli-readonly` | `credential`（Sentry user auth token、read scope だけ）                                                                                                                                                                                                                                                                                              | Agent の Sentry 読み取り（`sentry` CLI を inline `op://` で起動）。org `dayopt` での access は `alerts:read` / `member:read` / `project:read` / `team:read` / `org:read` / `event:read` だけ（2026-09-14 実測） |
-| `vercel-ai-gateway`   | `credential`（AI Gateway API key、budget $4 / 月、90 日期限）, `expires`                                                                                                                                                                                                                                                                             | 評価モデル Jev の呼び出し（`pnpm jev:*` を inline `op://` で起動）。下記 §評価モデル Jev の Gateway key                                                                                                         |
 
 **`agent/app` の `RECOVERY_CODE_PEPPER` は production と別値**（2026-09-14、User が値を表示しない比較で `different` を確認）。local dev の recovery code が production で通ることはない。
 
@@ -387,20 +386,6 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 **rotation**: §短命トークンのローテーション に従う。期限切れは MCP / safe-get の 401 で表面化する。
 
-## 評価モデル Jev の Gateway key
-
-策定日: 2026-09-17（[#2827](https://github.com/Dayopt/dayopt/issues/2827)）。評価モデル Jev は Vercel AI Gateway 経由で呼ぶ。key は `agent/vercel-ai-gateway` の `credential` に置き、**inline `op://` でそのプロセスだけへ注入する**。
-
-```bash
-AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke
-```
-
-**`.op-env.agent` には入れない。** 入れると `pnpm dev` が Jev の key に依存し、評価を回さない日でも 1Password の承認が要るようになる。Jev を呼ぶコマンドだけが承認を求める形を保つ。
-
-**agent vault に置いてよい理由**: key 側に budget（$4 / 月）と有効期限（90 日）が設定してあり、漏れても損害が上限で止まる。Gateway の credits は購入せず、無料枠（$5）の内側だけで使う（[#2827](https://github.com/Dayopt/dayopt/issues/2827) の制約）。
-
-**rotation**: §短命トークンのローテーション に従う。期限切れは `pnpm jev:*` の `auth_failed` で表面化する。運用手順と停止方法は [jev.md](./jev.md)。
-
 ## Service Account
 
 2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**を基本とする。同日の追加指示で、ローカルは**専用の標準 Mac ユーザー**を用意し、人間用ホームへのアクセスを閉じる分離を先に進める方針も承認した（[ローカル手順](./local-agent-isolation.md)）。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。同日、User は Codex Cloud の `dayopt` 環境への token / ID 登録と公開を報告した。公開後の task での照合、SA の read-only 等の管理権限、専用 Mac ユーザーの作成と旧 Mac 起動経路の停止は未確認であり、現行 Mac セッションの隔離完了を意味しない。
@@ -470,7 +455,7 @@ token の控えの保管先は未確認。token 値や個人の ID 実値は本�
 4. token 無し・無効で起動が失敗し、人間用認証の prompt / fallback が起きないことを確認する。Mac の home / 1Password / browser / 接続済み tool への到達経路が無いことも確認する。
 5. 1Password を使う対話・無人の agent 起動を `agent:run` に統一し、旧セッションを停止する。撤去対象の credential replica があれば記録してから処置する。障害時は専用環境を停止し、人間用の認証を agent に戻して復旧しない。
 
-Secret が setup phase のみに渡る cloud 実行先では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。Jev など作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--cloud-の実行環境)）。
+Secret が setup phase のみに渡る cloud 実行先では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--cloud-の実行環境)）。
 
 移行完了には platform 設定、SA 権限確認、live の正負検証、旧起動経路の停止の証跡が必要。fixture test の成功だけで完了と扱わない。
 

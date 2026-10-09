@@ -13,7 +13,7 @@
 | report / 4章 / 3タブ / セグメント / 配分 / 余白                        | [振り返りの仕様](product/specs/review.md)                                                                 |
 | 価格 / Free・Pro / 課金の境界                                          | [価格戦略](business/pricing.md)、[課金仕様](product/specs/billing.md)                                     |
 | 判断を残す / 二重管理 / state.md / 日次ブリーフ / 蒸留                 | [意図の継承と運用判断の理由](operations/ai-development-loop.md#意図の継承)                                |
-| モデルの役割 / 委譲 / Context Brief / Jev                              | [作業方針](../.agents/skills/routing/SKILL.md)、[Jev の運用](operations/jev.md)                           |
+| モデルの役割 / 委譲 / Context Brief                                    | [作業方針](../.agents/skills/routing/SKILL.md)                                                            |
 | 独立レビュー / 全PR / shadow / 人間の許可                              | [AGENTS.md](../AGENTS.md)、[AI開発標準ループ](operations/ai-development-loop.md)                          |
 | test / E2E / 実走 / CI 成功と本番状態                                  | [検証の責務](engineering/testing.md)                                                                      |
 | 文書の鮮度 / 生成本文 / 正本からの読取                                 | [文書の標準手順](README.md#ai-の標準手順)                                                                 |

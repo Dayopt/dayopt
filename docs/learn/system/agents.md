@@ -5,7 +5,7 @@ last_verified: 2026-09-22
 
 # AI まわりの仕組みの地図
 
-Dayopt の開発を手伝う AI（Claude Code）に向けた作り物は、4 種類に分かれて置かれている。**指示書**（何を守るか）、**skill**（特定の作業の手順）、**guard / hook**（間違えても機械が止める）、**memory**（Claude だけの覚え書き。repo の外）。このページは、それぞれがどこに在り、いつ読まれ、何を決めているかを 1 枚で見渡すための地図。中身の正本は各ファイルで、ここは要約とリンクだけを持つ。考え方（AI・機械・人の線引き）は [11 章](../11-agents-jev.md)。
+Dayopt の開発を手伝う AI（Claude Code）に向けた作り物は、4 種類に分かれて置かれている。**指示書**（何を守るか）、**skill**（特定の作業の手順）、**guard / hook**（間違えても機械が止める）、**memory**（Claude だけの覚え書き。repo の外）。このページは、それぞれがどこに在り、いつ読まれ、何を決めているかを 1 枚で見渡すための地図。中身の正本は各ファイルで、ここは要約とリンクだけを持つ。考え方（AI・機械・人の線引き）は [11 章](../11-agents.md)。
 
 ## 1 回の作業で、どこで何が効くか
 
@@ -95,7 +95,7 @@ flowchart LR
 
 - **場所**: repo の外（`~/.claude/projects/<repo のパス>/memory/`）。`MEMORY.md` が索引で、1 件 1 ファイル。2026-09-22 時点で 109 件
 - **誰が読むか**: Claude Code だけ。毎セッションの最初に索引が読み込まれ、関係しそうなものだけ本文を読む。repo に入っていないので、`pnpm docs:check` も他の人も見ない
-- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[tooling.md](../../operations/tooling.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、[jev.md](../../operations/jev.md)、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
+- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[tooling.md](../../operations/tooling.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
 - **使い分け**: どの AI にも効かせたい規則は、memory ではなく `AGENTS.md` か skill か上記の doc に書く。memory に置くのは、Claude が繰り返し踏む罠の回避と、repo に書くまでもない作業の癖だけ
 
 ## AI にこうさせたい時、どこを触るか

@@ -35,12 +35,6 @@
     "mcp:gate": "tsx scripts/tasks/mcp-gate.ts",
     "ai:usage": "node scripts/tasks/ai-usage.mjs",
     "ctx": "node scripts/tasks/ctx.mjs",
-    "jev:check": "pnpm exec tsx scripts/tasks/jev/check.ts",
-    "jev:assist": "pnpm exec tsx scripts/tasks/jev/assist.ts",
-    "jev:assist-eval": "pnpm exec tsx scripts/tasks/jev/assist-eval.ts",
-    "jev:pack": "pnpm exec tsx scripts/tasks/jev/pack.ts",
-    "jev:shadow": "pnpm exec tsx scripts/tasks/jev/shadow.ts",
-    "jev:smoke": "pnpm exec tsx scripts/tasks/jev/smoke.ts",
     "handoff:create": "node scripts/tasks/factory-handoff.mjs create",
     "handoff:validate": "node scripts/tasks/factory-handoff.mjs validate",
     "trace": "node scripts/tasks/trace.mjs",
@@ -119,7 +113,6 @@
     "storybook:collect-files-check": "tsx scripts/tasks/check-story-coverage.ts --collected-files"
   },
   "devDependencies": {
-    "@ai-sdk/gateway": "4.0.96",
     "@axe-core/playwright": "catalog:tooling",
     "@axe-core/react": "catalog:tooling",
     "@commitlint/cli": "^20.5.3",
@@ -146,7 +139,6 @@
     "@vitest/coverage-istanbul": "catalog:tooling",
     "@vitest/ui": "catalog:tooling",
     "@vueless/storybook-dark-mode": "catalog:tooling",
-    "ai": "7.0.118",
     "babel-plugin-react-compiler": "catalog:tooling",
     "eslint": "catalog:tooling",
     "eslint-config-next": "catalog:tooling",

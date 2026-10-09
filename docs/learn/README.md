@@ -86,7 +86,7 @@ Supabase そのものを止める lab と、メール送信を壊す lab はま�
 | 8   | [セキュリティ](08-security.md)               | 信頼境界と攻撃面を説明できる              |
 | 9   | [デプロイ](09-deployment.md)                 | commit から本番までを追跡できる           |
 | 10  | [API / MCP](10-api-mcp.md)                   | 外の AI から Dayopt までを追跡できる      |
-| 11  | [Jev / Agent](11-agents-jev.md)              | AI が何を見て、どこで止まるかを説明できる |
+| 11  | [Agent](11-agents.md)                        | AI が何を見て、どこで止まるかを説明できる |
 | 12  | [変更](12-change.md)                         | 影響範囲を自分で判断して変更できる        |
 
 最後に [卒業問題](graduation.md) の 7 問に、何も見ずに答える。
