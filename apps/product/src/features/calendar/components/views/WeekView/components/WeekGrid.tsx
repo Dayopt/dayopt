@@ -140,8 +140,8 @@ export const WeekGrid = ({
       >
         {/* 7日分のグリッド */}
         {weekDates.map((date, dayIndex) => {
-          const dateKey = getDateKey(date, timezone);
-          // TZ変換済みのtimeblocksByDateを使用（eventsByDateはTZ未対応）
+          // 列は暦日。予定・記録の実時刻をTZ変換した分類結果を参照する。
+          const dateKey = getDateKey(date);
           const dayEvents = tzTimeblocksByDate[dateKey] || [];
 
           return (

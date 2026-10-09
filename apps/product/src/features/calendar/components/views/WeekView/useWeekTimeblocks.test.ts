@@ -23,7 +23,7 @@ const createMockTimeblock = (
 
 // 2026-03-30(月)〜04-05(日) の週
 const weekDates = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date('2026-03-30');
+  const d = new Date(2026, 2, 30, 12);
   d.setDate(d.getDate() + i);
   return d;
 });
