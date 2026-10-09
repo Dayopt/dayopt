@@ -498,7 +498,7 @@ npx supabase secrets set --env-file .env.edge.<env> --project-ref=<REF>
 ### production の読み取り
 
 - **MCP 公開契約の破壊的変更を検討する前に接続数を実測する**。2026-08-18 時点で `oauth_connections` / `oauth_tokens` / `oauth_authorization_codes` は 3 table とも 0 行で、alias 維持の推奨は母数が空だった（#2174）。実測は時点ものなので、0 件を前提にする migration には適用時に数え直して 0 でなければ止まる preflight を付ける
-- **read-only の実測は `op run` 経由の Management API で自前実行できる**（`docs/operations/secrets.md` §実測で分かった罠）。config / branches endpoint は guard が言及ごと止めるので、診断は status page と PR の bot コメントで足りる
+- **read-only の実測は `op run` 経由の Management API で自前実行できる**（経路は `mcp-usage` skill の Supabase cloud 節）。config / branches endpoint は guard が言及ごと止めるので、診断は status page と PR の bot コメントで足りる
 
 ## 関連スキル
 

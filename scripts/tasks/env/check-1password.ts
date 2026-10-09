@@ -278,7 +278,7 @@ for (const [key, itemResult] of itemCache) {
     if (expiresAt <= now) {
       console.log(`${label}: EXPIRED ${date}`);
       console.log(
-        '  └ 再発行して 1Password と replica を更新する（docs/operations/secrets.md §短命トークンのローテーション）',
+        '  └ 再発行して 1Password と replica を更新する（docs/operations/secrets-services.md §期限付き token の再発行）',
       );
       hasFailure = true;
     } else if (daysLeft <= EXPIRY_WARNING_DAYS) {

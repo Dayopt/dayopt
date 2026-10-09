@@ -23,7 +23,7 @@
 #
 # 環境:
 #   `.op-env.human` は human vault（本番キー）を参照するため、実行は production への操作になる。
-#   実行したら手動作業ログを残す（docs/operations/tooling.md 第4部）。
+#   実行したら手動作業ログを残す（docs/operations/secrets-services.md の「管理者 script」）。
 # ========================================
 
 set -euo pipefail

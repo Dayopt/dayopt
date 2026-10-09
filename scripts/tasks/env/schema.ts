@@ -126,7 +126,7 @@ export const envSchema: EnvSchemaEntry[] = [
   // 絞れず team 全権になるため、agent vault の「漏れても 1 日で戻せる」定義に入らない。
   // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
   // agent は Vercel の資格情報を持たない。deployment の読み取りは GitHub の deployment status
-  // で行う（2026-10-09、#3053。docs/operations/secrets.md §Agent と Vercel）。
+  // で行う（2026-10-09、#3053。docs/operations/secrets-services.md §Vercel）。
 
   // webmaster verification 3 件（値が空で Vercel にも replica 無し）は、2026-09-14 に agent の
   // item ごと削除したため entry を置かない。ANTHROPIC_API_KEY も同日に削除し、2026-10 に
@@ -240,7 +240,7 @@ export const productionEnvSchema: EnvSchemaEntry[] = [
   // NEXT_PUBLIC_APP_URL / NEXT_PUBLIC_SITE_URL / RECOVERY_CODE_PEPPER は
   // replica（Vercel Production Env）に値がある可能性がある「反映漏れ」枠。
   // schema先行（機能未展開）ではないため pendingReason は付けない。EMPTY の場合は
-  // docs/operations/secrets.md §1password:check が失敗した時 の「本当の欠落」
+  // docs/operations/secrets-ledger.md §1password:check が失敗した時 の「本当の欠落」
   // 判定に従い、Vercel → master への逆流で埋める（#1940 の枠）。
   envEntry('NEXT_PUBLIC_APP_URL', false, 'public', 'production', human, 'app'),
   envEntry('NEXT_PUBLIC_SITE_URL', false, 'public', 'production', human, 'app'),
@@ -356,12 +356,12 @@ export const operationalItems: OperationalItem[] = [
   // Agent セッションの gh / git push が使う fine-grained PAT（Dayopt/dayopt repo 限定、
   // Administration / Secrets / Workflows 無し）。op run では消費せず、User が
   // `GH_CONFIG_DIR=~/.config/gh-agent gh auth login --with-token` で replica を作る。
-  // 発行手順と権限一覧は docs/operations/secrets.md §Agent の gh identity。
+  // 発行手順と権限一覧は docs/operations/secrets-services.md §GitHub。
   { vault: agent, item: 'github-agent', required: true },
   // Agent が production Supabase を読む時の scoped access token（read 権限だけ、期限付き）。
   // supabase MCP（--read-only）と supabase-mgmt-safe-get.mjs が inline op:// で使う。
   // write を含む human/supabase-cli を agent が解決しないための分離（2026-09-14 監査 P2-7）。
-  // field は日本語ロケールでも id が credential。docs/operations/secrets.md §Agent の Supabase 読み取り token。
+  // field は日本語ロケールでも id が credential。docs/operations/secrets-services.md §Supabase。
   // credential は op:// の解決先、expires は 90 日期限の検出（check-1password の必須 field）。
   {
     vault: agent,
