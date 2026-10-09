@@ -161,7 +161,7 @@ Supabase と Vercel の Marketplace integration（slug: `supabase`）は、Produ
 
 ### Cloud Preview の未初期化台帳（#2910）
 
-`ci/preview-e2e` の3参照（`PREVIEW_E2E_SUPABASE_READINESS_TOKEN`、`PREVIEW_E2E_BYPASS_SECRET`、`PREVIEW_E2E_SUPABASE_KEY`）は **planned master** としてoptional/pendingを維持する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。値は会話へ出さない。
+`ci/preview-e2e` の3参照（`PREVIEW_E2E_SUPABASE_READINESS_TOKEN`、`PREVIEW_E2E_BYPASS_SECRET`、`PREVIEW_E2E_SUPABASE_KEY`）は **planned master** としてoptional/pendingを維持する。1Password item・master値の実在や同期を確認した証拠ではない。2026-09-29の作業で、ユーザーの明示指示により個人Vault・1Passwordを開かず、readiness tokenと選択したIntegration DB keyを `Preview – product` Environmentへ直接保存し、登録名をUIで確認した。Environmentのbranch policyは `integration` だけに保存・確認済み。2026-10-09に実行元をmainへ移したため、policyを `main` だけへ変える作業がUserに残っている（[testing.md](../engineering/testing.md#cloudの明示実行既存ci)）。値は会話へ出さない。
 
 `PREVIEW_E2E_VERCEL_TOKEN` のplanned参照は廃止する。短寿命 `GITHUB_TOKEN` のdeployments/statuses read権限で、GitHubが認証したVercel botのProduct Preview記録を確認する。Production用 `VERCEL_TOKEN` のmaster・replica・release経路は変更しない。project-scoped Vercel tokenもProductのProductionを含むread/write権限を持つため、Preview用tokenとして新規発行しない。
 

@@ -464,7 +464,7 @@ jobs:
 
   preview-trust:
     name: Preview candidate trust
-    if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration'
+    if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -487,7 +487,7 @@ jobs:
   preview-e2e:
     name: Remote Preview login and CRUD
     needs: preview-trust
-    if: ${{ always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration' }}
+    if: ${{ always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: Preview – product
@@ -562,7 +562,7 @@ jobs:
 
   preview-recovery-trust:
     name: Preview recovery trust
-    if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run != '' && github.ref == 'refs/heads/integration'
+    if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run != '' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -582,7 +582,7 @@ jobs:
   preview-recovery:
     name: Recover interrupted Preview fixtures
     needs: preview-recovery-trust
-    if: ${{ always() && needs.preview-recovery-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run != '' && github.ref == 'refs/heads/integration' }}
+    if: ${{ always() && needs.preview-recovery-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run != '' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: Preview – product

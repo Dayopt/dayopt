@@ -264,8 +264,8 @@ export async function prepareCloudRecovery({
   if (
     env.GITHUB_REPOSITORY !== REPO ||
     env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
-    env.GITHUB_REF !== 'refs/heads/integration' ||
-    env.GITHUB_WORKFLOW_REF !== `${REPO}/.github/workflows/ci.yml@refs/heads/integration` ||
+    env.GITHUB_REF !== 'refs/heads/main' ||
+    env.GITHUB_WORKFLOW_REF !== `${REPO}/.github/workflows/ci.yml@refs/heads/main` ||
     !env.GITHUB_TOKEN?.trim()
   )
     throw new Error();

@@ -202,11 +202,11 @@ node scripts/runbook/preview-readiness.mjs \
 
 ### Cloudの明示実行（既存CI）
 
-GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **integration** にし、`preview_e2e=true` を指定する。PR番号・レビュー済み候補SHA・READY deployment ID・DB mode/ref/branch UUIDを全て明示する。通常のPR CIとmainのrelease経路は維持し、Cloud E2Eは独立したrunとして起動する。通常実行では `preview_recover_run` / `preview_recover_attempt` を空のままにする。default branchには既に `ci.yml` のdispatch入口がある。Integrationの新しい入力定義がUI/APIで実際に起動できるかは配線後に確認する。
+GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **main** にし、`preview_e2e=true` を指定する。PR番号・レビュー済み候補SHA・READY deployment ID・DB mode/ref/branch UUIDを全て明示する。通常のPR CIとmainのrelease経路は維持し、Cloud E2Eは独立したrunとして起動する。通常実行では `preview_recover_run` / `preview_recover_attempt` を空のままにする。信頼された実行元は2026-10-09にintegrationからmainへ移した（main とずれたintegrationを実行元にすると、main向けPRの候補がfixture契約の照合で毎回落ちるため）。
 
 Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head SHA・許可したbase/head branchを確認する。共有モードは既存Persistentのref/UUIDに限定し、`supabase/**` が変わるPRを拒否する。隔離モードは本番・Persistentを拒否し、既存readinessがPR専用branchとの対応を照合する。gateはコードの無害性を証明しない。権限ある担当が対象コードと依存をレビューしてSHAを選び、明示dispatchする。同一workerでのinstall-before-secretsは完全なsandboxではない。未信頼のcandidateは実行しない。
 
-既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch integrationのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。現在は `integration` のみ許可する設定を保存・確認済み。ユーザーの明示指示によりagentが設定保存を行えるが、個人Vault・1Passwordを開かず、値を会話へ出さない。
+既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch mainのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。2026-10-09時点で保存済みの設定は `integration` のみで、mainへの変更はUserの作業として残っている。変更するまでtrust gateは停止する。ユーザーの明示指示によりagentが設定保存を行えるが、個人Vault・1Passwordを開かず、値を会話へ出さない。
 
 このEnvironmentの長寿命Secretは必要なexecute/cleanup stepにだけ注入する。repository-wide secretやProductionの同名値で代用しない。`PREVIEW_E2E_SUPABASE_READINESS_TOKEN` と `PREVIEW_E2E_SUPABASE_KEY` はEnvironmentへの直接保存をUIで確認済みで、1Password masterの初期化・同期を証明するものではない。Protection bypassの権限境界は未決のため、保存・実走完了とは扱わない。
 
@@ -217,13 +217,13 @@ Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head 
 
 Vercel側のreadinessは数値project IDのAPI照合から、GitHubが認証した `vercel[bot]`（ID `35613825`）・Product path `/dayopt/product/`・`Preview – product` 環境・本番flag false・exact SHA・requested deployment ID・immutable originの契約へ置き換える。最新Product commit statusと最新deployment statusの成功を要求し、古い成功へのfallbackや曖昧な再デプロイ対応を拒否する。アプリの自己申告だけで合格にせず、同originのlive SHA/deployment ID/DB refとhealthを前後確認する。これは数値Vercel project IDの直接観測ではない。APIの観測失敗・発行者違い・別Product/環境・候補の変更はuser作成前に停止する。
 
-候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutはSHA・migration・fixture契約の読み取りだけに使い、候補の依存install・config・spec・importをworker上で実行しない。依存とChromiumは信頼済みIntegration checkoutから用意してからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みIntegrationのsupervisor・Playwright config・spec・推移的依存の全体で既存desktop/mobile critical pathを実行し、候補アプリは固定Preview URL越しに検証する。候補側だけに追加したspecはこの資格情報付きrunの検証対象にはならない。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
+候補checkout前に、run UUID・desktop/mobileの予定user ID・GitHub run/attempt・trusted workflow SHA・候補/DB bindingだけの `preview-intent-<run>-<attempt>` artifactを保存する。password/keyは含まない。候補のfixture生成2ファイルはtrusted workflowの契約と一致することを要求し、古い候補が予定IDを無視する場合はAuth作成前に停止する。候補checkoutはSHA・migration・fixture契約の読み取りだけに使い、候補の依存install・config・spec・importをworker上で実行しない。依存とChromiumは信頼済みmain checkoutから用意してからlive PRを再照合し、選択した非本番Authの基準合成ユーザーへのadmin GETでkeyを認証する。legacy keyのrole/refが違う場合、opaque keyの認証失敗、基準fixture欠落はいずれもuser作成前に停止する。providerの応答やメールアドレスは公開しない。続いて、信頼済みmainのsupervisor・Playwright config・spec・推移的依存の全体で既存desktop/mobile critical pathを実行し、候補アプリは固定Preview URL越しに検証する。候補側だけに追加したspecはこの資格情報付きrunの検証対象にはならない。runごとに別concurrency groupとfixtureを持ち、他のrunを自動cancelしない。終了・失敗・cancelでは、生きているworker上の `always()` stepが所有journalだけを再回収する。Playwrightは5分、supervisorは7分、回収は120秒以内、jobは20分。VM破棄・job強制終了でこのstepが実行できない場合は、以下の別worker回収入口を使う。共有schema更新の排他leaseも未実装で、前後readinessはdriftの検出まで。
 
 通常E2Eの結果artifactは信頼済みコードで再構成した **preview.jsonだけ**。候補SHA/deployment/DB、run ID、testのファイル・行・成否、所有user ID/statusと確認フラグを含む。画像、private出力、生のJSON、error本文、title、入力値、header/cookie/bodyをuploadしない。Cloud実走・2run並列・中断回収・次のPRでの再利用は実測後に証拠を記録し、配線やunit testだけでは完了扱いにしない。
 
 ### Worker消失後の限定回収
 
-同じ `CI` → `Run workflow` でworkflow branchを **integration**、`preview_e2e=true` とし、`preview_recover_run` / `preview_recover_attempt` に元の失敗run IDとattemptを指定する。PR/SHA/deployment/DB入力を再入力して回収対象を推測しない。信頼済みコードが、元run/対象attemptの完了・失敗、開始済みE2E step、元repo/workflow/ref/SHA、候補コード前に保存した一意なintent artifactをAPIで照合する。最新attemptが稼働中、元の成功、証拠不足、artifact期限切れ・置換・欠測では停止する。
+同じ `CI` → `Run workflow` でworkflow branchを **main**、`preview_e2e=true` とし、`preview_recover_run` / `preview_recover_attempt` に元の失敗run IDとattemptを指定する。PR/SHA/deployment/DB入力を再入力して回収対象を推測しない。信頼済みコードが、元run/対象attemptの完了・失敗、開始済みE2E step、元repo/workflow/ref/SHA、候補コード前に保存した一意なintent artifactをAPIで照合する。最新attemptが稼働中、元の成功、証拠不足、artifact期限切れ・置換・欠測では停止する。
 
 回収intent artifactはread-only GitHub tokenで、元run/attemptに結び付いたartifact IDを指定して取得する。`gh api` の応答ZIPは128KiB以内でメモリに保持し、展開前にREST metadataのSHA-256 digestと一致することを確認する。ZIPから読むのはroot直下の `intent.json` 1件だけで、16KiBを超える内容、追加entry、path、symlink、暗号化、破損した圧縮データを拒否し、ファイルシステムへ展開しない。取得前後のartifact ID/digestを再照合する。candidate codeは回収workerでcheckout/実行しない。資格情報を使う直前にも元run/APIを再確認し、選択した非本番Authでkeyを認証する。
 

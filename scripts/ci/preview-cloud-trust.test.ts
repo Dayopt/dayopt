@@ -18,7 +18,7 @@ const sha = 'a'.repeat(40);
 const context = {
   eventName: 'workflow_dispatch',
   repository: 'Dayopt/dayopt',
-  ref: 'refs/heads/integration',
+  ref: 'refs/heads/main',
   token: 'read-only-token',
   requestJson: JSON.stringify({
     preview_e2e: true,
@@ -66,7 +66,7 @@ function githubWorld({
   },
   branchPolicies = {
     total_count: 1,
-    branch_policies: [{ name: 'integration', type: 'branch' }],
+    branch_policies: [{ name: 'main', type: 'branch' }],
   },
   filesByPage = { 1: [{ filename: 'apps/product/src/example.ts', status: 'modified' }] },
 }: GithubWorldOptions = {}) {
@@ -106,7 +106,7 @@ function githubWorld({
 }
 
 describe('Preview Cloud trust gate', () => {
-  it('accepts only a fixed Integration dispatch, pinned internal open PR, restricted environment, and shared DB identity', async () => {
+  it('accepts only a main-ref dispatch, pinned internal open PR, restricted environment, and shared DB identity', async () => {
     const { fetchImpl } = githubWorld();
 
     const result = await verifyPreviewCloudTrust({ ...context, fetchImpl });
@@ -126,7 +126,7 @@ describe('Preview Cloud trust gate', () => {
   it.each([
     ['wrong event', { eventName: 'pull_request' }],
     ['wrong repository', { repository: 'attacker/repo' }],
-    ['wrong ref', { ref: 'refs/heads/main' }],
+    ['wrong ref', { ref: 'refs/heads/integration' }],
     ['missing token', { token: '' }],
   ])('rejects %s before making API calls', async (_label, override) => {
     const { fetchImpl } = githubWorld();
@@ -180,8 +180,8 @@ describe('Preview Cloud trust gate', () => {
       {
         total_count: 2,
         branch_policies: [
-          { name: 'integration', type: 'branch' },
           { name: 'main', type: 'branch' },
+          { name: 'integration', type: 'branch' },
         ],
       },
     ],
@@ -189,14 +189,14 @@ describe('Preview Cloud trust gate', () => {
       'uses a tag policy',
       {
         total_count: 1,
-        branch_policies: [{ name: 'integration', type: 'tag' }],
+        branch_policies: [{ name: 'main', type: 'tag' }],
       },
     ],
     [
       'has inconsistent total_count',
       {
         total_count: 2,
-        branch_policies: [{ name: 'integration', type: 'branch' }],
+        branch_policies: [{ name: 'main', type: 'branch' }],
       },
     ],
   ])('rejects a branch-policy response that %s', async (_label, branchPolicies) => {

@@ -92,7 +92,7 @@ function assertSourceRunMatchesIntent(run, intent, sourceRunId, sourceAttempt) {
   );
   requireCondition(
     run.event === 'workflow_dispatch' &&
-      run.head_branch === 'integration' &&
+      run.head_branch === 'main' &&
       run.head_sha === intent.workflowSha &&
       workflowPathMatches(run.path, intent.workflowRef),
     'source run workflow binding differs',
@@ -135,7 +135,7 @@ function assertSourceAttemptMatchesIntent(
   );
   requireCondition(
     attempt.event === 'workflow_dispatch' &&
-      attempt.head_branch === 'integration' &&
+      attempt.head_branch === 'main' &&
       attempt.head_sha === intent.workflowSha &&
       workflowPathMatches(attempt.path, intent.workflowRef),
     'selected source attempt workflow binding differs',
@@ -268,7 +268,7 @@ async function findIntentArtifact({
       metadata.id === sourceRunId &&
       metadata.repository_id === run.repositoryId &&
       metadata.head_repository_id === run.repositoryId &&
-      metadata.head_branch === 'integration' &&
+      metadata.head_branch === 'main' &&
       metadata.head_sha === intent.workflowSha,
     'source intent artifact metadata binding differs',
   );
@@ -276,7 +276,7 @@ async function findIntentArtifact({
 }
 
 /**
- * Verify a failed Integration run and its public intent through read-only GitHub APIs.
+ * Verify a failed main-ref run and its public intent through read-only GitHub APIs.
  * Artifact bytes must be downloaded and checked by the caller before recovery.
  * @param {{ repository: string, eventName: string, ref: string, token: string, sourceRunId: string | number, sourceAttempt: string | number, intent: object, fetchImpl?: typeof fetch }} options
  * @returns {Promise<{ intent: object, artifactId: number, digest: string }>}
@@ -293,7 +293,7 @@ export async function verifyPreviewRecoveryTrust({
 }) {
   requireCondition(eventName === 'workflow_dispatch', 'only workflow_dispatch is allowed');
   requireCondition(repository === GITHUB_REPOSITORY, 'repository is not allowed');
-  requireCondition(ref === 'refs/heads/integration', 'recovery must run from Integration');
+  requireCondition(ref === 'refs/heads/main', 'recovery must run from main');
   requireCondition(
     typeof token === 'string' && token.trim().length > 0,
     'read-only GitHub token is required',

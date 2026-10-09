@@ -192,9 +192,9 @@ export async function verifyPreviewEnvironmentBoundary({ token, fetchImpl }) {
     policyList?.total_count === 1 &&
       Array.isArray(policyList.branch_policies) &&
       policyList.branch_policies.length === 1 &&
-      policyList.branch_policies[0]?.name === 'integration' &&
+      policyList.branch_policies[0]?.name === 'main' &&
       policyList.branch_policies[0]?.type === 'branch',
-    'Preview environment must be restricted to the integration branch',
+    'Preview environment must be restricted to the main branch',
   );
 }
 
@@ -312,10 +312,7 @@ export async function verifyPreviewCloudTrust({
 }) {
   requireCondition(eventName === 'workflow_dispatch', 'only workflow_dispatch is allowed');
   requireCondition(repository === GITHUB_REPOSITORY, 'repository is not allowed');
-  requireCondition(
-    ref === 'refs/heads/integration',
-    'workflow must run from refs/heads/integration',
-  );
+  requireCondition(ref === 'refs/heads/main', 'workflow must run from refs/heads/main');
   requireCondition(
     typeof token === 'string' && token.trim().length > 0,
     'read-only GitHub token is required',

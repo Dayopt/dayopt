@@ -13,7 +13,7 @@ const intent = {
   schemaVersion: 1,
   repository: 'Dayopt/dayopt',
   workflow: '.github/workflows/ci.yml',
-  workflowRef: 'refs/heads/integration',
+  workflowRef: 'refs/heads/main',
   workflowSha,
   sourceRunId,
   sourceAttempt,
@@ -36,12 +36,12 @@ const intent = {
 
 const run = {
   id: sourceRunId,
-  path: '.github/workflows/ci.yml@refs/heads/integration',
+  path: '.github/workflows/ci.yml@refs/heads/main',
   event: 'workflow_dispatch',
   status: 'completed',
   conclusion: 'cancelled',
   run_attempt: sourceAttempt,
-  head_branch: 'integration',
+  head_branch: 'main',
   head_sha: workflowSha,
   repository: { id: 7001, full_name: 'Dayopt/dayopt' },
   head_repository: { id: 7001, full_name: 'Dayopt/dayopt' },
@@ -54,9 +54,9 @@ const sourceAttemptRecord = {
   run_attempt: sourceAttempt,
   status: 'completed',
   conclusion: 'cancelled',
-  path: '.github/workflows/ci.yml@refs/heads/integration',
+  path: '.github/workflows/ci.yml@refs/heads/main',
   event: 'workflow_dispatch',
-  head_branch: 'integration',
+  head_branch: 'main',
   head_sha: workflowSha,
   repository: { id: 7001, full_name: 'Dayopt/dayopt' },
   head_repository: { id: 7001, full_name: 'Dayopt/dayopt' },
@@ -103,7 +103,7 @@ const artifact = {
     id: sourceRunId,
     repository_id: 7001,
     head_repository_id: 7001,
-    head_branch: 'integration',
+    head_branch: 'main',
     head_sha: workflowSha,
   },
 };
@@ -141,7 +141,7 @@ function githubWorld(world: World = {}, selectedAttempt = sourceAttempt) {
       return Response.json(
         world.branchPolicies ?? {
           total_count: 1,
-          branch_policies: [{ name: 'integration', type: 'branch' }],
+          branch_policies: [{ name: 'main', type: 'branch' }],
         },
       );
     }
@@ -184,7 +184,7 @@ function githubWorld(world: World = {}, selectedAttempt = sourceAttempt) {
 const context = {
   repository: 'Dayopt/dayopt',
   eventName: 'workflow_dispatch',
-  ref: 'refs/heads/integration',
+  ref: 'refs/heads/main',
   token,
   sourceRunId: String(sourceRunId),
   sourceAttempt: String(sourceAttempt),
@@ -192,7 +192,7 @@ const context = {
 };
 
 describe('Preview Cloud recovery trust gate', () => {
-  it('accepts only the exact completed Integration attempt, passed trust job, failed execute step, and intent artifact', async () => {
+  it('accepts only the exact completed main-ref attempt, passed trust job, failed execute step, and intent artifact', async () => {
     const { fetchImpl } = githubWorld();
     const result = await verifyPreviewRecoveryTrust({ ...context, fetchImpl });
     expect(result).toEqual({ intent, artifactId, digest });
@@ -206,7 +206,7 @@ describe('Preview Cloud recovery trust gate', () => {
   it.each([
     ['wrong event', { eventName: 'pull_request' }],
     ['wrong repository', { repository: 'attacker/repo' }],
-    ['wrong recovery ref', { ref: 'refs/heads/main' }],
+    ['wrong recovery ref', { ref: 'refs/heads/integration' }],
     ['missing token', { token: '' }],
     ['noncanonical run string', { sourceRunId: '081726354' }],
     ['unsafe run number', { sourceRunId: Number.MAX_SAFE_INTEGER + 1 }],
@@ -238,7 +238,7 @@ describe('Preview Cloud recovery trust gate', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('rejects an intent bound to a different Integration workflow SHA before jobs or artifact lookup', async () => {
+  it('rejects an intent bound to a different main workflow SHA before jobs or artifact lookup', async () => {
     const { fetchImpl } = githubWorld();
     await expect(
       verifyPreviewRecoveryTrust({
@@ -262,7 +262,7 @@ describe('Preview Cloud recovery trust gate', () => {
     ['wrong event', { event: 'pull_request' }],
     ['wrong source branch', { head_branch: 'feature' }],
     ['wrong workflow SHA', { head_sha: 'e'.repeat(40) }],
-    ['wrong workflow', { path: '.github/workflows/promote.yml@refs/heads/integration' }],
+    ['wrong workflow', { path: '.github/workflows/promote.yml@refs/heads/main' }],
     ['wrong repository', { repository: { id: 7002, full_name: 'attacker/repo' } }],
     ['fork head repository', { head_repository: { id: 7002, full_name: 'someone/fork' } }],
   ])('rejects source run that is %s before reading jobs or artifacts', async (_label, changes) => {
@@ -460,7 +460,7 @@ describe('Preview Cloud recovery trust gate', () => {
     await expect(verifyPreviewRecoveryTrust({ ...context, fetchImpl })).rejects.toThrow();
   });
 
-  it('requires the Integration-only Environment boundary and hides raw API responses', async () => {
+  it('requires the main-only Environment boundary and hides raw API responses', async () => {
     const { fetchImpl } = githubWorld({
       environment: {
         deployment_branch_policy: { protected_branches: false, custom_branch_policies: false },
