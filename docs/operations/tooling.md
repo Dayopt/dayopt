@@ -458,7 +458,7 @@ BSD-2-Clause: 12 packages (1.3%)
 
 Chat は product / UX・research・仕様整理、Claude Code は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
-subagent の model は project 設定で既定を固定する（2026-10-09 User 指定）。`.claude/settings.json` の `env.CLAUDE_CODE_SUBAGENT_MODEL=sonnet` が general-purpose・teammate・独自 agent の既定で、built-in の Explore は `.claude/agents/explore.md`（haiku）、Plan は `.claude/agents/plan.md`（sonnet）で上書きする。Agent tool の `model` 引数と agent 定義の `model:` はこの既定より優先されるので、重い設計・レビューだけ呼び出し側で明示して上げる。主会話の model は固定しない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
+subagent の model は `.claude/agents/` の定義ファイルを正本として固定する（2026-10-09 User 指定、#3069）。built-in と同名の project agent が built-in を上書きし、general-purpose は `general-purpose.md`（sonnet）、Explore は `explore.md`（haiku）、Plan は `plan.md`（sonnet）で動く。model は「Agent tool の `model` 引数 → 定義の `model:` → `CLAUDE_CODE_SUBAGENT_MODEL` → 主会話を継承」の順に決まるので、重い設計・レビューだけ呼び出し側で明示して上げる。`.claude/settings.json` の `env.CLAUDE_CODE_SUBAGENT_MODEL=sonnet` は定義の無い teammate・独自 agent 向けの保険として残すが、デスクトップアプリの session には届かないことがある（2026-10-09 実測、同じ `env` 欄の `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` は届いた）ので、既定を環境変数に頼らない。定義ファイルは session 開始時に読まれ、途中で追加した定義はその session の subagent に効かなかった（2026-10-09 実測）。確認は `pnpm ai:usage` の subagent 別集計か transcript の model 欄で行い、subagent の自己申告は根拠にしない。主会話の model は固定しない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
 ## 3. Hook の共有と保証境界
 
