@@ -4,6 +4,10 @@ on:
   pull_request_target:
     branches: [main, integration]
     types: [opened, reopened, synchronize, ready_for_review]
+    # Supabase の PR 専用 branch は supabase/ に変更がある PR にだけ作られる。
+    # Preview は Integration へ fallback しないため、変更がない PR で起動すると
+    # branch 待ちで必ず失敗する。required check ではないので起動しなくても merge は止まらない（#3060）。
+    paths: ['supabase/**']
   workflow_dispatch:
     inputs:
       target:
