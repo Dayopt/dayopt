@@ -95,7 +95,7 @@ merge ごとに Production build を作るが、domain は割り当てない（A
 
 ### 4. 影響判定（impact）（GitHub Actions）
 
-Production Release workflow が起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。
+毎晩 03:00 JST に Production Release workflow が main HEAD で起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。
 
 - **ここを変えると**: 影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。
 - **コード**:
@@ -116,7 +116,7 @@ Production Release workflow が起動し、product / web / storybook それぞ�
 
 - 画面: 利用者は旧版を使い続ける。
 - データ: コードは旧版のまま。migration だけ新しい。
-- 再試行: 自動ではしない。直して次の merge で走り直すか、workflow を手で起動する。
+- 再試行: 自動ではしない。直して merge すれば次の夜間 run で走り直す。急ぐなら workflow を手で起動する。
 - 痕跡: area:deployment ラベルの issue が立つ（既にあれば更新）。E2E の report が artifact に残る。
 - **最初に見る場所**: その issue → Actions の run → Upload report の artifact。
 - 根拠:
@@ -126,9 +126,9 @@ Production Release workflow が起動し、product / web / storybook それぞ�
 
 ### 6. smoke してから本番へ切り替える（GitHub Actions）
 
-release job が migration の反映を確かめ、候補を smoke してから Production domain へ promote する。candidate mode では未確認の migration 状態も公開を止める。
+release job が migration の反映を確かめ（今は advisory で warning だけ）、候補を smoke してから Production domain へ promote する。
 
-- **ここを変えると**: 緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。
+- **ここを変えると**: 緊急の手動実行も層 3・smoke・設定監査を通す。force による gate 迂回は廃止。
 - **コード**:
   - [`.github/workflows/promote.yml`](../../../.github/workflows/promote.yml) で `Wait, smoke, and promote Production` を探す
   - [`scripts/ci/production-release.mjs`](../../../scripts/ci/production-release.mjs) で `promote` を探す
@@ -318,7 +318,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
       "id": "impact",
       "svc": "github",
       "title": "影響判定（impact）",
-      "what": "Production Release workflow が起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。",
+      "what": "毎晩 03:00 JST に Production Release workflow が main HEAD で起動し、product / web / storybook それぞれの現在公開中の SHA との差分から、どれに影響があるかを決める。",
       "change": "影響なしと判定された project の検証は走らない。docs だけの merge でも build は作られ、判定を通る。",
       "refs": [
         {
@@ -356,7 +356,7 @@ release job が migration の反映を確かめ、候補を smoke してから P
           "label": "E2E が失敗",
           "screen": "利用者は旧版を使い続ける。",
           "data": "コードは旧版のまま。migration だけ新しい。",
-          "retry": "自動ではしない。直して次の merge で走り直すか、workflow を手で起動する。",
+          "retry": "自動ではしない。直して merge すれば次の夜間 run で走り直す。急ぐなら workflow を手で起動する。",
           "trace": "area:deployment ラベルの issue が立つ（既にあれば更新）。E2E の report が artifact に残る。",
           "look": "その issue → Actions の run → Upload report の artifact。",
           "refs": [
@@ -393,8 +393,8 @@ release job が migration の反映を確かめ、候補を smoke してから P
       "id": "promote",
       "svc": "github",
       "title": "smoke してから本番へ切り替える",
-      "what": "release job が migration の反映を確かめ、候補を smoke してから Production domain へ promote する。candidate mode では未確認の migration 状態も公開を止める。",
-      "change": "緊急の手動実行も候補固定・検証・一致確認・smoke・設定監査を通す。force による gate 迂回は廃止。候補経路の有効化は別途承認して設定する。",
+      "what": "release job が migration の反映を確かめ（今は advisory で warning だけ）、候補を smoke してから Production domain へ promote する。",
+      "change": "緊急の手動実行も層 3・smoke・設定監査を通す。force による gate 迂回は廃止。",
       "refs": [
         {
           "path": ".github/workflows/promote.yml",

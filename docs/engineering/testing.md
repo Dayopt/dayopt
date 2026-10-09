@@ -20,10 +20,10 @@ code:
 | ----------------------------- | -------------------------------------------- | --------------------------------------------------- | ----------------------------------------- |
 | Static                        | コードとして成立している                     | typecheck / lint / boundaries / knip                | pre-push、PR（ci.yml）                    |
 | Unit（Vitest）                | 小さなロジックが正しい                       | 時刻計算、重なり判定、集計、状態遷移                | PR は related、nightly で full            |
-| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | main push（promote.yml 層 3）             |
+| Storybook + Vitest            | UI 部品の状態・操作・a11y                    | editor、activity picker、Report 部品                | 夜間 promote（promote.yml 層 3）          |
 | Integration（local Supabase） | 部品・DB・API をつないでも正しい             | RLS、RPC、migration 契約（fresh）                   | DB を触る PR（ci.yml）                    |
 | DB upgrade（local Supabase）  | 既存データからの更新と旧アプリ互換           | base + seed → candidate、fresh との一致、契約縮小   | migration を追加した PR（ci.yml、shadow） |
-| E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | main push（promote.yml 層 3）             |
+| E2E（Playwright）             | ユーザーが中核の目的を end-to-end で達成する | Plan → Record → reload → Report（desktop / mobile） | 夜間 promote（promote.yml 層 3）          |
 | 契約 / 監査                   | 横断リスク                                   | workflow contract、production config audit          | PR / main push / 日次                     |
 | 探索（dogfooding）            | まだ知らない問題                             | 迷い、余計な一手、状態不整合                        | オンデマンド（gate にしない）             |
 
@@ -42,14 +42,14 @@ E2E は万能にしない。小さい問題は小さい層で守り、E2E は中
 1. **作業中**: 変更を証明する最小の層をローカルで回す
 2. **push**: pre-push が affected な typecheck / lint、scripts test、format を回す
 3. **ready 化した PR**: ci.yml の Static / Unit / 影響に応じた Integration。product unit は `vitest related`（変更が import graph で届く test）に絞る。graph で追えない変更（`packages/*`、設定、test setup、未知の path）を含む PR は full。src を fs で読む契約 test は毎回走る（`scripts/ci/check.mjs` の `resolveProductUnitScope`）
-4. **main push**: promote.yml の層 3（影響のある project の E2E、desktop + `@mobile`、Storybook light / dark）が green の時だけ production へ promote
+4. **夜間 promote（03:00 JST）**: main HEAD に対する promote.yml の層 3（影響のある project の E2E、desktop + `@mobile`、Storybook light / dark）が green の時だけ production へ promote
 5. **nightly / 日次**: 自分が変えなくても変わるもの（production config drift、replica、backup）と、PR で絞った product unit の full 実行（`product-unit-full`）
 
 nightly の full が落ちたら、落ちた test を直すのに加えて、PR の判定が拾えなかった依存の種類を full 側へ倒す規則に足す。
 
 ## Storybook の実行契約
 
-`promote.yml` の専用 `storybook` job が、collect 検査、同じ Story の静的 build、light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。emergency run も同じ gates を通り、廃止済みの `force` による迂回はできない。candidate strict gate は `RELEASE_CANDIDATE_ENABLED=true` の時だけ有効。
+`promote.yml` の専用 `storybook` job が、collect 検査、同じ Story の静的 build、light / dark の render・play・a11y を実行する。両 app の配信中 SHA のうち、target の祖先と確認できる最も新しい SHA を共通基準に、product / web / 共有 UI / Storybook 設定と実行経路の変更を拾う。片方だけ昇格した後に古い app の SHA から同じ変更を繰り返し検査しない。配信 SHA の欠落・履歴の分岐・判定不能時は実行する。失敗・cancel・判定出力欠落は通常の promote を通さず、失敗通知は既存経路へ接続する。emergency run も同じ gates を通り、廃止済みの `force` による迂回はできない。
 
 - per-PR / local static: `pnpm storybook:collect-files-check`（`check:static` に含む）。Vitest の `list --filesOnly` で両テーマの include 集合を全 Story ファイルと比較する。ブラウザ不要で root / glob の収集漏れを検知するが、runtime tag・play・a11y は検査しない。MDX は比較対象外、`docs-only` / `wip` の Story ファイルは両辺に含む。
 - browser collect: `pnpm exec tsx scripts/tasks/check-story-coverage.ts --collected`

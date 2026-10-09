@@ -47,6 +47,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const accountId = env.STRIPE_ACCOUNT_ID?.trim();
   const livemode = env.STRIPE_LIVEMODE;
   if (!secretKey && !accountId && !livemode) {
+    // 課金未有効でもcron自体は正常に走った。heartbeatが無いと日次監査が毎日赤になる。
+    const skippedAt = new Date().toISOString();
+    await writeCronHeartbeat('billing-reconciliation', 'started', skippedAt);
+    await writeCronHeartbeat('billing-reconciliation', 'completed', skippedAt);
     return noStoreJson({ ok: true, configured: false });
   }
 

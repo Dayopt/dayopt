@@ -129,8 +129,8 @@ git pull origin main
 
 ### Phase 1.2: Production promote が完了していることを確認する
 
-**promote は main merge で自動的に走る**（2026-09-03 以降。`promote.yml` の `push: main`）。
-リリース作業の側から dispatch する必要は無い。workflow は `impact →（影響のある層 3）→ release`
+**promote は毎晩 03:00 JST に main HEAD で自動的に走る**（2026-10-09 以降。`promote.yml` の `schedule`）。
+夜間 run の後に merge した commit を今日 release するなら `gh workflow run promote.yml --ref main` で出す。workflow は `impact →（影響のある層 3）→ release`
 の 3 段で、層 3（E2E / Web Build & E2E）が green の時だけ promote する。
 
 やることは「main HEAD が既に promote 済みか」の確認だけ:
@@ -149,9 +149,9 @@ gh api "repos/Dayopt/dayopt/commits/$(git rev-parse origin/main)/status" \
 - **status が 1 件も無い** → その commit の run を見る
   （`gh run list --workflow=promote.yml --branch main --limit 5`）。走行中なら待つ。
   **run の release job が `skipped` で終わっている場合は、待っても status は来ない**
-  —— 層 3 が赤い、または後続 push に層 3 を cancel された run。その commit を
-  release 対象にするのは諦め、**main HEAD を対象にする**（後続 merge の run が
-  live 基準で拾い直しているので、HEAD には status が付く）
+  —— 層 3 が赤い、または後続 run に層 3 を cancel された run。その commit を
+  release 対象にするのは諦め、**main HEAD を対象にする**（次の夜間 run か dispatch が
+  live 基準で拾い直すので、その後 HEAD には status が付く）
 
 #### promote をやり直したい / 緊急で通したい時（break-glass）
 

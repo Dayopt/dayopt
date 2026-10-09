@@ -50,27 +50,6 @@ on:
         default: false
 
 jobs:
-  candidate_heartbeat:
-    name: Candidate missing or stale evidence
-    # A monitoring tick, never a candidate test trigger or a backup trigger.
-    if: vars.RELEASE_CANDIDATE_ENABLED == 'true' && (github.event.schedule == '30 21 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.jobs == 'replica-check' || inputs.jobs == 'all')))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_CANDIDATE_MAX_AGE_SECONDS: ${{ vars.RELEASE_CANDIDATE_MAX_AGE_SECONDS }}
-        run: node scripts/ci/release-candidate-heartbeat.mjs
-
   # ─── product unit の full 実行（#2743）──────────────────────────────
   # PR の Unit job は product unit を `vitest related`（変更が import graph で届く test）に
   # 絞っている（scripts/ci/check.mjs resolveProductUnitScope）。graph で追えない漏れ
@@ -240,13 +219,12 @@ jobs:
   # skipped（cron 振り分けで走らない job）は失敗ではない。
   notify-failure:
     name: File nightly failure
-    needs: [product-unit-full, replica-check, storage-backup-export, candidate_heartbeat]
+    needs: [product-unit-full, replica-check, storage-backup-export]
     if: >-
       ${{ !cancelled()
           && ( needs.product-unit-full.result == 'failure'
                || needs.replica-check.result == 'failure'
-               || needs.storage-backup-export.result == 'failure'
-               || needs.candidate_heartbeat.result == 'failure' ) }}
+               || needs.storage-backup-export.result == 'failure' ) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -260,16 +238,11 @@ jobs:
           UNIT_RESULT: ${{ needs.product-unit-full.result }}
           REPLICA_RESULT: ${{ needs.replica-check.result }}
           BACKUP_RESULT: ${{ needs.storage-backup-export.result }}
-          CANDIDATE_RESULT: ${{ needs.candidate_heartbeat.result }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           title_prefix="[auto] Nightly job が失敗しました"
           hints=""
-          if [ "$CANDIDATE_RESULT" = "failure" ]; then
-            hints="$hints
-          - **candidate_heartbeat**: #3009 の候補証拠が欠測・stale・red・未完了。候補全体を保留し、再検証する。原因 PR の自動除外や部分 release は行わない。"
-          fi
           if [ "$BACKUP_RESULT" = "failure" ]; then
             hints="$hints
           - **storage-backup-export**: Supabase Storage → Cloudflare R2 の日次搬出が止まっている。**連続すると DR の復元元（\`docs/operations/disaster-recovery-drill.md\` §Storage）が古くなる。** secrets 未投入なら run log の \`未設定の GitHub Secrets\` を見る。rclone の失敗なら \`scripts/ci/storage-backup.sh\` の \`--max-delete\` 上限（暫定 1000）に当たっていないか確認する"
@@ -289,7 +262,6 @@ jobs:
           | Product unit tests (full) | \`$UNIT_RESULT\` |
           | Check Vercel replica against 1Password ledger | \`$REPLICA_RESULT\` |
           | Export Supabase Storage to R2 | \`$BACKUP_RESULT\` |
-          | Candidate missing or stale evidence | \`$CANDIDATE_RESULT\` |
 
           run: $RUN_URL
           $hints
