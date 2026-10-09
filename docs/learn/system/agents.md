@@ -31,7 +31,7 @@ flowchart LR
   end
   subgraph S5["PR"]
     E1["CI の required checks"]
-    E3["@codex review"]
+    E3["@claude review"]
     E4["main の ruleset<br/>merge を止める"]
   end
   subgraph S6["merge"]

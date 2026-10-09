@@ -159,11 +159,11 @@ pnpm security:check
 3. **`handleServiceError()` を使用** - 直接TRPCErrorをthrowしない
 4. **守るべき前提を作ったら `docs/engineering/invariants.md` を同じ PR で更新** - 新しい
    Pro 限定機能、新しい公開エンドポイント種別、新しい table パターンなど。カタログは
-   GitHub の `@codex review` が
+   GitHub の `@claude review` が
    「あるべき検査の不在」を判定する時の照合先なので、更新を怠ると新機能の穴が構造的に
    見えなくなる。**判定は自動では走らない**（merge の hard gate ではない advisory
    レビュー。追加 reviewer は停止中。AGENTS.md §レビュー規則）。危険クラスの diff では
-   `protected-path-gate.mjs` が保護対象と判定する時だけ、検証済みの merge 候補で `@codex review` を依頼する
+   `protected-path-gate.mjs` が保護対象と判定する時だけ、検証済みの merge 候補で `@claude review` を依頼する
 
 5. **実装前に `docs/engineering/threat-model.md` の既往クラスと却下記録を読む** - Dayopt で
    実際に起きた欠陥のクラスと、反証つきで却下済みの候補が並んでいる。同じ穴を掘り直さない
@@ -172,7 +172,7 @@ pnpm security:check
 
 ## 関連する検査経路
 
-- **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@codex review` と裁定
+- **`pr-cross-review` skill** — auth / RLS / service role / OAuth / webhook / billing / redirect / migration を扱う PR の `@claude review` と裁定
 - **`gardening` skill §5** — 月次の sweep（Supabase の `get_advisors` + `pnpm security:check`）。所見は issue へ、既往は `docs/engineering/threat-model.md` へ戻る
 - **オンデマンド sweep** — 月次以外に「repository 全体 / この境界を sweep して」と明示依頼された時の手順（下記）。provider を問わず同じ順序で回す
 - **`/claude-security`** — 既存コードの深掘りスキャン。上の手順の **任意の加速器**で、無くても完走する（Claude 以外の runtime では使えない）

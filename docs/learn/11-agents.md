@@ -18,7 +18,7 @@ Dayopt は 1 人で開発し、実装の多くを AI が行う。だから「AI 
 ```mermaid
 flowchart LR
   AI["AI agent<br/>調査・実装・検証"] --> G["機械の gate<br/>hook・lint・test・ruleset"]
-  G --> R["独立レビュー<br/>@codex review"]
+  G --> R["独立レビュー<br/>@claude review"]
   R --> H["人<br/>価値判断・不可逆な操作"]
 ```
 
