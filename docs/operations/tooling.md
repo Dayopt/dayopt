@@ -474,7 +474,6 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
 - Claude Code の cloud session は `scripts/hooks/session-start.sh`（`CLAUDE_CODE_REMOTE=true` の時だけ `pnpm install --frozen-lockfile`）で依存を揃える。自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
-- Jev key を cloud の実行環境変数に置かない。L1 を Cloud L2 に渡す時は、ローカルの認証済み `pnpm ctx <N> --post` で Issue Brief に保存し、Cloud 側は [`pnpm ctx <N> --reuse-brief-l1`](./jev.md) で入力一致とBrief投稿者・現在の `gh` 認証ユーザーの一致を検証して読む
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 - `pnpm branch:finish` はlinked worktreeなら従来どおり削除する。Cloud等の通常checkoutは未保存差分がなく、local/remoteの先端がPRのheadと一致しorigin/mainへ到達していることを確認してdetachし、ディレクトリを保持する。mainと別branchのcheckoutは切り替えない。残存remote branchはPRのheadに対するlease付き削除で後続pushを保護する。GitHubのmerge条件は実行場所で変えない
 - 手元のUI確認は `pnpm storybook`、静的buildは `pnpm build-storybook`。既存mockを使い、アプリSecret・1Password・Local Supabaseを要求しない。これは実際の認証や外部連携の確認とは区別する

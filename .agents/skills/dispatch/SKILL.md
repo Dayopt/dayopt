@@ -38,6 +38,6 @@ Issue の分類・停止・作業順は [AGENTS.md](../../../AGENTS.md) §Issue 
 4. 対象 Issue が open で `status:blocked` を持たないことを `gh issue view <N> --json state,labels` で確認する。ブロック解除は本文の解除条件を確かめ、前提と作業範囲を見直してから行う。
 5. リンク済み open PR と `git worktree list` を見て、既に担当がいるか、対象 path が衝突しないか確認する。重なる仕事は可能なら同じ担当に束ねる。
 6. Issue 本文の 4 節、受け入れ条件、検証手順を整える。未解決の前提があれば着手させず `status:blocked` にする。
-7. Issue コメントに担当、範囲、完了条件を 1〜3 行で記録する。非自明なIssue作業を引き渡す時は、認証済みdispatch担当が公開HEADで `pnpm ctx <N> --post` を実行し、BriefとL1の状態（complete / partial / unevaluated / unavailable、理由・評価件数）を確認する。投稿成功だけでJev利用成功と扱わない。部分評価や未取得でも一次資料で続行できるが、引き渡しコメントへ状態と理由を残す。workerへGateway keyや新規評価を要求しない。担当には Issue URL と `pnpm ctx <N> --reuse-brief-l1` を渡し、本文を要求の正本とする。実装では最初の commit の後に Draft PR を作る。PR と Issue に対象 milestone を付ける。
+7. Issue コメントに担当、範囲、完了条件を 1〜3 行で記録する。担当には Issue URL と `pnpm ctx <N> --reuse-brief-l1` を渡し、本文を要求の正本とする。実装では最初の commit の後に Draft PR を作る。PR と Issue に対象 milestone を付ける。
 
 定期棚卸しや自分の作業の開始にはこの引き渡し手順を要求しない。Issue の open / closed、PR、コメントと worktree を直接見る。
