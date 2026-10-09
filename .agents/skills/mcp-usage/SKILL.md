@@ -35,7 +35,7 @@ repo 側に MCP 定義や認証情報を置かない（同名定義が user-glob
 - Auth config: `SUPABASE_ACCESS_TOKEN="op://agent/supabase-agent/credential" op run -- node scripts/agent/supabase-mgmt-safe-get.mjs auth-config <field>…`（allowlist 内の field だけ）。`curl` での直叩きは guard が block する。
 - advisors: `supabase` CLI にコマンドは無い。Management API の advisors 読み取りを使うか、User に Dashboard の Security Advisor 確認を依頼する（`docs/operations/security.md` の定期確認）。
 - migration・write は cloud から行わない。`supabase` skill の既存フロー（local → PR Preview → production）に従う。
-- token の発行・ローテーションは User 作業（`docs/operations/secrets.md` §Agent の Supabase 読み取り token）。
+- token の発行・ローテーションは User 作業（`docs/operations/secrets-services.md` §Supabase）。
 
 ## MCP（例外）
 

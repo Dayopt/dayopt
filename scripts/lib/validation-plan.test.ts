@@ -140,7 +140,7 @@ describe('trusted validation plan', () => {
   it.each([
     'AGENTS.md',
     '.agents/skills/test/SKILL.md',
-    'docs/operations/tooling.md',
+    'docs/operations/ai-harness.md',
     'docs/engineering/data/architecture/model.c4',
   ])('does not require the scripts suite for documentation-only changes: %s', (file) => {
     // producer は `📦 Unit Tests` で、ci.yml は `needs.impact.outputs.docs_only == 'true'` で

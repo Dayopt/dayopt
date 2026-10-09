@@ -3,7 +3,7 @@
 出典: [mattpocock/skills](https://github.com/mattpocock/skills) `skills/engineering/tdd/`（`tests.md` / `mocking.md`）@ `959a8e9f1edc3adbe2f7e3054bb6fbefa6696260`（取得 2026-09-17）。
 License: MIT, Copyright (c) 2026 Matt Pocock.
 
-上流の原文を Dayopt 向けに抜粋・再構成したもので、公式原文そのままではない。更新は `docs/operations/tooling.md` の外部 skill 導入一覧に従う。
+上流の原文を Dayopt 向けに抜粋・再構成したもので、公式原文そのままではない。更新は `docs/operations/ai-harness.md` の外部 skill 導入一覧に従う。
 
 **Dayopt 調整**: 上流の「seam をテスト前にユーザーへ確認する」規則は取り込んでいない（AGENTS.md の AUTONOMOUS に反し、可逆な作業で不要な停止を作るため）。テスト対象の境界は実装者が判断し、迷う場合だけ判断理由を報告に書く。上流が参照する `codebase-design` / `code-review` skill と `CONTEXT.md` は Dayopt に存在しないため参照しない。テスト配置は `SKILL.md` の「`X.test.ts` は `X` の隣」が正本。
 
