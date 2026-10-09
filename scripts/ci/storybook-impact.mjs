@@ -256,7 +256,7 @@ export function resolveStorybookIgnore({
         continue;
       }
       if (
-        /^(docs|supabase|\.agents|\.claude|\.codex|\.github)\//.test(path) ||
+        /^(docs|supabase|\.agents|\.claude|\.github)\//.test(path) ||
         /\.md$/.test(path) ||
         /^scripts\//.test(path)
       )
