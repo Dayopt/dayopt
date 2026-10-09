@@ -61,6 +61,13 @@ overrides:
   # smol-toml: knip 経由（宣言は `^1.5.2` だが lockfile が 1.7.0 に固定されて
   #   いた）。TOML parse の DoS (GHSA-7w5x-hrqm-74c2)。devDependency のみ
   'smol-toml@1.7.0': '^1.7.1'
+  # brace-expansion: minimatch 3.x（eslint 経由）が 1.x、他が 5.x を requester に持つ。
+  #   quadratic-time 展開 (GHSA-q2hr-2g5m-vwhr) と再帰 DoS (GHSA-qhr7-859c-m2p7)。
+  #   間接依存は Dependabot が version を指定して上げられず（pnpm が 5.x へ解決して
+  #   dependency_file_not_resolvable になる）、security update が失敗し続けていたため、
+  #   脆弱な 2 version を各 major 内で置換する。devDependency（lint）経由のみ
+  'brace-expansion@1.1.18': '1.1.21'
+  'brace-expansion@5.0.9': '^5.0.12'
   # extract-zip (GHSA-jmr9-qjv8-65gv) は **extract-zip 自体を override できない**。
   # advisory は `>=2.0.2` を修正版と書くが 2.0.2 は未リリースで、最新が 2.0.1
   # （override を書くと ERR_PNPM_NO_MATCHING_VERSION で install が落ちる）。
