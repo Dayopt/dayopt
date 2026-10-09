@@ -258,8 +258,16 @@ export function renderPreflight(state) {
     lines.push(
       '- gh なし: ctx / trace / branch:finish の GitHub 情報は未取得。利用可能な接続で確認する',
     );
-  if (!state.nodeMatches || !state.pnpmMatches)
-    lines.push('- Node.js / pnpm の version が repository contract と一致しません');
+  if (!state.nodeMatches)
+    lines.push(
+      process.env.CLAUDE_CODE_REMOTE === 'true'
+        ? `- Node ${state.node} は .nvmrc (${state.expectedNode}) と不一致: cloud environment の setup script で Node 24 を入れる（#3051）`
+        : `- Node ${state.node} は .nvmrc (${state.expectedNode}) と不一致: fnm で .nvmrc を自動切替、または PATH=/opt/homebrew/opt/node@24/bin を前置`,
+    );
+  if (!state.pnpmMatches)
+    lines.push(
+      '- pnpm の version が repository contract (package.json#packageManager) と一致しません',
+    );
   if (!state.dependencies || Object.values(state.hooks).some((ready) => !ready)) {
     lines.push('- commit / push 前に依存と Git hooks を準備してください');
   }
