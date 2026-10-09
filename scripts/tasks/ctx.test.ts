@@ -152,11 +152,6 @@ describe('isBotLogin / selectComments', () => {
         created_at: '2026-08-03T00:00:00Z',
         body: '[internal-review]\nfindings...',
       },
-      {
-        user: { login: 'codex' },
-        created_at: '2026-08-04T00:00:00Z',
-        body: '[codex-issue-review]\nfindings...',
-      },
       { user: { login: 'b' }, created_at: '2026-08-05T00:00:00Z', body: '5' },
     ];
     expect(selectComments(withMarkers, 10, false).map((c) => c.body)).toEqual(['1', '5']);
@@ -170,27 +165,6 @@ describe('isBotLogin / selectComments', () => {
       body: `${CTX_MARKER}\n重要な制約`,
     };
     expect(selectComments([spoofed], 10, true)).toEqual([spoofed]);
-  });
-
-  it('Codex（chatgpt-codex-connector[bot]）は bot 除外の対象外にする（実装前レビューを見落とさない）', () => {
-    const withCodex = [
-      { user: { login: 'a' }, created_at: '2026-08-01T00:00:00Z', body: '1' },
-      {
-        user: { login: 'chatgpt-codex-connector[bot]' },
-        created_at: '2026-08-02T00:00:00Z',
-        body: 'Codex のレビューコメント: P1 の指摘あり',
-      },
-      // 他の bot（dependabot 等）は引き続き除外する。
-      {
-        user: { login: 'dependabot[bot]' },
-        created_at: '2026-08-03T00:00:00Z',
-        body: 'dependency bump',
-      },
-    ];
-    expect(selectComments(withCodex, 10, false).map((c) => c.body)).toEqual([
-      '1',
-      'Codex のレビューコメント: P1 の指摘あり',
-    ]);
   });
 });
 

@@ -12,11 +12,7 @@ const digest = (value) => createHash('sha256').update(JSON.stringify(value)).dig
 export function classifyPlanPath(file) {
   const areas = [];
   if (file === 'README.md' || file === 'LICENSE') return ['prose'];
-  if (
-    /^(AGENTS\.md|CLAUDE\.md|\.agents\/|\.claude\/|\.codex\/|\.husky\/|\.github\/|scripts\/)/.test(
-      file,
-    )
-  )
+  if (/^(AGENTS\.md|CLAUDE\.md|\.agents\/|\.claude\/|\.husky\/|\.github\/|scripts\/)/.test(file))
     areas.push('policy');
   if (/^(docs\/)/.test(file)) areas.push('contract-docs');
   if (/\.mdx$/.test(file)) areas.push('executable-content');
@@ -24,14 +20,14 @@ export function classifyPlanPath(file) {
   if (/\/(time|timeblock|calendar)\/|\/features\/.*\/(domain|server)\//.test(file))
     areas.push('behavior');
   // `api` / `database` は suite を 1 つずつ足す（mcpConformance / integration）。**agent 向けの
-  // 手引き（`.agents/` `.claude/` `.codex/` 配下の Markdown）は契約そのものではない**ので掛けない。
+  // 手引き（`.agents/` `.claude/` 配下の Markdown）は契約そのものではない**ので掛けない。
   // path に `supabase` / `rls` を含むだけの SKILL.md が integration を required にする一方、
   // impact.mjs は同じ path を docs-only と判定して job を起動しないため、待っても満たされず
   // 恒久的に blocked になっていた（#2815、`.agents/skills/supabase/SKILL.md` で実発生）。
   // 契約が実際に変わる PR には SQL / TS / workflow が入り、そちらが area を立てる。
   // `docs/` は除外しない（`docs/engineering/data/db/rls-snapshot.md` を api-db として扱う
   // validation-shadow-report.mjs の判定がこの area に乗っている）。
-  const agentGuidance = /^(\.agents|\.claude|\.codex)\/.*\.md$/.test(file);
+  const agentGuidance = /^(\.agents|\.claude)\/.*\.md$/.test(file);
   if (!agentGuidance && /\/api\/|\/mcp\/|\/oauth/.test(file)) areas.push('api');
   if (!agentGuidance && /^supabase\/|\/database\/|\/supabase\/|rls/.test(file))
     areas.push('database');
@@ -123,8 +119,8 @@ export function createValidationPlan(input, options = {}) {
     // 文書だけの変更で required にすると**起動しない job を待って恒久 blocked になる**
     // （#2821。`README.md` / `LICENSE` 以外の Markdown は proseOnly にならないため、
     // AGENTS.md・skill・docs の更新が全部これに当たっていた）。`impact.docsOnly` は
-    // 実行可能なポリシー（`scripts/**`、`.github/workflows/**`、`.claude/settings.json`、
-    // `.codex/hooks.json`）を false にするので、挙動を変えうる変更では required のまま残る。
+    // 実行可能なポリシー（`scripts/**`、`.github/workflows/**`、`.claude/settings.json`）
+    // を false にするので、挙動を変えうる変更では required のまま残る。
     scripts: suite(
       !proseOnly && !impact.docsOnly,
       'Executable code and policy need script contract tests',
