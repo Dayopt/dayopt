@@ -27,7 +27,7 @@ const createMockTimeblock = (
 });
 
 describe('useDayView', () => {
-  const baseDate = new Date('2026-03-30');
+  const baseDate = new Date(2026, 2, 30, 12);
 
   it('タイムブロックがない場合は空の配列を返す', () => {
     const { result } = renderHook(() =>

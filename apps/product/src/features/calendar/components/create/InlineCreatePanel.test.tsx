@@ -9,9 +9,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { TimeModelEditorValue } from '@/features/timeblock';
+
 import { useInlineCreateStore } from '../../stores/useInlineCreateStore';
 
 import { InlineCreatePanel } from './InlineCreatePanel';
+
+const preferences = vi.hoisted(() => ({ timezone: 'UTC', timeFormat: '24h' }));
 
 const createPlanMutate = vi.hoisted(() => vi.fn());
 const createRecordMutate = vi.hoisted(() => vi.fn());
@@ -42,16 +46,39 @@ vi.mock('@/features/timeblock', async () => {
         selector({ openInspector, closeInspector }),
       { getState: () => ({ openInspector, closeInspector }) },
     ),
-    // 日付・時間・充実度・メモの入力は TimeblockEditor 側で検証済みなので、
-    // ここではメモと充実度が作成入力へ載るかだけを見る
+    // Editor境界の実時刻と、作成入力への受け渡しを検証する。
     TimeblockEditor: ({
+      value,
+      onDateTimeChange,
       onNoteChange,
       fulfillmentSlot,
     }: {
+      value: TimeModelEditorValue;
+      onDateTimeChange: (next: TimeModelEditorValue) => void;
       onNoteChange: (note: string) => void;
       fulfillmentSlot?: React.ReactNode;
     }) => (
       <div>
+        <output data-testid="editor-start-instant">{value.startAt.toISOString()}</output>
+        <output data-testid="editor-end-instant">{value.endAt.toISOString()}</output>
+        <button
+          type="button"
+          onClick={() =>
+            onDateTimeChange({
+              ...value,
+              startAt: new Date('2026-09-29T16:30:00Z'),
+              endAt: new Date('2026-09-29T17:30:00Z'),
+            })
+          }
+        >
+          edit-time
+        </button>
+        <button
+          type="button"
+          onClick={() => onDateTimeChange({ ...value, startAt: new Date('2026-09-29T16:30:00Z') })}
+        >
+          edit-start
+        </button>
         <button type="button" onClick={() => onNoteChange('集中できた')}>
           note
         </button>
@@ -110,7 +137,7 @@ vi.mock('@/features/activities', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 vi.mock('@/lib/hooks/useUserPreferences', () => ({
   useUserPreferences: (selector: (s: { timezone: string; timeFormat: string }) => unknown) =>
-    selector({ timezone: 'UTC', timeFormat: '24h' }),
+    selector(preferences),
 }));
 vi.mock('../../hooks/accessibility/useHapticFeedback', () => ({
   useHapticFeedback: () => ({ tap: vi.fn(), impact: vi.fn() }),
@@ -148,12 +175,78 @@ function futureDay() {
 
 describe('InlineCreatePanel', () => {
   beforeEach(() => {
+    preferences.timezone = 'UTC';
     createPlanMutate.mockClear();
     createRecordMutate.mockClear();
     openInspector.mockClear();
     closeInspector.mockClear();
     useInlineCreateStore.getState().clearPendingSelection();
     laneItems.length = 0;
+  });
+
+  it('ニューヨークの選択日時をEditorへ実時刻で渡す', () => {
+    preferences.timezone = 'America/New_York';
+    setSelection(new Date(2026, 8, 29));
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    expect(screen.getByTestId('editor-start-instant')).toHaveTextContent(
+      '2026-09-29T13:00:00.000Z',
+    );
+    expect(screen.getByTestId('editor-end-instant')).toHaveTextContent('2026-09-29T14:00:00.000Z');
+  });
+
+  it('Editorからの実時刻をドラッグ選択日時へ戻して同じ時刻で作成する', () => {
+    preferences.timezone = 'America/New_York';
+    useInlineCreateStore.getState().setPendingSelection({
+      date: new Date(2026, 8, 29),
+      startHour: 9,
+      startMinute: 0,
+      endHour: 10,
+      endMinute: 0,
+      durationSource: 'dragged',
+    });
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'edit-time' }));
+
+    const selection = useInlineCreateStore.getState().pendingSelection;
+    expect(selection?.date.getFullYear()).toBe(2026);
+    expect(selection?.date.getMonth()).toBe(8);
+    expect(selection?.date.getDate()).toBe(29);
+    expect(selection).toMatchObject({ startHour: 12, startMinute: 30, endHour: 13, endMinute: 30 });
+    fireEvent.click(screen.getByRole('tab', { name: 'timeblock.preview.plan' }));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createPlanMutate).toHaveBeenCalledOnce();
+    expect(createPlanMutate.mock.calls[0]?.[0]).toMatchObject({
+      start_at: '2026-09-29T16:30:00.000Z',
+      end_at: '2026-09-29T17:30:00.000Z',
+    });
+  });
+
+  it('開始だけ編集しても選択日の24時終了を保持する', () => {
+    preferences.timezone = 'America/New_York';
+    useInlineCreateStore.getState().setPendingSelection({
+      date: new Date(2026, 8, 29),
+      startHour: 12,
+      startMinute: 0,
+      endHour: 24,
+      endMinute: 0,
+      durationSource: 'dragged',
+    });
+    render(<InlineCreatePanel onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'edit-start' }));
+    expect(useInlineCreateStore.getState().pendingSelection).toMatchObject({
+      startHour: 12,
+      startMinute: 30,
+      endHour: 24,
+      endMinute: 0,
+    });
+    fireEvent.click(screen.getByRole('tab', { name: 'timeblock.preview.plan' }));
+    fireEvent.click(screen.getByRole('button', { name: '開発' }));
+    expect(createPlanMutate.mock.calls[0]?.[0]).toMatchObject({
+      start_at: '2026-09-29T16:30:00.000Z',
+      end_at: '2026-09-30T04:00:00.000Z',
+    });
   });
 
   it('過去スロットの既定は記録で、アクティビティを押した時点で Record を作る', () => {
