@@ -473,6 +473,8 @@ Claude Code は project の `.claude/settings.json` の hook を読み込む。`
 Node.js と package manager は実行場所ごとに暗黙で選ばせず、repository contract に揃える。
 
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
+- ローカルで Node 24 に自動で揃えるには fnm を使う（User 作業。shell 設定は repo 外）。`brew install fnm` の後、`~/.zshrc` に `eval "$(fnm env --use-on-cd --version-file-strategy=recursive)"` を追記し、新しい shell で repo に入って `fnm install` を実行する（`.nvmrc` を読む）。入れるまでは `PATH=/opt/homebrew/opt/node@24/bin:$PATH` を前置する。不一致時の preflight は原因と直し方を 1 行で出す（Cloud では setup script で Node 24 を入れる、[#3051](https://github.com/Dayopt/dayopt/issues/3051)）。repo の hook に installer は置かない
+- `pnpm dev` は Docker と local Supabase を前提にしたまま変えない（[#3058](https://github.com/Dayopt/dayopt/issues/3058)）。agent の vault には非本番 persistent branch の Supabase key が無く、`pnpm dev` をそこへ繋ぐには新しい secret が要る（User 判断）。Docker 無しで動かす現行の経路は、env を明示して渡す `pnpm dev:raw`（[secrets.md](./secrets.md)）で、product の動作確認は Vercel Preview で行う（[#2910](https://github.com/Dayopt/dayopt/issues/2910)）
 - Claude Code の cloud session は `scripts/hooks/session-start.sh`（`CLAUDE_CODE_REMOTE=true` の時だけ `pnpm install --frozen-lockfile`）で依存を揃える。自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 - `pnpm branch:finish` はlinked worktreeなら従来どおり削除する。Cloud等の通常checkoutは未保存差分がなく、local/remoteの先端がPRのheadと一致しorigin/mainへ到達していることを確認してdetachし、ディレクトリを保持する。mainと別branchのcheckoutは切り替えない。残存remote branchはPRのheadに対するlease付き削除で後続pushを保護する。GitHubのmerge条件は実行場所で変えない
@@ -570,10 +572,6 @@ read-only と repository scope を runtime で同時に強制できる delegate 
 
 ## 7. Migration acceptance と handoff
 
-native worktree root の fresh Codex session による共通指示・skills の発見と、サブディレクトリ起動の別 Codex session への review pack 引き継ぎを確認した。Codex の project trust と実 hook 発火、Antigravity の skill discovery と review adapter は未検証であり、設定ファイルの存在を有効化の証拠にしない。
-
-2026-09-07、`scripts/tasks` から新規 Codex read-only セッション（gpt-5.6-sol、session `01a0796e-8943-7303-9bb3-6184e41a9b2f`）を起動し、base `393f432c6` → head `bbdb9510a` の移行差分を pack で手渡した。result envelope は `reviewed`、recommendation は `revise`、指摘 1 件だった。指摘は shell の任意編集に対する保証の過大解釈で、経路別の保護表へ保証外の操作を明記した。これは別 OpenAI セッションの反証であり、別モデル系列の反証や native hook 発火の証拠ではない。旧 SHA の所見を後続 SHA の指摘ゼロとして再利用しない。
-
 次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。
 
 | trial                    | 対象                                                 | status  |
@@ -591,7 +589,7 @@ native worktree root の fresh Codex session による共通指示・skills の�
 
 `stale` / `partial` / `not-run` / `invalid` の区別と、未完了 result を findings 0 にしない契約は自動 test 24 件で検証済みである。これは実 PR での上記 3 trial や reviewer 品質の代替ではない。
 
-`pnpm ai:usage` と `pnpm trace` の session / token / tool データは Claude Code local transcript のみを収集する。Codex / Antigravity は `null` / unknown であり 0 ではない。GitHub 由来の aggregate PR outcomes は repo 全体の値なので、Claude Code の token や session で割って provider の効率を主張しない。
+`pnpm ai:usage` と `pnpm trace` の session / token / tool データは Claude Code local transcript のみを収集する。Antigravity は `null` / unknown であり 0 ではない。GitHub 由来の aggregate PR outcomes は repo 全体の値なので、Claude Code の token や session で割って provider の効率を主張しない。
 
 ---
 

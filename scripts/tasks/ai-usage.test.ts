@@ -25,7 +25,6 @@ describe('session telemetry coverage', () => {
   it('Claude Code だけを collected とし、未収集 provider を 0 にしない', () => {
     expect(SESSION_TELEMETRY_COVERAGE.providers).toEqual({
       claudeCode: 'collected',
-      codex: null,
       antigravity: null,
     });
     expect(SESSION_TELEMETRY_COVERAGE.missingMeans).toBe('unknown-not-zero');
@@ -498,7 +497,7 @@ describe('renderMarkdown', () => {
 
     expect(markdown).toContain('### AI 経済メトリクス（2026-08-01〜2026-08-31）');
     expect(markdown).toContain('Claude Code の local transcript のみ');
-    expect(markdown).toContain('Codex / Antigravity は未収集（不明であり 0 ではない）');
+    expect(markdown).toContain('Antigravity は未収集（不明であり 0 ではない）');
     expect(markdown).toContain('| sonnet | 1 | 100 |');
     expect(markdown).toContain('**merged PR 数**: 2');
     expect(markdown).toContain('**revert PR 数（title proxy）**: 0');
