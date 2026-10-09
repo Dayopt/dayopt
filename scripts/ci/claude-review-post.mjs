@@ -23,7 +23,7 @@ const SHA = /^[a-f0-9]{40}$/;
 const SEVERITIES = new Set(['P1', 'P2']);
 const MAX_FINDINGS = 20;
 const MAX_TEXT = 4000;
-/** trace.mjs / jev-shadow-truth.ts の P1 / P2 集計が読む badge 表記。 */
+/** trace.mjs の P1 / P2 集計が読む badge 表記。 */
 const BADGE = {
   P1: '![P1 Badge](https://img.shields.io/badge/P1-red?style=flat)',
   P2: '![P2 Badge](https://img.shields.io/badge/P2-orange?style=flat)',
