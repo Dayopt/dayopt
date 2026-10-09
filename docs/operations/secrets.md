@@ -42,54 +42,19 @@ provider ごとの入口は薄い adapter として分ける。
 **触ってよい（読み書き可）**:
 
 - `.op-env.agent` / `.op-env.agent.example` — 中身は `op://` 参照のみで実秘密なし（app ごとの `.env.example` は 2026-08-14 に廃止した。変数一覧の正本は `scripts/tasks/env/schema.ts` で、手動維持の重複コピーは drift 源にしかならないため）
-- `.op-env.human` / `.op-env.human.example` — 中身は `op://` 参照だけで実秘密は含まない。旧境界（作成・読み書き禁止）は 2026-08-13、User 決定（[#1993](https://github.com/Dayopt/dayopt/issues/1993)）で緩和した。読み・作成・編集は解禁し、境界は**消費**（`op run` にこのファイルを `--env-file` として渡す実行経路）だけに絞る。中身は参照 path のみで無害だが、消費すると production の service role key が解決される実行経路が用意されるため、消費は User の明示操作に限る。agent は schema の更新（`.op-env.human.example` の編集）だけでなく、`.op-env.human` 自体の作成・編集もできる。**enforcement は消費側だけに残す**: `pre-tool-guard-rules.mjs` の Bash 側ガードが、`--env-file` が `.op-env.human` 系（雛形含む）を指す実行を拒否する。`.claude/settings.json` の `deny`（旧 `Write` / `Edit`）は撤去した。契約は `scripts/__tests__/pre-tool-guard.test.ts` が固定する（作成・書き込みは許可、直後の消費は block、を両方 assert する）
-  - **雛形も消費側の対象に含める**（`.op-env.human.example` は `op://human/...` の参照をそのまま持つため、コピーせず `op run` に渡すだけで同じ本番権限が解決される）
+- `.op-env.human` / `.op-env.human.example` — 中身は `op://` 参照だけで実秘密は含まない（2026-08-13、[#1993](https://github.com/Dayopt/dayopt/issues/1993) で読み書きを解禁）。`op run` に渡す消費は User の明示操作で行う
 
-**共有 rules が adapter から呼ばれた時の判定境界。** 消費側は **allowlist で判定する**。`--env-file` に渡してよいのは `.op-env.agent` だけで、それ以外は中身を問わず落とす。
+**env-file の消費は token の到達範囲で閉じる（2026-10-09、[#3053](https://github.com/Dayopt/dayopt/issues/3053)）。** agent の `op` は `agent` vault だけを読める Service Account で動く（§Service Account）。`human` / `ci` の `op://` 参照は、どの env-file に書いても、どの書き方で `op run` に渡しても解決されない。そのため、以前 guard に置いていた env-file の検査（`.op-env.human` 系の消費禁止、`--env-file` の path と flag の allowlist、消費を単一コマンドに限る判定、env-file の中身と書き込みの vault allowlist）は撤去した。これらは「agent の `op` が human vault に届く」前提の speed bump で、2026-08 から 09 に path・flag・quote・NBSP の迂回を 1 つずつ塞いでいた。経緯は git 履歴と [#1949](https://github.com/Dayopt/dayopt/issues/1949) / [#1986](https://github.com/Dayopt/dayopt/issues/1986) / [#1987](https://github.com/Dayopt/dayopt/issues/1987)。
 
-禁止する側を数え上げる方式には 2 段階で穴が見つかった。第一に、`op` がコマンド位置に来る形だけを見ると `env op run` / `command op run` / 絶対パス / `sh -c "op run …"` / `xargs` で迂回できる。第二に、`--env-file` が `.op-env.human` 系を指す場合だけを落としても、**雛形を別名へ複製すれば破れる**（`cp .op-env.human.example /tmp/foo` → その別名を `op run` へ）。path 名から中身は判別できない以上、許可する側を固定するしかない。新しい env-file を足す時はガードも更新する（増やすこと自体を意図的な判断にするため）。
+**この前提が崩れる経路**: 同じ OS ユーザーの shell で `OP_SERVICE_ACCOUNT_TOKEN` を外して `op` を呼ぶと、1Password app の CLI 連携（人間用）に落ちうる。その場合は 1Password app の承認プロンプトが出るので、User は承認しない。agent は token を外した `op` を実行しない。
 
-**判定は fail closed で、path 文字列そのものを allowlist にする。** 許可するのは repo 直下（`.op-env.agent`）、明示 `./` 付き（`./.op-env.agent`）、workspace からの相対（`../../.op-env.agent`）の 3 形式だけ。
-
-ここに至るまでに、緩い判定は 2 通りの穴を開けた。「path らしくない token は無視する」例外は quote / backslash escape を含む path を検査対象から外し、空白入りの別名で迂回できた。basename での判定は、任意ディレクトリに同名で置くだけで通った（`cp .op-env.human.example /tmp/.op-env.agent`）。token を分類したり path を正規化したりせず、許可形の literal 以外はすべて落とす。
-
-adapter が共有 rules へ渡したコマンド文字列では、列挙した静的な path 表現を拒否する。起動方法（`env` / `command` / 絶対パス / `sh -c` / `xargs`）、別名、quote / escape、別ディレクトリの同名ファイルは許可形の literal に一致しないため落ちる。runtime が adapter を呼ばない経路と、後述する実行時の文字列組み立てはこの保証に含めない。
-
-**flag の書き方も allowlist で判定する。** path を allowlist にしても、**flag と path の書き方を変えれば照合に入らない**（`--env-file"=…"` のように `=` の前へ引用符を刺すと、トリガーの正規表現に一致せず素通りした）。regex でコマンド文字列を見る限り shell の引数解釈は再現できず、同じ argv に落ちる書き方は無数にあるので、変形を数え上げるのをやめた。**`-env-file` という言及が 1 つでもあれば、その言及が全部「flag + `=`/空白 + 許可 literal + 区切り」でない限り落とす。** 加えて引用符と backslash を除いた写しでも同じ判定を行い、どちらかが落ちたら落とす（flag 名の内側へ引用符を刺す `--env-f"ile"=…` はこの写しでしか捕まらない）。
-
-**path が allowlist を通っても、中身を検査する。** `.op-env.agent` は agent が書ける（本節の「触ってよい」）ので、そこへ `op://human/…` を書き足せば path トリックなしで production credential に届く。そこで **`op://` の vault を allowlist で判定する** — 通すのは `agent` だけで、それ以外を参照する env-file は落とす（2026-08-14 の信頼境界軸再編 #2086 で、旧 3 vault の列挙から `agent` 1 つに縮んだ）。`human` / `ci` を禁止する形にしないのは、vault が増えた時に穴が開くため。検査は 3 層に置く:
-
-1. **実行時** — 許可形を通った env-file の実ファイルを読み、許可外 vault があれば落とす。ファイルが無ければ解決される参照も無いので通す
-2. **消費は単一の単純コマンドに限る** — hook は Bash 呼び出しごとに実行前 1 回しか発火しないので、同じコマンドの中で先に書き換えられると 1 が**書き換え前**を読む（`echo … >> <env-file> && op run …`）。書き手を数え上げる方式は閉じない（`cp` / `tee` / `sed` / リダイレクトを列挙した実装を、`python3` / `node` / `>|` がすり抜けることを実測した）。**書き手ではなく「別のことが起きる余地」を落とす** — 区切り（`;` `&` `|` 改行）、コマンド置換（`$( )` / backtick）、プロセス置換（`<( )` / `>( )`）、`eval` のいずれかがあれば拒否する。リダイレクトは別のコマンドを走らせないので許す。この列挙は書き手やコマンド名と違って **shell の文法側で閉じている**。flag の言及判定・path の抽出・この単一コマンド判定は、生の文字列と引用符を除いた写しの**両方**で行う（片方だけだと `--env-f"ile"=…` がどの検査にも載らない）
-3. **書き込み時（Write / Edit）** — `.op-env.agent` / `.op-env.agent.example` へ許可外 vault を書くこと自体を落とす。1 は agent が `op run` を直接打つ場面でしか発火しない（`pnpm typecheck:op` などは npm script の内側で `op run` するので hook から見えない）ため、書き足しを発生源で止める。**これは best-effort で、権威は 1 の方**。この層が見るのは書き込まれるテキストだけなので、`agent` → `human` のように **`op://` を含まない部分置換の Edit は捕まらない**（[#1986](https://github.com/Dayopt/dayopt/issues/1986)）
-
-**この経路は本節の変更が新設したものではない。** 以前の `.op-env.agent.example` は Supabase の接続情報を `op://agent/supabase/...`（実測で production と同一値）で持っており、何も書き足さずに同じ到達ができた。
-
-**閉じない境界**（意図的に追わない。書かない境界は「閉じているはず」と誤読される方が危険なので明記する）:
-
-- **実行時に文字列を組み立てる形** — 変数展開（`op run --env-$X=…`）、shell の escape 展開（`$'\x6c\x65'` / `$'\154\145'` のような ANSI-C escape）、base64、wrapper script を書いてそれを実行する。これは事故ではなく意図的な回避（`eval` とコマンド置換は、flag を言及するコマンドでは上記 2 が落とす）。
-
-  **この集合は数え上げられない。** guard が見るのはコマンド文字列で、そこから shell の解釈を再現することはできない。静的に決まる quote 形式（`"` `'` `\`、`$'…'` / `$"…"` の literal）は正規化して追うが、**中身を展開しないと `--env-file` にならない形は追わない**。1 つ塞いでも同じ到達が別の形で作れる — 実測で、escape 展開を塞いでも `X=file; op run --env-$X=…` と wrapper script はどちらも通る。したがって escape 展開だけを塞ぐことに意味は無い。
-
-  **ここから先の権威は 2 つ**。実行時の中身検査（上記 1）が、どの書き方で辿り着いても最後に実ファイルを読む。そして `AGENTS.md` §シンプルルール の `EXPLICIT AUTHORITY` と 1Password 側の承認が、production への操作そのものを止める。**hook はそこへ至る前のスピードバンプ**であって、意図的な回避の最終的な境界ではない。
-
-- **inline env var 経由の `op://` 解決** — `VAR="op://…" op run -- <cmd>` の形は、env-file を経由しないため vault allowlist（env-file の中身検査）の対象外。`op run` は process env 中の参照も解決する。**これは意図的な受容**（機械で閉じるには hook がコマンド中の全 env 代入を解釈する必要があり、env-file 検査と同じ「regex で shell を再現できない」壁に当たる）。この形で human / ci を読むのは User の明示操作に限り、実効的な抑止は 1Password 側の承認プロンプトが担う。Service Account 導入の設計（[#2086](https://github.com/Dayopt/dayopt/issues/2086)）で機械的に閉じられるかを再訪する
-- **hook の cwd と実行時の cwd がずれる場合** — 中身の検査は hook の cwd から path を解決する。コマンド自身が `cd` する形は上記 2 で落とすが、tool 側の cwd が hook と異なる環境では検査対象と実際のファイルがずれうる
-- **tool 呼び出しをまたぐ書き換え** — 1 回目で書き、2 回目で消費する形は、2 回目の実行時検査が捕まえる（同一コマンド内は上記 2 が担当）
-
-**hook はスピードバンプであって最終的な境界ではない**（`.husky/pre-push` と同じ位置づけ）。production への操作を止める本体は `AGENTS.md` §シンプルルール の `EXPLICIT AUTHORITY` と、1Password 側の承認。
+**hook はスピードバンプであって最終的な境界ではない**（`.husky/pre-push` と同じ位置づけ）。production への操作を止める本体は、token の到達範囲と `AGENTS.md` §シンプルルール の `EXPLICIT AUTHORITY`。
 
 **guard script 自体が壊れた時の挙動は決定済み（2026-08-13、User 決定。[#1961](https://github.com/Dayopt/dayopt/issues/1961)）。** bash は構文エラーでも `exit 2` を返すため、単一ファイル構成では guard が壊れると hook は全操作をブロックし、**guard を直す編集まで塞ぐ**（2026-08-12 に発生し、別セッションからの復旧が必要になった）。
 
-採ったのは純粋な fail open でも fail closed 全面維持でもなく、**中間案**: 薄い loader `scripts/hooks/pre-tool-guard.mjs` と実ロジック `pre-tool-guard-rules.mjs` の 2 ファイルに分離する。loader は毎回 rules を `import()` し、成功したら委譲する（rules の判定は allow のみ 0、他はすべて 2 へ写す — 実行時エラーで例外を投げても fail closed を保つ）。import に失敗（構文エラー等）したら fail closed を既定にしつつ、**rules ファイル自身への Write/Edit だけ**を復旧目的で例外的に通す。他のすべての操作（Bash 全般、他ファイルの Write/Edit、spawn_task）は引き続きブロックする。当初は bash（`pre-tool-guard.sh` + `pre-tool-guard-impl.sh`、`bash -n` で構文検査）で実装し、2026-09-02 に他の L0 script と同じ Node へ移植した（挙動は同一、経緯は git 履歴）。
+採ったのは純粋な fail open でも fail closed 全面維持でもなく、**中間案**: 薄い loader `scripts/hooks/pre-tool-guard.mjs` と実ロジック `pre-tool-guard-rules.mjs` の 2 ファイルに分離する。loader は毎回 rules を `import()` し、成功したら委譲する（rules の判定は allow のみ 0、他はすべて 2 へ写す — 実行時エラーで例外を投げても fail closed を保つ）。import に失敗（構文エラー等）したら fail closed を既定にしつつ、**rules ファイル自身への Write/Edit だけ**を復旧目的で例外的に通す。他のすべての操作（Bash 全般、他ファイルの Write/Edit）は引き続きブロックする。当初は bash（`pre-tool-guard.sh` + `pre-tool-guard-impl.sh`、`bash -n` で構文検査）で実装し、2026-09-02 に他の L0 script と同じ Node へ移植した（挙動は同一、経緯は git 履歴）。
 
-1 ファイル構成では、自己検査コードを含めファイル内のどのコードも構文エラーで実行されなくなるため（bash も Node の ESM も、ファイル全体をパースしてから実行する）、この中間案は loader/rules の 2 ファイル分離でのみ実装できる。fail open 全面採用は復旧経路以外の全保護（force-push・env-file 消費・spawn_task ブロック）まで無効化する過剰な倒し方であり、fail closed 全面維持は復旧に別セッションを要求し続ける。中間案は問題の scope（復旧経路が塞がること）と対応の scope を一致させる。契約は `scripts/__tests__/pre-tool-guard.test.ts` の「loader/rules 分離」describe が固定する。
-
-**受け入れる誤検知**（fail closed の代償。どちらも回避策がある）:
-
-- `-env-file` のあとに何か語や引用符が続く文字列は、Bash 引数に含めるだけで落ちる（引用符の中でも散文でも同じ。`rg -- '--env-file' scripts/hooks/` のような自己検索も含む）。docs や commit message にコマンド例を書く時は Write / Edit で file に書いてから `--body-file` / `-F` で渡す。名前を検索したいだけなら **leading dash を外す**（`rg env-file scripts/hooks/` は通る）
-- `op run` の行に他のコマンドを繋げられない。雛形のコピーと実行を 1 行に畳む形（`cp .op-env.agent.example .op-env.agent && op run …`）、`cd` してからの実行、実行結果のリダイレクトによるログ取りが該当する。**分けて実行すれば通る**
-- 単一コマンド判定は文字単位なので、**引用済み引数の中の区切り記号でも落ちる**（`op run --env-file=… -- node -e "console.log('a|b')"`）。この形は分けても回避できない。判定範囲を絞れるかは [#1987](https://github.com/Dayopt/dayopt/issues/1987) で検討する
+1 ファイル構成では、自己検査コードを含めファイル内のどのコードも構文エラーで実行されなくなるため（bash も Node の ESM も、ファイル全体をパースしてから実行する）、この中間案は loader/rules の 2 ファイル分離でのみ実装できる。fail open 全面採用は復旧経路以外の全保護（force push・`.env`・worktree 境界）まで無効化する過剰な倒し方であり、fail closed 全面維持は復旧に別セッションを要求し続ける。中間案は問題の scope（復旧経路が塞がること）と対応の scope を一致させる。契約は `scripts/__tests__/pre-tool-guard.test.ts` の「loader/rules 分離」describe が固定する。
 
 **触らない（読みも書きもしない）**:
 
@@ -358,21 +323,17 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 **rotation**: §短命トークンのローテーション（expiry 付き再発行）に従う。新 PAT を発行 → 1Password 更新 → 上記 4 を再実行 → GitHub の token 一覧で新 token の Last used が更新されたことを確認 → 旧 PAT を revoke。
 
-## Agent の vercel CLI（読み取り系だけ）
+## Agent と Vercel
 
-策定日: 2026-09-14（Secret / Credential 監査 P1-2、User 裁可）。agent の `vercel` CLI は User 本人の対話 login で動き、team `Dayopt` の全権を持つ。現在はproject-scoped tokenも発行できるが、同じProduct project内のProduction/Previewを分離できずread/write権限を持つ。このため **agent から実行してよい vercel サブコマンドを読み取り系に固定する**。
+agent は Vercel の資格情報を持たない（2026-09-14 決定「Vercel token は agent に渡さない」を維持し、2026-10-09 に本人 login も agent から外した。[#3050](https://github.com/Dayopt/dayopt/issues/3050) / [#3053](https://github.com/Dayopt/dayopt/issues/3053)）。Vercel の token は scope を project の Production / Preview で分けられず、本人 login は team `Dayopt` の全権を持つ。agent vault の定義（漏れても 1 日で戻せるもの）に合わない。
 
-**agent 用 Vercel token は置かない。** 以前は `agent/vercel` を「agent 用の別発行 token（発行待ち）」として schema に持っていたが、実際には未使用の team 全権 token が入っていた。agent vault の定義（漏れても 1 日で戻せるもの）に合わないため、2026-09-14 に Vercel 側で revoke し、1Password の item を archive した。
+**agent 用 Vercel token は置かない。** 以前は `agent/vercel` を「agent 用の別発行 token（発行待ち）」として schema に持っていたが、実際には未使用の team 全権 token が入っていた。2026-09-14 に Vercel 側で revoke し、1Password の item を archive した。
 
-**許可するもの（`scripts/hooks/pre-tool-guard-rules.mjs` の allowlist）**: `ls` / `list` / `inspect` / `logs` / `whoami` / `help` / `--version`、`teams ls`、`project ls|inspect`、`env ls`、`domains ls|inspect`、`dns ls`、`certs ls`、`alias ls`、`integration list`、`api`（GET かつ body なし）。
+**読み取りの代替**: deployment の状態と Preview URL は GitHub の deployment status で読む（`gh api repos/Dayopt/dayopt/deployments` と各 deployment の `statuses` の `environment_url`）。Preview は Vercel の SSO で保護され、bypass secret は `ci` vault にだけあるため、agent は Preview の画面を直接開けない。表示の確認は CI の smoke / E2E の結果か、User が sign-in した内蔵 Browser で行う。
 
-**それ以外は block する。** 引数なしの `vercel`（= deploy）、`deploy` / `promote` / `rollback` / `redeploy` / `remove`、`env add|rm|pull`、`pull` / `dev` / `build`（実値を file や process へ引き出す）、`link`、`domains` / `certs` / `dns` / `alias` / `project` の変更、`api` の非 GET と body 付き。書き込み系を数え上げると新しいサブコマンドで穴が開くので、許可する側を固定している。
+**2026-09-14〜10-09 の経緯**: 本人 login を agent が使える状態のまま、guard が vercel のサブコマンドを読み取り系の allowlist に絞っていた。login を外したので guard の検査は撤去した（#3053）。
 
-**判定の保証境界**: コマンド文字列を quote を解釈して区切り（quote 外の `;` `&` `|` 改行 括弧 `$(` backtick）で分け、各区切りの先頭の `vercel` を見る。env 代入、`env` / `command` / `exec` / `npx` / `pnpm exec|dlx` / `bunx` / `xargs` / `op run ... --` の前置きと、`sh|bash|zsh -c` の中身は辿る。変数展開、wrapper script、npm script の内側（例: `pnpm vercel:env:pull:unsafe`）は見えない。hook は speed bump で、production 変更を止める本体は User の明示操作と `AGENTS.md` の EXPLICIT AUTHORITY。契約は `scripts/__tests__/pre-tool-guard.test.ts` が固定する。
-
-**受け入れる誤検知**: heredoc の本文は区切りを解釈しないので、行頭が書き込み系の vercel コマンドで始まる行を含むと落ちる。commit message や PR 本文にコマンド例を書く時は Write / Edit で file に書いてから `-F` / `--body-file` で渡す。quote 内の `|`（`rg "A|B"` 等）や、コマンド位置にない vercel の言及は落とさない。
-
-**User が行うもの**: production の env 変更、promote / rollback の手動実行、domain / cert、project 設定。いずれも User の terminal か Vercel Dashboard で行う。
+**User が行うもの**: production の env 変更、promote / rollback の手動実行、domain / cert、project 設定。いずれも User の terminal か Vercel Dashboard で行う。本人 login は User の terminal でだけ使い、作業後は logout する。
 
 ## Agent の Supabase 読み取り token
 

@@ -88,9 +88,9 @@ describe('agent/supabase の接続情報境界', () => {
     );
     expect(matches).toHaveLength(0);
 
-    // .op-env.agent.example は guard の vault allowlist（agent /
-    // Local のみ）により production 参照を持てない。ここでは staging 参照が
-    // 消えたことだけを見る（production 側への repoint はできないし、しない）。
+    // .op-env.agent.example は agent vault だけを参照する（agent の SA は agent vault
+    // しか読めない、#3052）。ここでは staging 参照が消えたことだけを見る
+    // （production 側への repoint はできないし、しない）。
     expect(opEnvExample).not.toContain('op://agent/supabase/SUPABASE_ACCESS_TOKEN');
 
     const block = stagingSupabaseItemBlock();

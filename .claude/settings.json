@@ -204,25 +204,7 @@
         ]
       },
       {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/hooks/pre-tool-guard.sh"
-          }
-        ]
-      },
-      {
         "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/hooks/pre-tool-guard.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__ccd_session__spawn_task",
         "hooks": [
           {
             "type": "command",

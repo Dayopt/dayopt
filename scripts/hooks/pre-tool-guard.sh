@@ -8,9 +8,9 @@
 # 非 0（コマンド not found = 127 を含む）は non-blocking error として tool 実行を
 # 続行する。settings.json に `node scripts/hooks/pre-tool-guard.mjs` と書くと
 # hook の起動が `node` の PATH 解決に依存し、解決できない実行コンテキストでは
-# 8 matcher（Write / Edit / MultiEdit / NotebookEdit / Bash / Agent / Read /
-# spawn_task）が **すべて無言で fail-open** する。force push / reset --hard /
-# `.op-env.human` 消費 / worktree 越境 Write / spawn_task が素通りする。
+# 全 matcher（Write / Edit / MultiEdit / NotebookEdit / Bash / Read）が
+# **すべて無言で fail-open** する。force push / reset --hard / `.env` の読み書き /
+# worktree 越境 Write が素通りする。
 # bash 版 guard（#2563 で撤去）にはこの依存が無かった。
 #
 # 実測（2026-09-05、cloud session）: この repo の node は /opt/node22/bin/node に
@@ -33,7 +33,7 @@
 #       scripts/__tests__/pre-tool-guard.test.ts が mode & 0o111 を assert する
 # どちらも「exit 2 以外の非 0 = non-blocking error」として tool 実行が続行される。
 
-# **意図的なトレードオフ**: node を解決できない時は 8 matcher すべてが block になるため、
+# **意図的なトレードオフ**: node を解決できない時は全 matcher が block になるため、
 # Bash も Read も止まりセッション内からは復旧できない（User が PATH を直すまで）。
 # 既知の絶対パスを探しに行く逃げ道は置かない — guard の解決先を PATH 外の
 # 決め打ちパスへ広げたくないのと、「node 不在なら exit 2」を test で固定できなくなるため。
