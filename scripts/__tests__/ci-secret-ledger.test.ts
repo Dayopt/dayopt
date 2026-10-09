@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ciSecretSchema } from '../tasks/env/schema';
 
-// GitHub Actions Secrets は 1Password master の replica（docs/operations/secrets.md
+// GitHub Actions Secrets は 1Password master の replica（docs/operations/secrets-ledger.md
 // §Replica 台帳）。基本方針 7「値がどこにあっても 1Password にもある」を、名前の対応で
 // 機械検査する。GitHub の Secret 一覧 API は admin 権限が要り CI からも agent からも
 // 読めないため、workflow が参照する名前を「実在する replica」の代理として使う。

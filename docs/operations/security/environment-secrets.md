@@ -160,7 +160,7 @@ production の Auth 設定（Bot Protection、メール変更の二重確認、�
 
 **「守らない」側は放置すると静かに腐る**（除外した名前空間に、後から安全性に効くキーが増えても気づけない）。**Supabase の Auth 新機能を認知した時点**、または security sweep の依頼時に再トリアージする。手順は live 応答の `keys` 列挙を取り直し、除外名前空間に増えたキーが無いかを見るだけでよい（`security_` / `hook_` / `mfa_` / `sessions_` / `password_` 配下は audit 自身が落ちるので確認不要）。
 
-手元での単発確認は `op run` 経由で行う（値は 1Password が masking する。`docs/operations/secrets.md` §API 経由の設定読戻し に従い、射影は完全一致で書く）:
+手元での単発確認は `op run` 経由で行う（値は 1Password が masking する。`docs/operations/secrets.md` §値を表示しない操作 に従い、射影は完全一致で書く）:
 
 ```bash
 SUPABASE_AUTH_AUDIT_TOKEN="op://ci/supabase-auth-audit/credential" op run -- node scripts/ci/production-auth-config-audit.mjs

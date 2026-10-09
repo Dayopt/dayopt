@@ -35,7 +35,7 @@ maxTurns: 15
 | [`references/async.md`](./references/async.md)   | データ取得が直列に見える、Suspense 境界を決める、API が遅い   |
 | [`references/bundle.md`](./references/bundle.md) | 重い component / package を足す、初期 JS を減らす、cold start |
 
-上流には server / client / rerender / js 系の規則もあるが、Dayopt では取り込んでいない（下記の適用除外）。必要になったら `docs/operations/tooling.md` の固定 SHA から上流を読む。
+上流には server / client / rerender / js 系の規則もあるが、Dayopt では取り込んでいない（下記の適用除外）。必要になったら `docs/operations/ai-harness.md` の固定 SHA から上流を読む。
 
 ## Dayopt の適用除外（上流をそのまま適用しない点）
 

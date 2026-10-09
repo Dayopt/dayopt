@@ -253,11 +253,11 @@ export function renderPreflight(state) {
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
     `**Claude hooks**: ${state.claudeHooks ?? '未取得'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
-    `**1Password**: ${state.onePassword?.tokenPresent ? 'OP_SERVICE_ACCOUNT_TOKEN あり（認証と vault の範囲は op whoami / op vault list で確認）' : 'OP_SERVICE_ACCOUNT_TOKEN 未設定（docs/operations/secrets.md §Service Account）'}`,
+    `**1Password**: ${state.onePassword?.tokenPresent ? 'OP_SERVICE_ACCOUNT_TOKEN あり（認証と vault の範囲は op whoami / op vault list で確認）' : 'OP_SERVICE_ACCOUNT_TOKEN 未設定（docs/operations/secrets-services.md §1Password）'}`,
   ];
   if (state.ghIdentity?.broadScopes.length)
     lines.push(
-      `- gh が User の OAuth token（${state.ghIdentity.broadScopes.join(', ')}）で動いている。Agent セッションは GH_CONFIG_DIR を agent 用 fine-grained PAT へ切り替える（docs/operations/secrets.md §Agent の gh identity）`,
+      `- gh が User の OAuth token（${state.ghIdentity.broadScopes.join(', ')}）で動いている。Agent セッションは GH_CONFIG_DIR を agent 用 fine-grained PAT へ切り替える（docs/operations/secrets-services.md §GitHub）`,
     );
   if (!state.cli.gh)
     lines.push(

@@ -31,7 +31,7 @@ const setup1PasswordScript = readFileSync(
 );
 
 const secretsDocumentation = readFileSync(
-  fileURLToPath(new URL('../../docs/operations/secrets.md', import.meta.url)),
+  fileURLToPath(new URL('../../docs/operations/secrets-ledger.md', import.meta.url)),
   'utf8',
 );
 

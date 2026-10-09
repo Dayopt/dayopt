@@ -140,7 +140,7 @@ describe('buildLedger / allowedNonLedgerKeys（schema との接続）', () => {
     expect(ledger.has('TOTALLY_UNKNOWN_KEY')).toBe(false);
   });
 
-  it('allowlist の各 entry は理由必須（空が既定。#2094 で integration-managed 11 件、#2458 で再注入された SUPABASE_ANON_KEY を例外登録済み。docs/operations/secrets.md §Vercel Production の integration-managed 例外）', () => {
+  it('allowlist の各 entry は理由必須（空が既定。#2094 で integration-managed 11 件、#2458 で再注入された SUPABASE_ANON_KEY を例外登録済み。docs/operations/secrets-ledger.md §Vercel Production の integration-managed 例外）', () => {
     expect(allowedNonLedgerKeys.size).toBe(10);
     for (const reason of allowedNonLedgerKeys.values()) {
       expect(reason.length).toBeGreaterThan(0);

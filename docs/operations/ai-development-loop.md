@@ -37,7 +37,7 @@ PR summary の各 review について、種類・状態・trigger・対象 commi
 PR summary / checklist では次を混ぜずに記録する。
 
 - Code Review と Security Review を別々にし、状態・trigger・完全な対象 SHA・確認 scope・指摘と裁定を残す。不要な種類は `not required`、確認できない項目は `unknown` とする。
-- GitHub Actions は workflow 名・run ID・状態・対象 SHA を記録する。Actions の実行と Codex review は別のイベントで、別 SHA の成功を現 head の証拠にしない。
+- GitHub Actions は workflow 名・run ID・状態・対象 SHA を記録する。Actions の実行と Claude review は別のイベントで、別 SHA の成功を現 head の証拠にしない。
 
 ## 意図の継承
 
