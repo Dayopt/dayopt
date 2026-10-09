@@ -14,7 +14,7 @@ last_verified: 2026-09-25
 更新経路は 3 つ:
 
 1. 実装側 — security skill（Dayopt 固有ルール 4）が、前提を作った PR での更新を義務付ける
-2. レビュー側 — 全 PR のセルフレビューと、保護対象 PR に限る GitHub の `@codex review` で、
+2. レビュー側 — 全 PR のセルフレビューと、保護対象 PR に限る `@claude review` で、
    カタログに無い新しい前提を見つけたら追記を提案する。差分の実際の failure scenario と一次情報を添えて判断する
 3. 月次ガーデニング — 鮮度を見る
 
@@ -69,6 +69,7 @@ docs へ残している。
   制約を広げる migration と**同じ変更**で行う（片方だけ足すと監査が恒久 missing になる）。
   監査対象の全job名を実DBのCHECK制約と照合するintegration testで追加漏れを検出する
   （#2864）。`billing-reconciliation` は差分検出の503とは独立に、照合完了を記録する。
+  期待状態（enabled / inactive）は `EXPECTED_JOB_MODES` で宣言し、env の欠落から inactive を推定しない（#3010）。
 - redirect 先はユーザー入力をそのまま使わず、`lib/safe-redirect.ts` の検証を通す
 
 ## メール通知

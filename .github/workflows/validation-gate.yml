@@ -38,11 +38,11 @@ on:
     workflows: [CI]
     types: [completed]
   status:
-  # レビュー証拠（@codex review 依頼、Codex の完了 comment / summary 表の編集、[review-summary]）は
+  # レビュー証拠（@claude review 依頼、claude-review.yml の結果 comment、[review-summary]）は
   # issue comment として届く。issue_comment も default branch の定義でしか走らない event。
   # review の submit / thread の resolve は issue_comment を出さないが、通常は修正 push → CI 完了の
   # workflow_run で再評価される（保証境界は docs/engineering/infra.md）。
-  # deleted も含める: 成功判定に使った comment（Codex の完了 comment / [review-summary]）が消えたら
+  # deleted も含める: 成功判定に使った comment（Claude review の結果 comment / [review-summary]）が消えたら
   # 再評価して status を更新する（消えた証拠で success が残らない）。
   issue_comment:
     types: [created, edited, deleted]

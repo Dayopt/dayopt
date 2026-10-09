@@ -1,7 +1,7 @@
 /**
  * `PROTECTED_PATH_GLOBS`（`scripts/ci/protected-path-gate.mjs`）の drift 検出（#2503）。
  *
- * このリストは「標準の GitHub `@codex review` で重点的に読む範囲を示す」という
+ * このリストは「`@claude review` で重点的に読む範囲を示す」という
  * 意味を持つ。リテラルとして書かれているため、次の 2 種類の drift が
  * 機械には見えない:
  *   1. glob が実際には 1 件も既存ファイルに一致しない（親ディレクトリが残って

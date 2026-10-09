@@ -53,6 +53,7 @@ ProductとWebのProductionデプロイはこの順序を揃えるまで保留す
    認証は `docs/operations/secrets.md` に従う。コマンド自体はDBとStripeを読み取り、ローカルSQLを作るだけで本番には書かない。生成物は顧客IDを含むためGitや公開issueへ添付しない。dry-runの後、有効化直前に再実行し、対象追加を再レビューする。既に消費済みの時刻を上書きしない。
 
 6. 明示指示後にレビュー済み分類SQLを適用する。MCP controlの現在revisionを読み、`set_mcp_billing_enforcement_v1(true, <expected_revision>)` でMCPのapp trial判定を有効にする。その後 `BILLING_ENFORCED=true` のProductを先に配備し、実Checkoutとtrial中MCP writeを確認してから45日説明を含むWebを公開する。write fence解除後、既存未契約者の初回利用で45日が一度だけ始まることを確認する。
+   本番に Stripe 設定を入れて照合 cron が初めて完了したら、同じ日のうちに `apps/product/src/lib/ops/cron-heartbeat-policy.mjs` の `EXPECTED_JOB_MODES['billing-reconciliation']` を `'enabled'` にする PR を merge する。それまでの監査は「declared inactive but ran」で失敗する（#3010）。
 7. 下の案内文を確定して利用者へ通知する。今回の実装では送信しない。アプリ内は終了7日前から表示し、新しい催促メールcronは作らない。
 
 ## 復帰

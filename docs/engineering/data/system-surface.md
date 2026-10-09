@@ -177,12 +177,13 @@ TS の `PRODUCT_EVENT_NAMES` と DB の CHECK 制約の両方で定義される�
 
 ## 設定
 
-### env 変数（67）
+### env 変数（68）
 
 名前と所在だけを載せる（値は 1Password にあり、この生成物は触らない）。
 
 | env                                      | 必須 | visibility | environment         | 1Password item                  | apps/product の env schema |
 | ---------------------------------------- | ---- | ---------- | ------------------- | ------------------------------- | -------------------------- |
+| `ANTHROPIC_API_KEY`                      | yes  | secret     | production          | anthropic-claude-review         | —                          |
 | `CALENDAR_TOKEN_ENCRYPTION_KEY`          | no   | secret     | staging, production | google-calendar                 | —                          |
 | `CRON_SECRET`                            | no   | secret     | staging, production | supabase                        | —                          |
 | `GOOGLE_CALENDAR_CLIENT_ID`              | no   | public     | staging, production | google-calendar                 | —                          |

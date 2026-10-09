@@ -5,6 +5,8 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { CLAUDE_REVIEW_MARKER } from '../lib/review-policy.mjs';
+
 import {
   buildTrustedPlan,
   collectEvidence,
@@ -169,12 +171,12 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
     [`repos/${REPO}/pulls/7/reviews?per_page=100`]: [
       {
         id: 5221740744,
-        user: { login: 'chatgpt-codex-connector[bot]', type: 'Bot' },
+        user: { login: 'github-actions[bot]', type: 'Bot' },
         state: 'COMMENTED',
         commit_id: headSha,
         submitted_at: '2026-09-16T10:56:22Z',
         html_url: `https://github.com/${REPO}/pull/7#pullrequestreview-5221740744`,
-        body: `**Reviewed commit:** \`${headSha.slice(0, 10)}\``,
+        body: `${CLAUDE_REVIEW_MARKER}\n**Reviewed commit:** \`${headSha}\``,
       },
     ],
     [`repos/${REPO}/issues/7/comments?per_page=100`]: [
@@ -182,7 +184,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
         id: 1,
         user: { login: 't3-nico', type: 'User' },
         author_association: 'OWNER',
-        body: '@codex review',
+        body: '@claude review',
         created_at: '2026-09-16T10:48:06Z',
         html_url: `https://github.com/${REPO}/pull/7#issuecomment-1`,
       },
@@ -190,7 +192,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
         id: 2,
         user: { login: 't3-nico', type: 'User' },
         author_association: 'OWNER',
-        body: `[review-summary]\nhead: ${headSha}\nprovider: codex\nagent: risk-reviewer\nstatus: reviewed\nfindings: 0\n`,
+        body: `[review-summary]\nhead: ${headSha}\nprovider: claude\nagent: risk-reviewer\nstatus: reviewed\nfindings: 0\n`,
         created_at: '2026-09-16T10:58:00Z',
         html_url: `https://github.com/${REPO}/pull/7#issuecomment-2`,
       },
@@ -230,8 +232,8 @@ function fakeGraphql(threads: unknown[] = []) {
                   comments: {
                     nodes: [
                       {
-                        author: { login: 'chatgpt-codex-connector' },
-                        body: 'P2',
+                        author: { login: 'github-actions' },
+                        body: `${CLAUDE_REVIEW_MARKER}\nP2`,
                         pullRequestReview: { id: 'PRR_1' },
                       },
                       {
@@ -797,7 +799,7 @@ describe('validation gate controller', () => {
           id: 1,
           user: { login: 't3-nico', type: 'User' },
           author_association: 'OWNER',
-          body: '@codex review',
+          body: '@claude review',
           created_at: '2026-09-16T10:48:06Z',
           html_url: `https://github.com/${REPO}/pull/7#issuecomment-1`,
         },

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  CODEX_LOGIN,
+  CLAUDE_REVIEW_MARKER,
+  REVIEWER_LOGIN,
   REVIEW_RESPONSE_TIMEOUT_MS,
-  collectCodexCompletions,
+  collectReviewCompletions,
   evaluateReviewPolicy,
   formatReviewPolicy,
-  readCodexSummaryRow,
+  readReviewFailure,
   toReviewCommitStatus,
 } from './review-policy.mjs';
 import { createValidationPlan } from './validation-plan.mjs';
@@ -32,34 +33,30 @@ const plan = (files: string[]) =>
     { graph },
   );
 
-// ── 実 PR #2800 / #2802 の応答を縮約した fixture ────────────────────────
-const codexReview = (commitId: string, id = 5221740744) => ({
+// ── scripts/ci/claude-review-post.mjs が投稿する形の fixture ───────────────
+const claudeReview = (commitId: string, id = 5221740744) => ({
   id,
-  authorLogin: CODEX_LOGIN,
+  authorLogin: REVIEWER_LOGIN,
   authorType: 'Bot',
   state: 'COMMENTED',
   commitId,
   submittedAt: '2026-09-16T10:56:22Z',
   htmlUrl: `https://github.com/Dayopt/dayopt/pull/2800#pullrequestreview-${id}`,
-  body: `\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** \`${commitId.slice(0, 10)}\`\n`,
+  body: `${CLAUDE_REVIEW_MARKER}\n### Claude Review\n\n**Reviewed commit:** \`${commitId}\`\n\n指摘 1 件。`,
 });
-const noFindings = (commit: string, createdAt = '2026-09-16T11:28:55Z') => ({
+const resultComment = (
+  commit: string,
+  result = 'completed',
+  createdAt = '2026-09-16T11:28:55Z',
+) => ({
   id: 5696600000,
-  authorLogin: CODEX_LOGIN,
+  authorLogin: REVIEWER_LOGIN,
   authorType: 'Bot',
-  body: `Codex Review: Didn't find any major issues. Keep them coming!\n\n**Reviewed commit:** \`${commit.slice(0, 10)}\`\n`,
+  body: `${CLAUDE_REVIEW_MARKER}\n**Reviewed commit:** \`${commit}\`\nResult: ${result}\nFindings: 0`,
   createdAt,
   htmlUrl: 'https://github.com/Dayopt/dayopt/pull/2802#issuecomment-5696600000',
 });
-const summaryComment = (status: string, commit: string) => ({
-  id: 5696241672,
-  authorLogin: CODEX_LOGIN,
-  authorType: 'Bot',
-  body: `<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ${status} | \`${commit.slice(0, 7)}\` | Manual request |\n`,
-  createdAt: '2026-09-16T10:48:27Z',
-  htmlUrl: 'https://github.com/Dayopt/dayopt/pull/2800#issuecomment-5696241672',
-});
-const request = (createdAt: string, body = '@codex review', authorAssociation = 'OWNER') => ({
+const request = (createdAt: string, body = '@claude review', authorAssociation = 'OWNER') => ({
   id: 5696237053,
   authorLogin: 't3-nico',
   authorType: 'User',
@@ -87,9 +84,9 @@ const thread = (
   path: 'scripts/ci/validation-plan-shadow.test.ts',
   comments: [
     {
-      authorLogin: CODEX_LOGIN,
+      authorLogin: REVIEWER_LOGIN,
       reviewId,
-      body: '**P2 Badge** Patch の変化で diff hash を検証する',
+      body: `${CLAUDE_REVIEW_MARKER}\n![P2 Badge](x) Patch の変化で diff hash を検証する`,
     },
     ...(reply
       ? [
@@ -168,7 +165,9 @@ describe('review policy: requirement from plan', () => {
     const result = evaluate(
       [RLS],
       evidence({
-        comments: [request('2026-09-16T11:45:00Z', '- [x] approved for production\n@codex review')],
+        comments: [
+          request('2026-09-16T11:45:00Z', '@claude review\n- [x] approved for production'),
+        ],
       }),
     );
     expect(result.authority.productionAuthorized).toBe(false);
@@ -177,10 +176,10 @@ describe('review policy: requirement from plan', () => {
 });
 
 describe('review policy: completion evidence', () => {
-  it('accepts a Codex review of the current head with all threads adjudicated', () => {
+  it('accepts a Claude review of the current head with all threads adjudicated', () => {
     const result = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(HEAD)], threads: [thread('PRR_1')] }),
+      evidence({ reviews: [claudeReview(HEAD)], threads: [thread('PRR_1')] }),
     );
     expect(result.state).toBe('complete');
     expect(result.verdict).toBe('satisfied');
@@ -188,11 +187,8 @@ describe('review policy: completion evidence', () => {
     expect(result.trigger.shouldRequest).toBe(false);
   });
 
-  it('accepts the no-findings comment for the current head', () => {
-    const result = evaluate(
-      [APP],
-      evidence({ comments: [summaryComment('✅ **Completed**', HEAD), noFindings(HEAD)] }),
-    );
+  it('accepts the completed result comment for the current head', () => {
+    const result = evaluate([APP], evidence({ comments: [resultComment(HEAD)] }));
     expect(result.state).toBe('complete');
     expect(result.verdict).toBe('satisfied');
   });
@@ -200,13 +196,13 @@ describe('review policy: completion evidence', () => {
   it('blocks while findings are unresolved or were resolved silently', () => {
     const unresolved = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(HEAD)], threads: [thread('PRR_1', { resolved: false })] }),
+      evidence({ reviews: [claudeReview(HEAD)], threads: [thread('PRR_1', { resolved: false })] }),
     );
     expect(unresolved.state).toBe('pending-adjudication');
     expect(unresolved.verdict).toBe('blocked');
     const silent = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(HEAD)], threads: [thread('PRR_1', { reply: false })] }),
+      evidence({ reviews: [claudeReview(HEAD)], threads: [thread('PRR_1', { reply: false })] }),
     );
     expect(silent.state).toBe('pending-adjudication');
     expect(silent.reason).toMatch(/without a reply/);
@@ -215,7 +211,7 @@ describe('review policy: completion evidence', () => {
   it('treats a review of an older commit as stale without requesting again automatically', () => {
     const result = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(OLD)], threads: [thread('PRR_1')] }),
+      evidence({ reviews: [claudeReview(OLD)], threads: [thread('PRR_1')] }),
     );
     expect(result.state).toBe('stale');
     expect(result.verdict).toBe('pending');
@@ -223,12 +219,19 @@ describe('review policy: completion evidence', () => {
     expect(result.trigger.reason).toMatch(/scope/i);
   });
 
-  it('does not accept a summary table row, a request comment or a reaction as completion', () => {
-    const summaryOnly = evaluate(
+  it('does not accept an unmarked github-actions comment or a request comment as completion', () => {
+    const unmarked = evaluate(
       [APP],
-      evidence({ comments: [summaryComment('✅ **Completed**', HEAD)] }),
+      evidence({
+        comments: [
+          {
+            ...resultComment(HEAD),
+            body: resultComment(HEAD).body.replace(CLAUDE_REVIEW_MARKER, ''),
+          },
+        ],
+      }),
     );
-    expect(summaryOnly.state).toBe('not-started');
+    expect(unmarked.state).toBe('not-started');
     const requested = evaluate([APP], evidence({ comments: [request('2026-09-16T11:45:00Z')] }));
     expect(requested.state).toBe('pending');
     expect(requested.trigger.shouldRequest).toBe(false);
@@ -251,22 +254,17 @@ describe('review policy: completion evidence', () => {
     expect(result.trigger.shouldRequest).toBe(true);
   });
 
-  it('reads running and failed states from the summary table', () => {
-    const running = evaluate(
-      [APP],
-      evidence({
-        comments: [
-          summaryComment(
-            '🔄 **Running** since <relative-time datetime="2026-09-16T22:10:19Z">x</relative-time>',
-            HEAD,
-          ),
-        ],
-      }),
-    );
-    expect(running.state).toBe('pending');
-    const failed = evaluate([APP], evidence({ comments: [summaryComment('❌ **Failed**', HEAD)] }));
+  it('reports failed only when the workflow failed for the current head', () => {
+    const failed = evaluate([APP], evidence({ comments: [resultComment(HEAD, 'failed')] }));
     expect(failed.state).toBe('failed');
     expect(failed.verdict).toBe('blocked');
+    const oldFailure = evaluate([APP], evidence({ comments: [resultComment(OLD, 'failed')] }));
+    expect(oldFailure.state).toBe('not-started');
+    const recovered = evaluate(
+      [APP],
+      evidence({ comments: [resultComment(HEAD, 'failed'), resultComment(HEAD)] }),
+    );
+    expect(recovered.state).toBe('complete');
   });
 
   it('rejects a bot response whose target commit cannot be determined and other bots', () => {
@@ -275,8 +273,8 @@ describe('review policy: completion evidence', () => {
       evidence({
         reviews: [
           {
-            ...codexReview(HEAD),
-            body: '**Reviewed commit:** `deadbeef1`',
+            ...claudeReview(HEAD),
+            body: `${CLAUDE_REVIEW_MARKER}\n**Reviewed commit:** \`deadbeef1\``,
             submittedAt: '2026-09-16T11:55:00Z', // head 切替後の応答
           },
         ],
@@ -286,26 +284,36 @@ describe('review policy: completion evidence', () => {
     expect(mismatch.verdict).toBe('blocked');
     const otherBot = evaluate(
       [APP],
-      evidence({ reviews: [{ ...codexReview(HEAD), authorLogin: 'other-bot[bot]' }] }),
+      evidence({ reviews: [{ ...claudeReview(HEAD), authorLogin: 'other-bot[bot]' }] }),
     );
     expect(otherBot.state).toBe('not-started');
+    // 人間が marker を貼っても reviewer の投稿にはならない
+    const forged = evaluate(
+      [APP],
+      evidence({
+        comments: [{ ...resultComment(HEAD), authorLogin: 't3-nico', authorType: 'User' }],
+      }),
+    );
+    expect(forged.state).toBe('not-started');
   });
 
   it('matches GraphQL thread authors without the [bot] suffix', () => {
     const graphqlThread = {
       ...thread('PRR_1', { resolved: false }),
-      comments: [{ authorLogin: 'chatgpt-codex-connector', reviewId: 'PRR_1', body: 'P2' }],
+      comments: [
+        { authorLogin: 'github-actions', reviewId: 'PRR_1', body: `${CLAUDE_REVIEW_MARKER}\nP2` },
+      ],
     };
     const result = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(HEAD)], threads: [graphqlThread] }),
+      evidence({ reviews: [claudeReview(HEAD)], threads: [graphqlThread] }),
     );
     expect(result.state).toBe('pending-adjudication');
   });
 
   it('excludes dismissed or pending reviews from completion evidence', () => {
     for (const state of ['DISMISSED', 'PENDING']) {
-      const result = evaluate([APP], evidence({ reviews: [{ ...codexReview(HEAD), state }] }));
+      const result = evaluate([APP], evidence({ reviews: [{ ...claudeReview(HEAD), state }] }));
       expect(result.state, state).toBe('not-started');
     }
   });
@@ -325,7 +333,7 @@ describe('review policy: completion evidence', () => {
   it('ignores review requests from untrusted authors', () => {
     const result = evaluate(
       [APP],
-      evidence({ comments: [request('2026-09-16T11:45:00Z', '@codex review', 'NONE')] }),
+      evidence({ comments: [request('2026-09-16T11:45:00Z', '@claude review', 'NONE')] }),
     );
     expect(result.state).toBe('not-started');
     expect(result.trigger.shouldRequest).toBe(true);
@@ -333,8 +341,8 @@ describe('review policy: completion evidence', () => {
 
   it('ignores a target-less response posted before the head switch', () => {
     const stale = {
-      ...codexReview(OLD),
-      body: '**Reviewed commit:** `deadbeef1`',
+      ...claudeReview(OLD),
+      body: `${CLAUDE_REVIEW_MARKER}\n**Reviewed commit:** \`deadbeef1\``,
       submittedAt: '2026-09-16T10:00:00Z',
     };
     const before = evaluate([APP], evidence({ reviews: [stale] }));
@@ -350,7 +358,7 @@ describe('review policy: completion evidence', () => {
     const outsiderReply = {
       ...thread('PRR_1'),
       comments: [
-        { authorLogin: CODEX_LOGIN, reviewId: 'PRR_1', body: 'P2' },
+        { authorLogin: REVIEWER_LOGIN, reviewId: 'PRR_1', body: `${CLAUDE_REVIEW_MARKER}\nP2` },
         {
           authorLogin: 'stranger',
           authorType: 'User',
@@ -362,7 +370,7 @@ describe('review policy: completion evidence', () => {
     };
     const result = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(HEAD)], threads: [outsiderReply] }),
+      evidence({ reviews: [claudeReview(HEAD)], threads: [outsiderReply] }),
     );
     expect(result.state).toBe('pending-adjudication');
     expect(result.reason).toMatch(/without a reply/);
@@ -383,7 +391,7 @@ describe('review policy: completion evidence', () => {
     expect(result.verdict).toBe('blocked');
   });
 
-  it('lets a trusted fixed-diff review satisfy the policy when Codex is unavailable', () => {
+  it('lets a trusted fixed-diff review satisfy the policy when Claude review is unavailable', () => {
     const late = new Date(Date.parse('2026-09-16T11:45:00Z') + REVIEW_RESPONSE_TIMEOUT_MS + 1);
     const result = evaluate(
       [APP],
@@ -395,7 +403,7 @@ describe('review policy: completion evidence', () => {
     expect(result.reason).toMatch(/Existing fixed-diff review evidence/);
   });
 
-  it('does not let a fixed-diff summary replace a missing or stale Codex request', () => {
+  it('does not let a fixed-diff summary replace a missing or stale review request', () => {
     const notStarted = evaluate([APP], evidence({ comments: [highRiskSummary(HEAD)] }));
     expect(notStarted.state).toBe('not-started');
     expect(notStarted.verdict).toBe('pending');
@@ -403,7 +411,7 @@ describe('review policy: completion evidence', () => {
 
     const stale = evaluate(
       [APP],
-      evidence({ reviews: [codexReview(OLD)], comments: [highRiskSummary(HEAD)] }),
+      evidence({ reviews: [claudeReview(OLD)], comments: [highRiskSummary(HEAD)] }),
     );
     expect(stale.state).toBe('stale');
     expect(stale.verdict).toBe('pending');
@@ -419,21 +427,21 @@ describe('review policy: completion evidence', () => {
 });
 
 describe('review policy: optional fixed-diff evidence', () => {
-  it('accepts the current Codex review on protected paths without an additional review', () => {
-    const missing = evaluate([RLS], evidence({ reviews: [codexReview(HEAD)] }));
+  it('accepts the current Claude review on protected paths without an additional review', () => {
+    const missing = evaluate([RLS], evidence({ reviews: [claudeReview(HEAD)] }));
     expect(missing.state).toBe('complete');
     expect(missing.highRisk?.status).toBe('missing');
     expect(missing.verdict).toBe('satisfied');
     const stale = evaluate(
       [RLS],
-      evidence({ reviews: [codexReview(HEAD)], comments: [highRiskSummary(OLD)] }),
+      evidence({ reviews: [claudeReview(HEAD)], comments: [highRiskSummary(OLD)] }),
     );
     expect(stale.highRisk?.status).toBe('stale');
     expect(stale.verdict).toBe('satisfied');
     const partial = evaluate(
       [RLS],
       evidence({
-        reviews: [codexReview(HEAD)],
+        reviews: [claudeReview(HEAD)],
         comments: [highRiskSummary(HEAD, 'risk-reviewer=partial')],
       }),
     );
@@ -441,18 +449,18 @@ describe('review policy: optional fixed-diff evidence', () => {
     expect(partial.verdict).toBe('satisfied');
     const ok = evaluate(
       [RLS],
-      evidence({ reviews: [codexReview(HEAD)], comments: [highRiskSummary(HEAD)] }),
+      evidence({ reviews: [claudeReview(HEAD)], comments: [highRiskSummary(HEAD)] }),
     );
     expect(ok.highRisk?.status).toBe('satisfied');
     expect(ok.verdict).toBe('satisfied');
   });
 
-  it('still requires a current Codex review and adjudication on protected paths', () => {
+  it('still requires a current Claude review and adjudication on protected paths', () => {
     expect(evaluate([RLS], evidence()).verdict).toBe('pending');
-    expect(evaluate([RLS], evidence({ reviews: [codexReview(OLD)] })).verdict).toBe('pending');
+    expect(evaluate([RLS], evidence({ reviews: [claudeReview(OLD)] })).verdict).toBe('pending');
     const unresolved = evaluate(
       [RLS],
-      evidence({ reviews: [codexReview(HEAD)], threads: [thread('PRR_1', { resolved: false })] }),
+      evidence({ reviews: [claudeReview(HEAD)], threads: [thread('PRR_1', { resolved: false })] }),
     );
     expect(unresolved.state).toBe('pending-adjudication');
     expect(unresolved.verdict).toBe('blocked');
@@ -462,7 +470,7 @@ describe('review policy: optional fixed-diff evidence', () => {
     const outsider = evaluate(
       [RLS],
       evidence({
-        reviews: [codexReview(HEAD)],
+        reviews: [claudeReview(HEAD)],
         comments: [highRiskSummary(HEAD, 'reviewed', 'NONE')],
       }),
     );
@@ -478,7 +486,7 @@ describe('review policy: optional fixed-diff evidence', () => {
     ] as const) {
       const result = evaluate(
         [RLS],
-        evidence({ reviews: [codexReview(HEAD)], comments: [highRiskSummary(HEAD, status)] }),
+        evidence({ reviews: [claudeReview(HEAD)], comments: [highRiskSummary(HEAD, status)] }),
       );
       expect(result.highRisk?.status, status).toBe(expected);
     }
@@ -488,7 +496,7 @@ describe('review policy: optional fixed-diff evidence', () => {
     const forged = evaluate(
       [RLS],
       evidence({
-        reviews: [codexReview(HEAD)],
+        reviews: [claudeReview(HEAD)],
         comments: [{ ...highRiskSummary(HEAD), authorLogin: 'x[bot]', authorType: 'Bot' }],
       }),
     );
@@ -497,24 +505,38 @@ describe('review policy: optional fixed-diff evidence', () => {
 });
 
 describe('review policy: parsers and rendering', () => {
-  it('parses completions and summary rows from the recorded formats', () => {
-    const completions = collectCodexCompletions(
-      evidence({ reviews: [codexReview(OLD)], comments: [noFindings(HEAD)] }),
+  it('parses completions and failures from the posted formats', () => {
+    const completions = collectReviewCompletions(
+      evidence({
+        reviews: [claudeReview(OLD)],
+        comments: [resultComment(HEAD), resultComment(HEAD, 'failed')],
+      }),
     );
     expect(completions.map((entry) => [entry.kind, entry.target])).toEqual([
       ['review', OLD],
-      ['no-findings', HEAD.slice(0, 10)],
+      ['comment', HEAD],
     ]);
     expect(
-      readCodexSummaryRow(evidence({ comments: [summaryComment('✅ **Completed**', HEAD)] }), HEAD),
-    ).toEqual({
-      status: '✅ **Completed**',
-      commit: HEAD.slice(0, 7),
-    });
+      readReviewFailure(evidence({ comments: [resultComment(HEAD, 'failed')] }), HEAD),
+    ).not.toBe(null);
+    expect(readReviewFailure(evidence({ comments: [resultComment(HEAD)] }), HEAD)).toBe(null);
+  });
+
+  it('accepts only a request on the first line, matching the workflow trigger', () => {
+    const quoted = evaluate(
+      [APP],
+      evidence({ comments: [request('2026-09-16T11:45:00Z', 'まだ\n@claude review')] }),
+    );
+    expect(quoted.state).toBe('not-started');
+    const legacy = evaluate(
+      [APP],
+      evidence({ comments: [request('2026-09-16T11:45:00Z', '@codex review')] }),
+    );
+    expect(legacy.state).toBe('not-started');
   });
 
   it('renders the shadow summary with trigger and authority lines', () => {
-    const text = formatReviewPolicy(evaluate([APP], evidence({ reviews: [codexReview(HEAD)] })));
+    const text = formatReviewPolicy(evaluate([APP], evidence({ reviews: [claudeReview(HEAD)] })));
     expect(text).toContain('Verdict: **satisfied** (complete)');
     expect(text).toContain('production=EXPLICIT AUTHORITY (authorized: false)');
     expect(text).toContain('no review is requested automatically');
