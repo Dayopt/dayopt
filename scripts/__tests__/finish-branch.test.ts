@@ -120,7 +120,7 @@ function threadsPayload(
               isResolved: thread.isResolved,
               path: thread.path ?? 'src/example.ts',
               comments: {
-                nodes: [{ author: { login: thread.author ?? 'chatgpt-codex-connector' } }],
+                nodes: [{ author: { login: thread.author ?? 'github-actions' } }],
               },
             })),
           },
@@ -1387,7 +1387,7 @@ describe('レビュー thread の必須解決 gate', () => {
         {
           isResolved: false,
           path: 'scripts/tasks/finish-branch.sh',
-          author: 'chatgpt-codex-connector',
+          author: 'github-actions',
         },
       ],
     });
