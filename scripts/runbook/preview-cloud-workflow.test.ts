@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest';
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 const cloud = workflow.slice(workflow.indexOf('\n  preview-trust:'));
 describe('Cloud Preview credential wiring', () => {
-  it('requires an explicit dispatch on the trusted Integration workflow ref', () => {
+  it('requires an explicit dispatch on the trusted main workflow ref', () => {
     expect(
       cloud.match(
-        /if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs\/heads\/integration'/g,
+        /if: github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs\/heads\/main'/g,
       ),
     ).toHaveLength(1);
     expect(cloud).toContain(
-      "always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/integration'",
+      "always() && needs.preview-trust.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.preview_e2e && inputs.preview_recover_run == '' && github.ref == 'refs/heads/main'",
     );
     expect(workflow).toContain('default: false');
     expect(workflow).toContain('cancel-in-progress: ${{ !inputs.preview_e2e }}');

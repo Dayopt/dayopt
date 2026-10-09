@@ -7,7 +7,7 @@
 #   op run --env-file=.op-env.human -- env USER_EMAIL=foo@example.com bash scripts/runbook/admin-show-user.sh
 #
 # 参照先が human である以上、実行は production への操作になる。
-# 手順と作業ログの規約は docs/operations/tooling.md 第4部 を正本とする。
+# 手順と作業ログの規約は docs/operations/secrets-services.md の「管理者 script」を正本とする。
 # 通常の local dev では使わない（pnpm dev は Supabase local を見る）。
 NEXT_PUBLIC_SUPABASE_URL=op://human/supabase/NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=op://human/supabase/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY

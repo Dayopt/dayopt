@@ -11,10 +11,10 @@ const request = {
 };
 const env = {
   GITHUB_REPOSITORY: 'Dayopt/dayopt',
-  GITHUB_REF: 'refs/heads/integration',
+  GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch',
   GITHUB_SHA: 'b'.repeat(40),
-  GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/integration',
+  GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/ci.yml@refs/heads/main',
   GITHUB_RUN_ID: '36405214644',
   GITHUB_RUN_ATTEMPT: '1',
 };
@@ -31,13 +31,13 @@ describe('Cloud Preview durable intent', () => {
     expect(JSON.stringify(a)).not.toMatch(/password|secret|token|email/i);
   });
   it.each([
-    { GITHUB_REF: 'refs/heads/main' },
+    { GITHUB_REF: 'refs/heads/integration' },
     { GITHUB_EVENT_NAME: 'pull_request' },
     { GITHUB_REPOSITORY: 'fork/dayopt' },
     { GITHUB_RUN_ID: '1;echo TOKEN' },
     { GITHUB_RUN_ATTEMPT: '0' },
     { GITHUB_SHA: 'old' },
-    { GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/other.yml@refs/heads/integration' },
+    { GITHUB_WORKFLOW_REF: 'Dayopt/dayopt/.github/workflows/other.yml@refs/heads/main' },
   ])('refuses unsupported producer context: %j', (override) => {
     expect(() => createCloudIntent({ request, env: { ...env, ...override } })).toThrow();
   });

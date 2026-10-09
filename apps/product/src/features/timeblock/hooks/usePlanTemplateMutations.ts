@@ -3,7 +3,7 @@
 /**
  * テンプレート（型）の mutation 群（#2567）。
  *
- * `optimistic-update` skill の 3 段（onMutate で cache 更新 / onError で rollback /
+ * 楽観的更新の 3 段（onMutate で cache 更新 / onError で rollback /
  * onSettled で再検証）に従う。適用（applyToDay）だけは plans の list cache へ temp 行を
  * 置くため、`useTimeblockWriteMutations` と同じ snapshot 単位を共有する
  * （両方が同じ cache を触るので、rollback 単位が食い違うと片方の巻き戻しが不完全になる）。

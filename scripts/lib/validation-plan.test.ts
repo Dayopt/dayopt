@@ -131,7 +131,7 @@ describe('trusted validation plan', () => {
   it.each(['supabase/AGENTS.md', 'docs/engineering/data/db/rls-snapshot.md'])(
     'keeps the database area outside the agent guidance directories: %s',
     (file) => {
-      // #2815 の除外は `.agents/` `.claude/` `.codex/` 配下の Markdown だけ。`docs/` の DB 契約を
+      // #2815 の除外は `.agents/` `.claude/` 配下の Markdown だけ。`docs/` の DB 契約を
       // api-db として扱う validation-shadow-report.mjs の判定がこの area に乗っている
       expect(plan([file]).areas).toContain('database');
       expect(plan([file]).required.integration.status).toBe('required');
@@ -140,7 +140,7 @@ describe('trusted validation plan', () => {
   it.each([
     'AGENTS.md',
     '.agents/skills/test/SKILL.md',
-    'docs/operations/tooling.md',
+    'docs/operations/ai-harness.md',
     'docs/engineering/data/architecture/model.c4',
   ])('does not require the scripts suite for documentation-only changes: %s', (file) => {
     // producer は `📦 Unit Tests` で、ci.yml は `needs.impact.outputs.docs_only == 'true'` で
@@ -155,7 +155,6 @@ describe('trusted validation plan', () => {
     'scripts/ci/impact.mjs',
     '.github/workflows/ci.yml',
     '.claude/settings.json',
-    '.codex/hooks.json',
     'apps/product/src/a.ts',
   ])('keeps the scripts suite required when behavior can change: %s', (file) => {
     expect(plan([file]).required.scripts.status).toBe('required');

@@ -14,7 +14,6 @@ user_invocable: true
 
 - `/blog-ideas` で手動実行する時
 - リリース後にブログ候補を洗い出したい時（`docs/business/content/content-operations.md` のリリース駆動フロー）
-- 月次ガーデニングでコンテンツバックログを補充する時
 - ネタの重複確認だけを依頼された時
 
 ## When NOT to Use
@@ -34,7 +33,7 @@ user_invocable: true
 1. **コンテンツ原則**: `docs/business/content/voice.md`（3本柱・6原則の正本）と `docs/business/growth.md`
 2. **文章基準**: `docs/business/content/writing-style.md`（提案タイトルもこの基準で書く）
 3. **意思決定ログ**: `docs/decisions.md` の最新 5 件程度
-4. **開発の動き**: `git log --oneline -30` と直近の `docs/decisions.md` の行）
+4. **開発の動き**: `git log --oneline -30`
 5. **既存ブログ記事**: `apps/web/content/blog/ja/*.mdx` のタイトル一覧（重複チェック用）
 6. **既存 Issue**: `gh issue list --label "area:blog" --state all --limit 50`（重複チェック用）
 

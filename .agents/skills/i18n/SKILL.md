@@ -216,8 +216,8 @@ t('items', { count: 5 }); // → "5 items"
 // ❌ 禁止 — "保存" を activities.json に定義して使う
 t('activities.category.save');
 
-// ✅ 正しい — actions.save を再利用
-t('actions.save');
+// ✅ 正しい — common.actions.save を再利用
+t('common.actions.save');
 ```
 
 ### ❌ 禁止語を使う
@@ -230,29 +230,9 @@ t('actions.save');
 { "timeblock": { "create": "タイムブロックを作成" } }
 ```
 
-## AI/Agent ルール
+## AI/Agent ルールとチェックリスト
 
-1. 直接日本語・英語文字列をコードに書かない
-2. `messages/{locale}/{namespace}.json` に追加する
-3. namespace は画面/機能単位にする
-4. `common` に入れるのは共通操作語だけ（domain 固有キーは feature ファイルへ）
-5. 新しい用語は `docs/product/glossary.md` を確認する
-6. 迷ったら既存キーをまず検索する（重複定義を防ぐ）
-7. 最後に `pnpm i18n:check` と `pnpm copy:check:strict` を実行する
-
-## チェックリスト
-
-新しいUIテキスト追加時：
-
-- [ ] `docs/product/glossary.md` で用語を確認したか
-- [ ] 配置先を判断フローで決定したか
-- [ ] en/ja 両方に追加したか（キー構造が完全一致）
-- [ ] 汎用単語は `actions.*` / `common.*` を再利用しているか（重複定義していない）
-- [ ] 機能固有キーは feature ファイルに置いたか（common.json に混ぜていない）
-- [ ] キー名は意味のあるドット記法か（例: `calendar.toast.deleted`）
-- [ ] `pnpm i18n:check` が通るか
-- [ ] キー名に旧語彙（`task` / `entry` / `tag` / `event`）を使っていないか
-- [ ] `pnpm copy:check:strict` が通るか
+[i18n.md](../../../docs/engineering/i18n.md) §AI/Agent ルール・§チェックリスト を正本とする。キー名に旧語彙（`task` / `entry` / `tag` / `event`）を使わず、最後に `pnpm i18n:check` と `pnpm copy:check:strict` を通す。
 
 ## 言語検出の仕組み
 

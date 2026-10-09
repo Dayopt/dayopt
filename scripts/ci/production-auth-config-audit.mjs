@@ -51,7 +51,7 @@ import { pathToFileURL } from 'node:url';
  * allowlist（`AUTH_CONFIG_CONTRACT`）に列挙した key 以外は**読まないし出力しない**。
  * 列挙した key は **値そのものが credential になり得ない設定値**（boolean / enum / 数値 /
  * 自 project の URL / redirect allowlist）に限る。だから失敗時の原因特定のために実測値を
- * error message に含めてよい（`docs/operations/secrets.md` §API 経由の設定読戻し の射影
+ * error message に含めてよい（`docs/operations/secrets.md` §値を表示しない操作 の射影
  * 規則における明示 allowlist に当たる）。`*_secrets` / `*_key` / `*_token` / `*_pass` /
  * `*_credentials` は契約へ入れない（contract test が名前で弾く）。
  *
@@ -510,7 +510,7 @@ function describeValue(value) {
  * **値の中身が credential になりうる**ので、名前ベースの test では防げない。
  *
  * 出すのは期待値（自 project の公開 URL）と不一致の事実だけにする。drift 先の確認は
- * Supabase Dashboard か、`docs/operations/secrets.md` §API 経由の設定読戻し に従った
+ * Supabase Dashboard か、`docs/operations/secrets.md` §値を表示しない操作 に従った
  * 手元の射影で行う。
  */
 function describeActual(value, redact) {

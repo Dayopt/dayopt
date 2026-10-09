@@ -67,10 +67,7 @@ const DOCS_FILES = new Set(['AGENTS.md', 'CLAUDE.md', 'README.md']);
 function isDocsPath(file) {
   if (DOCS_FILES.has(file)) return true;
   if (file.startsWith('docs/')) return true;
-  if (
-    ['.claude/', '.agents/', '.codex/'].some((prefix) => file.startsWith(prefix)) &&
-    file.endsWith('.md')
-  ) {
+  if (['.claude/', '.agents/'].some((prefix) => file.startsWith(prefix)) && file.endsWith('.md')) {
     return true;
   }
   return false;
@@ -225,7 +222,6 @@ function isNeutralPath(file) {
     '.github/', // workflow 定義（integration 対象の path は先に判定済み）
     '.claude/', // provider adapter
     '.agents/', // shared skills
-    '.codex/', // provider adapter
     '.husky/',
     '.vscode/',
     'apps/storybook/', // 開発者向け。Vercel の product / web project に含まれない
@@ -333,7 +329,6 @@ const WORKSPACE_TEST_NEUTRAL_PREFIXES = [
   '.github/',
   '.agents/',
   '.claude/',
-  '.codex/',
   '.husky/',
   '.vscode/',
   'supabase/',

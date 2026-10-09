@@ -24,8 +24,8 @@ ai:
   prerequisites: # 前提知識（任意）
     - 'Dayoptアカウントを作成済み'
   relatedDocs: # 関連ドキュメント（任意）
-    - '/docs/getting-started/quick-start'
-    - '/docs/features/calendar'
+    - '/docs'
+    - '/docs/plan/calendar'
   chunkStrategy: 'h2'
   searchable: true
   difficulty: 'beginner' # beginner / intermediate / advanced

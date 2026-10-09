@@ -158,9 +158,9 @@ production の Auth 設定（Bot Protection、メール変更の二重確認、�
 
 **保証境界**（`AGENTS.md §PR / git 運用` §同型指摘の打ち切り に従い明文化）。守るのは ① `security_` / `hook_` / `mfa_` / `sessions_` / `password_` 配下の**網羅性**（契約にも除外リストにも無いキーは型を問わず failure）② その外側は 2026-08-11 の全数トリアージで選んだ個別 pin ③ pin した値の**両方向**の drift。守らないのは `external_*` / `mailer_*` / `smtp_*` / `sms_*` に新しく増えるキー（キーの存在自体は危険ではなく、guard に入れると形骸化する）、値の意味の検証（死活監視ではない）、Dashboard 以外の経路で生じた状態。境界の外側に未 pin の値があるという指摘は、境界の更新提案として別 issue で扱う。
 
-**「守らない」側は放置すると静かに腐る**（除外した名前空間に、後から安全性に効くキーが増えても気づけない）。次のどちらかを契機に再トリアージする: **月次ガーデニング**、または **Supabase の Auth 新機能を認知した時点**。手順は live 応答の `keys` 列挙を取り直し、除外名前空間に増えたキーが無いかを見るだけでよい（`security_` / `hook_` / `mfa_` / `sessions_` / `password_` 配下は audit 自身が落ちるので確認不要）。
+**「守らない」側は放置すると静かに腐る**（除外した名前空間に、後から安全性に効くキーが増えても気づけない）。**Supabase の Auth 新機能を認知した時点**、または security sweep の依頼時に再トリアージする。手順は live 応答の `keys` 列挙を取り直し、除外名前空間に増えたキーが無いかを見るだけでよい（`security_` / `hook_` / `mfa_` / `sessions_` / `password_` 配下は audit 自身が落ちるので確認不要）。
 
-手元での単発確認は `op run` 経由で行う（値は 1Password が masking する。`docs/operations/secrets.md` §API 経由の設定読戻し に従い、射影は完全一致で書く）:
+手元での単発確認は `op run` 経由で行う（値は 1Password が masking する。`docs/operations/secrets.md` §値を表示しない操作 に従い、射影は完全一致で書く）:
 
 ```bash
 SUPABASE_AUTH_AUDIT_TOKEN="op://ci/supabase-auth-audit/credential" op run -- node scripts/ci/production-auth-config-audit.mjs

@@ -70,7 +70,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/app/[locale]/(app)/_providers/_composition/ProvidersComposition.tsx`
 
-- [Plan を保存](journeys/save-plan.md) の 3. 先に画面へ出す — キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。
+- [Plan を保存](journeys/save-plan.md) の 3. 先に画面へ出す — キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は conventions-frontend.md §楽観的更新 に従う。
 
 #### `apps/product/src/app/[locale]/(app)/_providers/useApplyUpdateWhenSafe.ts`
 
@@ -499,7 +499,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/timeblock/hooks/useTimeblockWriteMutations.ts`
 
-- [Plan を保存](journeys/save-plan.md) の 3. 先に画面へ出す — キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。
+- [Plan を保存](journeys/save-plan.md) の 3. 先に画面へ出す — キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は conventions-frontend.md §楽観的更新 に従う。
 - [Plan を保存](journeys/save-plan.md) の 4. tRPC で送る — link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。
 - [Plan を保存](journeys/save-plan.md) の 9. 時刻の規則で検査 — 規則の正本はここ。変える時は DB → service → UI の写しを 1 変更で全部変える。DB だけ緩めて UI の写しが残ると「操作はできるのに保存されない」になる。
 - [Plan を保存](journeys/save-plan.md) の 10. 確定して取り直す — 新しい集計画面を足したら、ここの取り直し対象に入れないと保存後も古い数字が残る。
@@ -521,7 +521,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/timeblock/server/plan-commands-router.ts`
 
-- [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
+- [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（conventions.md §API層）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service — schema に項目を足す時は、Service で埋める処理と command の引数を揃える。userId を input から受け取る形にしない（REVIEW-1）。
 - [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
@@ -543,7 +543,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/features/timeblock/server/timeblock-command-service.ts`
 
-- [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（trpc-router-creating skill）。利用記録は best-effort で、失敗しても保存は取り消さない。
+- [Plan を保存](journeys/save-plan.md) の 7. Router → Service — 業務ロジックは Service に置き、Router に書かない（conventions.md §API層）。利用記録は best-effort で、失敗しても保存は取り消さない。
 - [Plan / Record を動かす・直す](journeys/edit-timeblock.md) の 5. Router → Service — schema に項目を足す時は、Service で埋める処理と command の引数を揃える。userId を input から受け取る形にしない（REVIEW-1）。
 - [Record を作る・Plan を記録する](journeys/record-plan.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
 - [削除と取り消し](journeys/delete-undo.md) の 4. Router → Service — 入力に項目を足す時も userId は ctx から渡す（REVIEW-1）。
@@ -724,7 +724,7 @@ last_verified: 2026-09-21
 
 #### `apps/product/src/lib/trpc/query-client.ts`
 
-- [Plan を保存](journeys/save-plan.md) の 3. 先に画面へ出す — キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は optimistic-update skill の手順に従う。
+- [Plan を保存](journeys/save-plan.md) の 3. 先に画面へ出す — キャッシュのキーや一覧の絞り込み条件を変えると、差し込み先と巻き戻し対象がずれる。書き込み mutation を足す時は conventions-frontend.md §楽観的更新 に従う。
 - [Plan を保存](journeys/save-plan.md) の 4. tRPC で送る — link を足す・変える影響は全 API に及ぶ。エラーを受ける共通処理（401 で画面ごとログインへ移動、Sentry 送信）は QueryClient 側にある。
 - [Plan を保存](journeys/save-plan.md) の 5. /api/trpc で受ける — ここは全 tRPC 共通の入口。context に項目を足すと全 procedure の実行前コストが増える。
 - [Plan を保存](journeys/save-plan.md) の 6. 関門チェック — 順序に理由がある。write fence を rate limit より先に見るのは、止めている間の依頼で自分の枠を使い切り、復旧直後に締め出されるのを避けるため。

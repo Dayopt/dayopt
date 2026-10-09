@@ -179,22 +179,22 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 
 セキュリティレビューは 4 層で構成する。どの層も単独では完全でなく、コード変更起点（1・2）と時間経過起点（3・4）を組み合わせて成立させる。
 
-| 層         | タイミング               | 実体                                                                                                                                                                                                                                                                                         |
-| ---------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 実装中     | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                       |
-| PR ごと    | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / 保護対象 path だけ `@claude review`（追加 reviewer は起動しない） |
-| 継続       | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                         |
-| 定期・随時 | 月次 + オンデマンド      | `/gardening` §5 のセキュリティ sweep（advisors + `pnpm security:check`）/ 明示依頼は `security` skill §オンデマンド sweep の手順（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                  |
+| 層      | タイミング               | 実体                                                                                                                                                                                                                                                                                         |
+| ------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 実装中  | コード変更ごと           | `security` skill（OWASP 観点のガイド）/ risk に応じた主担当のセルフレビュー（`AGENTS.md §レーン運用`）                                                                                                                                                                                       |
+| PR ごと | CI（ready 後）+ merge 前 | `ci.yml` static job の secret scan（gitleaks + `secrets:check`）/ integration job（affected 時）の RLS snapshot drift 検査 / Vercel build の client bundle secret 検査（`verify:bundle`）/ `production-config-audit.yml` / 保護対象 path だけ `@claude review`（追加 reviewer は起動しない） |
+| 継続    | 常時・自動               | Dependabot alerts（security update は schedule と無関係に即時 PR）/ Actions の SHA 固定 / Sentry / CSP 違反モニタリング / rate limit                                                                                                                                                         |
+| 随時    | オンデマンド             | 明示依頼時に `security` skill §オンデマンド sweep の手順（advisors + `pnpm security:check` から始める（provider 非依存。`/claude-security` は任意の加速器）/ `/security-review` / `/code-review`                                                                                             |
 
 **束ねた PR のレビュー**: issue 数やPRサイズではClaude reviewを起動しない。`protected-path-gate.mjs` が外部契約・不可逆・ガードレール変更と判定した時だけ `@claude review` を使い、それ以外はセルフレビューと対象検査で閉じる。
 
 ## 定期検査の cadence
 
-定期検査の正本は `/gardening` §5（月次セキュリティ sweep）とする。実施内容:
+定期の sweep は持たない（2026-10-09、月次 gardening の撤去に伴う）。明示依頼時の sweep の実施内容:
 
 1. Supabase security advisors の確認（Dashboard の Security Advisor、または Management API の advisors 読み取り。経路は `mcp-usage` skill）
 2. `pnpm security:check`（= `pnpm audit --audit-level=moderate`。後述のローカルパッチ済み advisory は `auditConfig` で除く）
-3. 深掘りが要る月だけ 1 境界を読む（手順は `security` skill §オンデマンド sweep の手順。
+3. 深掘りが要る時だけ 1 境界を読む（手順は `security` skill §オンデマンド sweep の手順。
    `/claude-security` は任意の加速器で、Claude 以外の runtime では使わない。実装前の既往照合は
    [threat-model.md](../engineering/threat-model.md) の既往クラスと却下記録）
 
@@ -214,7 +214,7 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 
 secret 検出はこれとは別で、**ready 後の PR で自動実行される**（#2483 で docs-guard.yml から `ci.yml` の static job（`scripts/ci/check.mjs`）へ移設。draft 中は走らず pre-commit hook の gitleaks が一次防衛を担う）。`check.mjs` が gitleaks で base ref からの差分を、`pnpm secrets:check` で tracked tree 全体を見る。加えて Vercel build がビルド後の client bundle への混入を grep する。ローカルでは `pnpm check` に `secrets:check` が含まれる（CI 側は static job の 1 回のみで、二重実行はしない）。
 
-**2026-08-24 以降、`.husky/pre-commit` も gitleaks で staged 差分をスキャンする**（`gitleaks protect --staged`、CI より前に無料で落とす層）。前提として `brew install gitleaks` が必要（`op`/`gh` と同じ host 常駐 CLI 前提、`mcp-usage` skill と同じ運用）。対話環境で未インストールだと commit が hard fail する。**ローカルの gitleaks バージョンは brew の floating latest（本記述時点で 8.30.1）、CI は `scripts/ci/check.mjs` の `GITLEAKS_VERSION`（#2483 で docs-guard.yml から移設。本記述時点で 8.30.1、#2379 で 8.9.0 から更新）に sha256 で pin している。この 2 つは今も意図的に同期させていない**（ローカルはあくまで pre-CI の高速フィルタで、CI が最終網であるため。バージョン固定を hook に持たせると `brew upgrade` のたびに壊れるブリトルさの方が割に合わないと判断した）。**現在バージョン番号が一致しているのは偶然で、今後 `brew upgrade` によりローカルだけ先行する**（CI 側は次に手動で version bump するまで固定のまま）。**非対話環境（`CI` 変数設定 or TTY 無し、例: 月次 gardening 自動パートの cloud Routine）で gitleaks が無い場合は hard fail せず warning のみで commit を続行する**（brew の無い実行環境で全 commit が回復不能に詰まるのを避けるため。secret 検出は ready 後の CI（`ci.yml` static job）が最終網として残るため失われない）。
+**2026-08-24 以降、`.husky/pre-commit` も gitleaks で staged 差分をスキャンする**（`gitleaks protect --staged`、CI より前に無料で落とす層）。前提として `brew install gitleaks` が必要（`op`/`gh` と同じ host 常駐 CLI 前提、`mcp-usage` skill と同じ運用）。対話環境で未インストールだと commit が hard fail する。**ローカルの gitleaks バージョンは brew の floating latest（本記述時点で 8.30.1）、CI は `scripts/ci/check.mjs` の `GITLEAKS_VERSION`（#2483 で docs-guard.yml から移設。本記述時点で 8.30.1、#2379 で 8.9.0 から更新）に sha256 で pin している。この 2 つは今も意図的に同期させていない**（ローカルはあくまで pre-CI の高速フィルタで、CI が最終網であるため。バージョン固定を hook に持たせると `brew upgrade` のたびに壊れるブリトルさの方が割に合わないと判断した）。**現在バージョン番号が一致しているのは偶然で、今後 `brew upgrade` によりローカルだけ先行する**（CI 側は次に手動で version bump するまで固定のまま）。**非対話環境（`CI` 変数設定 or TTY 無し、例: cloud 上の自動実行）で gitleaks が無い場合は hard fail せず warning のみで commit を続行する**（brew の無い実行環境で全 commit が回復不能に詰まるのを避けるため。secret 検出は ready 後の CI（`ci.yml` static job）が最終網として残るため失われない）。
 
 **`.gitleaks.toml`（repo root）が false positive の抑止設定を持つ**（#2379、gitleaks **8.25.0 以上**が `[[allowlists]]` 構文の前提。ローカルの brew floating latest・CI の pin 版 8.30.1 はどちらも満たす）。`gitleaks detect` / `gitleaks protect` はどちらも明示 `--config` 無しで repo root の `.gitleaks.toml` を自動探索するが、`scripts/ci/check.mjs`（#2483 で docs-guard.yml から移設）は guardrail 実行のため `--config .gitleaks.toml` を明示している。`[extend].useDefault = true` で default ruleset を継承しつつ、Dayopt 固有の既知 false positive だけを追加する。新しい false positive を見つけたら:
 
@@ -320,8 +320,8 @@ Sentry Issuesで`type:csp-violation`を指定し、directive、正規化済みbl
 
 ### ダッシュボード（セキュリティ）
 
-- 月次セキュリティ sweep の結果（`/gardening` §5.7）
-- `pnpm security:check` 結果（CI では実行しない。月次 sweep で手動実行する）
+- セキュリティ sweep の結果（明示依頼時。所見は issue）
+- `pnpm security:check` 結果（CI では実行しない。sweep の依頼時に手動実行する）
 - Dependabot alerts（依存脆弱性の継続検知はこちらが担当）/ Supabase security advisors
 - Upstash Redis request / latency / error metrics（Ratelimit Analyticsとraw identifier保存は無効）
 - Sentry Issues / quota / discarded event

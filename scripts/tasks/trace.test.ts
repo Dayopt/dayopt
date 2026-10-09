@@ -825,7 +825,7 @@ describe('computeZeroFindingRoleNotes', () => {
       ],
     };
     expect(computeZeroFindingRoleNotes(internalReview, true)).toEqual([
-      'risk-reviewer: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする（gardening 手順 4）',
+      'risk-reviewer: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする',
     ]);
   });
 
@@ -909,8 +909,8 @@ describe('computeFindings', () => {
     expect(computeFindings({ exploreMedian: 10 })).toEqual([]);
   });
 
-  it('Codex P1 > 0 なら判断の記録の穴を疑う', () => {
-    expect(computeFindings({ codexP1: 1 })).toContain(
+  it('レビュー bot の P1 > 0 なら判断の記録の穴を疑う', () => {
+    expect(computeFindings({ reviewP1: 1 })).toContain(
       'レビューが P1 を拾った: 判断の記録（DoD / 分解表）に穴が無いか',
     );
   });
@@ -928,8 +928,8 @@ describe('computeFindings', () => {
     );
   });
 
-  it('未収集の Codex P1 は 0 件として扱わない', () => {
-    expect(computeFindings({ codexP1: null })).toEqual([]);
+  it('未収集のレビュー P1 は 0 件として扱わない', () => {
+    expect(computeFindings({ reviewP1: null })).toEqual([]);
   });
 
   it('どれにも当てはまらなければ空配列', () => {
@@ -983,7 +983,7 @@ describe('renderMarkdown', () => {
       review: {
         readyDate: '2026-08-14T00:00:00Z',
         commitsAfterReady: 1,
-        codex: { p1: 0, p2: 1 },
+        bot: { p1: 0, p2: 1 },
         unresolvedThreads: 0,
         hasMarker: true,
       },
@@ -1059,7 +1059,7 @@ describe('buildTracePack (execFileImpl 経由の gh 呼び出し形)', () => {
     expect(pack.header.title).toBeNull();
     expect(pack.sessions).toBeNull();
     expect(pack.sessionTelemetryCoverage.providers.antigravity).toBeNull();
-    expect(pack.review.codex).toBeNull();
+    expect(pack.review.bot).toBeNull();
     expect(pack.result.merged).toBeNull();
   });
 

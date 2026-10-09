@@ -3,7 +3,7 @@
 出典: [vercel-labs/web-interface-guidelines](https://github.com/vercel-labs/web-interface-guidelines) `command.md` @ `e3d624baaf29dc1fc645aff3e38f03e564d2d6b1`（取得 2026-09-17）。
 License: MIT, Copyright (c) 2025 Vercel Labs.
 
-**上流は毎回 `main` を取得する構成だが、Dayopt はこのスナップショットを正本にする。** 監査のたびにリモートを取得しない。更新は `docs/operations/tooling.md` の外部 skill 導入一覧に従い、固定 SHA との差分をレビューしてから手で反映する。
+**上流は毎回 `main` を取得する構成だが、Dayopt はこのスナップショットを正本にする。** 監査のたびにリモートを取得しない。更新は `docs/operations/ai-harness.md` の外部 skill 導入一覧に従い、固定 SHA との差分をレビューしてから手で反映する。
 
 Dayopt 向けの調整: 上流の `$ARGUMENTS` 展開と runtime fetch の指示を除去、英語だけに効く copy 規則（Chicago style の Title Case、カーリークォート）を除外、`nuqs` 等の依存提案を除外、既存規約への対応を注記として追加。
 

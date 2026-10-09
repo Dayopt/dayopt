@@ -29,7 +29,7 @@ import { detectJudgmentRecords, extractLinkedIssueNumbers } from './ctx.mjs';
  * gh 呼び出しは各セクション独立に fail-closed（そのセクションだけ「未取得」）。
  *
  * deferred（次回以降）: timeline API の `committed` event が実際に返らない環境の
- * 網羅的な fallback 検証、Codex 以外のレビュー bot への拡張、session log の
+ * 網羅的な fallback 検証、session log の
  * cwd ベース突合（現状は project ディレクトリ名の完全一致のみ）。
  */
 
@@ -324,11 +324,11 @@ export function extractDodExcerpt(text) {
  * GraphQL の `author.login` と REST の `user.login` で `[bot]` の有無が割れるので
  * 正規化する。集計・表示専用で、merge を gate する用途では使わない。
  */
-const CODEX_BOT_LOGIN = 'chatgpt-codex-connector';
+const LEGACY_CODEX_BOT_LOGIN = 'chatgpt-codex-connector';
 
 function isReviewBotItem(item) {
   const login = String(item?.user?.login ?? '').replace(/\[bot\]$/, '');
-  if (login === CODEX_BOT_LOGIN) return true;
+  if (login === LEGACY_CODEX_BOT_LOGIN) return true;
   return login === 'github-actions' && String(item?.body ?? '').includes(CLAUDE_REVIEW_MARKER);
 }
 
@@ -395,7 +395,7 @@ export function hasInternalReviewMarker(comments) {
  *
  * 無駄の構造は「レビューの有効性を HEAD で判定していた」ことにあり、その症状は
  * 「投げた回数のわりに指摘が出ない」という形で現れる（PR #2554 実測: 投稿 8 /
- * 応答 7 / 問題なし 6）。月次 gardening でこの 3 数字を読めるようにする。
+ * 応答 7 / 問題なし 6）。月次の振り返りでこの 3 数字を読めるようにする。
  */
 export function countReviewRequestCycles(comments) {
   let requests = 0;
@@ -682,7 +682,7 @@ export function buildInternalReviewSection({
         findingsSource,
         totalFindings,
         // 推定が混ざったかを表示側が区別できるようにする（marker 由来の実数だけを
-        // 見たい月次 gardening 用。#2560 項目 4）。
+        // 見たい月次の振り返り用。#2560 項目 4）。
         totalFindingsEstimated: markersMissingField > 0,
         commitsAfterMarker,
       };
@@ -710,7 +710,7 @@ export function computeZeroFindingRoleNotes(internalReview, merged) {
     )
     .map(
       (r) =>
-        `${r.role}: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする（gardening 手順 4）`,
+        `${r.role}: 指摘ゼロの role: 月次で scope・費用・独立性を見直し、縮小 / 廃止 / 別手段の候補にする`,
     );
 }
 
@@ -751,14 +751,14 @@ export function collectDecisionLines(raw, numbers) {
 /**
  * @param {{
  *   exploreMedian?: number | null,
- *   codexP1?: number | null,
+ *   reviewP1?: number | null,
  *   commitsAfterReady?: number | null,
  *   hasNoEditHeavyModel?: boolean,
  * }} [options]
  */
 export function computeFindings({
   exploreMedian = null,
-  codexP1 = null,
+  reviewP1 = null,
   commitsAfterReady = null,
   hasNoEditHeavyModel = false,
 } = {}) {
@@ -766,7 +766,7 @@ export function computeFindings({
   if (exploreMedian !== null && exploreMedian > 10) {
     lines.push('探索 turn が多い: brief（ctx --post）の選別漏れを疑う');
   }
-  if (codexP1 !== null && codexP1 > 0) {
+  if (reviewP1 !== null && reviewP1 > 0) {
     lines.push('レビューが P1 を拾った: 判断の記録（DoD / 分解表）に穴が無いか');
   }
   if (commitsAfterReady !== null && commitsAfterReady > 3) {
@@ -893,7 +893,7 @@ export function renderMarkdown(pack) {
       `ready 後の commit 数: ${r.commitsAfterReady === null ? '未取得' : r.commitsAfterReady}`,
     );
     lines.push(
-      `レビュー bot 指摘: ${r.codex === null ? '未取得' : `P1 ${r.codex.p1} / P2 ${r.codex.p2}`}`,
+      `レビュー bot 指摘: ${r.bot === null ? '未取得' : `P1 ${r.bot.p1} / P2 ${r.bot.p2}`}`,
     );
     lines.push(
       `未解決 thread: ${r.unresolvedThreads === null || r.unresolvedThreads === undefined ? '未取得' : r.unresolvedThreads}`,
@@ -904,9 +904,9 @@ export function renderMarkdown(pack) {
     // 「投げた回数のわりに指摘が出ない」を月次で見るための 3 数字（#2558 手順 6）。
     lines.push(
       `レビュー起動: ${
-        r.codexCycles === null || r.codexCycles === undefined
+        r.botCycles === null || r.botCycles === undefined
           ? '未取得'
-          : `投稿 ${r.codexCycles.requests} / 応答 ${r.codexCycles.responses} / 問題なし ${r.codexCycles.cleanResponses}`
+          : `投稿 ${r.botCycles.requests} / 応答 ${r.botCycles.responses} / 問題なし ${r.botCycles.cleanResponses}`
       }`,
     );
     if (r.internalReview) {
@@ -1068,20 +1068,20 @@ export function buildTracePack(options, deps = {}) {
     }
   }
 
-  const codexReviews = tryOr(
+  const prReviews = tryOr(
     () =>
       runGhJson(['api', `repos/${REPO}/pulls/${number}/reviews`, '--paginate'], { execFileImpl }),
     null,
   );
-  const codexComments = tryOr(
+  const prReviewComments = tryOr(
     () =>
       runGhJson(['api', `repos/${REPO}/pulls/${number}/comments`, '--paginate'], { execFileImpl }),
     null,
   );
-  const codex =
-    codexReviews === null && codexComments === null
+  const bot =
+    prReviews === null && prReviewComments === null
       ? null
-      : countReviewPriorities(codexReviews ?? [], codexComments ?? []);
+      : countReviewPriorities(prReviews ?? [], prReviewComments ?? []);
 
   const threadNodes = tryOr(() => {
     const raw = runGh(
@@ -1117,7 +1117,7 @@ export function buildTracePack(options, deps = {}) {
       ? null
       : buildInternalReviewSection({
           issueComments,
-          reviewComments: codexComments ?? [],
+          reviewComments: prReviewComments ?? [],
           commits: pr?.commits ?? [],
           headSha: pr?.headRefOid ?? null,
         });
@@ -1125,8 +1125,8 @@ export function buildTracePack(options, deps = {}) {
   const review = {
     readyDate,
     commitsAfterReady,
-    codex,
-    codexCycles: issueComments === null ? null : countReviewRequestCycles(issueComments),
+    bot,
+    botCycles: issueComments === null ? null : countReviewRequestCycles(issueComments),
     unresolvedThreads,
     hasMarker,
     internalReview,
@@ -1155,7 +1155,7 @@ export function buildTracePack(options, deps = {}) {
   const findings = [
     ...computeFindings({
       exploreMedian: sessions?.summary?.exploreMedian ?? null,
-      codexP1: codex?.p1 ?? null,
+      reviewP1: bot?.p1 ?? null,
       commitsAfterReady,
       hasNoEditHeavyModel: hasNoEditHeavyModelSession(sessions?.all ?? []),
     }),

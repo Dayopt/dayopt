@@ -211,7 +211,6 @@ describe('CI job 名の契約', () => {
     // 網羅性 assert の入力。定義を足したらここも更新することになる（それが目的）。
     const EXPECTED_SCAN_TARGETS = [
       'actions/setup/action.yml',
-      'workflows/calendar-navigation-e2e.yml',
       'workflows/ci.yml',
       'workflows/claude-review.yml',
       'workflows/create-release.yml',

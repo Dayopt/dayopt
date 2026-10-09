@@ -18,7 +18,7 @@ const sha = 'a'.repeat(40);
 const context = {
   eventName: 'workflow_dispatch',
   repository: 'Dayopt/dayopt',
-  ref: 'refs/heads/integration',
+  ref: 'refs/heads/main',
   token: 'read-only-token',
   requestJson: JSON.stringify({
     preview_e2e: true,
@@ -66,7 +66,7 @@ function githubWorld({
   },
   branchPolicies = {
     total_count: 1,
-    branch_policies: [{ name: 'integration', type: 'branch' }],
+    branch_policies: [{ name: 'main', type: 'branch' }],
   },
   filesByPage = { 1: [{ filename: 'apps/product/src/example.ts', status: 'modified' }] },
 }: GithubWorldOptions = {}) {
@@ -106,7 +106,7 @@ function githubWorld({
 }
 
 describe('Preview Cloud trust gate', () => {
-  it('accepts only a fixed Integration dispatch, pinned internal open PR, restricted environment, and shared DB identity', async () => {
+  it('accepts only a main-ref dispatch, pinned internal open PR, restricted environment, and shared DB identity', async () => {
     const { fetchImpl } = githubWorld();
 
     const result = await verifyPreviewCloudTrust({ ...context, fetchImpl });
@@ -124,9 +124,83 @@ describe('Preview Cloud trust gate', () => {
   });
 
   it.each([
+    [
+      'both empty recovery fields as in the manual UI',
+      ['preview_recover_run', 'preview_recover_attempt'],
+    ],
+    ['only recovery run', ['preview_recover_run']],
+    ['only recovery attempt', ['preview_recover_attempt']],
+  ])('accepts omitted %s without weakening the trust checks', async (_label, omitted) => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    for (const key of omitted) delete inputs[key];
+    expect(Object.keys(inputs)).toHaveLength(9 - omitted.length);
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).resolves.toEqual({
+      prNumber: 2910,
+      sha,
+      deploymentId: 'dpl_abc123XYZ',
+      branchName: 'codex/cloud-preview-test-2910',
+      supabaseProjectRef: persistentRef,
+      supabaseBranchId: persistentBranchId,
+      databaseMode: 'shared',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
+  });
+
+  it.each([
+    'preview_e2e',
+    'preview_pr',
+    'preview_sha',
+    'preview_deployment',
+    'preview_db_ref',
+    'preview_db_branch',
+    'preview_db_mode',
+  ])('rejects omitted required field %s before API access', async (key) => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    delete inputs.preview_recover_run;
+    delete inputs.preview_recover_attempt;
+    delete inputs[key];
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).rejects.toThrow('unexpected workflow input fields');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(
+    ['preview_recover_run', 'preview_recover_attempt'].flatMap((key) =>
+      [null, 0, false, '123', ' ', [], {}].map((value) => ({ key, value })),
+    ),
+  )('rejects explicit recovery input $key=$value before API access', async ({ key, value }) => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    delete inputs.preview_recover_run;
+    delete inputs.preview_recover_attempt;
+    inputs[key] = value;
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).rejects.toThrow('recovery inputs cannot be used for Preview E2E');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown fields in the seven-field manual UI request before API access', async () => {
+    const { fetchImpl } = githubWorld();
+    const inputs = JSON.parse(context.requestJson);
+    delete inputs.preview_recover_run;
+    delete inputs.preview_recover_attempt;
+    inputs.preview_unknown = '';
+    await expect(
+      verifyPreviewCloudTrust({ ...context, requestJson: JSON.stringify(inputs), fetchImpl }),
+    ).rejects.toThrow('unexpected workflow input fields');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
     ['wrong event', { eventName: 'pull_request' }],
     ['wrong repository', { repository: 'attacker/repo' }],
-    ['wrong ref', { ref: 'refs/heads/main' }],
+    ['wrong ref', { ref: 'refs/heads/integration' }],
     ['missing token', { token: '' }],
   ])('rejects %s before making API calls', async (_label, override) => {
     const { fetchImpl } = githubWorld();
@@ -180,8 +254,8 @@ describe('Preview Cloud trust gate', () => {
       {
         total_count: 2,
         branch_policies: [
-          { name: 'integration', type: 'branch' },
           { name: 'main', type: 'branch' },
+          { name: 'integration', type: 'branch' },
         ],
       },
     ],
@@ -189,14 +263,14 @@ describe('Preview Cloud trust gate', () => {
       'uses a tag policy',
       {
         total_count: 1,
-        branch_policies: [{ name: 'integration', type: 'tag' }],
+        branch_policies: [{ name: 'main', type: 'tag' }],
       },
     ],
     [
       'has inconsistent total_count',
       {
         total_count: 2,
-        branch_policies: [{ name: 'integration', type: 'branch' }],
+        branch_policies: [{ name: 'main', type: 'branch' }],
       },
     ],
   ])('rejects a branch-policy response that %s', async (_label, branchPolicies) => {
