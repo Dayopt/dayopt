@@ -398,34 +398,36 @@ agent の 1Password は **`agent` vault を read-only で読む Service Account�
 
 ### ローカル: Claude Code の環境に置く
 
-**置き場は `~/.claude/settings.json` の `env`**（user 設定。repo の外）。Claude Code の CLI と desktop の Code tab が同じ設定を読み、Bash tool の全コマンドへ渡る。
+**置き場は repo の `.claude/settings.local.json` の `env`**（gitignore 済み。`GH_CONFIG_DIR` と同じ file）。Claude Code の CLI と desktop の Code tab が同じ設定を読み、Bash tool の全コマンドへ渡る。desktop app は worktree 作成時にこの file を新しい worktree へ複製するので、どの session でも同じ token が届く。
 
 ```json
 {
   "env": {
+    "GH_CONFIG_DIR": "<絶対パス>/.config/gh-agent",
     "OP_SERVICE_ACCOUNT_TOKEN": "<1Password の human に控えた SA token>"
   }
 }
 ```
 
-この置き場を選んだ理由と、採らなかった候補:
+この置き場を選んだ理由と、採らなかった候補（2026-10-09、User 判断）:
 
-| 候補                                   | 判断   | 理由                                                                                                                            |
-| -------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `~/.claude/settings.json` の `env`     | 採用   | repo の外。Claude Code の process にだけ届き、人間の terminal の `op` は 1Password app 連携のまま。worktree に複製されない      |
-| `.claude/settings.local.json` の `env` | 不採用 | gitignore 済みだが repo の中。desktop app が worktree 作成時にこの file を複製するため、平文の token が worktree の数だけ増える |
-| shell の login 環境（`.zprofile` 等）  | 不採用 | 人間の terminal の `op` まで SA に切り替わる。shell rc に平文を置かない規則（#3052）にも反する                                  |
-| `launchctl setenv`                     | 不採用 | 再起動で消え、全 GUI app と人間の terminal に届く                                                                               |
-| Claude desktop の環境変数設定          | 不採用 | Code tab の設定に該当項目が無い（2026-10-09 実測）                                                                              |
+| 候補                                   | 判断   | 理由                                                                                                                                                             |
+| -------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/settings.local.json` の `env` | 採用   | agent 用 secret の置き場を `GH_CONFIG_DIR` と 1 file に統一できる。gitignore 済みで commit されない。worktree ごとに複製されるが、読める人は同じ Mac の同じ user |
+| `~/.claude/settings.json` の `env`     | 不採用 | repo の外で複製は無いが、置き場が 2 つに分かれて迷う。repo 内の `.claude/settings.json`（tracked、public）と名前が同じで取り違えやすい                           |
+| repo の `.claude/settings.json`        | 禁止   | tracked で public repo に載る。commit した時点で token が公開される                                                                                              |
+| shell の login 環境（`.zprofile` 等）  | 不採用 | 人間の terminal の `op` まで SA に切り替わる。shell rc に平文を置かない規則（#3052）にも反する                                                                   |
+| `launchctl setenv`                     | 不採用 | 再起動で消え、全 GUI app と人間の terminal に届く                                                                                                                |
+| Claude desktop の環境変数設定          | 不採用 | Code tab の設定に該当項目が無い（2026-10-09 実測）                                                                                                               |
 
-平文で保存される点は `~/.config/gh-agent/hosts.yml` と同じ扱いで、file を `0600` にし、§Replica 台帳に載せる。token の控え（master）は 1Password の `human` に置く。agent が自分の token を 1Password から取得する循環は作らない。
+平文で保存される点は `~/.config/gh-agent/hosts.yml` と同じ扱いで、file を `0600` にし、§Replica 台帳に載せる。token の控え（master）は 1Password の `human` に置く。`agent` vault に置くと、最初の 1 個を取り出す token が無い循環になるため置かない。agent が自分の token を 1Password から取得する循環も作らない。
 
 設定は User が行う（token の値を agent・chat・コマンド引数に通さない）:
 
 1. 1Password app で SA token の控えを開いてコピーする。
-2. `~/.claude/settings.json` を editor で開き、上の `env` を追記して保存する。
-3. `chmod 600 ~/.claude/settings.json` を実行する。
-4. Claude Code の新しい session を開き、下記 §確認 を agent に実行させる。
+2. main checkout の `.claude/settings.local.json` を editor で開き、`env` に `OP_SERVICE_ACCOUNT_TOKEN` を追記して保存する。tracked の `.claude/settings.json` ではないことを `git status` で確かめる。
+3. `chmod 600 .claude/settings.local.json` を実行する。
+4. Claude Code の新しい session を開き、下記 §確認 を agent に実行させる。既存の session には届かない。
 
 ### Claude Code cloud
 
@@ -447,7 +449,7 @@ pnpm agent:preflight               # **1Password** 行が「OP_SERVICE_ACCOUNT_T
 ### rotation
 
 - **Integration ID も変わる**。`op whoami` の Integration ID は SA 本体ではなく token ごとの ID。ID を設定や docs に固定しない。
-- 新しい token を `human` の控えと `~/.claude/settings.json` の `env`、cloud の environment 変数へ入れ替え、§確認 を実行する。
+- 新しい token を `human` の控えと `.claude/settings.local.json` の `env`、cloud の environment 変数へ入れ替え、§確認 を実行する。
 - 旧 token は 1Password の管理画面で revoke する。
 
 ### 撤去した経路（2026-10-09）
@@ -546,16 +548,16 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 基本方針 7「値がどこに存在していようと、必ず 1Password にもある」を検査可能にするための列挙。**この表に載っていない場所に長寿命の実値が存在したら、それ自体が違反**（発見したら master へ登録するか撤去し、この表を更新する）。
 
-| 場所                                                                          | master                                                                                                              | 機械検証                                                                                                                                                           |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vercel Production Env（product / web）                                        | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
-| Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                  | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
-| GitHub Actions environment secrets（`production-release` / `production-ops`） | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
-| GitHub Actions environment secrets（`Nonproduction login`）                   | Integration用・Preview用の別1Password login items と owner-managed `supabase-preview-provision` item                | `scripts/runbook/setup-nonproduction-login.sh`（専用Environmentへの同期。値はstdin経由）                                                                           |
-| Supabase Dashboard Secrets                                                    | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
-| PR Preview Branch credentials                                                 | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
-| `~/.config/gh-agent/hosts.yml`（開発機、0600）                                | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
-| `~/.claude/settings.json` の `env.OP_SERVICE_ACCOUNT_TOKEN`（開発機、0600）   | `human` の SA token 控え（§Service Account）                                                                        | `pnpm agent:preflight` の 1Password 行（有無だけ）                                                                                                                 |
+| 場所                                                                                             | master                                                                                                              | 機械検証                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vercel Production Env（product / web）                                                           | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
+| Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                                     | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
+| GitHub Actions environment secrets（`production-release` / `production-ops`）                    | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
+| GitHub Actions environment secrets（`Nonproduction login`）                                      | Integration用・Preview用の別1Password login items と owner-managed `supabase-preview-provision` item                | `scripts/runbook/setup-nonproduction-login.sh`（専用Environmentへの同期。値はstdin経由）                                                                           |
+| Supabase Dashboard Secrets                                                                       | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
+| PR Preview Branch credentials                                                                    | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
+| `~/.config/gh-agent/hosts.yml`（開発機、0600）                                                   | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
+| `.claude/settings.local.json` の `env.OP_SERVICE_ACCOUNT_TOKEN`（開発機、0600、worktree へ複製） | `human` の SA token 控え（§Service Account）                                                                        | `pnpm agent:preflight` の 1Password 行（有無だけ）                                                                                                                 |
 
 **未台帳だった bypass secret は解消済み**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は 2026-08-14 の実測で GitHub Secrets と Vercel にだけ存在していたが、2026-09-14 に `ci/vercel-production` へ登録した（field 名を実測、値は未取得）。
 
