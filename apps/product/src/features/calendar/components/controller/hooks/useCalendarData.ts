@@ -282,9 +282,9 @@ export function useCalendarData({
     }
 
     // 表示範囲内のイベントのみをフィルタリング。
-    // 日次バケットはユーザーTZの yyyy-MM-dd を正とし、ブラウザTZでは再計算しない。
-    const startDateKey = getDateKey(viewDateRange.start, timezone);
-    const endDateKey = getDateKey(viewDateRange.end, timezone);
+    // 範囲の端は暦日の値なのでそのまま読み、予定・記録の実時刻だけユーザーTZの日付へ変換する。
+    const startDateKey = getDateKey(viewDateRange.start);
+    const endDateKey = getDateKey(viewDateRange.end);
 
     const filtered = allCalendarEvents.filter((event) => {
       if (!event.startDate || !event.endDate) {
