@@ -46,7 +46,7 @@ claude.ai の connector 設定画面から MCP を接続する経路は `~/.clau
 
 ### 常駐を増やさない
 
-外部能力の扱いは `AGENTS.md` §委任・報告の作法（原則③）に従う。ローカルアプリ依存（`eagle` / `storybook` / `supabase-local`）と、購入・停止・deploy など不可逆の能力を含む OAuth MCP（Vercel 等）は常駐させない。使う時だけ `claude mcp add` / `codex mcp add`、終わったら `claude mcp remove` / `codex mcp remove`（登録内容は上の表が正本）。
+外部能力の扱いは `AGENTS.md` §委任・報告の作法（原則③）に従う。ローカルアプリ依存（`eagle` / `storybook` / `supabase-local`）と、購入・停止・deploy など不可逆の能力を含む OAuth MCP（Vercel 等）は常駐させない。使う時だけ `claude mcp add`、終わったら `claude mcp remove`（登録内容は上の表が正本）。
 
 ### オンデマンド専用サーバーの登録・解除
 

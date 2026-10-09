@@ -966,7 +966,7 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('linked issues: #2540');
     expect(markdown).toContain('#### 見た・実行（session）');
     expect(markdown).toContain('Claude Code の local transcript のみ');
-    expect(markdown).toContain('Codex / Antigravity は未収集（不明であり 0 ではない）');
+    expect(markdown).toContain('Antigravity は未収集（不明であり 0 ではない）');
     expect(markdown).toContain('PR / review / merge 情報は GitHub 由来の repo 全体');
     expect(markdown).toContain('abcdef12');
     expect(markdown).toContain('#### 判断');
@@ -1022,7 +1022,6 @@ describe('buildTracePack (execFileImpl 経由の gh 呼び出し形)', () => {
     );
     expect(pack.header.title).toBeNull();
     expect(pack.sessions).toBeNull();
-    expect(pack.sessionTelemetryCoverage.providers.codex).toBeNull();
     expect(pack.sessionTelemetryCoverage.providers.antigravity).toBeNull();
     expect(pack.review.codex).toBeNull();
     expect(pack.result.merged).toBeNull();

@@ -808,7 +808,7 @@ export function renderMarkdown(pack) {
   }
   lines.push('');
   lines.push(
-    '**session telemetry**: Claude Code の local transcript のみ。Codex / Antigravity は未収集（不明であり 0 ではない）。PR / review / merge 情報は GitHub 由来の repo 全体で、Claude Code の効率へ帰属させない。',
+    '**session telemetry**: Claude Code の local transcript のみ。Antigravity は未収集（不明であり 0 ではない）。PR / review / merge 情報は GitHub 由来の repo 全体で、Claude Code の効率へ帰属させない。',
   );
   lines.push('');
 

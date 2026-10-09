@@ -157,6 +157,16 @@ function commandPresent(name) {
   });
 }
 
+/** devDependency として入る CLI（`node_modules/.bin`）も存在として数える。 */
+function localBinPresent(root, name) {
+  try {
+    accessSync(join(root, 'node_modules/.bin', name), constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function collectPreflight(cwd = process.cwd()) {
   const root = git(['rev-parse', '--show-toplevel'], cwd);
   if (!root) throw new Error('Git worktree を確認できません');
@@ -173,7 +183,7 @@ export function collectPreflight(cwd = process.cwd()) {
   const cli = Object.fromEntries(
     ['gh', 'claude', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => [
       name,
-      commandPresent(name),
+      commandPresent(name) || (name === 'supabase' && localBinPresent(root, name)),
     ]),
   );
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
@@ -208,11 +218,6 @@ export function collectPreflight(cwd = process.cwd()) {
     skills,
     // Presence is not proof of runtime activation or trust.
     claudeHooks: collectClaudeHooks(root),
-    readOnlyDelegation: {
-      wrapper: false,
-      claude: false,
-      native: 'unsupported; repository scope cannot be enforced at runtime',
-    },
   };
 }
 
@@ -242,7 +247,6 @@ export function renderPreflight(state) {
       .join(' ')} (${state.hooksPath ?? '未設定'})`,
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
     `**Claude hooks**: ${state.claudeHooks ?? '未取得'}`,
-    `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
     `**1Password**: ${state.onePassword?.tokenPresent ? 'Service Account 設定あり（認証・scope は未検証）' : 'Service Account 未設定'} | vault 権限:未検証 | 実行環境の分離:未検証`,
   ];

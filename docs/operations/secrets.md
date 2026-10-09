@@ -340,7 +340,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 ## Agent の gh identity（fine-grained PAT）
 
-策定日: 2026-09-14（Secret / Credential 監査 P1-1、User 裁可）。Agent セッション（Claude Code / Codex）の `gh` と git push（credential helper は `gh auth git-credential`）は、User 本人の OAuth token（`admin:org` / `delete_repo` / `repo` / `workflow`）ではなく **Dayopt/dayopt repo だけに効く fine-grained PAT** で動かす。hook の regex で `gh api` の書き込みを数え上げるのではなく、token の scope に無い操作（ruleset 変更・Secret 上書き・repo 削除・workflow 編集）を構造的に不可能にするのが目的。User の terminal の `gh`（keyring）は変更しない。
+策定日: 2026-09-14（Secret / Credential 監査 P1-1、User 裁可）。Agent セッション（Claude Code）の `gh` と git push（credential helper は `gh auth git-credential`）は、User 本人の OAuth token（`admin:org` / `delete_repo` / `repo` / `workflow`）ではなく **Dayopt/dayopt repo だけに効く fine-grained PAT** で動かす。hook の regex で `gh api` の書き込みを数え上げるのではなく、token の scope に無い操作（ruleset 変更・Secret 上書き・repo 削除・workflow 編集）を構造的に不可能にするのが目的。User の terminal の `gh`（keyring）は変更しない。
 
 **identity の分け方**: `GH_CONFIG_DIR` で config dir を分ける。User は既定（`~/.config/gh`、keyring）、Agent は `~/.config/gh-agent`（plaintext `hosts.yml`、0600）。keyring は host / user 単位で 1 token しか持てず、同じ account の 2 token が衝突するため、Agent 側だけ `--insecure-storage` を使う。この file は replica で、master は `agent/github-agent`（上記 Replica 台帳）。
 
@@ -431,7 +431,7 @@ pnpm agent:run -- claude
 2026-10-01、User の「人間はアプリ、エージェントは SA」という指定に従い、人間用 CLI で bootstrap 項目を取得する処理を廃止した。指定済み SA token を macOS login Keychain の専用項目へ暗号化して保存し、[`scripts/tasks/agent-op.mjs`](../../scripts/tasks/agent-op.mjs) は注入済み token、またはその Keychain 項目だけを使う。
 
 - 1Password アプリの CLI / SDK 連携をオフにし、MCP 統合もオフのまま、既存 MCP 認証をクリアした。元の CLI の account 一覧は 0 件で、人間用 session は存在しないことを確認した。
-- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。2026-10-09、User 指示で判定に `CLAUDECODE=1`（Claude Code が Bash に渡す環境変数）を追加した。同日、Claude Code desktop の shell で `op vault list` が SA 経由で `agent` 1 件だけを返すことを実測。`CLAUDECODE` を外した process が人間用認証へ fallback しないことの確認は未実施（auto mode が当該コマンドを拒否したため、User の terminal で行う）。
+- `~/.local/bin/op` は `CLAUDECODE=1`（Claude Code が Bash に渡す環境変数）がある process に SA 用 entry point を適用する（repo 外の実装には旧 `CODEX_*` 判定が残るが、Codex は撤去済みで使わない）。それ以外は元の CLI を呼ぶ。2026-10-09、Claude Code desktop の shell で `op vault list` が SA 経由で `agent` 1 件だけを返すことを実測。`CLAUDECODE` を外した process が人間用認証へ fallback しないことの確認は未実施（auto mode が当該コマンドを拒否したため、User の terminal で行う）。
 - `~/.config/dayopt-agent-op/config.json` には元の CLI の絶対 path、検証対象の SA / vault ID だけを保存する。人間用 account / vault / item の参照は除去した。
 - token は平文ファイル・コマンド引数・ログに保存しない。Keychain の service は `dayopt-agent-service-account`、account は指定 SA ID。読み出しには `/usr/bin/security` を使い、その stdout は process 内だけで受け取る。
 - 継承した `OP_*` は除去し、一時設定・生体認証無効の SA 環境で identity と絞り込みなしの vault 一覧を照合してから、要求 command を実行する。
@@ -442,7 +442,7 @@ pnpm agent:run -- claude
 
 SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
 
-Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。同日 User が SA token を rotation した（User 報告）ため、Codex Cloud に残る旧 token は無効。Codex Cloud 側の登録の削除は未確認。rotation 後のローカルの切替手順（2026-10-09 実測）:
+2026-10-09 に User が SA token を rotation した（User 報告）。rotation 後のローカルの切替手順（2026-10-09 実測）:
 
 - **ID も変わる**。`op user get --me` の `id`（= `op whoami` の Integration ID）は Service Account 本体ではなく token ごとの ID で、rotation で変わる。`~/.config/dayopt-agent-op/config.json` の `serviceAccountId` を新しい値へ更新しないと `Agent op: IDENTITY_MISMATCH` で止まる
 - **Keychain 項目は新しい ID を account 名にして作り直す**。入口は service `dayopt-agent-service-account`・account `serviceAccountId` で探す
@@ -621,7 +621,7 @@ GitHub Actions Secrets は CI/CD 用の replica。build / e2e 用 public env な
 
 1Passwordを正本としてGitHub Environmentの暗号化secretsへ必要分だけ同期する。最初にGitHub Settingsで空の `Nonproduction login` Environmentを作り、deployment branch policyを `main` と `integration` のみにする。次にSupabase Dashboard `/account/tokens` でScoped Management PATを発行し、`Development Branches: Read`、`API Keys: Read`、`API Key Secrets: Read` だけを付与する。resource scopeはまず親dayopt projectを指定する。動的Preview branchのAPI keyまで取得できるかは公式資料で確認できていないため、実行時に権限エラーとなった場合だけ必要なbranch scopeへ広げる。Classic full-access tokenは使わない。発行したPATは1Password item `supabase-preview-provision` の `credential` fieldへ保存する。このitemはまだ作成されていない。通常は `ci` vaultを使い、別vaultに保存する場合はownerがそのVault IDを `NONPROD_LOGIN_PROVISION_VAULT_ID` で指定する。値やVault IDを会話・ログへ貼らない。Integration login sourceは1Password item ID `s3tems3afbzvvguakggydcgxni` の `username` / `password` fieldsで、指定Vaultから両fieldが非空であることを確認済み。Preview loginはownerが専用1Password itemを指定済みだが、fieldsの非空確認とGitHub replicaへの同期は未実施。
 
-1Password startup checkが通る環境で、ownerが管理するログインVault IDを `NONPROD_LOGIN_VAULT_ID` に設定して `scripts/runbook/setup-nonproduction-login.sh --execute` を実行する。PAT itemを `ci` 以外へ保存した場合は `NONPROD_LOGIN_PROVISION_VAULT_ID` も設定する。Vault IDはログへ出さない。既定はdry-run。scriptはIntegration用とPreview用のitemを分けて読み、Management PATも含む全5値をGitHubへ書く前に空でないことを確認する。Integration側のVault IDは明示し、Preview側はowner指定itemのlocatorを使う。branch policyに `main` / `integration` 以外があれば停止する。値はprocess memoryとstdinだけを通り、一時ファイル、argv、ログへ保存しない。1Password read失敗時は固定メッセージで停止し、GitHub secretsを書かない。同期は5つのsecret更新なので、GitHub側の途中失敗は手動で再実行する。PAT itemまたはEnvironment設定が不足する場合は同期完了と扱わない。Codex workspace外から実行する場合もstartup checkは必須で、owner端末上の承認済みchecker pathを `OP_STARTUP_CHECK` で指定する。checkerが見つからない／失敗した場合は処理を中断する。
+1Password startup checkが通る環境で、ownerが管理するログインVault IDを `NONPROD_LOGIN_VAULT_ID` に設定して `scripts/runbook/setup-nonproduction-login.sh --execute` を実行する。PAT itemを `ci` 以外へ保存した場合は `NONPROD_LOGIN_PROVISION_VAULT_ID` も設定する。Vault IDはログへ出さない。既定はdry-run。scriptはIntegration用とPreview用のitemを分けて読み、Management PATも含む全5値をGitHubへ書く前に空でないことを確認する。Integration側のVault IDは明示し、Preview側はowner指定itemのlocatorを使う。branch policyに `main` / `integration` 以外があれば停止する。値はprocess memoryとstdinだけを通り、一時ファイル、argv、ログへ保存しない。1Password read失敗時は固定メッセージで停止し、GitHub secretsを書かない。同期は5つのsecret更新なので、GitHub側の途中失敗は手動で再実行する。PAT itemまたはEnvironment設定が不足する場合は同期完了と扱わない。workspace外から実行する場合もstartup checkは必須で、owner端末上の承認済みchecker pathを `OP_STARTUP_CHECK` で指定する。checkerが見つからない／失敗した場合は処理を中断する。
 
 `pull_request_target`はworkflowがdefault branchに入るまで自動実行されない。merge後は新規・更新・ready化したinternal PRで自動準備される。Integrationはtrusted Integration refから手動dispatchできる。候補PRのコードはcredentials付きjobでcheckout/実行しない。workflow導入とEnvironment/secret同期の後、Integrationをdispatchし、PR PreviewでAuth password grantを確認する。いずれもアプリUIの実ログイン、redirect、CRUDを別途確認する。
 
