@@ -45,7 +45,7 @@ Node.js と package manager は実行場所ごとに暗黙で選ばせず、repo
 
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は不一致なら原因と直し方を 1 行で出して exit 1 にする
 - ローカルで Node 24 に自動で揃えるには fnm を使う（User 作業。shell 設定は repo 外）。`brew install fnm` の後、`~/.zshrc` に `eval "$(fnm env --use-on-cd --version-file-strategy=recursive)"` を追記し、新しい shell で repo に入って `fnm install` を実行する。入れるまでは `PATH=/opt/homebrew/opt/node@24/bin:$PATH` を前置する
-- `pnpm dev` は Docker と local Supabase を前提にする（[#3058](https://github.com/Dayopt/dayopt/issues/3058)）。Docker 無しで動かす経路は env を明示して渡す `pnpm dev:raw` で、product の動作確認は Vercel Preview で行う（[#2910](https://github.com/Dayopt/dayopt/issues/2910)）
+- `pnpm dev` は Docker と local Supabase を前提にする（[#3058](https://github.com/Dayopt/dayopt/issues/3058)）。Docker 無しで動かす経路は env を明示して渡す `pnpm dev:raw` で、非本番 `integration` branch の key は `agent/supabase-integration` にある（2026-10-09、[#3073](https://github.com/Dayopt/dayopt/issues/3073)）。product の動作確認は Vercel Preview で行う（[#2910](https://github.com/Dayopt/dayopt/issues/2910)）
 - 手元の UI 確認は `pnpm storybook`、静的 build は `pnpm build-storybook`。既存 mock を使い、アプリ Secret・1Password・Local Supabase を要求しない
 - DB 型取得は `pnpm types:generate --target preview --project-ref <ref>` 等で対象を指定する。省略時に本番へ接続しない。環境構成は [infra.md](../engineering/infra.md#cloud-firstへの移行契約2910継続中) を読む
 - `pnpm branch:finish` は linked worktree なら削除する。通常 checkout は未保存差分がなく、local / remote の先端が PR の head と一致し origin/main へ到達していることを確かめて detach し、ディレクトリを残す。他の作業が使う checkout は切り替え・削除しない

@@ -126,6 +126,7 @@
       "Read(**/.envrc)",
       "Read(~/.ssh/**)",
       "Read(~/.aws/**)",
+      "Read(**/.claude/settings.local.json)",
       "Bash(sudo:*)",
       "Bash(rm -rf /:*)",
       "Bash(rm -rf ~:*)",
@@ -133,7 +134,7 @@
       "Bash(shutdown:*)",
       "Bash(reboot:*)"
     ],
-    "ask": ["Bash(git pull:*)", "Bash(git reset:*)", "Bash(curl:*)", "Bash(wget:*)"]
+    "ask": ["Bash(git pull:*)", "Bash(git reset:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(env)"]
   },
   "hooks": {
     "SessionStart": [
