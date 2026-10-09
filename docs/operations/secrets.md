@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-10-09
 code: scripts/tasks/env/schema.ts
 ---
 
@@ -388,76 +388,73 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 ## Service Account
 
-2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**を基本とする。同日の追加指示で、ローカルは**専用の標準 Mac ユーザー**を用意し、人間用ホームへのアクセスを閉じる分離を先に進める方針も承認した（[ローカル手順](./local-agent-isolation.md)）。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。同日、User は Codex Cloud の `dayopt` 環境への token / ID 登録と公開を報告した。公開後の task での照合、SA の read-only 等の管理権限、専用 Mac ユーザーの作成と旧 Mac 起動経路の停止は未確認であり、現行 Mac セッションの隔離完了を意味しない。
+agent の 1Password は **`agent` vault を read-only で読む Service Account（SA）だけ**を使う（2026-09-30 決定、維持）。入口は環境変数 `OP_SERVICE_ACCOUNT_TOKEN` 1 個で、ローカルも Claude Code cloud も同じ（2026-10-09、[#3050](https://github.com/Dayopt/dayopt/issues/3050) / [#3052](https://github.com/Dayopt/dayopt/issues/3052)）。`op` CLI はこの変数があれば SA で認証するため、repo にも開発機にも wrapper を置かない（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)）。
 
-### 権限と実行環境
+### 権限
 
 - SA は `agent` vault の **`read_items` のみ**。`write_items` / `share_items` / vault 作成 / 1Password Environments へのアクセスは付けない。権限と vault の変更には SA の作り直しが必要（[公式仕様](https://www.1password.dev/service-accounts/get-started)）。vault の read-only は 1Password 内の権限であり、保存した API credential の外部サービス上の権限とは別。
-- agent は人間用 Mac から分離したクラウド環境で動かす。人間用の 1Password app / browser profile / CLI session / Keychain / home directory を配置・mount・同期しない。Mac のファイルやアプリを操作できる tool / MCP 接続も持ち込まない。
-- ローカルでは専用の標準 Mac ユーザーで同じ境界を作る。人間用ホームへの到達を OS のアクセス権で閉じ、人間用認証や設定をコピーしない。専用ユーザーへ admin / sudo 権限を付けない。SA token の環境変数設定だけでは分離したことにならない。
-- VM を採る場合は admin と実行 user を分け、agent に sudo、host socket、他環境の secret を読める cloud role を与えない。SSH agent forwarding は使わない。これらは provider 側の設定と live 証跡で確認する。repo の wrapper は OS や cloud role の権限境界ではない。
-- 人間用環境は `human` / `ci` の管理を持つ。切替のために、別作業中の Mac の認証設定・worktree を変更しない。旧セッションを停止し、必要な作業を専用環境へ移してから切替完了とする。
+- 境界は token の到達範囲で作る。agent に渡すのは `agent` vault に入れてよい値（read-only か非本番 scope）だけで、本番の書き込み権限は token が無いので行使できない。同じ OS ユーザーで動く以上、Mac の人間用アプリ・ブラウザー・ファイルへの到達は閉じない。それを前提に、`agent` vault には「漏れても困らない」値だけを置く（§Vault / Item / Field Schema の `agent`）。
+- token を持つ process とその子 process は token を読める。第三者 PR の test / build や依存の install script を未信頼コードとして走らせる場合は、token の無い別環境で実行する。
 
-### 起動契約
+### ローカル: Claude Code の環境に置く
 
-実装は [`scripts/tasks/agent-service-account.mjs`](../../scripts/tasks/agent-service-account.mjs)。CLI が確認する metadata と platform 側で確認する隔離を区別する。
+**置き場は `~/.claude/settings.json` の `env`**（user 設定。repo の外）。Claude Code の CLI と desktop の Code tab が同じ設定を読み、Bash tool の全コマンドへ渡る。
 
-| 入力                              | 扱い                                                                                                                                                             |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない                         |
-| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | `op user get --me` の `id`（= `op whoami` の Integration ID）。SA 本体ではなく token ごとの ID で rotation で変わる。秘密ではない。起動する identity を pin する |
-| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                                                |
-
-起動前に token と ID の存在を検査する。`OP_CONNECT_*`（SA より認証の優先順位が高い）、`OP_SESSION*`、`OP_ACCOUNT` を継承せず、private な一時 `OP_CONFIG_DIR`、`OP_BIOMETRIC_UNLOCK_ENABLED=false`、cache / debug 無効を設定する（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)、[環境変数](https://www.1password.dev/cli/environment-variables)）。
-
-`op user get --me` が確認済みの active SA と一致し、絞り込みなしの `op vault list` が確認済み ID・名前 `agent` の 1 件だけなら、渡された command を shell を介さず起動する。token 未設定・認証失敗・identity / vault 不一致では command を起動しない。検査の raw stdout / stderr は出さず、固定 error code だけを返す。一時 CLI 設定は終了時に削除する。
-
-`agent:run` は **SA を利用する、信頼済み agent の起動入口**であり、未信頼コードの sandbox ではない。起動した process とその子 process は SA token を読める。第三者 PR の test / build、依存の install script 等を未信頼コードとして実行する場合は、token・Keychain・親 process の認証情報・host socket に到達できない別 worker で実行する。同じ OS user の子 process から環境変数を外すだけでは親 process 等への到達を閉じた証明にならない。SA の vault 制限は token の持ち出しや、vault 内の API credential の外部権限を制限しない。今回のクラウド検証は未信頼コード worker の隔離を含まない。
-
-```bash
-# 専用クラウド側で秘密ストアから token を注入した後に実行する
-pnpm agent:secrets:check --json
-pnpm agent:run -- claude
+```json
+{
+  "env": {
+    "OP_SERVICE_ACCOUNT_TOKEN": "<1Password の human に控えた SA token>"
+  }
+}
 ```
 
-検査成功は **SA identity と読める vault の範囲**の証跡に限る。write / share / vault 作成 / Environments 権限は管理画面で別途確認する。`agent:preflight` は token / ID の設定有無だけを表示し、scope と実行環境の隔離を未検証と表示する。wrapper を通常の Mac で実行しても、人間用認証・UI への別経路を閉じたことにはならない。
+この置き場を選んだ理由と、採らなかった候補:
 
-### Bootstrap と移行
+| 候補                                   | 判断   | 理由                                                                                                                            |
+| -------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.claude/settings.json` の `env`     | 採用   | repo の外。Claude Code の process にだけ届き、人間の terminal の `op` は 1Password app 連携のまま。worktree に複製されない      |
+| `.claude/settings.local.json` の `env` | 不採用 | gitignore 済みだが repo の中。desktop app が worktree 作成時にこの file を複製するため、平文の token が worktree の数だけ増える |
+| shell の login 環境（`.zprofile` 等）  | 不採用 | 人間の terminal の `op` まで SA に切り替わる。shell rc に平文を置かない規則（#3052）にも反する                                  |
+| `launchctl setenv`                     | 不採用 | 再起動で消え、全 GUI app と人間の terminal に届く                                                                               |
+| Claude desktop の環境変数設定          | 不採用 | Code tab の設定に該当項目が無い（2026-10-09 実測）                                                                              |
 
-#### ローカル agent の通常の `op` 呼び出し
+平文で保存される点は `~/.config/gh-agent/hosts.yml` と同じ扱いで、file を `0600` にし、§Replica 台帳に載せる。token の控え（master）は 1Password の `human` に置く。agent が自分の token を 1Password から取得する循環は作らない。
 
-2026-10-01、User の「人間はアプリ、エージェントは SA」という指定に従い、人間用 CLI で bootstrap 項目を取得する処理を廃止した。指定済み SA token を macOS login Keychain の専用項目へ暗号化して保存し、[`scripts/tasks/agent-op.mjs`](../../scripts/tasks/agent-op.mjs) は注入済み token、またはその Keychain 項目だけを使う。
+設定は User が行う（token の値を agent・chat・コマンド引数に通さない）:
 
-- 1Password アプリの CLI / SDK 連携をオフにし、MCP 統合もオフのまま、既存 MCP 認証をクリアした。元の CLI の account 一覧は 0 件で、人間用 session は存在しないことを確認した。
-- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。2026-10-09、User 指示で判定に `CLAUDECODE=1`（Claude Code が Bash に渡す環境変数）を追加した。同日、Claude Code desktop の shell で `op vault list` が SA 経由で `agent` 1 件だけを返すことを実測。`CLAUDECODE` を外した process が人間用認証へ fallback しないことの確認は未実施（auto mode が当該コマンドを拒否したため、User の terminal で行う）。
-- `~/.config/dayopt-agent-op/config.json` には元の CLI の絶対 path、検証対象の SA / vault ID だけを保存する。人間用 account / vault / item の参照は除去した。
-- token は平文ファイル・コマンド引数・ログに保存しない。Keychain の service は `dayopt-agent-service-account`、account は指定 SA ID。読み出しには `/usr/bin/security` を使い、その stdout は process 内だけで受け取る。
-- 継承した `OP_*` は除去し、一時設定・生体認証無効の SA 環境で identity と絞り込みなしの vault 一覧を照合してから、要求 command を実行する。
-- token 取得 / SA 検証に失敗した場合は停止する。人間用認証へ fallback しない。`--account` / `--session` / `--config` / `--debug` と `signin` / `signout` は入口で拒否する。
-- **これは CLI / SDK の認証経路の整理であり、OS / UI の隔離ではない。** 同じ OS ユーザーの全権限がある process に、設定の再変更や人間用アプリ・ブラウザーの画面操作を禁止する境界はない。
-- 反映確認は agent の実際の shell で `op vault list` を実行する。元の CLI に SA token を渡さない別 process は認証失敗となることを確認する。別の実行環境・PATH・MCP にも適用されるとは推測しない。
-- 解除は今回作成した `~/.local/bin/op` を削除する。Keychain の SA 項目を削除すると、この入口は token 未注入時に停止する。
+1. 1Password app で SA token の控えを開いてコピーする。
+2. `~/.claude/settings.json` を editor で開き、上の `env` を追記して保存する。
+3. `chmod 600 ~/.claude/settings.json` を実行する。
+4. Claude Code の新しい session を開き、下記 §確認 を agent に実行させる。
 
-SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
+### Claude Code cloud
 
-Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。同日 User が SA token を rotation した（User 報告）ため、Codex Cloud に残る旧 token は無効。Codex Cloud 側の登録の削除は未確認。rotation 後のローカルの切替手順（2026-10-09 実測）:
+environment の変数として同じ名前 `OP_SERVICE_ACCOUNT_TOKEN` を置く。変数は session 内の全コマンドから読め、値はマスクされない。cloud での成立確認は [#3051](https://github.com/Dayopt/dayopt/issues/3051) が行う。
 
-- **ID も変わる**。`op user get --me` の `id`（= `op whoami` の Integration ID）は Service Account 本体ではなく token ごとの ID で、rotation で変わる。`~/.config/dayopt-agent-op/config.json` の `serviceAccountId` を新しい値へ更新しないと `Agent op: IDENTITY_MISMATCH` で止まる
-- **Keychain 項目は新しい ID を account 名にして作り直す**。入口は service `dayopt-agent-service-account`・account `serviceAccountId` で探す
-- **`security add-generic-password -w` の入力プロンプトは長い token を切り詰める**（約 128 文字。SA token は 852 文字）。切れた token は `failed to DecodeSACredentials: unexpected end of JSON input` になる。値はプロンプトを通さず `security -i` へ標準入力で渡す。1Password はコピー後に clipboard を自動で消すので、コピー直後に実行する
-- 確認は agent の shell で `op vault list` が `agent` 1 件だけを返すこと
+### 確認
 
-token の控えの保管先は未確認。token 値や個人の ID 実値は本ページに保存しない。
+値を出さずに、identity と読める vault の範囲を確かめる。
 
-1. provider と実行先を確定し、人間用の認証・ファイル・tool 接続を持たない環境を用意する。Node.js は `.nvmrc`、pnpm は `packageManager` に揃え、1Password CLI を公式配布から導入する。
-2. 管理画面で SA の read-only / 1 vault / Environments 無し / vault 作成不可を確認し、SA ID・vault ID を登録する。token は秘密ストアの UI 等から注入し、chat や引数へ貼らない。
-3. 専用環境で `agent:secrets:check` の metadata 結果を確認する。既知の非秘密 canary item を `agent` から取得でき、実在確認済みの `human` / `ci` の canary は権限拒否となることを process 内で確認し、値は表示しない。network error / item 不在を権限拒否の証明にしない。
-4. token 無し・無効で起動が失敗し、人間用認証の prompt / fallback が起きないことを確認する。Mac の home / 1Password / browser / 接続済み tool への到達経路が無いことも確認する。
-5. 1Password を使う対話・無人の agent 起動を `agent:run` に統一し、旧セッションを停止する。撤去対象の credential replica があれば記録してから処置する。障害時は専用環境を停止し、人間用の認証を agent に戻して復旧しない。
+```bash
+op whoami                          # User Type: SERVICE_ACCOUNT
+op vault list                      # agent の 1 件だけ
+pnpm 1password:check               # agent の item / field の実在。human / ci は MISSING_VAULT になるのが正しい
+pnpm agent:preflight               # **1Password** 行が「OP_SERVICE_ACCOUNT_TOKEN あり」
+```
 
-Secret が setup phase のみに渡る cloud 実行先では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--cloud-の実行環境)）。
+`.op-env.agent` を env-file に渡した `op run` で `op://agent/...` 参照が解決されることも確認する。解決後の環境変数をそのまま出力しない。
 
-移行完了には platform 設定、SA 権限確認、live の正負検証、旧起動経路の停止の証跡が必要。fixture test の成功だけで完了と扱わない。
+### rotation
+
+- **Integration ID も変わる**。`op whoami` の Integration ID は SA 本体ではなく token ごとの ID。ID を設定や docs に固定しない。
+- 新しい token を `human` の控えと `~/.claude/settings.json` の `env`、cloud の environment 変数へ入れ替え、§確認 を実行する。
+- 旧 token は 1Password の管理画面で revoke する。
+
+### 撤去した経路（2026-10-09）
+
+2026-10-01〜10-09 は、ローカルの `op` を `~/.local/bin/op`（node の wrapper）で置き換え、Claude Code / Codex の環境変数を見て macOS のログインキーチェーンに保存した SA token を注入していた。repo 側の wrapper 実装、SA 起動検査、それを呼ぶ `pnpm` script 2 本は #3052 で削除した。2026-09-30 の「ローカルは専用の標準 Mac ユーザーで分離する」方針は、環境変数 1 個の SA で到達範囲が同じになるため撤回した（決定の記録は [#3057](https://github.com/Dayopt/dayopt/issues/3057)）。開発機に残る wrapper・設定・キーチェーン項目の削除は User が行う。
+
+Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。同日の SA token rotation（User 報告）で旧 token は無効。Codex Cloud 側の登録の削除は未確認。
 
 ---
 
@@ -558,6 +555,7 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 | Supabase Dashboard Secrets                                                    | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
 | PR Preview Branch credentials                                                 | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
 | `~/.config/gh-agent/hosts.yml`（開発機、0600）                                | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
+| `~/.claude/settings.json` の `env.OP_SERVICE_ACCOUNT_TOKEN`（開発機、0600）   | `human` の SA token 控え（§Service Account）                                                                        | `pnpm agent:preflight` の 1Password 行（有無だけ）                                                                                                                 |
 
 **未台帳だった bypass secret は解消済み**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は 2026-08-14 の実測で GitHub Secrets と Vercel にだけ存在していたが、2026-09-14 に `ci/vercel-production` へ登録した（field 名を実測、値は未取得）。
 

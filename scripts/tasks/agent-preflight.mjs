@@ -2,11 +2,16 @@ import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectOnePasswordConfig } from './agent-service-account.mjs';
 
 // SessionStart の待ち時間を短く保つため、外部 command は gh と pnpm を逐次確認し、
 // 各々に同じ短い上限を持たせる。
 const PREFLIGHT_COMMAND_TIMEOUT_MS = 2_000;
+
+// 1Password の入口は OP_SERVICE_ACCOUNT_TOKEN 1 個（#3052）。ここでは有無だけを見る。
+// 認証と vault の範囲は op whoami / op vault list で確かめる。値は読まない。
+export function collectOnePassword(env = process.env) {
+  return { tokenPresent: Boolean(env.OP_SERVICE_ACCOUNT_TOKEN?.trim()) };
+}
 
 function git(args, cwd) {
   try {
@@ -204,7 +209,7 @@ export function collectPreflight(cwd = process.cwd()) {
     hooks,
     cli,
     ghIdentity,
-    onePassword: collectOnePasswordConfig(),
+    onePassword: collectOnePassword(),
     skills,
     // Presence is not proof of runtime activation or trust.
     claudeHooks: collectClaudeHooks(root),
@@ -244,7 +249,7 @@ export function renderPreflight(state) {
     `**Claude hooks**: ${state.claudeHooks ?? '未取得'}`,
     `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
-    `**1Password**: ${state.onePassword?.tokenPresent ? 'Service Account 設定あり（認証・scope は未検証）' : 'Service Account 未設定'} | vault 権限:未検証 | 実行環境の分離:未検証`,
+    `**1Password**: ${state.onePassword?.tokenPresent ? 'OP_SERVICE_ACCOUNT_TOKEN あり（認証と vault の範囲は op whoami / op vault list で確認）' : 'OP_SERVICE_ACCOUNT_TOKEN 未設定（docs/operations/secrets.md §Service Account）'}`,
   ];
   if (state.ghIdentity?.broadScopes.length)
     lines.push(

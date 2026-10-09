@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   collectClaudeHooks,
   collectGhIdentity,
+  collectOnePassword,
   collectPreflight,
   parseGhAuthStatus,
   renderPreflight,
@@ -22,19 +23,27 @@ function fixture() {
   return root;
 }
 describe('agent preflight', () => {
-  it('reports missing service-account authentication without claiming runtime isolation', () => {
+  it('reports a missing OP_SERVICE_ACCOUNT_TOKEN', () => {
     const root = fixture();
     const previousToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
     delete process.env.OP_SERVICE_ACCOUNT_TOKEN;
     try {
       const state = collectPreflight(root);
-      expect(state.onePassword.tokenPresent).toBe(false);
-      expect(state.onePassword.scope).toBe('unverified');
-      expect(state.onePassword.runtimeIsolation).toBe('unverified');
-      expect(renderPreflight(state)).toContain('Service Account 未設定');
+      expect(state.onePassword).toEqual({ tokenPresent: false });
+      expect(renderPreflight(state)).toContain('OP_SERVICE_ACCOUNT_TOKEN 未設定');
     } finally {
       if (previousToken !== undefined) process.env.OP_SERVICE_ACCOUNT_TOKEN = previousToken;
     }
+  });
+  it('reports token presence without printing its value or claiming verification', () => {
+    const state = collectOnePassword({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture-value' });
+    expect(state).toEqual({ tokenPresent: true });
+    expect(collectOnePassword({ OP_SERVICE_ACCOUNT_TOKEN: '  ' })).toEqual({ tokenPresent: false });
+    const line = renderPreflight({ ...collectPreflight(fixture()), onePassword: state })
+      .split('\n')
+      .find((l) => l.startsWith('**1Password**'));
+    expect(line).toContain('OP_SERVICE_ACCOUNT_TOKEN あり');
+    expect(line).not.toContain('ops_fixture-value');
   });
   it('reports missing dependencies and hooks, never marks runtime hooks as active', () => {
     const root = fixture();
