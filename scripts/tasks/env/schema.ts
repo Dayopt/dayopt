@@ -125,7 +125,8 @@ export const envSchema: EnvSchemaEntry[] = [
   // agent 用 Vercel token は置かない（2026-09-14、監査 P1-2）。Vercel の token は scope を
   // 絞れず team 全権になるため、agent vault の「漏れても 1 日で戻せる」定義に入らない。
   // 未使用のまま置かれていた agent/vercel は Vercel 側で revoke し item を archive した。
-  // agent の Vercel 読み取りは CLI の読み取り系サブコマンドだけで行う（pre-tool-guard）。
+  // agent は Vercel の資格情報を持たない。deployment の読み取りは GitHub の deployment status
+  // で行う（2026-10-09、#3053。docs/operations/secrets.md §Agent と Vercel）。
 
   // ANTHROPIC_API_KEY（consumer 無し）と webmaster verification 3 件（値が空で Vercel にも
   // replica 無し）は、2026-09-14 に agent の item ごと削除したため entry を置かない。

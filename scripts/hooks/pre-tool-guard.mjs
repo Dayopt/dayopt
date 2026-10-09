@@ -17,13 +17,13 @@
 //     - import 自体が失敗（構文エラー等）したら fail closed を既定にしつつ、
 //       **rules ファイル自身への Write/Edit だけ**を復旧目的で例外的に通す
 //       （exit 0 + 警告）。他のすべての操作（Bash 全般、他ファイルの
-//       Write/Edit、spawn_task 等）は引き続きブロックする。例外は rules の
+//       Write/Edit 等）は引き続きブロックする。例外は rules の
 //       literal path 一致のみで、scripts/hooks/** のような広い glob には
 //       しない（このガード自身が「許可形は選択肢で列挙する」idiom を使って
 //       いるのに合わせる）
 
 import { execFileSync } from 'node:child_process';
-import { realpathSync, writeSync } from 'node:fs';
+import { realpathSync, statSync, writeSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -104,6 +104,32 @@ function extractToolNameAndFilePath(rawInput) {
   }
 }
 
+/**
+ * rules に渡す cwd を決める。hook 入力の `cwd`（harness が渡す session の作業ディレクトリ）が
+ * 絶対パスの実在ディレクトリならそれを使い、無ければ `process.cwd()` に戻す。
+ *
+ * desktop app の worktree session では、hook の process は main checkout を cwd にして
+ * 起動する（settings.json の相対 command が main checkout 側で解決されるため）。
+ * `process.cwd()` で「自分の worktree」を決めると、自分の worktree への Write / Edit と
+ * `rm -r` を「他の worktree」と誤判定して止める（2026-10-09 に 3 回発生、#3053）。
+ * 入力の `cwd` は session の作業ディレクトリを指すので、こちらを優先する。
+ *
+ * 保証境界: session が `cd` で別の worktree へ移ると、その worktree が「自分」になる。
+ * 意図して移動した後の編集までは止めない（speed bump であって境界ではない）。
+ */
+function resolveHookCwd(rawInput) {
+  try {
+    const parsed = JSON.parse(rawInput);
+    const cwd = parsed && typeof parsed === 'object' ? parsed.cwd : undefined;
+    if (typeof cwd === 'string' && cwd.startsWith('/') && statSync(cwd).isDirectory()) {
+      return cwd;
+    }
+  } catch {
+    // JSON でない / 実在しない場合は process.cwd() に戻す
+  }
+  return process.cwd();
+}
+
 async function main() {
   const rawInput = await readStdin();
 
@@ -145,7 +171,10 @@ async function main() {
 
   let result;
   try {
-    result = rulesModule.evaluate(rawInput, { cwd: process.cwd(), execFileImpl: execFileSync });
+    result = rulesModule.evaluate(rawInput, {
+      cwd: resolveHookCwd(rawInput),
+      execFileImpl: execFileSync,
+    });
   } catch (evalError) {
     recoverOrBlock('評価が例外を投げた', evalError);
   }
