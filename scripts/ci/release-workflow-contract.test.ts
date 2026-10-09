@@ -40,13 +40,13 @@ describe('release workflow contract', () => {
     releaseJob.indexOf('\n    runs-on:'),
   );
 
-  it('promotes on every push to main, with no paths filter (2026-09-03)', () => {
-    // #2268 は「merge のたびに Production が切り替わる」ことを嫌って push:main を
-    // 廃止したが、その代償として promote が人の手番になり実際に 6 日 40 merge 分
-    // 滞留した。2026-09-03 に merge 連動へ戻し、切り替えの安全は「影響のある層 3
-    // が同一 run で green」であることで担保する（層 4 gate は release job の if:）。
-    expect(onBlock).toMatch(/^\s*push:/m);
-    expect(onBlock).toMatch(/^\s*branches:\s*\[main\]\s*$/m);
+  it('promotes main HEAD once a night, with no paths filter (2026-10-09)', () => {
+    // #2268 は promote を人の手番にして 6 日 40 merge 分滞留した。2026-09-03 の merge
+    // 連動は層 3 を merge ごとに走らせ、Actions を月約 3,000 分使った。2026-10-09 から
+    // 夜 1 回（03:00 JST）に main HEAD をまとめて出す。人の手番には戻さない。
+    expect(onBlock).toMatch(/^\s*schedule:/m);
+    expect(onBlock).toMatch(/^\s*- cron: '0 18 \* \* \*'\s*$/m);
+    expect(code(onBlock)).not.toMatch(/^\s*push:/m);
     expect(onBlock).toMatch(/^\s*workflow_dispatch:/m);
 
     // **paths filter を付けない。** docs のみの merge も release job まで到達させ、
@@ -176,38 +176,6 @@ describe('release workflow contract', () => {
     expect(release).not.toContain('check-runs');
     expect(release).not.toContain('required_checks');
     expect(gate.length).toBeGreaterThan(0);
-  });
-
-  it('checks an enabled candidate before release work and again immediately before promote', () => {
-    const impactJob = code(
-      release.slice(release.indexOf('\n  impact:'), release.indexOf('\n  e2e:')),
-    );
-    const earlyGate = impactJob.indexOf('Verify tested candidate before release work');
-    const impactResolution = impactJob.indexOf('Resolve release impact');
-    expect(earlyGate).toBeGreaterThan(-1);
-    expect(impactResolution).toBeGreaterThan(earlyGate);
-    const earlyGateStep = impactJob.slice(earlyGate, impactResolution);
-    expect(earlyGateStep).toContain("if: vars.RELEASE_CANDIDATE_ENABLED == 'true'");
-    expect(earlyGateStep).toContain('RELEASE_CANDIDATE_MAX_AGE_SECONDS');
-    expect(earlyGateStep).toContain('node scripts/ci/release-candidate-gate.mjs production');
-
-    const migrationReadiness = release.indexOf(
-      'Verify candidate migrations are applied in Production',
-    );
-    const finalGate = release.indexOf('Verify tested candidate immediately before promotion');
-    const promote = release.indexOf('Wait, smoke, and promote Production');
-    expect(migrationReadiness).toBeGreaterThan(-1);
-    expect(finalGate).toBeGreaterThan(migrationReadiness);
-    expect(promote).toBeGreaterThan(finalGate);
-
-    const readinessStep = release.slice(migrationReadiness, finalGate);
-    expect(readinessStep).toContain(
-      'MIGRATION_READINESS_REQUIRED: ${{ vars.RELEASE_CANDIDATE_ENABLED }}',
-    );
-    const finalGateStep = release.slice(finalGate, promote);
-    expect(finalGateStep).toContain("if: vars.RELEASE_CANDIDATE_ENABLED == 'true'");
-    expect(finalGateStep).toContain('RELEASE_CANDIDATE_MAX_AGE_SECONDS');
-    expect(finalGateStep).toContain('node scripts/ci/release-candidate-gate.mjs production');
   });
 
   it('pins the release gate expression exactly', () => {

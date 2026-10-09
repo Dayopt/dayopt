@@ -2,11 +2,16 @@ import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectOnePasswordConfig } from './agent-service-account.mjs';
 
-// SessionStart の外側 timeout は 10 秒（.codex/hooks.json）。外部 command は
-// gh と pnpm を逐次確認するため、各々に同じ短い上限を持たせて合計を内側に収める。
+// SessionStart の待ち時間を短く保つため、外部 command は gh と pnpm を逐次確認し、
+// 各々に同じ短い上限を持たせる。
 const PREFLIGHT_COMMAND_TIMEOUT_MS = 2_000;
+
+// 1Password の入口は OP_SERVICE_ACCOUNT_TOKEN 1 個（#3052）。ここでは有無だけを見る。
+// 認証と vault の範囲は op whoami / op vault list で確かめる。値は読まない。
+export function collectOnePassword(env = process.env) {
+  return { tokenPresent: Boolean(env.OP_SERVICE_ACCOUNT_TOKEN?.trim()) };
+}
 
 function git(args, cwd) {
   try {
@@ -109,6 +114,41 @@ function nodeMajor(version) {
   return version.match(/^v?(\d+)/)?.[1] ?? null;
 }
 
+/** Claude Code が guard と preflight を読む時に必須とする hook 登録。 */
+export const REQUIRED_CLAUDE_HOOKS = [
+  { event: 'SessionStart', matcher: null, command: 'scripts/hooks/session-start.sh' },
+  { event: 'PreToolUse', matcher: 'Bash', command: 'scripts/hooks/pre-tool-guard.sh' },
+  { event: 'PreToolUse', matcher: 'Write', command: 'scripts/hooks/pre-tool-guard.sh' },
+  { event: 'PreToolUse', matcher: 'Edit', command: 'scripts/hooks/pre-tool-guard.sh' },
+  { event: 'PreToolUse', matcher: 'Read', command: 'scripts/hooks/pre-tool-guard.sh' },
+];
+
+/**
+ * `.claude/settings.json` の hook 登録を検査する。登録の有無だけで、runtime の発火は証明しない。
+ * @param {string} root
+ */
+export function collectClaudeHooks(root) {
+  const path = join(root, '.claude/settings.json');
+  if (!existsSync(path)) return 'missing';
+  let hooks;
+  try {
+    hooks = JSON.parse(readFileSync(path, 'utf8')).hooks ?? {};
+  } catch {
+    return 'invalid settings.json';
+  }
+  const missing = REQUIRED_CLAUDE_HOOKS.filter(
+    ({ event, matcher, command }) =>
+      !(hooks[event] ?? []).some(
+        (entry) =>
+          (matcher === null || entry.matcher === matcher) &&
+          (entry.hooks ?? []).some((hook) => hook.command === command),
+      ),
+  );
+  if (missing.length)
+    return `incomplete (${missing.map(({ event, matcher }) => (matcher ? `${event}:${matcher}` : event)).join(', ')})`;
+  return 'configured; runtime activation unverified';
+}
+
 function commandPresent(name) {
   const pathValue = process.env.PATH ?? '';
   return pathValue.split(delimiter).some((directory) => {
@@ -120,6 +160,16 @@ function commandPresent(name) {
       return false;
     }
   });
+}
+
+/** devDependency として入る CLI（`node_modules/.bin`）も存在として数える。 */
+function localBinPresent(root, name) {
+  try {
+    accessSync(join(root, 'node_modules/.bin', name), constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function collectPreflight(cwd = process.cwd()) {
@@ -136,9 +186,9 @@ export function collectPreflight(cwd = process.cwd()) {
     ]),
   );
   const cli = Object.fromEntries(
-    ['gh', 'codex', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => [
+    ['gh', 'claude', 'op', 'supabase', 'gitleaks', 'vercel'].map((name) => [
       name,
-      commandPresent(name),
+      commandPresent(name) || (name === 'supabase' && localBinPresent(root, name)),
     ]),
   );
   const skills = existsSync(join(root, '.agents/skills/routing/SKILL.md'));
@@ -169,18 +219,10 @@ export function collectPreflight(cwd = process.cwd()) {
     hooks,
     cli,
     ghIdentity,
-    onePassword: collectOnePasswordConfig(),
+    onePassword: collectOnePassword(),
     skills,
     // Presence is not proof of runtime activation or trust.
-    codexHooks: existsSync(join(root, '.codex/hooks.json'))
-      ? 'configured; runtime activation unverified'
-      : 'missing',
-    readOnlyDelegation: {
-      wrapper: false,
-      codex: false,
-      claude: false,
-      native: 'unsupported; repository scope cannot be enforced at runtime',
-    },
+    claudeHooks: collectClaudeHooks(root),
   };
 }
 
@@ -209,10 +251,9 @@ export function renderPreflight(state) {
       .map(([name, active]) => `${name}:${active ? 'configured' : 'missing'}`)
       .join(' ')} (${state.hooksPath ?? '未設定'})`,
     `**Shared skills**: ${state.skills ? 'present; session discovery unverified' : 'missing'}`,
-    `**Codex hooks**: ${state.codexHooks}`,
-    `**Read-only delegation**: wrapper:${state.readOnlyDelegation?.wrapper ? 'yes' : 'no'} codex:${state.readOnlyDelegation?.codex ? 'yes' : 'no'} claude:${state.readOnlyDelegation?.claude ? 'yes' : 'no'}; native: ${state.readOnlyDelegation?.native ?? 'unverified'}`,
+    `**Claude hooks**: ${state.claudeHooks ?? '未取得'}`,
     `**gh identity**: ${renderGhIdentity(state.ghIdentity)}`,
-    `**1Password**: ${state.onePassword?.tokenPresent ? 'Service Account 設定あり（認証・scope は未検証）' : 'Service Account 未設定'} | vault 権限:未検証 | 実行環境の分離:未検証`,
+    `**1Password**: ${state.onePassword?.tokenPresent ? 'OP_SERVICE_ACCOUNT_TOKEN あり（認証と vault の範囲は op whoami / op vault list で確認）' : 'OP_SERVICE_ACCOUNT_TOKEN 未設定（docs/operations/secrets.md §Service Account）'}`,
   ];
   if (state.ghIdentity?.broadScopes.length)
     lines.push(
@@ -222,8 +263,16 @@ export function renderPreflight(state) {
     lines.push(
       '- gh なし: ctx / trace / branch:finish の GitHub 情報は未取得。利用可能な接続で確認する',
     );
-  if (!state.nodeMatches || !state.pnpmMatches)
-    lines.push('- Node.js / pnpm の version が repository contract と一致しません');
+  if (!state.nodeMatches)
+    lines.push(
+      process.env.CLAUDE_CODE_REMOTE === 'true'
+        ? `- Node ${state.node} は .nvmrc (${state.expectedNode}) と不一致: cloud environment の setup script で Node 24 を入れる（#3051）`
+        : `- Node ${state.node} は .nvmrc (${state.expectedNode}) と不一致: fnm で .nvmrc を自動切替、または PATH=/opt/homebrew/opt/node@24/bin を前置`,
+    );
+  if (!state.pnpmMatches)
+    lines.push(
+      '- pnpm の version が repository contract (package.json#packageManager) と一致しません',
+    );
   if (!state.dependencies || Object.values(state.hooks).some((ready) => !ready)) {
     lines.push('- commit / push 前に依存と Git hooks を準備してください');
   }

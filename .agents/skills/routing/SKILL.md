@@ -29,11 +29,9 @@ description: 非自明な作業の方針・検証方法を決める時、前提�
 
 ## Issue Context Brief
 
-Issue / PR に着手する担当は `pnpm ctx <N> --reuse-brief-l1` で Issue 本文と Brief を取得する。本文が要求の正本、Jev の L1 候補は読む資料の助言。候補外の資料を無関係とみなさない。
+Issue / PR に着手する担当は `pnpm ctx <N> --reuse-brief-l1` で Issue 本文と Brief を取得する。本文が要求の正本、Brief は読む資料の助言。Brief にない資料を無関係とみなさない。
 
-再利用は trusted `ctx-brief` の Issue 番号・URL・入力 snapshot・公開 HEAD SHA・投稿者を照合できる場合だけ。欠落・古い Brief・取得失敗では未取得を報告し、本文と一次資料から続ける。コメントの存在だけで取得済みと扱わない。着手時にL1の状態・評価件数・未取得理由を確認し、候補があればリンク先の一次資料を読む。`trusted_brief_missing_or_stale` はdispatch担当が公開HEADでBriefを更新する対象であり、workerがkeyを取得したりAPIを呼んだりして補わない。
-
-通常読取は Jev API を呼ばない。dispatch 担当だけが既存の key 注入経路で `pnpm ctx <N> --post` を使い、同じコメントを更新する。Cloud 担当へ key を渡したり、`--post` を要求したりしない。品質評価を Brief の日常利用の条件にしない。入力仕様は [dispatch](../dispatch/SKILL.md)、Jev の仕組みは [jev.md](../../../docs/operations/jev.md)。
+取得失敗・古い Brief では未取得を報告し、本文と一次資料から続ける。コメントの存在だけで取得済みと扱わない。`--reuse-brief-l1` は旧 L1 助言の互換 flag で、指定しなくても同じ L0 の Brief を返す。品質評価を Brief の日常利用の条件にしない。入力仕様は [dispatch](../dispatch/SKILL.md)。
 
 Brief の決定ログは対象・親・リンク先の Issue / PR 番号を含む行の抜粋で、表示は各行 200 文字まで。番号で結ばれていない類似判断、撤回・後継、理由の全文を網羅しない。候補がないことを「過去判断なし」と扱わず、正本と索引を検索して補う。記録・更新・未決の扱いは [意図の継承](../../../docs/operations/ai-development-loop.md#意図の継承)に従う。
 

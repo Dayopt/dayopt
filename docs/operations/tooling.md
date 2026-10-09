@@ -441,75 +441,83 @@ BSD-2-Clause: 12 packages (1.3%)
 
 # 第3部: AI 協働ハーネス
 
-**Date**: 2026-09-07
+**Date**: 2026-10-09
 **Scope**: `AGENTS.md`、`.agents/skills/`、provider adapter、共有 hook rules
 **Status**: current
 
 ## 1. 正本と互換 adapter
 
-- 実装・調査・レビューの共通ガイダンスは `AGENTS.md` を正本とする。OpenAI / Codex が primary harness だが、判断層・Dayopt の不変条件・authority level は provider に依存しない
+- 実装・調査・レビューの共通ガイダンスは `AGENTS.md` を正本とする。開発 harness は Claude Code（2026-10-09 に Codex から切替、Codex の adapter は撤去）。それでも判断層・Dayopt の不変条件・authority level は provider に依存しない
 - project skill の実体は `.agents/skills/*/SKILL.md` に置く。`.claude/skills` は Claude Code が同じ実体を見つけるための相対 symlink で、複製ではない
 - `CLAUDE.md` は `@AGENTS.md` を import する互換 adapter。provider 固有の設定を共通ガイダンスへ逆流させない
 - runtime / tool 固有の command が必要な skill は、共通の目的・scope・出力契約を先に書き、command を optional provider adapter として示す。別 runtime では同じ契約を満たす generic fallback を使う
 
 ## 2. Routing の基準
 
-通常開発は ChatGPT Chat + Codex。共通指示は `AGENTS.md`、作業方針・Issue Brief・委譲の手順は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
+通常開発は Claude Code。共通指示は `AGENTS.md`、作業方針・Issue Brief・委譲の手順は `.agents/skills/routing/SKILL.md` を正本とする。同じ主担当が調査・判断・実装・検証・修正まで完了し、初期の委譲対象は実行時に read-only 境界を検証できる大量調査に限る。
 
-Chat は product / UX・research・仕様整理、Codex は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
+Chat は product / UX・research・仕様整理、Claude Code は repo に基づく判断と実装を担う。受け渡しが必要な時だけ [Chat 連携手順](./chat-handoff.md) を読む。承認済みの目的・仕様・リスク境界内の技術判断を毎回 Chat に戻さない。
 
-モデルの固定割当や切替順序は設けない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
+subagent の model は project 設定で既定を固定する（2026-10-09 User 指定）。`.claude/settings.json` の `env.CLAUDE_CODE_SUBAGENT_MODEL=sonnet` が general-purpose・teammate・独自 agent の既定で、built-in の Explore は `.claude/agents/explore.md`（haiku）、Plan は `.claude/agents/plan.md`（sonnet）で上書きする。Agent tool の `model` 引数と agent 定義の `model:` はこの既定より優先されるので、重い設計・レビューだけ呼び出し側で明示して上げる。主会話の model は固定しない。実測なしに効率を主張しない。`pnpm ctx` の既存 L0〜L3 / preparation は助言として維持し、別 agent の起動指示にしない。
 
 ## 3. Hook の共有と保証境界
 
-判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置き、provider adapter は runtime の tool-call payload を共有形式へ変換する薄い入口にする。Claude Code は `scripts/hooks/pre-tool-guard.mjs`、Codex は `scripts/hooks/codex-pre-tool-guard.mjs` を入口とする。
+判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置き、provider adapter は runtime の tool-call payload を共有形式へ変換する薄い入口にする。Claude Code は `scripts/hooks/pre-tool-guard.mjs` を入口とする（Codex 用 adapter は 2026-10-09 に撤去）。
 
 adapter の script が存在するだけでは tool call は止まらない。runtime 側で adapter が実行前 hook として登録・起動され、block 結果を尊重する必要がある。repo は user-global 設定、直接 shell、User 自身の UI 操作、未知の tool surface を強制できない。具体的な secret 境界と残余リスクは [secrets.md](./secrets.md) を正本とする。
 
-Codex でこの project を初めて開く時は、project trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User が 1 回レビューする。repo の `.codex/config.toml` に `hooks = true` があっても、runtime が project を trust して hook を読み込んだ証拠にはならない。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、Codex hook 設定ファイル、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
+Claude Code は project の `.claude/settings.json` の hook を読み込む。`pnpm agent:preflight`（機械利用は `pnpm agent:preflight --json`）は依存、Git hooks、CLI、skills、`.claude/settings.json` への guard / SessionStart の登録、read-only delegation の状態を確認するが、runtime の trust や実際の hook 発火は判定できない。read-only delegation は scope を runtime で強制できないため unsupported と表示され、bulk read の経路に使わない。user-global 設定はこの onboarding で変更しない。
 
-### Local / Codex Cloud の実行環境
+### Local / Cloud の実行環境
 
 Node.js と package manager は実行場所ごとに暗黙で選ばせず、repository contract に揃える。
 
 - `.nvmrc` と `package.json#packageManager` が runtime の正本。`pnpm agent:preflight` は Node.js の major、pnpm の version、依存、hook を表示し、不一致なら exit 1 にする
-- Codex Cloud の Dayopt 環境は自動 package-manager detection を使わず、setup / maintenance script で `nvm` から `.nvmrc` の Node.js を選び、標準の [`scripts/runbook/codex-cloud-setup.sh`](../../scripts/runbook/codex-cloud-setup.sh) で `packageManager` の pnpm を検証して `pnpm install --frozen-lockfile` を一度だけ実行する
-- Cloud の setup / maintenance はネットワークが有効な setup phase で実行し、自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
-- Codex Cloud の Secret は setup script にだけ渡り、agent phase の前に取り除かれる。Jev key を Cloud の通常 Environment Variable に置くと agent phase から読めるため設定しない。L1 を Cloud L2 に渡す時は、ローカルの認証済み `pnpm ctx <N> --post` で Issue Brief に保存し、Cloud 側は [`pnpm ctx <N> --reuse-brief-l1`](./jev.md) で入力一致とBrief投稿者・現在の `gh` 認証ユーザーの一致を検証して読む
+- ローカルで Node 24 に自動で揃えるには fnm を使う（User 作業。shell 設定は repo 外）。`brew install fnm` の後、`~/.zshrc` に `eval "$(fnm env --use-on-cd --version-file-strategy=recursive)"` を追記し、新しい shell で repo に入って `fnm install` を実行する（`.nvmrc` を読む）。入れるまでは `PATH=/opt/homebrew/opt/node@24/bin:$PATH` を前置する。不一致時の preflight は原因と直し方を 1 行で出す（Cloud では setup script で Node 24 を入れる、[#3051](https://github.com/Dayopt/dayopt/issues/3051)）。repo の hook に installer は置かない
+- `pnpm dev` は Docker と local Supabase を前提にしたまま変えない（[#3058](https://github.com/Dayopt/dayopt/issues/3058)）。agent の vault には非本番 persistent branch の Supabase key が無く、`pnpm dev` をそこへ繋ぐには新しい secret が要る（User 判断）。Docker 無しで動かす現行の経路は、env を明示して渡す `pnpm dev:raw`（[secrets.md](./secrets.md)）で、product の動作確認は Vercel Preview で行う（[#2910](https://github.com/Dayopt/dayopt/issues/2910)）
+- Claude Code の cloud session は `scripts/hooks/session-start.sh`（`CLAUDE_CODE_REMOTE=true` の時だけ `pnpm install --frozen-lockfile`）で依存を揃える。自動検出が各 workspace へ npm を実行して `catalog:` / `workspace:` を壊す経路を作らない。Issue の context を `gh` で読む Cloud task は、repository access に加えて agent phase の GitHub API への限定アクセスが要る。無効・未認証なら context 未取得として止めず、取得できた L0 だけで進める
 - Cloud で Docker・local Supabase・実ブラウザ・vault が必要な検証は完了扱いにせず、対応する local または CI の証跡を別に残す
 - `pnpm branch:finish` はlinked worktreeなら従来どおり削除する。Cloud等の通常checkoutは未保存差分がなく、local/remoteの先端がPRのheadと一致しorigin/mainへ到達していることを確認してdetachし、ディレクトリを保持する。mainと別branchのcheckoutは切り替えない。残存remote branchはPRのheadに対するlease付き削除で後続pushを保護する。GitHubのmerge条件は実行場所で変えない
 - 手元のUI確認は `pnpm storybook`、静的buildは `pnpm build-storybook`。既存mockを使い、アプリSecret・1Password・Local Supabaseを要求しない。これは実際の認証や外部連携の確認とは区別する
-- DB型取得は `pnpm types:generate --target preview --project-ref <ref>` 等で対象を指定する。省略時に本番へ接続しない。環境構成・終了時のDB費用・未移行項目は [infra.md](../engineering/infra.md#cloud-firstへの移行契約2910構築中) を参照
+- DB型取得は `pnpm types:generate --target preview --project-ref <ref>` 等で対象を指定する。省略時に本番へ接続しない。環境構成・終了時のDB費用・未移行項目は [infra.md](../engineering/infra.md#cloud-firstへの移行契約2910継続中) を参照
+
+### Claude Code Cloud の実行環境（未実測）
+
+Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）は Codex Cloud と同じ repository contract に従う。以下は 2026-10-09 時点の公式 docs（code.claude.com の cloud-environments / claude-code-on-the-web）と repo の実装から読んだ前提で、Dayopt の session での実測はまだない。実測したら結果で置き換える。
+
+- **Node.js**: 既定 image は Node 20 / 21 / 22（`/opt/node22` が PATH 上）で、`.nvmrc` の 24 を含まない。`scripts/hooks/session-start.sh` は Node を選ばずに `pnpm install --frozen-lockfile` を実行するため、setup script（claude.ai の環境設定側にあり repo には置かれない）で Node 24 を用意しない限り、`pnpm agent:preflight` は MISMATCH を返す。install が失敗すると husky の `prepare` が走らず、pre-commit / pre-push hook も無効になる。session 開始時の `**deps**:` 行と `git config core.hooksPath` を確認してから commit する
+- **GitHub**: `gh` は GitHub proxy 経由で認証済み。ただし proxy は GraphQL（`gh pr` / `gh issue` を含む）、branch 削除、tag push を拒否する。`pnpm ctx` は REST で取れる issue 本文を読み、GraphQL のセクションは「未取得」として続行する。`pnpm branch:finish` は GraphQL と remote branch 削除に依存するため、Cloud では実行せず local で実行する
+- **Network**: 既定の Trusted allowlist は GitHub・npm・nodejs.org 等を含み、`*.vercel.app` / `*.supabase.co` は含まない。Preview や非本番 Supabase を Cloud から確認するには、環境の network を Custom にして必要な非本番 host だけを追加する。本番 host は追加しない
+- **Secret**: 環境変数は環境の利用者全員が読めるため、Secret を置かない。必要な検証は CI または local の証跡で残す（上の Codex Cloud と同じ扱い）
+- **Docker**: image には Docker と Postgres があるが、[infra.md](../engineering/infra.md#codex-work-と任意の-local-development) の方針どおり Cloud 作業環境では `supabase start` を使わない
 
 ### 実行経路ごとの保護範囲
 
-「機械」は該当 hook が信頼・発火した場合の判定を指す。現時点の native Codex 発火は未確認である。
+「機械」は該当 hook が信頼・発火した場合の判定を指す。
 
-| 分類・操作                                  | Claude Code                                           | Codex                                                                            | Antigravity                                |
-| ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
-| 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査      | apply_patch の全対象・shell の個別パターンを機械検査。汎用read toolはsurface依存 | repo hook接続なし。指示で制御、実動未確認  |
-| 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外           | apply_patch の変更元/先・symlinkを機械検査。任意shell編集は保証外                | 指示で制御、機械保護は未対応               |
-| Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                          | 共通Bash判定を再利用                                                             | 共通Git hookのみ。tool実行前の検査は未対応 |
-| 大量の読み取り調査                          | scope を runtime で強制できないため委譲しない         | scope を runtime で強制できないため委譲しない                                    | read-only 境界を確認できないため委譲しない |
-| コスト・利便性                              | モデル名に基づく委任制限は撤去。起動確認は共通command | 同左                                                                             | 共通commandを手動利用可能、実動未確認      |
+| 分類・操作                                  | Claude Code                                        | Antigravity                                |
+| ------------------------------------------- | -------------------------------------------------- | ------------------------------------------ |
+| 秘密情報: envファイル、vault参照            | Read/Write/Edit と Bash の個別パターンを機械検査   | repo hook接続なし。指示で制御、実動未確認  |
+| 破壊的操作: 既存migration・他worktreeの編集 | Write/Editで機械検査。任意shell編集は保証外        | 指示で制御、機械保護は未対応               |
+| Git運用: force push、no-verify、直接merge等 | Bashの列挙パターンを機械検査                       | 共通Git hookのみ。tool実行前の検査は未対応 |
+| 大量の読み取り調査                          | scope を runtime で強制できないため委譲しない      | read-only 境界を確認できないため委譲しない |
+| コスト・利便性                              | subagent の model 既定は §2。起動確認は共通command | 共通commandを手動利用可能、実動未確認      |
 
-**shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。Codexのファイル変更は原則 `apply_patch` を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
+**shell の任意編集は機械的に閉じていない**。`sed -i`、`perl -pi`、`cp`、`mv`、`tee`、出力redirect、任意scriptによる既存migration・他worktreeへの書き込みを、このadapterは一般には検出しない。ファイル変更は原則 Write / Edit を使い、shell編集へ切り替えてこの検査を迂回しない（指示による制御）。hookに到達しただけで全操作が保護されるわけではない。write_stdin、hosted/specialized tool、wrapper内部の処理も同じ保証を持たない。
 
 この境界はshell interpreterの自作で埋めず、runtimeの書き込み範囲・Git hooks/CI・最小権限の資格情報で補う。本番は既存の明示権限・独立レビュー・dry-run/backupを維持する。上記が不足する操作は未対応として扱い、通常開発の実動試行でも境界を確認する。
 
 ### 実測で分かった罠（guard / hook / scripts）
 
-2026-09-22 に Claude Code の memory から昇格。判定ロジックは共有なので Codex の adapter でも同じ形で起きる。
+2026-09-22 に Claude Code の memory から昇格。
 
 - **guard は「言及」でも止まる**。判定は tool call の command 文字列全体を見るので、禁止コマンド名を説明する commit message / issue コメント / review reply の heredoc も同じ文字列一致で止まる（2026-08-24 #2293 で 4 回）。これは意図した trade-off で guard 側を緩めない。本文はファイルへ書いてから `gh ... --body-file` / `git commit -F` で渡し、言い回しを変えて該当句の連続を崩す
 - **textual guard は shell 展開を捕まえられない**。quote 剥がしで allowlist を補強しても `$'\x2d\x2d...'` や `${IFS}` は素通りする（#2291 PR #2309）。動的引数のコマンドを許す時は「値をコマンドラインに載せない」方向へ寄せる（body は固定パスの `--body-file`、`--repo` は値ごと固定）。展開形を 1 つずつ追いかけない
-- **壊れると自分の編集まで止まるファイル（hook script / `.claude/settings.json` / `.codex/hooks.json`）は scratch 先行で触る**。構文エラーでも exit 2 が「止める」と解釈され、直す編集自体ができなくなる（2026-08-12）。scratch に候補を書き `bash -n` と実挙動を通してから `cp` で設置する。復旧は別 session か User に `git -C <worktree> checkout -- <path>` を 1 コマンド依頼する
+- **壊れると自分の編集まで止まるファイル（hook script / `.claude/settings.json`）は scratch 先行で触る**。構文エラーでも exit 2 が「止める」と解釈され、直す編集自体ができなくなる（2026-08-12）。scratch に候補を書き `bash -n` と実挙動を通してから `cp` で設置する。復旧は別 session か User に `git -C <worktree> checkout -- <path>` を 1 コマンド依頼する
 - **migration guard は `refs/remotes/origin/main` の tree に載っているファイルだけを止める**（#2185 PR #2714）。未 merge の PR にしか無い migration は push 済みでも編集できる。止まったのに未 merge のはずなら `git fetch origin main`。判定不能（ref 不在 / git 不動）は全部止める
 - **root `package.json` の script を改名・統合する時は permission allowlist を両方向で見る**。消す側が wildcard に一致して許可され、残す側が漏れて prompt に落ちる向きが本当の failure（2026-08-18）。統合後の名前を実際に叩いて prompt が出ないか確認し、消した名前の pattern は同時に削る（許可範囲は広げない）
 - **`scripts/` に新規ファイルを足して docs から名指しすると taxonomy test が `runbook` 判定にする**（`classifyHits` は docs の言及を importedBy より先に見る）。`scripts/lib/` の純粋な lib でも落ちるので、`scripts/__tests__/scripts-taxonomy.test.ts` の `KNOWN_PLACEMENT_EXCEPTIONS` へ理由つきで追記する（2026-09-16 #2775 で 2 回）
-- **skill の効果は発動条件と揃えた依頼でしか測れない**。既存 migration の「レビュー」依頼では両条件とも `supabase` skill を読まず「効果なし」と誤判定しかけた（#2810）。どの skill が読まれたかは `codex exec --json` の `exec_command_begin` から `.agents/skills/<name>/` を grep して機械的に取る。自己申告は根拠にしない
-- **`codex exec` の隔離と model**: `--cd <pack-dir> --sandbox read-only --skip-git-repo-check` は cwd を pack へ固定し書き込みを禁じるだけで、agent は `..` や絶対パスから repo を読める。**読み取りの隔離にはならない**ので、比較実験で正解データや現在の修正が漏れてはいけない時は、container / chroot / 読み取り許可 root の制限のように repo を実際に不可視にする境界を使う。`-m` を省くと config の既定 model が 400 で落ちることがある。応答が名乗る model 名は run ごとにぶれるので、証拠は起動コマンド側に残す（2026-09-10 実測）
-- **usage limit は turn 途中で run を落とす**。`turn.failed` で `token_count` が出ず tokens が null になるのが機械的な見分け方。比較実験は条件ペアで交互に回さず 1 条件を全ケース終えてから次へ行き、欠損を片側に寄せる。中断を「効果なし」と書かない（2026-09-17 #2810）
+- **skill の効果は発動条件と揃えた依頼でしか測れない**。既存 migration の「レビュー」依頼では両条件とも `supabase` skill を読まず「効果なし」と誤判定しかけた（#2810）。どの skill が読まれたかは実行ログ（Claude Code は transcript の Skill / Read の tool 呼び出し）から `.agents/skills/<name>/` を grep して機械的に取る。自己申告は根拠にしない
 
 ## 4. Skill 設計
 
@@ -564,10 +572,6 @@ read-only と repository scope を runtime で同時に強制できる delegate 
 
 ## 7. Migration acceptance と handoff
 
-native worktree root の fresh Codex session による共通指示・skills の発見と、サブディレクトリ起動の別 Codex session への review pack 引き継ぎを確認した。Codex の project trust と実 hook 発火、Antigravity の skill discovery と review adapter は未検証であり、設定ファイルの存在を有効化の証拠にしない。
-
-2026-09-07、`scripts/tasks` から新規 Codex read-only セッション（gpt-5.6-sol、session `01a0796e-8943-7303-9bb3-6184e41a9b2f`）を起動し、base `393f432c6` → head `bbdb9510a` の移行差分を pack で手渡した。result envelope は `reviewed`、recommendation は `revise`、指摘 1 件だった。指摘は shell の任意編集に対する保証の過大解釈で、経路別の保護表へ保証外の操作を明記した。これは別 OpenAI セッションの反証であり、別モデル系列の反証や native hook 発火の証拠ではない。旧 SHA の所見を後続 SHA の指摘ゼロとして再利用しない。
-
 次の 3 trial は過去の移行計画として記録したもので、2026-09-17 の User 指示により追加 reviewer の試行は行わない。ここに別の常設 tracker は作らない。
 
 | trial                    | 対象                                                 | status  |
@@ -585,7 +589,7 @@ native worktree root の fresh Codex session による共通指示・skills の�
 
 `stale` / `partial` / `not-run` / `invalid` の区別と、未完了 result を findings 0 にしない契約は自動 test 24 件で検証済みである。これは実 PR での上記 3 trial や reviewer 品質の代替ではない。
 
-`pnpm ai:usage` と `pnpm trace` の session / token / tool データは Claude Code local transcript のみを収集する。Codex / Antigravity は `null` / unknown であり 0 ではない。GitHub 由来の aggregate PR outcomes は repo 全体の値なので、Claude Code の token や session で割って provider の効率を主張しない。
+`pnpm ai:usage` と `pnpm trace` の session / token / tool データは Claude Code local transcript のみを収集する。Antigravity は `null` / unknown であり 0 ではない。GitHub 由来の aggregate PR outcomes は repo 全体の値なので、Claude Code の token や session で割って provider の効率を主張しない。
 
 ---
 
@@ -614,7 +618,7 @@ skill invocation は description を読んで判断される仕様上、**descri
 **スコープ外（別タスク）**:
 
 - user-global skills（`~/.claude/skills/` 配下、個人設定）の 4.7 チューニング
-- adversarial review 等の subagent 設計（`.claude/agents/` ディレクトリ自体が現状存在しない）
+- adversarial review 等の subagent 設計（2026-04 時点。`.claude/agents/` は 2026-10-09 に subagent の model 既定のためだけに置いた）
 
 **実施内容**:
 

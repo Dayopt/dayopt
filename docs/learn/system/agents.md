@@ -5,7 +5,7 @@ last_verified: 2026-09-22
 
 # AI まわりの仕組みの地図
 
-Dayopt の開発を手伝う AI（Claude Code / Codex）に向けた作り物は、4 種類に分かれて置かれている。**指示書**（何を守るか）、**skill**（特定の作業の手順）、**guard / hook**（間違えても機械が止める）、**memory**（Claude だけの覚え書き。repo の外）。このページは、それぞれがどこに在り、いつ読まれ、何を決めているかを 1 枚で見渡すための地図。中身の正本は各ファイルで、ここは要約とリンクだけを持つ。考え方（AI・機械・人の線引き）は [11 章](../11-agents-jev.md)。
+Dayopt の開発を手伝う AI（Claude Code）に向けた作り物は、4 種類に分かれて置かれている。**指示書**（何を守るか）、**skill**（特定の作業の手順）、**guard / hook**（間違えても機械が止める）、**memory**（Claude だけの覚え書き。repo の外）。このページは、それぞれがどこに在り、いつ読まれ、何を決めているかを 1 枚で見渡すための地図。中身の正本は各ファイルで、ここは要約とリンクだけを持つ。考え方（AI・機械・人の線引き）は [11 章](../11-agents.md)。
 
 ## 1 回の作業で、どこで何が効くか
 
@@ -46,16 +46,18 @@ flowchart LR
 
 ## 指示書
 
-| ファイル                                                                    | 誰が読むか                    | いつ読まれるか                         | 何を決めているか                                                                                                                                                          |
-| --------------------------------------------------------------------------- | ----------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [AGENTS.md](../../../AGENTS.md)                                             | Claude Code・Codex            | 毎セッションの最初                     | 正本。レビュー規則、AUTONOMOUS / CHECKPOINT / EXPLICIT AUTHORITY の判断層、時間の不変条件、アーキテクチャ、Non-Negotiables、PR / git 運用、委任・報告の作法、skill の索引 |
-| [CLAUDE.md](../../../CLAUDE.md)                                             | Claude Code                   | 毎セッションの最初                     | `@AGENTS.md` を読み込むだけの adapter。中身は書かない                                                                                                                     |
-| [apps/product/src/AGENTS.md](../../../apps/product/src/AGENTS.md)           | Codex（主に `@codex review`） | `apps/product/src/` 配下の変更を見る時 | レビューで追加確認する 3 規則: 認証・所有権・secret の境界（AUTH-1）、外部状態・webhook・課金（EXT-1）、時刻・日付境界（TIME-1）                                          |
-| [supabase/AGENTS.md](../../../supabase/AGENTS.md)                           | Codex（主に `@codex review`） | `supabase/` 配下の変更を見る時         | 同じく 3 規則: RLS・policy・GRANT（DB-1）、SECURITY DEFINER（DB-2）、破壊的 migration（DB-3）                                                                             |
-| [apps/product/messages/CLAUDE.md](../../../apps/product/messages/CLAUDE.md) | Claude Code                   | 翻訳ファイルを触る時                   | 先に `i18n` skill を読む。キー名にも旧語彙を使わない                                                                                                                      |
-| [supabase/migrations/CLAUDE.md](../../../supabase/migrations/CLAUDE.md)     | Claude Code                   | migration を触る時                     | 先に `supabase` skill を読む                                                                                                                                              |
+| ファイル                                                                    | 誰が読むか                                       | いつ読まれるか                         | 何を決めているか                                                                                                                                                          |
+| --------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [AGENTS.md](../../../AGENTS.md)                                             | Claude Code（`CLAUDE.md` 経由）                  | 毎セッションの最初                     | 正本。レビュー規則、AUTONOMOUS / CHECKPOINT / EXPLICIT AUTHORITY の判断層、時間の不変条件、アーキテクチャ、Non-Negotiables、PR / git 運用、委任・報告の作法、skill の索引 |
+| [CLAUDE.md](../../../CLAUDE.md)                                             | Claude Code                                      | 毎セッションの最初                     | `@AGENTS.md` を読み込むだけの adapter。中身は書かない                                                                                                                     |
+| [apps/product/src/AGENTS.md](../../../apps/product/src/AGENTS.md)           | Claude Code（`apps/product/src/CLAUDE.md` 経由） | `apps/product/src/` 配下の変更を見る時 | レビューで追加確認する 3 規則: 認証・所有権・secret の境界（AUTH-1）、外部状態・webhook・課金（EXT-1）、時刻・日付境界（TIME-1）                                          |
+| [supabase/AGENTS.md](../../../supabase/AGENTS.md)                           | Claude Code（`supabase/CLAUDE.md` 経由）         | `supabase/` 配下の変更を見る時         | 同じく 3 規則: RLS・policy・GRANT（DB-1）、SECURITY DEFINER（DB-2）、破壊的 migration（DB-3）                                                                             |
+| [apps/product/src/CLAUDE.md](../../../apps/product/src/CLAUDE.md)           | Claude Code                                      | `apps/product/src/` 配下の変更を見る時 | `@AGENTS.md` で同じ階層の AUTH-1 / EXT-1 / TIME-1 を読み込むだけ                                                                                                          |
+| [supabase/CLAUDE.md](../../../supabase/CLAUDE.md)                           | Claude Code                                      | `supabase/` 配下の変更を見る時         | `@AGENTS.md` で同じ階層の DB-1〜3 を読み込むだけ                                                                                                                          |
+| [apps/product/messages/CLAUDE.md](../../../apps/product/messages/CLAUDE.md) | Claude Code                                      | 翻訳ファイルを触る時                   | 先に `i18n` skill を読む。キー名にも旧語彙を使わない                                                                                                                      |
+| [supabase/migrations/CLAUDE.md](../../../supabase/migrations/CLAUDE.md)     | Claude Code                                      | migration を触る時                     | 先に `supabase` skill を読む                                                                                                                                              |
 
-「誰が読むか」は各 AI の仕様による（Claude Code は `CLAUDE.md` を、Codex は `AGENTS.md` を、作業するディレクトリの階層に沿って読む）。repo の中にこの読み込み規則を書いた正本は無い。帰結として、**Claude Code には入れ子の `AGENTS.md` の規則（AUTH-1・DB-1 など）が自動では届かず、Codex には入れ子の `CLAUDE.md` の skill への誘導が届かない**。どちらにも効かせたい規則は root の `AGENTS.md` か skill に置く。
+「誰が読むか」は Claude Code の仕様による（`CLAUDE.md` を作業するディレクトリの階層に沿って読み、`AGENTS.md` は読まない）。そのため入れ子の `AGENTS.md` には同じディレクトリに `@AGENTS.md` だけを持つ `CLAUDE.md` を置く（2026-10-09、Codex 撤去時に追加。それまで AUTH-1・DB-1 などは Claude Code に自動では届いていなかった）。
 
 `.claude/skills` は `.agents/skills` への symlink で、skill の正本は `.agents/skills/` の 1 か所だけ。Next.js の `next dev` が app 直下に書き出す `AGENTS.md` / `CLAUDE.md` は指示の正本ではない（生成は止めてある。[infra.md](../../engineering/infra.md)）。
 
@@ -68,9 +70,8 @@ flowchart LR
 | 名前                                | 発火するタイミング                                                           | 何をするか                                                                                                                                                                                                            | 止めるか                 | 設定の場所                                                                        |
 | ----------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------- |
 | `pre-tool-guard`                    | Claude Code がツールを使う前（Write / Edit / Bash / Read / Agent など 8 種） | 危険な操作を止める（下の一覧）                                                                                                                                                                                        | 止める                   | `.claude/settings.json` の `hooks.PreToolUse` → `scripts/hooks/pre-tool-guard.sh` |
-| `codex-pre-tool-guard`              | Codex がツールを使う前（全ツール）                                           | 同じ判定。**規則の本体 `pre-tool-guard-rules.mjs` を Claude 側と共有**し、Codex の入出力形式へ写すだけ                                                                                                                | 止める                   | `.codex/hooks.json`（`.codex/config.toml` で hooks を有効化）                     |
 | permissions                         | Claude Code がツールを使う前                                                 | allow / ask / deny の設定が操作を分類する。現在の登録件数は末尾で生成し、作用は設定と各 runtime の契約を確認する                                                                                                      | 止める                   | `.claude/settings.json` の `permissions`                                          |
-| `session-start` / `agent-preflight` | セッション開始時                                                             | branch・変更・環境・gh の権限などを最初に見せる。Claude では token の消費量の集計（`session-token-usage.py`）も出す                                                                                                   | 止めない                 | Claude は `session-start.sh` 経由、Codex は `agent-preflight.mjs` を直接          |
+| `session-start` / `agent-preflight` | セッション開始時                                                             | branch・変更・環境・gh の権限などを最初に見せる。Claude では token の消費量の集計（`session-token-usage.py`）も出す                                                                                                   | 止めない                 | `.claude/settings.json` の `hooks.SessionStart` → `session-start.sh`              |
 | `post-tool-format`                  | Claude Code が Write / Edit した後                                           | prettier で整形する                                                                                                                                                                                                   | 止めない                 | `.claude/settings.json` の `hooks.PostToolUse`                                    |
 | `notification` / `stop-failure`     | 許可待ち・作業完了の時                                                       | macOS の通知を出す。エラーを記録する                                                                                                                                                                                  | 止めない                 | `.claude/settings.json`                                                           |
 | `.husky/pre-commit`                 | `git commit`（人・AI とも）                                                  | staged 差分の secret を gitleaks で探し、lint-staged で整形する                                                                                                                                                       | 止める                   | `.husky/pre-commit`                                                               |
@@ -93,8 +94,8 @@ flowchart LR
 ## memory（Claude Code の覚え書き）
 
 - **場所**: repo の外（`~/.claude/projects/<repo のパス>/memory/`）。`MEMORY.md` が索引で、1 件 1 ファイル。2026-09-22 時点で 109 件
-- **誰が読むか**: Claude Code だけ。毎セッションの最初に索引が読み込まれ、関係しそうなものだけ本文を読む。**Codex は読まない**。repo に入っていないので、`pnpm docs:check` も他の人も見ない
-- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[tooling.md](../../operations/tooling.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、[jev.md](../../operations/jev.md)、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
+- **誰が読むか**: Claude Code だけ。毎セッションの最初に索引が読み込まれ、関係しそうなものだけ本文を読む。repo に入っていないので、`pnpm docs:check` も他の人も見ない
+- **2026-09-22 に repo へ昇格した**。Codex を主担当にする引き継ぎで、今も有効で repo に無かった知見を「実測で分かった罠」節として次へ書いた: [testing.md](../../engineering/testing.md)（検証と報告、ローカル E2E）、[runbook.md](../../operations/runbook.md) 第5部（git / worktree / CI / release）、[tooling.md](../../operations/tooling.md) §3（guard / hook / scripts）、[ai-development-loop.md](../../operations/ai-development-loop.md)（現状確認の誤診）、[secrets.md](../../operations/secrets.md)、[conventions.md](../../engineering/conventions.md) §9、`supabase` / `pr-cross-review` skill。Claude Code の tool や UI にしか効かないもの（Browser pane の座標、subagent の催促、plugin 選定など）と、既に `AGENTS.md` / skill にあるものは昇格しなかった。以後、memory は Claude の残骸であって正本ではない
 - **使い分け**: どの AI にも効かせたい規則は、memory ではなく `AGENTS.md` か skill か上記の doc に書く。memory に置くのは、Claude が繰り返し踏む罠の回避と、repo に書くまでもない作業の癖だけ
 
 ## AI にこうさせたい時、どこを触るか
@@ -103,9 +104,9 @@ flowchart LR
 | -------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | どの作業でも常に守らせる         | `AGENTS.md`                                | 約 200 行の予算。足す時は削れるものが無いか先に見る                                                                              |
 | 特定の作業の時だけ手順を守らせる | skill（`skill-design` skill に沿って作る） | `description` の条件が合わないと読まれない                                                                                       |
-| 特定のディレクトリを触る時だけ   | 入れ子の `AGENTS.md` / `CLAUDE.md`         | Claude Code は `CLAUDE.md`、Codex は `AGENTS.md` を読む。両方に効かせるなら両方に置くか、root へ                                 |
+| 特定のディレクトリを触る時だけ   | 入れ子の `AGENTS.md` / `CLAUDE.md`         | Claude Code は `CLAUDE.md` だけを読む。`AGENTS.md` に書いたら同じ場所に `@AGENTS.md` の `CLAUDE.md` を置く                       |
 | AI が間違えても止めたい          | guard / git hook / CI / ruleset            | 文章で頼むより強い。git hook と ruleset は人の操作にも効く。確実に止まるのは ruleset（merge）と EXPLICIT AUTHORITY（本番の操作） |
-| Claude の癖だけ直したい          | memory                                     | Codex には効かない                                                                                                               |
+| Claude の癖だけ直したい          | memory                                     | repo の外。他の人や CI は見ない                                                                                                  |
 
 全体の重複や置き場所の見直しは、`audit-ai-config` skill の棚卸しで行う。
 
@@ -128,7 +129,7 @@ flowchart LR
 <details>
 <summary>3. pre-tool-guard が効いていない気がする。何を見るか</summary>
 
-`.claude/settings.json` の `hooks.PreToolUse` の matcher に、そのツールが入っているか。guard が止める合図は `exit 2` だけで、node が見つからない時などに止める側へ倒すのが launcher（`pre-tool-guard.sh`）の役目。Codex なら `.codex/hooks.json` と、`.codex/config.toml` で hooks が有効になっているか。
+`.claude/settings.json` の `hooks.PreToolUse` の matcher に、そのツールが入っているか。guard が止める合図は `exit 2` だけで、node が見つからない時などに止める側へ倒すのが launcher（`pre-tool-guard.sh`）の役目。
 
 </details>
 
@@ -247,6 +248,14 @@ flowchart LR
     "find": "## DB-3: 破壊的migration"
   },
   {
+    "path": "apps/product/src/CLAUDE.md",
+    "find": "@AGENTS.md"
+  },
+  {
+    "path": "supabase/CLAUDE.md",
+    "find": "@AGENTS.md"
+  },
+  {
     "path": "apps/product/messages/CLAUDE.md",
     "find": ".agents/skills/i18n/SKILL.md"
   },
@@ -262,22 +271,7 @@ flowchart LR
     "path": ".claude/settings.json",
     "find": "\"command\": \"scripts/hooks/post-tool-format.sh\""
   },
-  {
-    "path": ".codex/hooks.json",
-    "find": "codex-pre-tool-guard.sh"
-  },
-  {
-    "path": ".codex/hooks.json",
-    "find": "scripts/tasks/agent-preflight.mjs"
-  },
-  {
-    "path": ".codex/config.toml",
-    "find": "hooks = true"
-  },
-  {
-    "path": "scripts/hooks/codex-pre-tool-guard.mjs",
-    "find": "Policy remains in pre-tool-guard-rules.mjs."
-  },
+
   {
     "path": "scripts/hooks/pre-tool-guard-rules.mjs",
     "find": "BLOCKED: git push --force は禁止です"

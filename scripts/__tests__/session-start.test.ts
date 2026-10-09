@@ -201,7 +201,9 @@ describe('session-start.sh: 実行環境の報告', () => {
     expect(stateIndex).toBeGreaterThanOrEqual(0);
     expect(envIndex).toBeGreaterThan(stateIndex);
     expect(r.stdout).toMatch(/\*\*node\*\*: v\d+\.\d+\.\d+ \(\.nvmrc: 24\)/);
-    expect(r.stdout).toMatch(/\*\*cli\*\*: gh:no codex:no op:no supabase:no gitleaks:no vercel:no/);
+    expect(r.stdout).toMatch(
+      /\*\*cli\*\*: gh:no claude:no op:no supabase:no gitleaks:no vercel:no/,
+    );
   });
 
   it('gh が無ければ、gh 依存の L0 入口（ctx / trace / branch:finish）が使えない旨と MCP への迂回を出す', () => {

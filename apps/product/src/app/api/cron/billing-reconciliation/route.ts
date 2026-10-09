@@ -47,6 +47,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const accountId = env.STRIPE_ACCOUNT_ID?.trim();
   const livemode = env.STRIPE_LIVEMODE;
   if (!secretKey && !accountId && !livemode) {
+    // 照合していないので完了を記録しない。inactive かどうかは env ではなく
+    // cron-heartbeat-policy の EXPECTED_JOB_MODES が決める（#3010）。
     return noStoreJson({ ok: true, configured: false });
   }
 

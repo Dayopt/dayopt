@@ -7,8 +7,8 @@
 # 詳細: docs/operations/security.md、AGENTS.md §PR / git 運用
 if ! command -v gitleaks > /dev/null 2>&1; then
   # 非対話環境（CI 変数設定 or stdin が TTY でない）では hard fail にしない。
-  # 月次 gardening 自動パート（cloud Routine、brew が無い環境）は draft PR
-  # 作成のため commit を伴う。ここを hard fail のままにすると、--no-verify
+  # brew が無い環境（Claude Code の cloud session など）でも agent は
+  # commit する。ここを hard fail のままにすると、--no-verify
   # も agent には禁止済みのため全 commit が回復不能に詰まる（2026-08-24、
   # merge 前クロスレビュー risk-reviewer 指摘）。CI（docs-guard.yml）が
   # secret 検出の最終網であるため、この環境だけ skip しても検出自体は

@@ -78,7 +78,7 @@ describe('billing reconciliation cron', () => {
     expect(writeCronHeartbeat).not.toHaveBeenCalled();
   });
 
-  it('Stripeが全て未設定なら正常にskipする', async () => {
+  it('Stripeが全て未設定なら照合もheartbeatもせずにskipする', async () => {
     envMock.STRIPE_SECRET_KEY = undefined;
     envMock.STRIPE_ACCOUNT_ID = undefined;
     envMock.STRIPE_LIVEMODE = undefined;
@@ -88,6 +88,7 @@ describe('billing reconciliation cron', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, configured: false });
     expect(reconcileBillingWebhookEvents).not.toHaveBeenCalled();
+    // 設定欠落を暗黙の inactive として完了扱いにしない（#3010）。
     expect(writeCronHeartbeat).not.toHaveBeenCalled();
   });
 

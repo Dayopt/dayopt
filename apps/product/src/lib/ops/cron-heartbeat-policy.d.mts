@@ -12,9 +12,24 @@ export const JOB_MAX_AGE_MINUTES: Readonly<{
 
 export type CronHeartbeatJobName = keyof typeof JOB_MAX_AGE_MINUTES;
 
+export type CronJobMode = 'enabled' | 'inactive';
+
+export const EXPECTED_JOB_MODES: Readonly<{
+  'billing-reconciliation': 'inactive';
+}>;
+
+export function listInactiveJobs(
+  modes?: Readonly<Partial<Record<CronHeartbeatJobName, string>>>,
+): CronHeartbeatJobName[];
+
 export interface CronHeartbeatStatusRow {
   job_name: string;
+  last_started_at?: string | null;
   last_completed_at: string | null;
 }
 
-export function evaluateHeartbeats(rows: readonly CronHeartbeatStatusRow[], now?: number): string[];
+export function evaluateHeartbeats(
+  rows: readonly CronHeartbeatStatusRow[],
+  now?: number,
+  modes?: Readonly<Partial<Record<CronHeartbeatJobName, string>>>,
+): string[];

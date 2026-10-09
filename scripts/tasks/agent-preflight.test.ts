@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  collectClaudeHooks,
   collectGhIdentity,
+  collectOnePassword,
   collectPreflight,
   parseGhAuthStatus,
   renderPreflight,
@@ -21,19 +23,27 @@ function fixture() {
   return root;
 }
 describe('agent preflight', () => {
-  it('reports missing service-account authentication without claiming runtime isolation', () => {
+  it('reports a missing OP_SERVICE_ACCOUNT_TOKEN', () => {
     const root = fixture();
     const previousToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
     delete process.env.OP_SERVICE_ACCOUNT_TOKEN;
     try {
       const state = collectPreflight(root);
-      expect(state.onePassword.tokenPresent).toBe(false);
-      expect(state.onePassword.scope).toBe('unverified');
-      expect(state.onePassword.runtimeIsolation).toBe('unverified');
-      expect(renderPreflight(state)).toContain('Service Account 未設定');
+      expect(state.onePassword).toEqual({ tokenPresent: false });
+      expect(renderPreflight(state)).toContain('OP_SERVICE_ACCOUNT_TOKEN 未設定');
     } finally {
       if (previousToken !== undefined) process.env.OP_SERVICE_ACCOUNT_TOKEN = previousToken;
     }
+  });
+  it('reports token presence without printing its value or claiming verification', () => {
+    const state = collectOnePassword({ OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture-value' });
+    expect(state).toEqual({ tokenPresent: true });
+    expect(collectOnePassword({ OP_SERVICE_ACCOUNT_TOKEN: '  ' })).toEqual({ tokenPresent: false });
+    const line = renderPreflight({ ...collectPreflight(fixture()), onePassword: state })
+      .split('\n')
+      .find((l) => l.startsWith('**1Password**'));
+    expect(line).toContain('OP_SERVICE_ACCOUNT_TOKEN あり');
+    expect(line).not.toContain('ops_fixture-value');
   });
   it('reports missing dependencies and hooks, never marks runtime hooks as active', () => {
     const root = fixture();
@@ -42,8 +52,6 @@ describe('agent preflight', () => {
     expect(state.pnpmMatches).toBe(false);
     expect(state.expectedPnpm).toBe(null);
     expect(state.hooks['pre-push']).toBe(false);
-    expect(state.readOnlyDelegation.wrapper).toBe(false);
-    expect(state.readOnlyDelegation.native).toContain('unsupported');
     expect(renderPreflight(state)).toContain('commit / push 前に');
   });
   it('flags a Node.js mismatch independently of the test runner version', () => {
@@ -52,6 +60,33 @@ describe('agent preflight', () => {
     writeFileSync(join(root, '.nvmrc'), `${currentMajor + 1}\n`);
     const state = collectPreflight(root);
     expect(state.nodeMatches).toBe(false);
+  });
+  it.each([
+    [
+      'local',
+      undefined,
+      'fnm で .nvmrc を自動切替、または PATH=/opt/homebrew/opt/node@24/bin を前置',
+    ],
+    ['remote', 'true', 'cloud environment の setup script で Node 24 を入れる（#3051）'],
+  ])('states the cause and fix on one line for a Node mismatch (%s)', (_name, remote, fix) => {
+    const root = fixture();
+    const currentMajor = Number(process.versions.node.split('.')[0]);
+    writeFileSync(join(root, '.nvmrc'), `${currentMajor + 1}\n`);
+    const previous = process.env.CLAUDE_CODE_REMOTE;
+    if (remote === undefined) delete process.env.CLAUDE_CODE_REMOTE;
+    else process.env.CLAUDE_CODE_REMOTE = remote;
+    try {
+      const lines = renderPreflight(collectPreflight(root))
+        .split('\n')
+        .filter((line) => line.includes('不一致') && line.includes('Node'));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain(fix);
+      const other = remote === undefined ? 'cloud environment' : 'fnm';
+      expect(lines[0]).not.toContain(other);
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDE_CODE_REMOTE;
+      else process.env.CLAUDE_CODE_REMOTE = previous;
+    }
   });
   it('uses the Corepack entrypoint when it is the only matching pnpm contract', () => {
     const root = fixture();
@@ -86,20 +121,13 @@ describe('agent preflight', () => {
   });
   it('uses repository root from a subdirectory and verifies configured hook files', () => {
     const root = fixture();
-    for (const dir of [
-      'src/deep',
-      'node_modules/.pnpm',
-      '.husky/_',
-      '.agents/skills/routing',
-      '.codex',
-    ])
+    for (const dir of ['src/deep', 'node_modules/.pnpm', '.husky/_', '.agents/skills/routing'])
       mkdirSync(join(root, dir), { recursive: true });
     for (const name of ['pre-commit', 'pre-push']) {
       writeFileSync(join(root, '.husky/_', name), '#!/bin/sh\n');
       writeFileSync(join(root, '.husky', name), 'true\n');
     }
     writeFileSync(join(root, '.agents/skills/routing/SKILL.md'), 'test');
-    writeFileSync(join(root, '.codex/hooks.json'), '{}');
     expect(spawnSync('git', ['config', 'core.hooksPath', '.husky/_'], { cwd: root }).status).toBe(
       0,
     );
@@ -108,10 +136,9 @@ describe('agent preflight', () => {
     expect(state.dependencies).toBe(true);
     expect(state.hooks['pre-push']).toBe(true);
     expect(state.skills).toBe(true);
-    expect(state.codexHooks).toContain('unverified');
-    expect(state.readOnlyDelegation.wrapper).toBe(false);
-    expect(state.readOnlyDelegation.native).toContain('scope cannot be enforced');
-    expect(renderPreflight(state)).toContain('Read-only delegation');
+    expect(state.claudeHooks).toBe('missing');
+    expect(renderPreflight(state)).toContain('**Claude hooks**: missing');
+    expect(renderPreflight(state)).not.toContain('Read-only delegation');
   });
   it('flags a User OAuth token (classic broad scopes) as an un-isolated gh identity', () => {
     // 監査 P1-1 の実測形。token 行は parse 対象にしない
@@ -174,5 +201,37 @@ describe('agent preflight', () => {
     );
     expect(result.status).toBe(1);
     expect(JSON.parse(result.stdout).dependencies).toBe(false);
+  });
+  it('reports the repository Claude settings as configured', () => {
+    expect(collectClaudeHooks(resolve(__dirname, '../..'))).toBe(
+      'configured; runtime activation unverified',
+    );
+  });
+  it('names the missing Claude guard registrations', () => {
+    const root = fixture();
+    mkdirSync(join(root, '.claude'), { recursive: true });
+    writeFileSync(
+      join(root, '.claude/settings.json'),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [
+            { hooks: [{ type: 'command', command: 'scripts/hooks/session-start.sh' }] },
+          ],
+          PreToolUse: [
+            {
+              matcher: 'Bash',
+              hooks: [{ type: 'command', command: 'scripts/hooks/pre-tool-guard.sh' }],
+            },
+            {
+              matcher: 'Write',
+              hooks: [{ type: 'command', command: 'scripts/hooks/other.sh' }],
+            },
+          ],
+        },
+      }),
+    );
+    expect(collectClaudeHooks(root)).toBe(
+      'incomplete (PreToolUse:Write, PreToolUse:Edit, PreToolUse:Read)',
+    );
   });
 });

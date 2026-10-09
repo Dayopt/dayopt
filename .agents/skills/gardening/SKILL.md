@@ -7,7 +7,7 @@ description: ユーザーが月次の改善ループの実施を明示依頼し�
 
 目的は「仮説 → 1 か月運用 → 実測 → 判定」を **人が月 1 回 30 分で閉じる** こと。benchmark は持たず実際の issue / PR outcome を benchmark とし、月を試行の単位にする（`docs/decisions.md` 参照）。
 
-**engine は月初に User が開く session**。`pnpm ai:usage` と `pnpm trace` の session / token / tool telemetry は Claude Code の local transcript だけを読む。Codex / Antigravity は未収集であり、欠けた値を 0 と扱わない。GitHub 由来の PR / review / merge outcome は repo 全体の指標として別に読み、Claude Code の効率へ帰属させない。自動パートは持たない。
+**engine は月初に User が開く session**。`pnpm ai:usage` と `pnpm trace` の session / token / tool telemetry は Claude Code の local transcript だけを読む。それ以外の provider は未収集であり、欠けた値を 0 と扱わない。GitHub 由来の PR / review / merge outcome は repo 全体の指標として別に読み、Claude Code の効率へ帰属させない。自動パートは持たない。
 
 ## When to Use
 
@@ -20,7 +20,7 @@ description: ユーザーが月次の改善ループの実施を明示依頼し�
 ## 手順（30 分）
 
 0. **決定的な計測**（数十秒、LLM は結果を読むだけ）
-   - `pnpm ai:usage`（既定 = 前月の暦月）。Claude Code telemetry の期間と欠損を確認する。Codex / Antigravity の未収集値は 0 と比較しない
+   - `pnpm ai:usage`（既定 = 前月の暦月）。Claude Code telemetry の期間と欠損を確認する。未収集の provider の値は 0 と比較しない
    - ready 後の commit が 3 回を超えた PR、revert、P1 / P2、User の追加介入があった PR を `pnpm trace <PR>` で見る（候補は `gh pr list --state merged --search "merged:YYYY-MM-01..YYYY-MM-31" --json number` から）。session 部分は Claude Code のみ、GitHub outcome は repo 全体として分けて読む
 1. **AI 協働の 4 問**に yes / no で答える（`routing` skill の成功条件との距離）
    - issue / PR の成功条件を満たし、revert や再発を増やしていないか
@@ -32,7 +32,7 @@ description: ユーザーが月次の改善ループの実施を明示依頼し�
 3. **判断層の検証**（`AGENTS.md` §シンプルルール）: ①今月このルールに戻った場面はあったか（1 度も戻らないルールは削る候補）②無言で破られたルールは無いか ③先月触らなかった機能はどれか（ルール 5。削除候補は `dispatch` intake で起票）
 4. **レビューの歩留まり**: provider を問わず P1 / P2 で同じ構造の指摘が当月 2 回以上、または通算 2 回以上なら機械化（test / lint / CI）の issue を起票する。指摘ゼロが続く reviewer / provider は、費用と独立性を再評価し、縮小か廃止の候補にする
    - 外部知見や複数 finding の再利用可否を判断する時は、[`AI開発標準ループ`](../../../docs/operations/ai-development-loop.md)の知見カードで出典・Dayoptへの適用根拠・既存の行き先を分ける。単発で明確な不具合の修正を月次や複数回の発生まで待たせない
-5. **security sweep**: cloud Supabase MCP をオンデマンド登録して `get_advisors`（security）、あわせて `pnpm security:check`。所見は issue、使用後に登録解除（`mcp-usage` skill）。深掘りが要る月は `/claude-security` を 1 境界だけ回す（任意の加速器で、無くても完走する）
+5. **security sweep**: Supabase の security advisors（Dashboard または Management API。経路は `mcp-usage` skill）、あわせて `pnpm security:check`。所見は issue。深掘りが要る月は `/claude-security` を 1 境界だけ回す（任意の加速器で、無くても完走する）
    - `pnpm-workspace.yaml` の `overrides` / `patchedDependencies` / `audit.ignore` の棚卸しを同時に行う。**lockfile に対象 version が無いことを stale の根拠にしない** — 効いている override はその version を消すので、不在はむしろ現役の証拠。1 件ずつ外して `pnpm install` し、`pnpm audit` の advisory と lockfile の `packages:` 件数が両方とも変わらないものだけを削除する
 6. **成果物**: ルール・skill・docs に変更があれば docs 束 PR（`{agent}/gardening-YYYY-MM`）。無ければ **無音**。journal ファイルも常設 issue も作らない（再計算できる数値は複製せず、残す判断は `decisions.md` に入れる）
 

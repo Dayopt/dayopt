@@ -1,14 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildContextInput } from '../lib/jev-assist-context.mjs';
 import {
   bodyReferencesNumber,
-  buildBriefAnnotations,
   buildCommentBody,
   buildContextPack,
-  buildContextPackWithL1,
   buildJudgmentHint,
-  buildL1ShadowPreview,
   buildPostArgs,
   computeCiRollup,
   computeContextSnapshotId,
@@ -22,7 +18,6 @@ import {
   extractPathTokens,
   filterExistingPaths,
   findMarkerComment,
-  findReusableBriefL1Preview,
   isBotLogin,
   isPullRequest,
   mapSkills,
@@ -30,8 +25,6 @@ import {
   parseArgs,
   postContextBrief,
   renderMarkdown,
-  resolveContextL1Mode,
-  runContextL1ShadowAssist,
   selectComments,
   truncateBody,
   truncateCommentBody,
@@ -46,8 +39,6 @@ describe('parseArgs', () => {
       bodyLines: 60,
       allComments: false,
       post: false,
-      l1Shadow: false,
-      reuseBriefL1: false,
     });
   });
 
@@ -61,8 +52,6 @@ describe('parseArgs', () => {
       bodyLines: 10,
       allComments: true,
       post: false,
-      l1Shadow: false,
-      reuseBriefL1: false,
     });
   });
 
@@ -70,19 +59,8 @@ describe('parseArgs', () => {
     expect(parseArgs(['2550', '--post'])).toMatchObject({ number: 2550, post: true });
   });
 
-  it('--reuse-brief-l1 は保存済みBriefのL1だけを読む指定として解釈する', () => {
-    expect(parseArgs(['2550', '--reuse-brief-l1'])).toMatchObject({
-      number: 2550,
-      reuseBriefL1: true,
-    });
-  });
-
-  it('--l1-shadow は明示previewとして通常出力でL1を含める', () => {
-    expect(parseArgs(['2550', '--l1-shadow'])).toMatchObject({ l1Shadow: true, post: false });
-    expect(parseArgs(['2550', '--post', '--l1-shadow'])).toMatchObject({
-      l1Shadow: true,
-      post: true,
-    });
+  it('--reuse-brief-l1 は互換 flag として受け付け、options を変えない', () => {
+    expect(parseArgs(['2550', '--reuse-brief-l1'])).toEqual(parseArgs(['2550']));
   });
 
   it('番号が無い・不正・複数は例外', () => {
@@ -93,29 +71,7 @@ describe('parseArgs', () => {
 
   it('未知の引数は例外', () => {
     expect(() => parseArgs(['1', '--foo'])).toThrow(/未知の引数/);
-  });
-});
-
-describe('resolveContextL1Mode', () => {
-  it('通常の読み取りはJevを呼ばずBriefのL1を再利用する', () => {
-    expect(resolveContextL1Mode(parseArgs(['2550']))).toMatchObject({ reuseBriefL1: true });
-  });
-
-  it('dispatch投稿と明示previewはJev生成を許可する', () => {
-    expect(resolveContextL1Mode(parseArgs(['2550', '--post']))).toMatchObject({
-      post: true,
-      reuseBriefL1: false,
-    });
-    expect(resolveContextL1Mode(parseArgs(['2550', '--l1-shadow']))).toMatchObject({
-      l1Shadow: true,
-      reuseBriefL1: false,
-    });
-  });
-
-  it('明示的なBrief再利用はそのまま維持する', () => {
-    expect(resolveContextL1Mode(parseArgs(['2550', '--reuse-brief-l1']))).toMatchObject({
-      reuseBriefL1: true,
-    });
+    expect(() => parseArgs(['1', '--l1-shadow'])).toThrow(/未知の引数/);
   });
 });
 
@@ -864,57 +820,6 @@ describe('nextStep', () => {
 });
 
 describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
-  it('assistだけ切り詰め前の資料を持ち、通常出力と自己生成コメント除外は維持する', () => {
-    const comments: Array<{
-      id: number;
-      user: { login: string };
-      created_at: string;
-      body: string;
-      author_association?: string;
-    }> = Array.from({ length: 101 }, (_, index) => ({
-      id: index + 1,
-      user: { login: 'tomoya' },
-      created_at: `2026-09-${String(index + 1).padStart(2, '0')}T00:00:00Z`,
-      body: index === 0 ? '古い重要制約\n'.repeat(80) : `進捗 ${index}`,
-    }));
-    comments.push({
-      id: 10,
-      user: { login: 'tomoya' },
-      author_association: 'OWNER',
-      created_at: '2026-09-10T00:00:00Z',
-      body: `${CTX_MARKER}\n自己生成`,
-    });
-    const deps = {
-      now: () => new Date('2026-09-24T00:00:00Z'),
-      execFileImpl: (_cmd: string, args: string[]) => {
-        if (args[1]?.includes('/comments'))
-          return JSON.stringify(
-            args.includes('--slurp') ? [comments.slice(0, 100), comments.slice(100)] : comments,
-          );
-        if (args[0] === 'search') return '[]';
-        return JSON.stringify({
-          title: 'issue',
-          body: '要求',
-          labels: [],
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-09-24T00:00:00Z',
-          html_url: 'https://github.com/Dayopt/dayopt/issues/1',
-        });
-      },
-      readFileImpl: () => `#1 ${'長い決定'.repeat(100)}`,
-      existsFn: () => false,
-    };
-    const options = parseArgs(['1']);
-    const normal = buildContextPack(options, deps);
-    const { assistSource, ...unchanged } = buildContextPack({ ...options, assist: true }, deps);
-    expect(unchanged).toEqual(normal);
-    expect(normal).not.toHaveProperty('assistSource');
-    if (!assistSource?.comments) throw new Error('assist資料が無い');
-    expect(assistSource.updatedAt).toBe('2026-01-01T00:00:00Z');
-    expect(assistSource.comments).toHaveLength(101);
-    expect(assistSource.comments[0].body).toBe(comments[0].body);
-    expect(assistSource.decisions[0].length).toBeGreaterThan(200);
-  });
   it('表示から省略された本文でも振り分けと資料の鮮度に反映する', () => {
     const make = (suffix: string) =>
       buildContextPack(
@@ -984,455 +889,6 @@ describe('buildContextPack (execFileImpl 経由の gh 呼び出し形)', () => {
         relatedPrs: [{ ...base.relatedPrs[0], headSha: 'b'.repeat(40) }],
       }),
     ).not.toBe(first);
-  });
-  it('L1注釈は採用済み・完全評価・既知参照だけを表示し、部分評価は未評価に戻す', () => {
-    const sources = [
-      { id: 'comment-10', url: 'https://github.com/Dayopt/dayopt/issues/1#issuecomment-10' },
-    ];
-    const rows = [
-      {
-        id: 'comment-10',
-        relevance: 0.93,
-        category: 'constraint',
-        evaluatedAt: '2026-09-24T00:00:00Z',
-        confidence: 0.91,
-        url: 'https://evil.example/forged',
-        sha: 'f'.repeat(40),
-        text: '自由文で必要条件を作る',
-      },
-    ];
-    const adopted = buildBriefAnnotations({
-      packId: 'context-relevance',
-      adoptedPackIds: ['context-relevance'],
-      complete: true,
-      rows,
-      sources,
-    });
-    expect(adopted.status).toBe('adopted');
-    expect(adopted.rows[0]).toEqual({
-      sourceId: 'comment-10',
-      url: sources[0].url,
-      category: 'constraint',
-      relevance: 0.93,
-      evaluatedAt: '2026-09-24T00:00:00Z',
-    });
-    expect(JSON.stringify(adopted)).not.toContain('evil.example');
-    expect(JSON.stringify(adopted)).not.toContain('必要条件を作る');
-    expect(JSON.stringify(adopted)).not.toContain('f'.repeat(40));
-    expect(
-      buildBriefAnnotations({
-        packId: 'context-relevance',
-        adoptedPackIds: [],
-        complete: true,
-        rows,
-        sources,
-      }),
-    ).toMatchObject({ status: 'not_adopted', rows: [] });
-    expect(
-      buildBriefAnnotations({
-        packId: 'context-relevance',
-        adoptedPackIds: ['context-relevance'],
-        complete: false,
-        failure: 'rate_limited',
-        rows,
-        sources,
-      }),
-    ).toMatchObject({ status: 'unevaluated', reason: 'rate_limited', rows: [] });
-    for (const failure of [
-      'timeout',
-      'balance_below_floor',
-      'balance_unknown',
-      'missing_credentials',
-    ]) {
-      expect(
-        buildBriefAnnotations({
-          packId: 'context-relevance',
-          adoptedPackIds: ['context-relevance'],
-          complete: false,
-          failure,
-          rows,
-          sources,
-        }),
-      ).toMatchObject({ status: 'unevaluated', reason: failure, rows: [] });
-    }
-    expect(
-      buildBriefAnnotations({
-        packId: 'context-relevance',
-        adoptedPackIds: ['context-relevance'],
-        complete: true,
-        rows: [{ ...rows[0], confidence: 0.4 }],
-        sources,
-      }),
-    ).toMatchObject({ status: 'unevaluated', reason: 'low_confidence', rows: [] });
-    expect(
-      buildBriefAnnotations({
-        packId: 'context-relevance',
-        adoptedPackIds: ['context-relevance'],
-        complete: true,
-        rows,
-        sources: [{ id: 'comment-10', url: 'https://evil.example/source' }],
-      }),
-    ).toMatchObject({ status: 'unevaluated', reason: 'incomplete', rows: [] });
-    expect(
-      buildBriefAnnotations({
-        packId: 'context-relevance',
-        adoptedPackIds: ['context-relevance'],
-        complete: true,
-        rows: [{ ...rows[0], confidence: Number.NaN }],
-        sources,
-      }),
-    ).toMatchObject({ status: 'unevaluated', reason: 'low_confidence', rows: [] });
-  });
-  it('L1 shadowは同一入力だけから固定ラベルと一次資料リンクを作り、部分評価を完全順位にしない', () => {
-    const sha = 'a'.repeat(40);
-    const source = {
-      title: 'Issue title',
-      body: 'Canonical request',
-      url: 'https://github.com/Dayopt/dayopt/issues/1',
-      updatedAt: '2026-09-24T00:00:00Z',
-      comments: [{ id: 12, body: 'Constraint source', created_at: '2026-09-24T01:00:00Z' }],
-      related: [{ number: 2, title: 'Related', body: 'Related source' }],
-      decisions: ['2026-09-23 #1 decision'],
-      missing: [],
-    };
-    const input = buildContextInput(1, sha, source);
-    const report = {
-      packId: 'context-relevance',
-      mode: 'shadow',
-      target: { number: 1, sha, url: input.url },
-      input,
-      complete: true,
-      missing: [],
-      omitted: [],
-      rows: input.candidates.map((candidate, index) => ({
-        ...candidate,
-        relevance: index === 1 ? 0.98 : 0.65,
-        category: 'constraint',
-        evaluatedAt: '2026-09-24T02:00:00Z',
-        source: 'live',
-        reason: 'evaluated',
-        text: 'model must not author source text',
-        url: 'https://evil.example/forged',
-      })),
-    };
-
-    const preview = buildL1ShadowPreview(report, input);
-    expect(preview.status).toBe('complete');
-    expect(preview.candidates[0]).toMatchObject({
-      id: input.candidates[1].id,
-      url: input.candidates[1].url,
-      categoryLabel: '制約',
-    });
-    expect(JSON.stringify(preview)).not.toContain('evil.example');
-    expect(JSON.stringify(preview)).not.toContain('model must not author');
-    expect(JSON.stringify(preview)).not.toContain('0.98');
-
-    const stale = buildL1ShadowPreview(
-      { ...report, input: { ...input, body: 'Changed request' } },
-      input,
-    );
-    expect(stale).toMatchObject({ status: 'snapshot_mismatch', candidates: [] });
-
-    const partial = buildL1ShadowPreview(
-      {
-        ...report,
-        complete: false,
-        rows: [
-          { ...report.rows[0], relevance: null, category: null, reason: 'missing_credentials' },
-          report.rows[1],
-        ],
-      },
-      input,
-    );
-    expect(partial).toMatchObject({ status: 'partial', evaluatedCount: 1, selectedCount: 2 });
-  });
-  it('信頼済みBriefのL1は同一Issue・snapshot・HEADの候補だけ再利用する', () => {
-    const sha = 'a'.repeat(40);
-    const source = {
-      title: 'Issue title',
-      body: 'Canonical request',
-      url: 'https://github.com/Dayopt/dayopt/issues/23',
-      updatedAt: '2026-09-24T00:00:00Z',
-      comments: [
-        {
-          id: 42,
-          body: 'Constraint source',
-          html_url: 'https://github.com/Dayopt/dayopt/issues/23#issuecomment-42',
-          created_at: '2026-09-24T01:00:00Z',
-        },
-      ],
-      related: [],
-      decisions: [],
-      missing: [],
-    };
-    const input = buildContextInput(23, sha, source);
-    const snapshotId = 'b'.repeat(64);
-    const candidate = input.candidates[0];
-    const metadata = {
-      schemaVersion: 1,
-      issueNumber: 23,
-      snapshotId,
-      target: { number: 23, sha, url: input.url },
-      preview: {
-        status: 'complete',
-        reason: null,
-        evaluatedCount: 1,
-        selectedCount: 1,
-        omittedCount: 0,
-        candidates: [
-          {
-            id: candidate.id,
-            url: candidate.url,
-            updatedAt: candidate.updatedAt,
-            category: 'constraint',
-            evaluatedAt: '2026-09-24T02:00:00Z',
-          },
-        ],
-      },
-    };
-    const body = `${CTX_MARKER}\n<!-- ctx-l1-v1:${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`;
-    const comment = { body, author_association: 'OWNER', user: { login: 'tomoya' } };
-    const expected = { ...input, snapshotId, authLogin: 'tomoya' };
-
-    expect(findReusableBriefL1Preview([comment], expected)).toMatchObject({
-      status: 'complete',
-      source: 'trusted_brief',
-      candidates: [{ id: candidate.id, url: candidate.url, categoryLabel: '制約' }],
-    });
-    expect(findReusableBriefL1Preview([comment], { ...expected, sha: 'c'.repeat(40) })).toBeNull();
-    expect(
-      findReusableBriefL1Preview([comment], { ...expected, snapshotId: 'd'.repeat(64) }),
-    ).toBeNull();
-    expect(
-      findReusableBriefL1Preview([{ ...comment, author_association: 'NONE' }], expected),
-    ).toBeNull();
-    expect(
-      findReusableBriefL1Preview([{ ...comment, user: { login: 'another-member' } }], expected),
-    ).toBeNull();
-    expect(findReusableBriefL1Preview([comment], { ...expected, authLogin: null })).toBeNull();
-  });
-  it('Jev CLIは固定argvで呼び、JSON以外の出力やshell評価を使わない', () => {
-    const execFileImpl = vi.fn(() => '{"packId":"context-relevance"}');
-    expect(runContextL1ShadowAssist(23, { cwd: '/repo', execFileImpl })).toEqual({
-      packId: 'context-relevance',
-    });
-    expect(execFileImpl).toHaveBeenCalledWith(
-      '/repo/node_modules/.bin/tsx',
-      ['scripts/tasks/jev/assist.ts', 'context', '--issue', '23', '--json'],
-      { cwd: '/repo', encoding: 'utf8', maxBuffer: 2_000_000 },
-    );
-  });
-  it('通常のContext packへ同一snapshotのL1助言を載せ、失敗時はL0を残す', () => {
-    const sha = 'a'.repeat(40);
-    const source = {
-      title: 'Issue title',
-      body: 'Canonical request',
-      url: 'https://github.com/Dayopt/dayopt/issues/23',
-      updatedAt: '2026-09-24T00:00:00Z',
-      comments: [],
-      related: [],
-      decisions: [],
-      missing: [],
-    };
-    const expectedInput = buildContextInput(23, sha, source);
-    const buildPack = vi.fn((options: { assist?: boolean }) =>
-      options.assist
-        ? {
-            number: 23,
-            snapshotId: 'b'.repeat(64),
-            header: { url: source.url },
-            assistSource: source,
-            trustedBriefComments: [],
-          }
-        : { number: 23 },
-    ) as unknown as typeof buildContextPack;
-    const report = {
-      packId: 'context-relevance',
-      mode: 'shadow',
-      target: { number: 23, sha, url: expectedInput.url },
-      input: expectedInput,
-      complete: true,
-      missing: [],
-      omitted: [],
-      rows: [],
-    };
-    const runAssist = vi.fn(() => report);
-    const options = parseArgs(['23']);
-
-    const pack = buildContextPackWithL1(options, {
-      cwd: '/repo',
-      getHeadSha: () => sha,
-      getAuthLogin: () => null,
-      buildPack,
-      runAssist,
-    });
-    expect(buildPack).toHaveBeenCalledWith({ ...options, assist: true }, expect.any(Object));
-    expect(runAssist).toHaveBeenCalledWith(23, { cwd: '/repo' });
-    expect(pack).toMatchObject({
-      number: 23,
-      l1ShadowPreview: { status: 'complete', candidates: [] },
-    });
-    expect(pack).not.toHaveProperty('assistSource');
-
-    const fallback = buildContextPackWithL1(options, {
-      cwd: '/repo',
-      getHeadSha: () => sha,
-      getAuthLogin: () => null,
-      buildPack,
-      runAssist: () => {
-        throw new Error('Jev unavailable');
-      },
-    });
-    expect(fallback).toMatchObject({
-      number: 23,
-      l1ShadowPreview: { status: 'unavailable', candidates: [] },
-    });
-  });
-  it('reuse指定はJevを呼ばず、信頼済みBriefの一致するL1だけを返す', () => {
-    const sha = 'a'.repeat(40);
-    const snapshotId = 'b'.repeat(64);
-    const source = {
-      title: 'Issue title',
-      body: 'Canonical request',
-      url: 'https://github.com/Dayopt/dayopt/issues/23',
-      updatedAt: '2026-09-24T00:00:00Z',
-      comments: [
-        {
-          id: 42,
-          body: 'Constraint source',
-          html_url: 'https://github.com/Dayopt/dayopt/issues/23#issuecomment-42',
-          created_at: '2026-09-24T01:00:00Z',
-        },
-      ],
-      related: [],
-      decisions: [],
-      missing: [],
-    };
-    const input = buildContextInput(23, sha, source);
-    const candidate = input.candidates[0];
-    const metadata = {
-      schemaVersion: 1,
-      issueNumber: 23,
-      snapshotId,
-      target: { number: 23, sha, url: input.url },
-      preview: {
-        status: 'complete',
-        reason: null,
-        evaluatedCount: 1,
-        selectedCount: 1,
-        omittedCount: 0,
-        candidates: [
-          {
-            id: candidate.id,
-            url: candidate.url,
-            updatedAt: candidate.updatedAt,
-            category: 'constraint',
-            evaluatedAt: '2026-09-24T02:00:00Z',
-          },
-        ],
-      },
-    };
-    const brief = {
-      body: `${CTX_MARKER}\n<!-- ctx-l1-v1:${Buffer.from(JSON.stringify(metadata)).toString('base64url')} -->`,
-      author_association: 'OWNER',
-      user: { login: 'tomoya' },
-    };
-    const buildPack = vi.fn(() => ({
-      number: 23,
-      snapshotId,
-      header: { url: source.url },
-      assistSource: source,
-      trustedBriefComments: [brief],
-    })) as unknown as typeof buildContextPack;
-    const runAssist = vi.fn(() => {
-      throw new Error('reuse mode must not call Jev');
-    });
-    const pack = buildContextPackWithL1(parseArgs(['23', '--reuse-brief-l1']), {
-      cwd: '/repo',
-      getHeadSha: () => sha,
-      getAuthLogin: () => 'tomoya',
-      buildPack,
-      runAssist,
-    });
-
-    expect(runAssist).not.toHaveBeenCalled();
-    expect(pack).toMatchObject({
-      l1ShadowPreview: {
-        status: 'complete',
-        source: 'trusted_brief',
-        candidates: [{ id: candidate.id, url: candidate.url }],
-      },
-    });
-    expect(pack).not.toHaveProperty('trustedBriefComments');
-
-    const fallbackPack = buildContextPackWithL1(parseArgs(['23']), {
-      cwd: '/repo',
-      getHeadSha: () => sha,
-      getAuthLogin: () => 'tomoya',
-      buildPack,
-      runAssist: () => {
-        throw new Error('Jev unavailable');
-      },
-    });
-    expect(fallbackPack).toMatchObject({
-      l1ShadowPreview: {
-        status: 'complete',
-        source: 'trusted_brief',
-      },
-    });
-
-    const defaultReadAssist = vi.fn(() => {
-      throw new Error('default reads must not call Jev');
-    });
-    const defaultReadPack = buildContextPackWithL1(resolveContextL1Mode(parseArgs(['23'])), {
-      cwd: '/repo',
-      getHeadSha: () => sha,
-      getAuthLogin: () => 'tomoya',
-      buildPack,
-      runAssist: defaultReadAssist,
-    });
-    expect(defaultReadAssist).not.toHaveBeenCalled();
-    expect(defaultReadPack).toMatchObject({
-      l1ShadowPreview: { status: 'complete', source: 'trusted_brief' },
-    });
-  });
-  it('Brief欠落時はAPIを呼ばずL0へ戻り、dispatchの更新手順を表示する', () => {
-    const runAssist = vi.fn();
-    const pack = buildContextPackWithL1(resolveContextL1Mode(parseArgs(['23'])), {
-      getHeadSha: () => 'a'.repeat(40),
-      getAuthLogin: () => 'tomoya',
-      runAssist,
-      buildPack: (() => ({
-        number: 23,
-        snapshotId: 'b'.repeat(64),
-        header: { title: 'title', url: 'https://github.com/Dayopt/dayopt/issues/23' },
-        assistSource: {
-          title: 'title',
-          body: 'body',
-          url: 'https://github.com/Dayopt/dayopt/issues/23',
-          comments: [],
-          related: [],
-          decisions: [],
-          updatedAt: null,
-        },
-        trustedBriefComments: [],
-        comments: [],
-        related: {},
-        files: [],
-        decisionLines: [],
-        skills: [],
-        judgmentRecords: {},
-      })) as unknown as typeof buildContextPack,
-    }) as ReturnType<typeof buildContextPack> & {
-      l1ShadowPreview: { status: string; reason: string; candidates: unknown[] };
-    };
-    expect(runAssist).not.toHaveBeenCalled();
-    expect(pack.l1ShadowPreview).toMatchObject({
-      status: 'unavailable',
-      reason: 'trusted_brief_missing_or_stale',
-      candidates: [],
-    });
-    expect(renderMarkdown(pack)).toContain('dispatch担当');
   });
   it('issue: issues API → comments → search prs → pr view(headRefName,files) の順で argv を渡す', () => {
     const calls: string[][] = [];
@@ -1866,19 +1322,6 @@ describe('renderMarkdown', () => {
       judgmentRecords: { dod: true, breakdown: false, brief: true },
       nextStep: 'pnpm branch:finish 2549',
       nextStepSecondary: '判断の記録が欠けている: 分解表（routing skill 手順 1 / dispatch 手順 7）',
-      l1ShadowPreview: {
-        status: 'partial',
-        evaluatedCount: 1,
-        selectedCount: 2,
-        omittedCount: 0,
-        candidates: [
-          {
-            id: 'comment-99',
-            url: 'https://github.com/Dayopt/dayopt/issues/2549#issuecomment-99',
-            categoryLabel: '制約',
-          },
-        ],
-      },
     };
 
     const markdown = renderMarkdown(pack);
@@ -1897,13 +1340,6 @@ describe('renderMarkdown', () => {
     expect(markdown).toContain('#### 決定ログ');
     expect(markdown).toContain('#### 関連 skill 候補');
     expect(markdown).toContain('#### 判断の記録');
-    expect(markdown).toContain('#### L1 Jev 候補（shadow助言）');
-    expect(markdown).toContain('Codexの作業入力へ渡す助言情報（shadow）');
-    expect(markdown).toContain('部分評価 1/2 件');
-    expect(markdown).toContain(
-      '[comment-99](https://github.com/Dayopt/dayopt/issues/2549#issuecomment-99)',
-    );
-    expect(markdown).toContain('Issueの要求・必須条件・policy・検証条件を変更せず');
     expect(markdown).toContain('DoD: あり | 分解表: なし | brief: あり');
     expect(markdown).toContain('次の一手: pnpm branch:finish 2549');
     expect(markdown).toContain(
@@ -2005,7 +1441,6 @@ describe('renderMarkdown', () => {
         linkedIssues: null,
       },
       missingSources: ['comments_unavailable'],
-      l1Annotations: { status: 'unevaluated', reason: 'timeout', rows: [] },
       files: null,
       protectedRequired: null,
       decisionLines: [],
@@ -2035,7 +1470,6 @@ describe('renderMarkdown', () => {
       `head SHA ${'d'.repeat(40)} | base SHA ${'e'.repeat(40)} | CI SUCCESS 0 / FAILURE 1 / PENDING 0`,
     );
     expect(markdown).toContain('comments_unavailable');
-    expect(markdown).toContain('L1: 未評価（timeout）');
     expect(markdown.split('\n').length).toBeLessThanOrEqual(150);
   });
 
@@ -2595,56 +2029,6 @@ describe('postContextBrief', () => {
       expect.stringContaining(CTX_MARKER),
       'utf8',
     );
-  });
-
-  it('L1を含むBriefへissue・snapshot・公開HEAD付きの再利用データを保存する', () => {
-    const l1Pack = {
-      ...pack,
-      l1ShadowPreview: {
-        status: 'complete',
-        reason: null,
-        evaluatedCount: 0,
-        selectedCount: 0,
-        omittedCount: 0,
-        candidates: [],
-        snapshotId: pack.snapshotId,
-        target: {
-          number: pack.number,
-          sha: 'c'.repeat(40),
-          url: pack.header.url,
-        },
-      },
-    };
-    const execFileImpl = vi.fn((_cmd: string, args: string[]) => {
-      if (args[0] === 'api' && args[1] === 'user') return 'tomoya\n';
-      if (args[0] === 'api') return JSON.stringify([]);
-      if (args[0] === 'issue' && args[1] === 'comment') return 'created\n';
-      throw new Error(`unexpected args: ${args.join(' ')}`);
-    });
-    const writeFileImpl = vi.fn();
-
-    postContextBrief(l1Pack, markdown, {
-      execFileImpl,
-      getCurrentSnapshotId: () => pack.snapshotId,
-      writeFileImpl,
-      mkdtempImpl: () => '/tmp/ctx-brief-l1',
-    });
-
-    const body = writeFileImpl.mock.calls[0]?.[1];
-    expect(body).toContain('<!-- ctx-l1-v1:');
-    expect(
-      findReusableBriefL1Preview(
-        [{ body, author_association: 'OWNER', user: { login: 'tomoya' } }],
-        {
-          number: pack.number,
-          snapshotId: pack.snapshotId,
-          sha: 'c'.repeat(40),
-          url: pack.header.url,
-          candidates: [],
-          authLogin: 'tomoya',
-        },
-      ),
-    ).toMatchObject({ status: 'complete', source: 'trusted_brief', candidates: [] });
   });
 
   it('既存の ctx brief コメントが有れば PATCH で更新する', () => {

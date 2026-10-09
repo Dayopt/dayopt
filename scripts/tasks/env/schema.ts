@@ -361,24 +361,16 @@ export const operationalItems: OperationalItem[] = [
   // supabase MCP（--read-only）と supabase-mgmt-safe-get.mjs が inline op:// で使う。
   // write を含む human/supabase-cli を agent が解決しないための分離（2026-09-14 監査 P2-7）。
   // field は日本語ロケールでも id が credential。docs/operations/secrets.md §Agent の Supabase 読み取り token。
-  { vault: agent, item: 'supabase-agent', required: true },
+  // credential は op:// の解決先、expires は 90 日期限の検出（check-1password の必須 field）。
+  {
+    vault: agent,
+    item: 'supabase-agent',
+    required: true,
+    requiredFields: ['credential', 'expires'],
+  },
   // Agent の Sentry 読み取り token（org の read scope だけ。2026-09-14 に access を実測、#2696）。
   // sentry CLI が inline op:// で使う。mcp-usage skill §Sentry。
   { vault: agent, item: 'sentry-cli-readonly', required: true },
-  // Vercel AI Gateway の評価用 key（#2827 Phase 0）。Jev を無料枠で呼ぶためだけに使い、
-  // `AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke`
-  // の形で注入する（`.op-env.agent` には置かない。pnpm dev の起動条件を増やさないため）。
-  // agent vault の基準「漏れても rotate すれば 1 日で戻せるもの」は、key 側の budget
-  // （$4 / monthly）と expiration（90 日）で満たす。key は Vercel dashboard 発行で、
-  // 作成まで 1password:check はこの item を MISSING_ITEM として落とす（fail-closed）。
-  {
-    vault: agent,
-    item: 'vercel-ai-gateway',
-    required: true,
-    // credential が欠けると smoke の op:// 解決が実行時まで失敗せず、expires が無いと
-    // コメント上の 90 日制約を満たさない key が通ってしまう。両方をここで落とす。
-    requiredFields: ['credential', 'expires'],
-  },
 ];
 
 // CI（GitHub Actions）が消費する automation credential の master（vault ci）。replica は
@@ -426,22 +418,6 @@ function rcloneEntries(side: 'SOURCE' | 'DEST', item: string): EnvSchemaEntry[] 
 }
 
 export const ciSecretSchema: EnvSchemaEntry[] = [
-  // #3009: planned activation only. No master or replica is provisioned by code.
-  ...[
-    ['SUPABASE_MIGRATION_READINESS_TOKEN', 'supabase-migration-readiness'],
-    ['RELEASE_CANDIDATE_TOKEN', 'github-release-candidate'],
-  ].map(([envName, item]) => ({
-    ...pendingEnvEntry(
-      envName,
-      'secret',
-      'production',
-      ci,
-      item,
-      '#3009 release activation is not approved; master and replica remain unprovisioned',
-      'credential',
-    ),
-    githubEnvironments: ['production-release'],
-  })),
   // item 名は 2026-09-14 に vercel から vercel-production へ変更（用途を名前で分かるように）。
   // token は team 全権で、promote / rollback（promote.yml）と読み取り監査で共用する。
   // Production master は既存team token。project tokenも同じProduct内のProduction/Previewを分離しない。

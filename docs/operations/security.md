@@ -192,7 +192,7 @@ OWASP準拠のセキュリティ監視の全体像と、定期検査の cadence 
 
 定期検査の正本は `/gardening` §5（月次セキュリティ sweep）とする。実施内容:
 
-1. Supabase security advisors の確認（`mcp__supabase__get_advisors`、read-only）
+1. Supabase security advisors の確認（Dashboard の Security Advisor、または Management API の advisors 読み取り。経路は `mcp-usage` skill）
 2. `pnpm security:check`（= `pnpm audit --audit-level=moderate`。後述のローカルパッチ済み advisory は `auditConfig` で除く）
 3. 深掘りが要る月だけ 1 境界を読む（手順は `security` skill §オンデマンド sweep の手順。
    `/claude-security` は任意の加速器で、Claude 以外の runtime では使わない。実装前の既往照合は

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-10-09
 code: scripts/tasks/env/schema.ts
 ---
 
@@ -30,17 +30,14 @@ Preview E2E のログイン用アカウント資格情報は branch API credenti
 
 ## AI エージェントの env ファイル境界
 
-この境界は provider を問わず、Dayopt の workspace を読む・書く全 coding agent に適用する。OpenAI / Codex を primary harness とし、Claude Code など他 provider も同じ規約を読む。規約の正本は本節、共有判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置く。
+この境界は provider を問わず、Dayopt の workspace を読む・書く全 coding agent に適用する。開発 harness は Claude Code（2026-10-09 に Codex から切替）。他 provider を使う場合も同じ規約を読む。規約の正本は本節、共有判定ロジックは `scripts/hooks/pre-tool-guard-rules.mjs` に置く。
 
 provider ごとの入口は薄い adapter として分ける。
 
 - Claude Code は `.claude/settings.json` から `scripts/hooks/pre-tool-guard.mjs` を呼ぶ
-- Codex 用の入口は `scripts/hooks/codex-pre-tool-guard.mjs`。Codex の tool-call payload を共有 rules の入力へ変換する
 - 他 runtime は共有 rules を呼ぶ adapter が登録されている場合だけ同じ機械判定を受ける。adapter が無ければ本節と `AGENTS.md` の規律だけが適用される
 
-**script が repo に存在するだけでは強制力にならない。** runtime が該当 adapter を tool 実行前に登録・起動し、block 結果を尊重する場合にだけ、その runtime 内の対象 tool call を止める。repo は user-global Codex 設定や未知の provider の hook 登録を保証しない。直接 shell、User 自身の UI 操作、adapter が受け取らない tool surface、意図的な文字列組み立てまで閉じる security boundary とは表現しない。hook は事故を減らす speed bump で、production mutation の最終境界は `AGENTS.md` の EXPLICIT AUTHORITY とサービス側の認証・承認である。
-
-Codex では project 初回利用時に trust を確認し、`/hooks` で `.codex/hooks.json` の command と有効状態を User がレビューする。`pnpm agent:preflight --json` の `codexHooks: "configured; runtime activation unverified"` は設定ファイルの存在だけを表し、runtime trust や hook の発火を証明しない。この移行は user-global Codex 設定を変更しない。
+**script が repo に存在するだけでは強制力にならない。** runtime が該当 adapter を tool 実行前に登録・起動し、block 結果を尊重する場合にだけ、その runtime 内の対象 tool call を止める。repo は user-global の Claude Code 設定や未知の provider の hook 登録を保証しない。直接 shell、User 自身の UI 操作、adapter が受け取らない tool surface、意図的な文字列組み立てまで閉じる security boundary とは表現しない。hook は事故を減らす speed bump で、production mutation の最終境界は `AGENTS.md` の EXPLICIT AUTHORITY とサービス側の認証・承認である。
 
 **触ってよい（読み書き可）**:
 
@@ -241,18 +238,17 @@ vault は 2026-08-14 の信頼境界軸再編（[#2086](https://github.com/Dayop
 
 固定 Integration は Production branch の複製ではなく、Supabase の非本番 `integration` branch と既存 Product Vercel projectのbranch-scoped Preview設定を使う。IntegrationのSupabase接続値や専用外部service credentialsを1Password `agent` vaultへ複製しない。Productionの鍵をPreviewへ流用しない。local dev のSupabase接続は `scripts/tasks/dev-with-op.sh` が `supabase status -o env` から注入し、1Passwordを経由しない。この境界は `scripts/__tests__/staging-supabase-boundary.test.ts` が固定する。
 
-| Item                  | Fields                                                                                                                                                                                                                                                                                                                                               | 用途                                                                                                                                                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | local dev 用 optional secret（cron / send-email hook の検証）                                                                                                                                                   |
-| `upstash`             | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                                                                                 | Redis rate limit / cache                                                                                                                                                                                        |
-| `stripe-test`         | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                                                                              | Stripe test mode                                                                                                                                                                                                |
-| `app`                 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_OAUTH_PREVIEW_BRANCH`, `MCP_OAUTH_PREVIEW_UPSTASH_HOST`, `MCP_WRITE_ENABLED_CLIENTS` | App URL / recovery code HMAC pepper / MCP OAuth beta                                                                                                                                                            |
-| `google-calendar`     | `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_PROJECT_NUMBER`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `CALENDAR_TOKEN_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_REDIRECT_URIS`                                                                                                                                                                                     | 外部カレンダー取り込みの OAuth client（local dev 用）                                                                                                                                                           |
-| `turnstile`           | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                                                                                                                                                                                                                                                             | Cloudflare Turnstile（旧 Shared）                                                                                                                                                                               |
-| `github-agent`        | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity）                                                                             |
-| `supabase-agent`      | `credential`（Supabase scoped access token、read 権限だけ、90 日期限）, `expires`                                                                                                                                                                                                                                                                    | Agent の production Supabase 読み取り（supabase MCP `--read-only`、`supabase-mgmt-safe-get.mjs`）。下記 §Agent の Supabase 読み取り token                                                                       |
-| `sentry-cli-readonly` | `credential`（Sentry user auth token、read scope だけ）                                                                                                                                                                                                                                                                                              | Agent の Sentry 読み取り（`sentry` CLI を inline `op://` で起動）。org `dayopt` での access は `alerts:read` / `member:read` / `project:read` / `team:read` / `org:read` / `event:read` だけ（2026-09-14 実測） |
-| `vercel-ai-gateway`   | `credential`（AI Gateway API key、budget $4 / 月、90 日期限）, `expires`                                                                                                                                                                                                                                                                             | 評価モデル Jev の呼び出し（`pnpm jev:*` を inline `op://` で起動）。下記 §評価モデル Jev の Gateway key                                                                                                         |
+| Item                  | Fields                                                                                                                                                                                                                                                                                                                                               | 用途                                                                                                                                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase`            | `CRON_SECRET`, `SEND_EMAIL_HOOK_SECRET`, `SENTRY_DSN`（Edge Function send-auth-email 用、任意）                                                                                                                                                                                                                                                      | local dev 用 optional secret（cron / send-email hook の検証）                                                                                                                                                                             |
+| `upstash`             | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                                                                                                                                                                                                                                                 | Redis rate limit / cache                                                                                                                                                                                                                  |
+| `stripe-test`         | `STRIPE_SECRET_KEY`, `STRIPE_ACCOUNT_ID`, `STRIPE_LIVEMODE`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID`                                                                                                                                                                                                                              | Stripe test mode                                                                                                                                                                                                                          |
+| `app`                 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `RECOVERY_CODE_PEPPER`, `OAUTH_CLAUDE_REDIRECT_URIS`, `OAUTH_CHATGPT_REDIRECT_URIS`, `OAUTH_CURSOR_REDIRECT_URIS`, `MCP_OAUTH_ENVIRONMENT`, `OAUTH_AUTHORIZATION_SERVER_URI`, `MCP_CANONICAL_RESOURCE_URI`, `MCP_OAUTH_PREVIEW_BRANCH`, `MCP_OAUTH_PREVIEW_UPSTASH_HOST`, `MCP_WRITE_ENABLED_CLIENTS` | App URL / recovery code HMAC pepper / MCP OAuth beta                                                                                                                                                                                      |
+| `google-calendar`     | `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_PROJECT_NUMBER`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `CALENDAR_TOKEN_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_REDIRECT_URIS`                                                                                                                                                                                     | 外部カレンダー取り込みの OAuth client（local dev 用）                                                                                                                                                                                     |
+| `turnstile`           | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                                                                                                                                                                                                                                                                             | Cloudflare Turnstile（旧 Shared）                                                                                                                                                                                                         |
+| `github-agent`        | `credential`（fine-grained PAT、Dayopt/dayopt 限定）, `expires`                                                                                                                                                                                                                                                                                      | Agent セッションの `gh` / git push 用 identity。op run では消費せず `GH_CONFIG_DIR` の replica で使う（下記 §Agent の gh identity）                                                                                                       |
+| `supabase-agent`      | `credential`（Supabase scoped access token、read 権限だけ、90 日期限）, `expires`                                                                                                                                                                                                                                                                    | Agent の production Supabase 読み取り（`supabase-mgmt-safe-get.mjs` と read-only SELECT。経路は `mcp-usage` skill）。下記 §Agent の Supabase 読み取り token                                                                               |
+| `sentry-cli-readonly` | `credential`（Sentry user auth token、read scope だけ）                                                                                                                                                                                                                                                                                              | Agent の Sentry 読み取り（`sentry` CLI を inline `op://` で起動。経路は `mcp-usage` skill）。org `dayopt` での access は `alerts:read` / `member:read` / `project:read` / `team:read` / `org:read` / `event:read` だけ（2026-09-14 実測） |
 
 **`agent/app` の `RECOVERY_CODE_PEPPER` は production と別値**（2026-09-14、User が値を表示しない比較で `different` を確認）。local dev の recovery code が production で通ることはない。
 
@@ -334,8 +330,6 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 | `Cloudflare-R2-storagebackup`     | `RCLONE_CONFIG_DEST_*`（6 field）, `Token value`                                                              | nightly の Storage backup の書き込み先（Cloudflare R2、Bucket Locks 35 日）。R2 の token は「Object Read & Write」を backup 先 bucket だけに限定して発行する。`Token value` は同じ token の Cloudflare API 用の表現で rclone には使わないが、S3 用の key はこの token から派生するため **token を revoke すると backup も止まる** |
 | `sentry-release-token`            | `SENTRY_AUTH_TOKEN`                                                                                           | Vercel Production build の source map upload（#2085 で分離）。GitHub Actions からは使わない                                                                                                                                                                                                                                       |
 
-#3009 の候補運用用 master はまだ未作成・未承認。`supabase-migration-readiness/credential` は Production の migration 状態を読む `database_read` 専用 token、`github-release-candidate/credential` は Dayopt/dayopt だけの PR 作成・ready 化・通常 merge と通常 Actions イベント起動を行う期限付き token の予定参照。`ciSecretSchema` と同期 script に pending として宣言する。発行・vault 保存・environment 同期・権限設定は独立承認後に行う。Production リリース用 Vercel token を候補テスト worker に渡さない。
-
 **Supabase Management API の scoped access token（`sbp_` prefix）は Account Settings → Access Tokens（https://supabase.com/dashboard/account/tokens）で発行する。** Project の Settings → API Keys ページ（`sb_sec...` prefix、Data API 用の secret key）とは別物で Management API には使えない。2026-08-25、`supabase-storage-rls-audit` token の発行でこの取り違えにより 401 が発生した（[#2345](https://github.com/Dayopt/dayopt/issues/2345) コメント参照）。
 
 `VERCEL_TOKEN`はautomation専用とし、local CLIのloginや`--token`引数には使わない。Production Config AuditとProduction Releaseが環境変数からprocess内で読み、Authorization headerにだけ設定する。Production Releaseはenv metadataの読取に加えて、Production deploymentのpromoteとrollbackを行う。localの確認方法とrotation順序は[Environment Secrets](./security/environment-secrets.md)を正とする。agent からは読まない（agent の `replica:check` は agent 用の別発行 token を使う。発行までは User 実行）。
@@ -344,7 +338,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 ## Agent の gh identity（fine-grained PAT）
 
-策定日: 2026-09-14（Secret / Credential 監査 P1-1、User 裁可）。Agent セッション（Claude Code / Codex）の `gh` と git push（credential helper は `gh auth git-credential`）は、User 本人の OAuth token（`admin:org` / `delete_repo` / `repo` / `workflow`）ではなく **Dayopt/dayopt repo だけに効く fine-grained PAT** で動かす。hook の regex で `gh api` の書き込みを数え上げるのではなく、token の scope に無い操作（ruleset 変更・Secret 上書き・repo 削除・workflow 編集）を構造的に不可能にするのが目的。User の terminal の `gh`（keyring）は変更しない。
+策定日: 2026-09-14（Secret / Credential 監査 P1-1、User 裁可）。Agent セッション（Claude Code）の `gh` と git push（credential helper は `gh auth git-credential`）は、User 本人の OAuth token（`admin:org` / `delete_repo` / `repo` / `workflow`）ではなく **Dayopt/dayopt repo だけに効く fine-grained PAT** で動かす。hook の regex で `gh api` の書き込みを数え上げるのではなく、token の scope に無い操作（ruleset 変更・Secret 上書き・repo 削除・workflow 編集）を構造的に不可能にするのが目的。User の terminal の `gh`（keyring）は変更しない。
 
 **identity の分け方**: `GH_CONFIG_DIR` で config dir を分ける。User は既定（`~/.config/gh`、keyring）、Agent は `~/.config/gh-agent`（plaintext `hosts.yml`、0600）。keyring は host / user 単位で 1 token しか持てず、同じ account の 2 token が衝突するため、Agent 側だけ `--insecure-storage` を使う。この file は replica で、master は `agent/github-agent`（上記 Replica 台帳）。
 
@@ -358,7 +352,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 2. 1Password GUI: vault `agent` に API Credential item `github-agent`、field `credential` に値、`expires` に期限、タグ `dayopt/github`
 3. `mkdir -p ~/.config/gh-agent && chmod 700 ~/.config/gh-agent`
 4. `op read "op://agent/github-agent/credential" | GH_CONFIG_DIR=~/.config/gh-agent gh auth login --hostname github.com --git-protocol https --with-token --insecure-storage`（pipe で渡すので値は表示されない。agent の Bash tool では `op read` が block されるため User の terminal で行う）
-5. Agent セッションへ `GH_CONFIG_DIR=<絶対パス>/.config/gh-agent` を渡す。Claude Code は `.claude/settings.local.json`（gitignored）の `env`、Codex は `~/.codex/config.toml` の `[shell_environment_policy.set]`。tracked の `.claude/settings.json` には機種依存の絶対パスを書かない
+5. Agent セッションへ `GH_CONFIG_DIR=<絶対パス>/.config/gh-agent` を渡す。Claude Code は `.claude/settings.local.json`（gitignored）の `env`。tracked の `.claude/settings.json` には機種依存の絶対パスを書かない
 
 **検証**: Agent セッションで `gh auth status` に `admin:org` / `delete_repo` が出ないこと、`gh api repos/Dayopt/dayopt/rulesets` が読めること、`gh api orgs/Dayopt/actions/secrets` が 403 / 404 になること（admin 不在の証明。書き込みは試さない）。`pnpm agent:preflight` の `gh identity` 行が classic scope を検出すると警告を出す（speed bump、fail はしない）。`pnpm 1password:check` は `agent/github-agent` の実在を検査する（`operationalItems`）。
 
@@ -382,7 +376,7 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 ## Agent の Supabase 読み取り token
 
-策定日: 2026-09-14（Secret / Credential 監査 P2-7、User 裁可）。Agent が production Supabase を読む経路（supabase MCP `--read-only`、`scripts/agent/supabase-mgmt-safe-get.mjs`）は、これまで `human/supabase-cli` を inline `op://` で解決していた。この token は Auth Config **Write** を含むため、MCP の `--read-only` flag だけが書き込みを止めていた。flag は client 側の設定で、token 自体は書ける。そこで読み取り専用の scoped token を `agent/supabase-agent` に置き、Agent の読み取りはこちらだけを使う。
+策定日: 2026-09-14（Secret / Credential 監査 P2-7、User 裁可）。Agent が production Supabase を読む経路（当時は supabase MCP `--read-only` と `scripts/agent/supabase-mgmt-safe-get.mjs`。現在は CLI / script のみで `mcp-usage` skill が正本）は、これまで `human/supabase-cli` を inline `op://` で解決していた。この token は Auth Config **Write** を含むため、MCP の `--read-only` flag だけが書き込みを止めていた。flag は client 側の設定で、token 自体は書ける。そこで読み取り専用の scoped token を `agent/supabase-agent` に置き、Agent の読み取りはこちらだけを使う。
 
 **発行（User、Supabase Dashboard → Account → Access Tokens。Project の API Keys ページではない）**: 有効期限 90 日、対象 project は production（`yvglwblxrnrenfifsnje`）だけ。権限は **読み取りだけ**を選ぶ: Database / Migrations / Advisors / Logs（Analytics）/ Auth config / Edge Functions の read。**Write 系、Secrets、API keys、Branches は付けない**（API keys と Branches は credential を返す）。値は 1Password GUI で `agent/supabase-agent` の `credential` に入れ、`expires` に期限を書く。
 
@@ -392,106 +386,77 @@ IntegrationのOAuth identity確認はread-only RPCだけを使い、healthやOAu
 
 **rotation**: §短命トークンのローテーション に従う。期限切れは MCP / safe-get の 401 で表面化する。
 
-## 評価モデル Jev の Gateway key
-
-策定日: 2026-09-17（[#2827](https://github.com/Dayopt/dayopt/issues/2827)）。評価モデル Jev は Vercel AI Gateway 経由で呼ぶ。key は `agent/vercel-ai-gateway` の `credential` に置き、**inline `op://` でそのプロセスだけへ注入する**。
-
-```bash
-AI_GATEWAY_API_KEY="op://agent/vercel-ai-gateway/credential" op run -- pnpm jev:smoke
-```
-
-**`.op-env.agent` には入れない。** 入れると `pnpm dev` が Jev の key に依存し、評価を回さない日でも 1Password の承認が要るようになる。Jev を呼ぶコマンドだけが承認を求める形を保つ。
-
-**agent vault に置いてよい理由**: key 側に budget（$4 / 月）と有効期限（90 日）が設定してあり、漏れても損害が上限で止まる。Gateway の credits は購入せず、無料枠（$5）の内側だけで使う（[#2827](https://github.com/Dayopt/dayopt/issues/2827) の制約）。
-
-**rotation**: §短命トークンのローテーション に従う。期限切れは `pnpm jev:*` の `auth_failed` で表面化する。運用手順と停止方法は [jev.md](./jev.md)。
-
 ## Service Account
 
-2026-09-30、User は Service Account 作成済みと報告し、ルールだけの vault 制限を権限と実行環境の分離へ移す方針を承認した。実行先は**専用クラウド環境**を基本とする。同日の追加指示で、ローカルは**専用の標準 Mac ユーザー**を用意し、人間用ホームへのアクセスを閉じる分離を先に進める方針も承認した（[ローカル手順](./local-agent-isolation.md)）。2026-08-17 の「無人実行のみ・対話的 desktop 統合は変更しない」という適用範囲を更新し、対話・無人とも同じ境界に揃える。同日、User は Codex Cloud の `dayopt` 環境への token / ID 登録と公開を報告した。公開後の task での照合、SA の read-only 等の管理権限、専用 Mac ユーザーの作成と旧 Mac 起動経路の停止は未確認であり、現行 Mac セッションの隔離完了を意味しない。
+agent の 1Password は **`agent` vault を read-only で読む Service Account（SA）だけ**を使う（2026-09-30 決定、維持）。入口は環境変数 `OP_SERVICE_ACCOUNT_TOKEN` 1 個で、ローカルも Claude Code cloud も同じ（2026-10-09、[#3050](https://github.com/Dayopt/dayopt/issues/3050) / [#3052](https://github.com/Dayopt/dayopt/issues/3052)）。`op` CLI はこの変数があれば SA で認証するため、repo にも開発機にも wrapper を置かない（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)）。
 
-### 権限と実行環境
+### 権限
 
 - SA は `agent` vault の **`read_items` のみ**。`write_items` / `share_items` / vault 作成 / 1Password Environments へのアクセスは付けない。権限と vault の変更には SA の作り直しが必要（[公式仕様](https://www.1password.dev/service-accounts/get-started)）。vault の read-only は 1Password 内の権限であり、保存した API credential の外部サービス上の権限とは別。
-- agent は人間用 Mac から分離したクラウド環境で動かす。人間用の 1Password app / browser profile / CLI session / Keychain / home directory を配置・mount・同期しない。Mac のファイルやアプリを操作できる tool / MCP 接続も持ち込まない。
-- ローカルでは専用の標準 Mac ユーザーで同じ境界を作る。人間用ホームへの到達を OS のアクセス権で閉じ、人間用認証や設定をコピーしない。専用ユーザーへ admin / sudo 権限を付けない。SA token の環境変数設定だけでは分離したことにならない。
-- VM を採る場合は admin と実行 user を分け、agent に sudo、host socket、他環境の secret を読める cloud role を与えない。SSH agent forwarding は使わない。これらは provider 側の設定と live 証跡で確認する。repo の wrapper は OS や cloud role の権限境界ではない。
-- 人間用環境は `human` / `ci` の管理を持つ。切替のために、別作業中の Mac の認証設定・worktree を変更しない。旧セッションを停止し、必要な作業を専用環境へ移してから切替完了とする。
+- 境界は token の到達範囲で作る。agent に渡すのは `agent` vault に入れてよい値（read-only か非本番 scope）だけで、本番の書き込み権限は token が無いので行使できない。同じ OS ユーザーで動く以上、Mac の人間用アプリ・ブラウザー・ファイルへの到達は閉じない。それを前提に、`agent` vault には「漏れても困らない」値だけを置く（§Vault / Item / Field Schema の `agent`）。
+- token を持つ process とその子 process は token を読める。第三者 PR の test / build や依存の install script を未信頼コードとして走らせる場合は、token の無い別環境で実行する。
 
-### 起動契約
+### ローカル: Claude Code の環境に置く
 
-実装は [`scripts/tasks/agent-service-account.mjs`](../../scripts/tasks/agent-service-account.mjs)。CLI が確認する metadata と platform 側で確認する隔離を区別する。
+**置き場は repo の `.claude/settings.local.json` の `env`**（gitignore 済み。`GH_CONFIG_DIR` と同じ file）。Claude Code の CLI と desktop の Code tab が同じ設定を読み、Bash tool の全コマンドへ渡る。desktop app は worktree 作成時にこの file を新しい worktree へ複製するので、どの session でも同じ token が届く。
 
-| 入力                              | 扱い                                                                                                                                     |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `OP_SERVICE_ACCOUNT_TOKEN`        | クラウドの秘密ストア、または専用 Mac ユーザーの Terminal の非表示入力から実行 process へ注入。値を repo / shell 設定 / chat に保存しない |
-| `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` | 管理画面で確認した SA の user ID。秘密ではない。起動する identity を pin する                                                            |
-| `DAYOPT_AGENT_VAULT_ID`           | 管理画面で確認した `agent` vault の ID。秘密ではない。同名の別 vault を許可しない                                                        |
-
-起動前に token と ID の存在を検査する。`OP_CONNECT_*`（SA より認証の優先順位が高い）、`OP_SESSION*`、`OP_ACCOUNT` を継承せず、private な一時 `OP_CONFIG_DIR`、`OP_BIOMETRIC_UNLOCK_ENABLED=false`、cache / debug 無効を設定する（[CLI 認証](https://www.1password.dev/service-accounts/use-with-1password-cli)、[環境変数](https://www.1password.dev/cli/environment-variables)）。
-
-`op user get --me` が確認済みの active SA と一致し、絞り込みなしの `op vault list` が確認済み ID・名前 `agent` の 1 件だけなら、渡された command を shell を介さず起動する。token 未設定・認証失敗・identity / vault 不一致では command を起動しない。検査の raw stdout / stderr は出さず、固定 error code だけを返す。一時 CLI 設定は終了時に削除する。
-
-`agent:run` は **SA を利用する、信頼済み agent の起動入口**であり、未信頼コードの sandbox ではない。起動した process とその子 process は SA token を読める。第三者 PR の test / build、依存の install script 等を未信頼コードとして実行する場合は、token・Keychain・親 process の認証情報・host socket に到達できない別 worker で実行する。同じ OS user の子 process から環境変数を外すだけでは親 process 等への到達を閉じた証明にならない。SA の vault 制限は token の持ち出しや、vault 内の API credential の外部権限を制限しない。今回のクラウド検証は未信頼コード worker の隔離を含まない。
-
-```bash
-# 専用クラウド側で秘密ストアから token を注入した後に実行する
-pnpm agent:secrets:check --json
-pnpm agent:run -- codex
-pnpm agent:run -- claude
+```json
+{
+  "env": {
+    "GH_CONFIG_DIR": "<絶対パス>/.config/gh-agent",
+    "OP_SERVICE_ACCOUNT_TOKEN": "<1Password の human に控えた SA token>"
+  }
+}
 ```
 
-検査成功は **SA identity と読める vault の範囲**の証跡に限る。write / share / vault 作成 / Environments 権限は管理画面で別途確認する。`agent:preflight` は token / ID の設定有無だけを表示し、scope と実行環境の隔離を未検証と表示する。wrapper を通常の Mac で実行しても、人間用認証・UI への別経路を閉じたことにはならない。
+この置き場を選んだ理由と、採らなかった候補（2026-10-09、User 判断）:
 
-### Bootstrap と移行
+| 候補                                   | 判断   | 理由                                                                                                                                                             |
+| -------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/settings.local.json` の `env` | 採用   | agent 用 secret の置き場を `GH_CONFIG_DIR` と 1 file に統一できる。gitignore 済みで commit されない。worktree ごとに複製されるが、読める人は同じ Mac の同じ user |
+| `~/.claude/settings.json` の `env`     | 不採用 | repo の外で複製は無いが、置き場が 2 つに分かれて迷う。repo 内の `.claude/settings.json`（tracked、public）と名前が同じで取り違えやすい                           |
+| repo の `.claude/settings.json`        | 禁止   | tracked で public repo に載る。commit した時点で token が公開される                                                                                              |
+| shell の login 環境（`.zprofile` 等）  | 不採用 | 人間の terminal の `op` まで SA に切り替わる。shell rc に平文を置かない規則（#3052）にも反する                                                                   |
+| `launchctl setenv`                     | 不採用 | 再起動で消え、全 GUI app と人間の terminal に届く                                                                                                                |
+| Claude desktop の環境変数設定          | 不採用 | Code tab の設定に該当項目が無い（2026-10-09 実測）                                                                                                               |
 
-#### ローカル Codex の通常の `op` 呼び出し
+平文で保存される点は `~/.config/gh-agent/hosts.yml` と同じ扱いで、file を `0600` にし、§Replica 台帳に載せる。token の控え（master）は 1Password の `human` に置く。`agent` vault に置くと、最初の 1 個を取り出す token が無い循環になるため置かない。agent が自分の token を 1Password から取得する循環も作らない。
 
-2026-10-01、User の「人間はアプリ、エージェントは SA」という指定に従い、人間用 CLI で bootstrap 項目を取得する処理を廃止した。指定済み SA token を macOS login Keychain の専用項目へ暗号化して保存し、[`scripts/tasks/agent-op.mjs`](../../scripts/tasks/agent-op.mjs) は注入済み token、またはその Keychain 項目だけを使う。
+設定は User が行う（token の値を agent・chat・コマンド引数に通さない）:
 
-- 1Password アプリの CLI / SDK 連携をオフにし、MCP 統合もオフのまま、既存 MCP 認証をクリアした。元の CLI の account 一覧は 0 件で、人間用 session は存在しないことを確認した。
-- `~/.local/bin/op` は `CODEX_THREAD_ID` / `CODEX_SESSION_ID` がある process に SA 用 entry point を適用する。それ以外は元の CLI を呼ぶ。
-- `~/.config/dayopt-agent-op/config.json` には元の CLI の絶対 path、検証対象の SA / vault ID だけを保存する。人間用 account / vault / item の参照は除去した。
-- token は平文ファイル・コマンド引数・ログに保存しない。Keychain の service は `dayopt-agent-service-account`、account は指定 SA ID。読み出しには `/usr/bin/security` を使い、その stdout は process 内だけで受け取る。
-- 継承した `OP_*` は除去し、一時設定・生体認証無効の SA 環境で identity と絞り込みなしの vault 一覧を照合してから、要求 command を実行する。
-- token 取得 / SA 検証に失敗した場合は停止する。人間用認証へ fallback しない。`--account` / `--session` / `--config` / `--debug` と `signin` / `signout` は入口で拒否する。
-- **これは CLI / SDK の認証経路の整理であり、OS / UI の隔離ではない。** 同じ OS ユーザーの全権限がある process に、設定の再変更や人間用アプリ・ブラウザーの画面操作を禁止する境界はない。
-- 反映確認は Codex の実際の shell で `op vault list` を実行する。元の CLI に SA token を渡さない別 process は認証失敗となることを確認する。別の実行環境・PATH・MCP にも適用されるとは推測しない。
-- 解除は今回作成した `~/.local/bin/op` を削除する。Keychain の SA 項目を削除すると、この入口は token 未注入時に停止する。
+1. 1Password app で SA token の控えを開いてコピーする。
+2. main checkout の `.claude/settings.local.json` を editor で開き、`env` に `OP_SERVICE_ACCOUNT_TOKEN` を追記して保存する。tracked の `.claude/settings.json` ではないことを `git status` で確かめる。
+3. `chmod 600 .claude/settings.local.json` を実行する。
+4. Claude Code の新しい session を開き、下記 §確認 を agent に実行させる。既存の session には届かない。
 
-SA token の控えは **1Password の `human` に保管できる**（[公式の保管手順](https://www.1password.dev/service-accounts/get-started)）。旧記述の「1Password 自身には保管できない」は保存と起動時の取得を混同していたため訂正する。クラウドでは cloud secret store から注入する。ローカルの初回起動では User が専用ユーザーの Terminal に非表示入力し、process 内だけで保持する。agent が自分の token を 1Password から取得する循環を作らない。
+### Claude Code cloud
 
-| 登録先                        | 登録内容                                                                       | 確認状況                                                                                                                                                                                                               |
-| ----------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex Cloud の Personal vault | `OP_SERVICE_ACCOUNT_TOKEN`。専用の `dayopt` 環境が個人の値を要求する           | 2026-10-01 に適用先を dayopt のみに限定して保存。編集環境では画面から開始した turn の注入・SA認証・agent 1件を実測。CLI と起動手順を再公開済み。新しい通常 task でも token 注入・agent 1件・token なしの認証失敗を実測 |
-| Codex Cloud の `dayopt` 環境  | `DAYOPT_AGENT_SERVICE_ACCOUNT_ID` / `DAYOPT_AGENT_VAULT_ID`。ID は秘密ではない | 2026-09-30 に User が登録・公開を報告。2026-10-01 に指定値一致を実測                                                                                                                                                   |
+environment の変数として同じ名前 `OP_SERVICE_ACCOUNT_TOKEN` を置く。変数は session 内の全コマンドから読め、値はマスクされない。cloud での成立確認は [#3051](https://github.com/Dayopt/dayopt/issues/3051) が行う。
 
-token の控えの保管先は未確認。token 値や個人の ID 実値は本ページに保存しない。
+### 確認
 
-1. provider と実行先を確定し、人間用の認証・ファイル・tool 接続を持たない環境を用意する。Node.js は `.nvmrc`、pnpm は `packageManager` に揃え、1Password CLI を公式配布から導入する。
-2. 管理画面で SA の read-only / 1 vault / Environments 無し / vault 作成不可を確認し、SA ID・vault ID を登録する。token は秘密ストアの UI 等から注入し、chat や引数へ貼らない。
-3. 専用環境で `agent:secrets:check` の metadata 結果を確認する。既知の非秘密 canary item を `agent` から取得でき、実在確認済みの `human` / `ci` の canary は権限拒否となることを process 内で確認し、値は表示しない。network error / item 不在を権限拒否の証明にしない。
-4. token 無し・無効で起動が失敗し、人間用認証の prompt / fallback が起きないことを確認する。Mac の home / 1Password / browser / 接続済み tool への到達経路が無いことも確認する。
-5. 1Password を使う対話・無人の agent 起動を `agent:run` に統一し、旧セッションを停止する。撤去対象の credential replica があれば記録してから処置する。障害時は専用環境を停止し、人間用の認証を agent に戻して復旧しない。
+値を出さずに、identity と読める vault の範囲を確かめる。
 
-### Codex Cloud を使う場合の登録
+```bash
+op whoami                          # User Type: SERVICE_ACCOUNT
+op vault list                      # agent の 1 件だけ
+pnpm 1password:check               # agent の item / field の実在。human / ci は MISSING_VAULT になるのが正しい
+pnpm agent:preflight               # **1Password** 行が「OP_SERVICE_ACCOUNT_TOKEN あり」
+```
 
-現行の [Codex Cloud 公式手順](https://learn.chatgpt.com/docs/environments/cloud-environments#supply-personal-values)では、**Personal vault の Environment variable** を task 内の process へ渡せる。アカウントの画面にこの項目があるか確認してから登録する。1Password の vault と Codex の Personal vault は別の保管先である。
+`.op-env.agent` を env-file に渡した `op run` で `op://agent/...` 参照が解決されることも確認する。解決後の環境変数をそのまま出力しない。
 
-1. **Settings → Codex Cloud → Environments** で専用環境を作成・編集する。**Privacy → Who can use** は **Only me** とし、**Environment variables → Manage** で上記 3 key を要求するよう設定する。人間用の 1Password 認証や Mac の tool 接続は追加しない。
-2. **Settings → Codex Cloud → Personal vault → Add** を開く。**Type: Environment variable**、**Key: OP_SERVICE_ACCOUNT_TOKEN** とし、User が **Value** に SA token を直接入力する。**Applies to: Selected environments** で専用環境だけを選び、保存する。同様に 2 つの ID をそれぞれの key で登録する。**All environments** は選ばない。
-3. SA の user ID が不明な場合は、token を注入済みの専用クラウドで `op user get --me` の `ID` を確認する。`Type: SERVICE_ACCOUNT` と `State: ACTIVE` を確認し、`op vault list --format=json` が `agent` 1 件だけであることとその `id` を管理画面の設定と照合して登録する。これらは metadata だけを取得する。item の値や token を表示するコマンドは使わない。
-4. 必要な 1Password 接続先を環境の network policy に許可し、Node.js / pnpm / 1Password CLI と検査 script を配置する。保存・Publish / Republish 後の新しい task で `pnpm agent:secrets:check --json` を実行する。既存 task は独自の状態を保持するため、環境更新だけで移行済みと扱わない。
+### rotation
 
-専用クラウドの CLI は `/workspace/.dayopt-1password/bin/op` に配置する。`/workspace/AGENTS.md` から `/workspace/.dayopt-1password/START.md` と `startup-check.py` を参照し、SA 認証・vault 範囲と token なしの認証失敗を検証する。未注入なら停止する。標準 PATH のディレクトリは書き込み不可のため、各 shell でこのディレクトリを PATH の先頭に加えるか、launcher の絶対パスを使う。launcher は SA token 以外の `OP_*` を除去し、専用の CLI 設定を使う。秘密や人間用 account/session は image に保存しない。
+- **Integration ID も変わる**。`op whoami` の Integration ID は SA 本体ではなく token ごとの ID。ID を設定や docs に固定しない。
+- 新しい token を `human` の控えと `.claude/settings.local.json` の `env`、cloud の environment 変数へ入れ替え、§確認 を実行する。
+- 旧 token は 1Password の管理画面で revoke する。
 
-status API の secret binding / readiness の表示だけでは token 注入の可否を判定しない。実行 process 内で存在を boolean として確認し、SA 認証と絞り込みなしの vault 一覧で検証する。編集環境の成功と、再公開後の新しい通常 task の成功は別に判定する。2026-10-01 に通常 task への CLI と token の継承も確認済み。保存した Start skill の本文・参照先は通常 task の取得経路では得られなかったため、手順を環境 image 内の上記ファイルにも保存した。同日に再公開後の新しい通常 task「1Password利用前の確認」で、場所・コマンドを含めない依頼から `START.md` の読み取り、shell の PATH 設定、`startup-check.py` の実行まで自律的に進み、終了コード 0 を実測した。これは案内の読み取りと使用前確認の成功であり、task 起動時に script が無条件で実行される保証ではない。検査には SA 認証・agent 1件・token なしの認証失敗が含まれるため、status API が `unknown` でも実アクセスの検査成功を未確認へ戻さない。専用設定の `op-daemon.sock` は自身所有・0700 の Unix socket の場合だけ許容し、JSON 内の token・人間用 account/session がないことを検査する。
+### 撤去した経路（2026-10-09）
 
-**Network secret は使わない。** Network secret は proxy が置換する placeholder を process に渡す方式であり、1Password CLI が必要とする実 token を直接読めない。Personal vault の Environment variable は保存後の UI では値が隠れるが、実行する task は実値を読める。アクセス範囲は SA の権限と専用クラウドの分離で制限する。
+2026-10-01〜10-09 は、ローカルの `op` を `~/.local/bin/op`（node の wrapper）で置き換え、Claude Code / Codex の環境変数を見て macOS のログインキーチェーンに保存した SA token を注入していた。repo 側の wrapper 実装、SA 起動検査、それを呼ぶ `pnpm` script 2 本は #3052 で削除した。2026-09-30 の「ローカルは専用の標準 Mac ユーザーで分離する」方針は、環境変数 1 個の SA で到達範囲が同じになるため撤回した（決定の記録は [#3057](https://github.com/Dayopt/dayopt/issues/3057)）。開発機に残る wrapper・設定・キーチェーン項目の削除は User が行う。
 
-Personal vault が無く、Secret が setup phase のみに渡る旧構成では、agent phase の `op run` 用 token を得られない。setup から plaintext file / image / cache へ token を残す回避は採らず、runtime への秘密注入ができる専用実行先を使う。Jev など作業中に渡さない秘密は、既存の setup 限定の扱いを維持する（[tooling](./tooling.md#local--codex-cloud-の実行環境)）。
-
-移行完了には platform 設定、SA 権限確認、live の正負検証、旧起動経路の停止の証跡が必要。fixture test の成功だけで完了と扱わない。
+Codex Cloud の Personal vault と `dayopt` 環境への登録（2026-09-30〜10-01）は、2026-10-09 の Codex 撤去で使わなくなった。同日の SA token rotation（User 報告）で旧 token は無効。Codex Cloud 側の登録の削除は未確認。
 
 ---
 
@@ -583,15 +548,16 @@ master へ値を戻す時は GUI か対象を限定した `op item create` / `op
 
 基本方針 7「値がどこに存在していようと、必ず 1Password にもある」を検査可能にするための列挙。**この表に載っていない場所に長寿命の実値が存在したら、それ自体が違反**（発見したら master へ登録するか撤去し、この表を更新する）。
 
-| 場所                                                                                            | master                                                                                                              | 機械検証                                                                                                                                                           |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vercel Production Env（product / web）                                                          | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
-| Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                                    | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
-| GitHub Actions environment secrets（`production-release` / `production-ops` / `claude-review`） | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
-| GitHub Actions environment secrets（`Nonproduction login`）                                     | Integration用・Preview用の別1Password login items と owner-managed `supabase-preview-provision` item                | `scripts/runbook/setup-nonproduction-login.sh`（専用Environmentへの同期。値はstdin経由）                                                                           |
-| Supabase Dashboard Secrets                                                                      | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
-| PR Preview Branch credentials                                                                   | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
-| `~/.config/gh-agent/hosts.yml`（開発機、0600）                                                  | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
+| 場所                                                                                             | master                                                                                                              | 機械検証                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vercel Production Env（product / web）                                                           | `scripts/tasks/env/schema.ts` の各 entry                                                                            | `production-config-audit.mjs`（台帳 → replica）+ `pnpm replica:check`（replica → 台帳、§Verification）                                                             |
+| Vercel Preview Env（`RECOVERY_CODE_PEPPER`）                                                     | `agent` / `human` の `app`（Preview 維持の経緯は [Environment Secrets](./security/environment-secrets.md) §Vercel） | 無し                                                                                                                                                               |
+| GitHub Actions environment secrets（`production-release` / `production-ops` / `claude-review`）  | `ci` vault（`scripts/tasks/env/schema.ts` の `ciSecretSchema`）                                                     | `scripts/__tests__/ci-secret-ledger.test.ts`（workflow が参照する名前 ⇔ 台帳。値と、どの workflow も参照しない Secret は見ない。一覧 API は admin 権限が要るため） |
+| GitHub Actions environment secrets（`Nonproduction login`）                                      | Integration用・Preview用の別1Password login items と owner-managed `supabase-preview-provision` item                | `scripts/runbook/setup-nonproduction-login.sh`（専用Environmentへの同期。値はstdin経由）                                                                           |
+| Supabase Dashboard Secrets                                                                       | `agent/turnstile` 等（下記 §Supabase Dashboard Secrets）                                                            | 無し                                                                                                                                                               |
+| PR Preview Branch credentials                                                                    | 1Password 非保存（基本方針の既知の例外。ephemeral）                                                                 | —                                                                                                                                                                  |
+| `~/.config/gh-agent/hosts.yml`（開発機、0600）                                                   | `agent/github-agent`                                                                                                | `pnpm agent:preflight` の gh identity 行（classic scope が見えたら警告）                                                                                           |
+| `.claude/settings.local.json` の `env.OP_SERVICE_ACCOUNT_TOKEN`（開発機、0600、worktree へ複製） | `human` の SA token 控え（§Service Account）                                                                        | `pnpm agent:preflight` の 1Password 行（有無だけ）                                                                                                                 |
 
 **未台帳だった bypass secret は解消済み**: `VERCEL_AUTOMATION_BYPASS_PRODUCT` / `VERCEL_AUTOMATION_BYPASS_WEB` は 2026-08-14 の実測で GitHub Secrets と Vercel にだけ存在していたが、2026-09-14 に `ci/vercel-production` へ登録した（field 名を実測、値は未取得）。
 
@@ -654,7 +620,7 @@ GitHub Actions Secrets は CI/CD 用の replica。build / e2e 用 public env な
 
 1Passwordを正本としてGitHub Environmentの暗号化secretsへ必要分だけ同期する。最初にGitHub Settingsで空の `Nonproduction login` Environmentを作り、deployment branch policyを `main` と `integration` のみにする。次にSupabase Dashboard `/account/tokens` でScoped Management PATを発行し、`Development Branches: Read`、`API Keys: Read`、`API Key Secrets: Read` だけを付与する。resource scopeはまず親dayopt projectを指定する。動的Preview branchのAPI keyまで取得できるかは公式資料で確認できていないため、実行時に権限エラーとなった場合だけ必要なbranch scopeへ広げる。Classic full-access tokenは使わない。発行したPATは1Password item `supabase-preview-provision` の `credential` fieldへ保存する。このitemはまだ作成されていない。通常は `ci` vaultを使い、別vaultに保存する場合はownerがそのVault IDを `NONPROD_LOGIN_PROVISION_VAULT_ID` で指定する。値やVault IDを会話・ログへ貼らない。Integration login sourceは1Password item ID `s3tems3afbzvvguakggydcgxni` の `username` / `password` fieldsで、指定Vaultから両fieldが非空であることを確認済み。Preview loginはownerが専用1Password itemを指定済みだが、fieldsの非空確認とGitHub replicaへの同期は未実施。
 
-1Password startup checkが通る環境で、ownerが管理するログインVault IDを `NONPROD_LOGIN_VAULT_ID` に設定して `scripts/runbook/setup-nonproduction-login.sh --execute` を実行する。PAT itemを `ci` 以外へ保存した場合は `NONPROD_LOGIN_PROVISION_VAULT_ID` も設定する。Vault IDはログへ出さない。既定はdry-run。scriptはIntegration用とPreview用のitemを分けて読み、Management PATも含む全5値をGitHubへ書く前に空でないことを確認する。Integration側のVault IDは明示し、Preview側はowner指定itemのlocatorを使う。branch policyに `main` / `integration` 以外があれば停止する。値はprocess memoryとstdinだけを通り、一時ファイル、argv、ログへ保存しない。1Password read失敗時は固定メッセージで停止し、GitHub secretsを書かない。同期は5つのsecret更新なので、GitHub側の途中失敗は手動で再実行する。PAT itemまたはEnvironment設定が不足する場合は同期完了と扱わない。Codex workspace外から実行する場合もstartup checkは必須で、owner端末上の承認済みchecker pathを `OP_STARTUP_CHECK` で指定する。checkerが見つからない／失敗した場合は処理を中断する。
+1Password startup checkが通る環境で、ownerが管理するログインVault IDを `NONPROD_LOGIN_VAULT_ID` に設定して `scripts/runbook/setup-nonproduction-login.sh --execute` を実行する。PAT itemを `ci` 以外へ保存した場合は `NONPROD_LOGIN_PROVISION_VAULT_ID` も設定する。Vault IDはログへ出さない。既定はdry-run。scriptはIntegration用とPreview用のitemを分けて読み、Management PATも含む全5値をGitHubへ書く前に空でないことを確認する。Integration側のVault IDは明示し、Preview側はowner指定itemのlocatorを使う。branch policyに `main` / `integration` 以外があれば停止する。値はprocess memoryとstdinだけを通り、一時ファイル、argv、ログへ保存しない。1Password read失敗時は固定メッセージで停止し、GitHub secretsを書かない。同期は5つのsecret更新なので、GitHub側の途中失敗は手動で再実行する。PAT itemまたはEnvironment設定が不足する場合は同期完了と扱わない。workspace外から実行する場合もstartup checkは必須で、owner端末上の承認済みchecker pathを `OP_STARTUP_CHECK` で指定する。checkerが見つからない／失敗した場合は処理を中断する。
 
 `pull_request_target`はworkflowがdefault branchに入るまで自動実行されない。merge後は新規・更新・ready化したinternal PRで自動準備される。Integrationはtrusted Integration refから手動dispatchできる。候補PRのコードはcredentials付きjobでcheckout/実行しない。workflow導入とEnvironment/secret同期の後、Integrationをdispatchし、PR PreviewでAuth password grantを確認する。いずれもアプリUIの実ログイン、redirect、CRUDを別途確認する。
 
@@ -756,8 +722,8 @@ reCAPTCHA 関連 env は旧方式。新規設定・docs・example には追加�
 - **`op whoami` が未サインインでも `op run` は通る**。desktop 統合は別経路で、承認プロンプトが閉じられていると `authorization timeout` になるだけ。`op whoami` や `supabase projects list` の失敗を根拠に「経路なし」と誤診しない（2026-09-04 #2175、2026-09-18 再確認）。production への SELECT は `op run` で token を env に解決し、既存の read-only helper `scripts/lib/production-db-readonly.mjs`（`runReadOnlyQuery`。`Authorization: Bearer`・JSON content type・`read_only: true` を必ず付け、credential を引数やエラーに出さない）を経由して送る。手書き `curl` を使う時も同じ request 契約（Bearer header + `{"query": ..., "read_only": true}`）を満たす。query は secret を含まない JSON をファイルへ先に書き、1 回の `op run` にまとめて承認を 1 回にする。PII は件数と sha256 だけ出す
 - **credential の発行は最初から User 手作業として計画に書く**。key の値が画面に出る操作へ到達する browser 操作は自動化の分類器に止められる（2026-09-18 #2827）。agent がやってよいのは読み取りでの現況確認（残高・既存 key 件数・プラン）と、秘密でない欄の入力まで
 - **agent の gh は fine-grained PAT（`GH_CONFIG_DIR=~/.config/gh-agent`）**。`.github/workflows/` を含む commit の push は拒否される（`refusing to allow a Personal Access Token to create or update workflow`）。agent は commit まで作り、push は User の terminal で行う。identity を切り替える形の push は自動化側でも止まるので、コマンドを渡すところまでが agent の仕事。`gh` が 403 / `Resource not accessible` を返したら scope 外なので User へ依頼する（2026-09-14 PR #2761）
-- **Sentry の読み取りは `SENTRY_AUTH_TOKEN="op://agent/sentry-cli-readonly/credential" op run -- sentry issue list dayopt/`**（CLI 名は `sentry`。`sentry-cli` は別物の build tool）。build 用 token の正本は `ci/sentry-release-token`。2026-09-07 の「agent から Sentry を読む経路が無い」は item 名の取り違えによる誤診だった
-- **MCP 定義は user-global にだけ置く**（Claude は `~/.claude.json`、Codex は `~/.codex/config.toml` の `[mcp_servers.*]`）。repo に同名定義を足すとキー単位でマージされ `invalid configuration: url is not supported for stdio` で MCP 全体が起動しなくなる（2026-07-23 に 2 回）。詳細は `mcp-usage` skill
+- **Sentry の読み取りは `SENTRY_AUTH_TOKEN="op://agent/sentry-cli-readonly/credential" op run -- sentry issue list dayopt/`**（CLI 名は `sentry`。`sentry-cli` は別物の build tool）。build 用 token の正本は `ci/sentry-release-token`。2026-09-07 の「agent から Sentry を読む経路が無い」は item 名の取り違えによる誤診だった。経路表の正本は `mcp-usage` skill
+- **MCP 定義は user-global にだけ置く**（Claude は `~/.claude.json`）。repo に同名定義を足すとキー単位でマージされ `invalid configuration: url is not supported for stdio` で MCP 全体が起動しなくなる（2026-07-23 に 2 回）。外部サービスは CLI-first で、MCP は context7 と dayopt 自身だけ（`mcp-usage` skill）
 
 ---
 
