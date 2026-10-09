@@ -110,4 +110,4 @@ Dayopt の共通指示。Project 設定を正本とし、個人設定・ホー�
 
 ## Deploy / Release
 
-Staging → 開発者確認 → 明示指示後に Production。両環境を同時に触らない。release 手順は `releasing`、Supabase Edge Functions は `supabase functions deploy --use-api`。
+Preview / Integration で確認 → main merge 後は Production Release workflow が毎晩 03:00 JST に自動 promote。手動 promote・Edge Functions の deploy・その他の本番操作は明示指示後。本番と非本番を同時に触らない。release 手順は `releasing`、Supabase Edge Functions は `supabase functions deploy --use-api`。
