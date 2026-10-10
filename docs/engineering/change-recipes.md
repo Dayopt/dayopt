@@ -49,9 +49,9 @@ last_verified: 2026-10-10
 
 | #   | レシピ                     | 判断 | 散在 | 暗黙 | 規則化候補 | repo 外 | 展開 | 手動 | 人間判断 |
 | --- | -------------------------- | ---- | ---- | ---- | ---------- | ------- | ---- | ---- | -------- |
-| 1   | カテゴリ色を追加           | 6    | 2    | 1    | 1          | 0       | 12   | 8    | 0        |
+| 1   | カテゴリ色を追加           | 6    | 2    | 1    | 1          | 0       | 12   | 7    | 0        |
 | 2   | user_settings の選択肢追加 | 5    | 2    | 2    | 0          | 0       | 9    | 8    | 0        |
-| 3   | locale を追加              | 9    | 3    | 5    | 0          | 0       | 17   | 15   | 0        |
+| 3   | locale を追加              | 9    | 3    | 5    | 0          | 0       | 17   | 14   | 0        |
 | 4   | OAuth client を追加        | 7    | 2    | 1    | 0          | 0       | 13   | 10   | 0        |
 | 5   | MCP tool を追加            | 7    | 3    | 1    | 0          | 0       | 13   | 6    | 0        |
 | 6   | cron job を追加            | 9    | 4    | 1    | 2          | 0       | 13   | 8    | 0        |
@@ -64,9 +64,9 @@ last_verified: 2026-10-10
 | 13  | i18n namespace を追加      | 5    | 1    | 0    | 0          | 0       | 10   | 6    | 0        |
 | 14  | 価格・トライアル日数を変更 | 6    | 3    | 1    | 0          | 1       | 9    | 6    | 1        |
 | 15  | Node のメジャー更新        | 3    | 1    | 0    | 0          | 1       | 7    | 4    | 1        |
-|     | **合計**                   | 90   | 34   | 16   | 5          | 4       | 145  | 103  | 4        |
+|     | **合計**                   | 90   | 34   | 16   | 5          | 4       | 145  | 101  | 4        |
 
-KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 103）。どちらも 0 を目標にする。規則化候補は、規則を [decisions.md](../decisions.md) に記録した時点で集約に移す。
+KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 101）。どちらも 0 を目標にする。規則化候補は、規則を [decisions.md](../decisions.md) に記録した時点で集約に移す。
 
 初版（同日）は判断と展開を分けずに「手動 51」と数えていた。展開先の漏れと、展開に混入した判断を数え直した結果が上表。
 
@@ -97,7 +97,7 @@ KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 103
 | `category-colors.ts` の Tailwind safelist コメント                                   | 手動 | 色名       |
 | `src/features/activities/server/router.ts`（`CATEGORY_COLOR`）                       | 手動 | 色名       |
 | `src/features/activities/server/activities-mutation-service.ts`（`CATEGORY_COLORS`） | 手動 | 色名       |
-| 新 migration で `categories_color_valid` を再作成                                    | 手動 | 色名       |
+| 新 migration で `categories_color_valid` を再作成（CHECK 照合テスト）                | 検査 | 色名       |
 | `colors.css` の 4 ブロック（light / dark × 本体 / tint）                             | 手動 | 色相、規則 |
 | `packages/foundations/src/tailwind-theme.css` の 2 ブロック                          | 手動 | 色名       |
 | `messages/{en,ja}/common.json`                                                       | 検査 | 表示名     |
@@ -122,17 +122,17 @@ KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 103
 
 展開:
 
-| 展開先                                                                  | 担保 | 使う決定 |
-| ----------------------------------------------------------------------- | ---- | -------- |
-| `src/lib/time/user-preference.ts`                                       | 手動 | 値       |
-| `src/features/settings/server/router.ts`（z.enum / z.literal）          | 手動 | 値       |
-| `src/features/settings/server/settings-service.ts`（型と `as` cast）    | 手動 | 値       |
-| `src/lib/hooks/useUserPreferences.ts`（独立した型の再定義）             | 手動 | 値       |
-| `src/features/settings/hooks/useUserSettings.ts` のキーごとの変換       | 手動 | 値       |
-| `src/features/settings/components/DisplaySettings.tsx`（選択肢と cast） | 手動 | 値、文言 |
-| `messages/{en,ja}/settings.json`                                        | 検査 | 文言     |
-| 新 migration で該当 CHECK を再作成（CHECK がある設定のみ）              | 手動 | 値       |
-| 週の開始曜日: SQL 関数と `src/lib/date/core.ts`                         | 手動 | 値       |
+| 展開先                                                                  | 担保 | 使う決定                                                                          |
+| ----------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------- |
+| `src/lib/time/user-preference.ts`                                       | 手動 | 値                                                                                |
+| `src/features/settings/server/router.ts`（z.enum / z.literal）          | 手動 | 値                                                                                |
+| `src/features/settings/server/settings-service.ts`（型と `as` cast）    | 手動 | 値                                                                                |
+| `src/lib/hooks/useUserPreferences.ts`（独立した型の再定義）             | 手動 | 値                                                                                |
+| `src/features/settings/hooks/useUserSettings.ts` のキーごとの変換       | 手動 | 値                                                                                |
+| `src/features/settings/components/DisplaySettings.tsx`（選択肢と cast） | 手動 | 値、文言                                                                          |
+| `messages/{en,ja}/settings.json`                                        | 検査 | 文言                                                                              |
+| 新 migration で該当 CHECK を再作成（CHECK がある設定のみ）              | 手動 | 値（照合テストは `user-preference.ts` の定数と比べるが、router は導出していない） |
+| 週の開始曜日: SQL 関数と `src/lib/date/core.ts`                         | 手動 | 値                                                                                |
 
 ### 3. locale を追加
 
@@ -171,7 +171,7 @@ KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 103
 | `DisplaySettings.tsx` の言語名                                                                                                       | 手動 | 自称名                                                                    |
 | Turnstile の言語指定（4 箇所）                                                                                                       | 手動 | Turnstile                                                                 |
 | `settings-service.ts` の `'en' \| 'ja'` cast                                                                                         | 手動 | locale コード                                                             |
-| 新 migration で `preferred_locale` の CHECK を再作成                                                                                 | 手動 | locale コード                                                             |
+| 新 migration で `preferred_locale` の CHECK を再作成（CHECK 照合テスト）                                                             | 検査 | locale コード                                                             |
 | `apps/web/content/{docs,blog,legal}/<locale>/`                                                                                       | 手動 | 公開範囲                                                                  |
 
 ### 4. OAuth client を追加
@@ -190,21 +190,21 @@ KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 103
 
 展開:
 
-| 展開先                                                                                                        | 担保 | 使う決定                                   |
-| ------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------ |
-| `clients.ts`（`EXTRA_REDIRECT_URI_ENV`、`CLIENTS`）                                                           | 検査 | id、表示名                                 |
-| `src/env.ts`（redirect URI の env）                                                                           | 検査 | env 名                                     |
-| `redirect-uris.ts` の検証 switch の case                                                                      | 手動 | 検証規則（型での網羅は未確認）             |
-| `scripts/tasks/env/schema.ts`（staging と production-pending の 2 箇所）                                      | 手動 | env 名                                     |
-| `.op-env.agent.example`                                                                                       | 手動 | env 名（test は MCP 変数の固定リストのみ） |
-| `scripts/runbook/setup-1password.sh`（2 箇所）                                                                | 手動 | env 名                                     |
-| `docs/operations/secrets-ledger.md`                                                                           | 手動 | env 名                                     |
-| `scripts/tasks/mcp-gate.ts`（`VALID_CLIENT_IDS`）                                                             | 手動 | id                                         |
-| DB: client_id の CHECK 5 制約と関数内の配列 3 箇所（新 migration）                                            | 手動 | id、unknown                                |
-| `McpConnectionsSettings.tsx`（`clientLabelFor`）と `messages/*/settings.json`（未知は「Unknown client」表示） | 手動 | 表示名                                     |
-| test（`redirect-uris.test.ts`、`clients.test.ts` の env stub、`supabase/tests/`）                             | 手動 | id                                         |
-| 公開 docs と `docs/product/specs/auth.md`                                                                     | 手動 | id、表示名                                 |
-| `docs/engineering/data/system-surface.md`                                                                     | 生成 | env 名                                     |
+| 展開先                                                                                                        | 担保 | 使う決定                                                               |
+| ------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| `clients.ts`（`EXTRA_REDIRECT_URI_ENV`、`CLIENTS`）                                                           | 検査 | id、表示名                                                             |
+| `src/env.ts`（redirect URI の env）                                                                           | 検査 | env 名                                                                 |
+| `redirect-uris.ts` の検証 switch の case                                                                      | 手動 | 検証規則（型での網羅は未確認）                                         |
+| `scripts/tasks/env/schema.ts`（staging と production-pending の 2 箇所）                                      | 手動 | env 名                                                                 |
+| `.op-env.agent.example`                                                                                       | 手動 | env 名（test は MCP 変数の固定リストのみ）                             |
+| `scripts/runbook/setup-1password.sh`（2 箇所）                                                                | 手動 | env 名                                                                 |
+| `docs/operations/secrets-ledger.md`                                                                           | 手動 | env 名                                                                 |
+| `scripts/tasks/mcp-gate.ts`（`VALID_CLIENT_IDS`）                                                             | 手動 | id                                                                     |
+| DB: client_id の CHECK 5 制約と関数内の配列 3 箇所（新 migration）                                            | 手動 | id、unknown（照合テストの値は `OAuthClientId` の写しで、正本は #3095） |
+| `McpConnectionsSettings.tsx`（`clientLabelFor`）と `messages/*/settings.json`（未知は「Unknown client」表示） | 手動 | 表示名                                                                 |
+| test（`redirect-uris.test.ts`、`clients.test.ts` の env stub、`supabase/tests/`）                             | 手動 | id                                                                     |
+| 公開 docs と `docs/product/specs/auth.md`                                                                     | 手動 | id、表示名                                                             |
+| `docs/engineering/data/system-surface.md`                                                                     | 生成 | env 名                                                                 |
 
 ### 5. MCP tool を追加
 
@@ -267,7 +267,7 @@ KPI は「散在 + 暗黙」（現在 50）と「展開の手動」（現在 103
 | route 内の `CRON_SECRET` 照合                                               | 手動 | 認証                                                |
 | `apps/product/vercel.json`（`crons`）                                       | 手動 | schedule（本番監査で missing になって初めて気づく） |
 | pg_cron の場合の `cron.schedule` と heartbeat 書込 SQL                      | 手動 | job 名、schedule                                    |
-| 新 migration で `cron_heartbeats_job_name_check` を再作成                   | 検査 | job 名（policy ⊆ CHECK の片方向、ローカル DB のみ） |
+| 新 migration で `cron_heartbeats_job_name_check` を再作成                   | 検査 | job 名（CHECK 照合テストで双方向）                  |
 | `supabase/tests/cron-heartbeats.sql` の件数                                 | 手動 | job 名（件数がハードコード）                        |
 | system surface・`docs/learn/system/entrypoints.md`                          | 生成 | job 名、schedule                                    |
 | `docs/operations/monitoring.md`                                             | 手動 | 全般                                                |
