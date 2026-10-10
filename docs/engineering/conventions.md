@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-09-22
+last_verified: 2026-10-10
 code: apps/product/src
 ---
 
@@ -96,6 +96,49 @@ Composition:          settings  (= 通常 feature DAG には乗せない)
 - barrel は「ページから見た public API」のみを export
 - 子 feature 化（`calendar-view` / `calendar-filter` / `calendar-interaction`）は launch 後に検討
 - 子featureへの分割は現時点でactiveな取り組みではない。着手時に epic issue 本文へ設計を書く
+
+---
+
+## 正本と派生（判断と展開の分離）
+
+値の集合・対応表・登録先のように複数箇所に現れる事実は、人間が決める**判断**と、判断から機械的に決まる**展開**に分ける。定型変更ごとの現状は [定型変更レシピ台帳](./change-recipes.md) に記録する（2026-10-10、[#3098](https://github.com/Dayopt/dayopt/issues/3098)）。
+
+| #   | 原則                                                                                                                                                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0  | 1 つの事実につき正本は 1 つ。正本は判断が下される場所に置く。全体で 1 つの SSOT から全部を生成する形にはしない                                                                                    |
+| P1  | DB の値の集合（`CHECK ... IN (...)`）は TS 定数を正本にし、DB は migration で写して契約テストで集合一致を検査する。DB enum 型には移行しない。RLS や時間規則など DB が強制点の不変条件は DB が正本 |
+| P2  | 1 つの判断は 1 箇所で宣言する（決定入力）。展開先では判断しない。例: エラーコードは定義時に HTTP 種別・client への露出・報告の有無を持ち、対応表はそこから導く                                    |
+| P3  | 既存データが規則に従っている値は、規則として記録して導出する。個別判断にしない                                                                                                                    |
+| P4  | union を分岐する `switch` は `default` を持たず `assertNever` で閉じる。外部入力の `string` は境界で parse してから union として扱う                                                              |
+| P5  | 判断のうち AUTONOMOUS なものは実装者が Task / PR に確定して書く。CHECKPOINT なものは `type:question` に切り出し、回答まで依存 Task を `status:blocked` にする                                     |
+
+派生の手段は、上から順に最も安いものを選ぶ。
+
+| 順  | 手段                  | 使う場面                                    | 例                                                         |
+| --- | --------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| 1   | 型レベルの導出        | 同じ言語の中                                | `as const` → `z.enum(CONST)`、`satisfies Record<Union, …>` |
+| 2   | 生成 + `--check`      | 言語・形式をまたぐ「状態」ファイル          | `pnpm types:generate`、`pnpm auth-email:sync`              |
+| 3   | 契約テスト（照合）    | 追記専用の migration や外部システムとの境界 | CHECK 制約と TS 定数の照合、OAuth scope の allowlist 照合  |
+| 4   | 決定記録 + CHECKPOINT | 正本が repo の外、または人間の判断          | Stripe Dashboard の購読設定、価格、翻訳文                  |
+
+### union の分岐を閉じる
+
+`@typescript-eslint/switch-exhaustiveness-check` が、union の case の漏れを lint error にする（`apps/product/src` が対象）。意図した no-op も case として列挙し、`default` は `@dayopt/config` の `assertNever` で閉じる。
+
+```ts
+import { assertNever } from '@dayopt/config';
+
+switch (outcome) {
+  case 'synced':
+    return markSynced();
+  case 'failed':
+    return markFailed();
+  default:
+    return assertNever(outcome, 'CalendarSyncOutcome');
+}
+```
+
+既存の未対応箇所には理由付きの `eslint-disable-next-line` があり、直したら外す（不要になった disable は `reportUnusedDisableDirectives` が error にする）。
 
 ---
 

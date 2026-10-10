@@ -1,3 +1,4 @@
+export { assertNever } from './assert-never';
 export {
   createDayoptUrl,
   dayoptBrand,

@@ -61,6 +61,7 @@ export function useDateUtilities({
     if (effectiveDayCount !== null) {
       fullDates = generateMultiDayDates(referenceDate, effectiveDayCount, showWeekends);
     } else {
+      // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- #3094 で assertNever 化
       switch (viewType) {
         case 'week': {
           // 週の開始日を計算して7日間すべて生成

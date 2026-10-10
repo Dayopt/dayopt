@@ -64,6 +64,7 @@ export function handlePointerMove(
   effects: InteractionEffect[],
   interval: number,
 ): InteractionResult {
+  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- #3094 で assertNever 化
   switch (state.mode) {
     case 'pending': {
       if (maxAbsDelta(state.startPoint, action.point) <= DRAG_THRESHOLD_PX) {

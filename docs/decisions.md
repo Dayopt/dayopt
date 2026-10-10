@@ -4,20 +4,21 @@
 
 この索引は履歴であり、全行が現在も有効な規則ではない。まず下表から関係する正本を読み、理由や却下案が足りない時に索引を機能名・旧称・Issue 番号で検索する。同じ対象の撤回・後継まで追い、日付が新しいだけで適用範囲の違う判断を上書きしない。記載がない理由・見直し条件は未記載、資料を取得できない場合は未取得とする。
 
-| 判断したいこと・検索語                                                 | 現行の意味を持つ正本                                                                                      |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| 何を作るか / タスク管理 / Todo / AI チャット / 通知 / 点数・ストリーク | [戦略 §原体験・プロダクト原則](strategy.md)                                                               |
-| カレンダー / 2レーン / 操作数 / ルーティン / 目標と未決事項            | [体験設計](product/principles.md)                                                                         |
-| Plan / Record / 過去の編集 / 未来 / 記録の確定                         | [Plan / Record の仕様](product/specs/plan-record.md)、[時間不変条件と写し表](engineering/invariants.md)   |
-| ghost / 外部予定 / 自動取り込み / 変換                                 | [外部カレンダーの仕様](product/specs/external-calendar.md)。ルーティンや API の目標・未決事項は体験設計へ |
-| report / 4章 / 3タブ / セグメント / 配分 / 余白                        | [振り返りの仕様](product/specs/review.md)                                                                 |
-| 価格 / Free・Pro / 課金の境界                                          | [価格戦略](business/pricing.md)、[課金仕様](product/specs/billing.md)                                     |
-| 判断を残す / 二重管理 / state.md / 日次ブリーフ / 蒸留                 | [意図の継承と運用判断の理由](operations/ai-development-loop.md#意図の継承)                                |
-| モデルの役割 / 委譲 / Context Brief                                    | [作業方針](../.agents/skills/routing/SKILL.md)                                                            |
-| 独立レビュー / 全PR / shadow / 人間の許可                              | [AGENTS.md](../AGENTS.md)、[AI開発標準ループ](operations/ai-development-loop.md)                          |
-| test / E2E / 実走 / CI 成功と本番状態                                  | [検証の責務](engineering/testing.md)                                                                      |
-| 文書の鮮度 / 生成本文 / 正本からの読取                                 | [文書の標準手順](README.md#ai-の標準手順)                                                                 |
-| secret / 1Password / agent の資格情報 / MCP / 開発環境                 | [Secrets の境界](operations/secrets.md)、`mcp-usage` skill、[AI 協働ハーネス](operations/ai-harness.md)   |
+| 判断したいこと・検索語                                                 | 現行の意味を持つ正本                                                                                                     |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 何を作るか / タスク管理 / Todo / AI チャット / 通知 / 点数・ストリーク | [戦略 §原体験・プロダクト原則](strategy.md)                                                                              |
+| カレンダー / 2レーン / 操作数 / ルーティン / 目標と未決事項            | [体験設計](product/principles.md)                                                                                        |
+| Plan / Record / 過去の編集 / 未来 / 記録の確定                         | [Plan / Record の仕様](product/specs/plan-record.md)、[時間不変条件と写し表](engineering/invariants.md)                  |
+| ghost / 外部予定 / 自動取り込み / 変換                                 | [外部カレンダーの仕様](product/specs/external-calendar.md)。ルーティンや API の目標・未決事項は体験設計へ                |
+| report / 4章 / 3タブ / セグメント / 配分 / 余白                        | [振り返りの仕様](product/specs/review.md)                                                                                |
+| 価格 / Free・Pro / 課金の境界                                          | [価格戦略](business/pricing.md)、[課金仕様](product/specs/billing.md)                                                    |
+| 判断を残す / 二重管理 / state.md / 日次ブリーフ / 蒸留                 | [意図の継承と運用判断の理由](operations/ai-development-loop.md#意図の継承)                                               |
+| モデルの役割 / 委譲 / Context Brief                                    | [作業方針](../.agents/skills/routing/SKILL.md)                                                                           |
+| 独立レビュー / 全PR / shadow / 人間の許可                              | [AGENTS.md](../AGENTS.md)、[AI開発標準ループ](operations/ai-development-loop.md)                                         |
+| test / E2E / 実走 / CI 成功と本番状態                                  | [検証の責務](engineering/testing.md)                                                                                     |
+| 文書の鮮度 / 生成本文 / 正本からの読取                                 | [文書の標準手順](README.md#ai-の標準手順)                                                                                |
+| secret / 1Password / agent の資格情報 / MCP / 開発環境                 | [Secrets の境界](operations/secrets.md)、`mcp-usage` skill、[AI 協働ハーネス](operations/ai-harness.md)                  |
+| 正本 / 派生 / 二重管理 / コード生成 / 網羅検査 / 定型変更              | [正本と派生](engineering/conventions.md#正本と派生判断と展開の分離)、[定型変更レシピ台帳](engineering/change-recipes.md) |
 
 索引は入口、リンク先は現在の判断、Issue / PR はその判断を下した時点の要求と証拠を持つ。相互に矛盾する場合は黙って選ばず、明示された撤回・後継と適用範囲を調べる。解消できない意図の衝突だけを人間に戻す。チャット全文の再読や個人メモリを通常の開始条件にしない。
 
@@ -140,3 +141,4 @@
 - 2026-10-09: [infra] 開発環境の再編で次の決定は維持する: 2026-08-14 の vault 3 箱（agent / ci / human）、2026-09-14 の fine-grained PAT・Supabase の read-only token・agent から resend / anthropic / google / vercel を外したこと、2026-09-30 の agent vault read-only の Service Account、2026-10-09 の Codex 撤去と subagent の既定 model、Supabase Preview branch は `supabase/` を変更する PR だけ（理由: 3 原則と矛盾せず、境界の本体になっている。正本は [secrets.md](operations/secrets.md)）（参照: [#3050](https://github.com/Dayopt/dayopt/issues/3050)、[#2910](https://github.com/Dayopt/dayopt/issues/2910)）
 - 2026-10-09: [process] 月次改善ループ（`gardening` skill）を撤去し、定期のセキュリティ sweep は持たず明示依頼時の `security` skill §オンデマンド sweep だけにする。docs と重複していた実装系の `store-creating` / `optimistic-update` / `trpc-router-creating` も撤去し、規約の正本を `docs/engineering/conventions*.md` に一本化する。既存の `結果(未):` は gardening を待たず、関連する作業の時に判定する（理由: gardening の実行は 2026-08 の 1 回だけで、起動役のいない定期手順は形骸化していた。依存の脆弱性は Dependabot が常時見る。実装系 3 本は規約 docs の写しと汎用 template で、selector・helper・登録先が実装と食い違っていた）（参照: [#3075](https://github.com/Dayopt/dayopt/issues/3075)、2026-10-09 の User 指示）
 - 2026-10-09: [infra] Cloud Preview E2E（`ci.yml` の `preview_e2e` dispatch と限定回収）の信頼された実行元を `integration` から `main` へ移し、`Preview – product` Environment の branch 制限も `main` だけにする（理由: main と 267 commit ずれた integration を実行元にすると、main 向け PR の候補が fixture 契約の照合で毎回落ちる。2026-10-05〜06 の 14 回連続失敗の一因。同日の「integration を staging にしない」とも揃う。却下: integration を main へ追従させ続ける案、両 branch を許す案）（参照: [Cloudの明示実行](engineering/testing.md#cloudの明示実行既存ci)、[#2910](https://github.com/Dayopt/dayopt/issues/2910)、2026-10-09 の User の選択）
+- 2026-10-10: [process] 定型変更は人間が決める判断と機械的に決まる展開を分け、1 つの事実につき正本を 1 つにして、派生は型導出 > 生成 + `--check` > 契約テスト > 決定記録の順で最も安い手段を選ぶ（P0〜P5。DB の値の集合は TS を正本に CHECK と照合し、union の switch は `assertNever` で閉じ、CHECKPOINT の判断は `type:question` に切り出す）（理由: 監査で手書き同期と、展開に紛れた判断が多数見つかり、背景知識なしでは定型変更を完了できなかった。却下: 全体で 1 つの SSOT から全部を生成する案。migration は追記専用で再生成できず、独自 DSL が新しい背景知識になる）（参照: [#3098](https://github.com/Dayopt/dayopt/issues/3098)、[#3089](https://github.com/Dayopt/dayopt/issues/3089)、[正本と派生](engineering/conventions.md#正本と派生判断と展開の分離)）

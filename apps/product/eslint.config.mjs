@@ -58,6 +58,30 @@ const eslintConfig = defineConfig([
     },
   },
 
+  // union の switch の網羅検査（型情報を使う）。正本: docs/engineering/conventions.md §正本と派生
+  // tsconfig.json の exclude と同じ範囲を外す（project service が型情報を得られないため）。
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    // `.well-known` は tsconfig の `**/*.ts` に一致せず（ドットで始まるディレクトリ）、型情報が無い。
+    ignores: [
+      'src/lib/test/integration/**',
+      'src/lib/test/storybook-setup*.ts',
+      'src/app/.well-known/**',
+    ],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: false },
+      ],
+    },
+  },
+
   // TypeScript用カスタムルール
   {
     files: ['**/*.{ts,tsx}'],

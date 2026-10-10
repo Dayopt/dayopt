@@ -10,6 +10,7 @@ export function handlePointerUp(
   state: InteractionState,
   effects: InteractionEffect[],
 ): InteractionResult {
+  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- #3094 で assertNever 化
   switch (state.mode) {
     case 'pending': {
       effects.push({ type: 'EVENT_CLICK', timeblockId: state.timeblockId });
