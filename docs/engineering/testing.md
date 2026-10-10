@@ -204,6 +204,16 @@ node scripts/runbook/preview-readiness.mjs \
 
 GitHub Actionsの既存 `CI` → `Run workflow` でworkflow branchを **main** にし、`preview_e2e=true` を指定する。PR番号・レビュー済み候補SHA・READY deployment ID・DB mode/ref/branch UUIDを全て明示する。通常のPR CIとmainのrelease経路は維持し、Cloud E2Eは独立したrunとして起動する。通常実行では `preview_recover_run` / `preview_recover_attempt` を空のままにする。信頼された実行元は2026-10-09にintegrationからmainへ移した（main とずれたintegrationを実行元にすると、main向けPRの候補がfixture契約の照合で毎回落ちるため）。
 
+入力の取り方（共有モード。`supabase/**` を変えない通常PR）:
+
+- `preview_pr` / `preview_sha`: 対象PRの番号とhead SHA（`gh pr view <N> --json headRefOid`）。PRはOPEN・非Draftで、fixture契約の9ファイルがmainと一致している必要がある。mainを取り込んでいないPRは `fixture-contract` で止まる。
+- `preview_deployment`: head SHAのcommit status `Vercel – product` の `target_url` 末尾のIDに `dpl_` を付けた値（`gh api repos/Dayopt/dayopt/commits/<SHA>/statuses`）。
+- `preview_db_mode=shared`、`preview_db_ref=tilwaprottpyhlfoggbb`、`preview_db_branch=4c2ed092-cba3-4f37-98e1-78f61cdf52ed`（Persistentのref・branch UUID。trust gateのコードに固定されていて、違う値は拒否される）。
+
+```bash
+gh workflow run ci.yml --repo Dayopt/dayopt --ref main -f preview_e2e=true -f preview_pr=<N> -f preview_sha=<SHA> -f preview_deployment=dpl_<ID> -f preview_db_mode=shared -f preview_db_ref=tilwaprottpyhlfoggbb -f preview_db_branch=4c2ed092-cba3-4f37-98e1-78f61cdf52ed
+```
+
 Secret取得前のread-only gateはOPEN・非Draft・同一repo PR・exact head SHA・許可したbase/head branchを確認する。共有モードは既存Persistentのref/UUIDに限定し、`supabase/**` が変わるPRを拒否する。隔離モードは本番・Persistentを拒否し、既存readinessがPR専用branchとの対応を照合する。gateはコードの無害性を証明しない。権限ある担当が対象コードと依存をレビューしてSHAを選び、明示dispatchする。同一workerでのinstall-before-secretsは完全なsandboxではない。未信頼のcandidateは実行しない。
 
 既存GitHub Environment **Preview – product** は、初回の管理資格情報保存前にDeployment branches/tagsを **Selected branches and tags**、許可を **branch mainのみ** に限定する。trust gateはこの制限をAPIで照合し、unrestricted・追加branch/tag・観測失敗を拒否する。2026-10-09時点で保存済みの設定は `integration` のみで、mainへの変更はUserの作業として残っている。変更するまでtrust gateは停止する。ユーザーの明示指示によりagentが設定保存を行えるが、個人Vault・1Passwordを開かず、値を会話へ出さない。
