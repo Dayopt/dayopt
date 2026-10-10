@@ -18,6 +18,7 @@ import { SUPPORTED_LOCALES } from '@dayopt/config';
 import { CATEGORY_COLOR_NAMES } from '@/features/activities/lib/category-colors';
 import { fulfillmentSchema } from '@/features/timeblock/schemas/timeblock';
 import { PRODUCT_EVENT_NAMES } from '@/lib/analytics/product-events';
+import { SUPPORTED_SCOPES, type SupportedScope } from '@/lib/oauth-server/scopes';
 import type { CheckConstraintRegistry } from '@/lib/test/check-constraint-registry-diff';
 import { planSources, recordSources } from '@/lib/time/timeblock';
 import { timeFormats, weekStartsOnValues } from '@/lib/time/user-preference';
@@ -28,6 +29,13 @@ import { JOB_MAX_AGE_MINUTES } from '../../ops/cron-heartbeat-policy.mjs';
 const OAUTH_CLIENT_IDS_WITH_UNKNOWN = ['claude-ai', 'chatgpt', 'cursor', 'unknown'];
 // 正本は #3095 で `OAUTH_CLIENT_IDS` として作る。それまでは `OAuthClientId` の値をここに写す。
 const OAUTH_CLIENT_IDS = ['claude-ai', 'chatgpt', 'cursor'];
+
+/** write / delete の scope。`scopes.ts` の `WRITE_SCOPES` と同じ規則（`scopes.test.ts` が検査）で導く。 */
+const WRITE_SCOPE_SET = SUPPORTED_SCOPES.filter(
+  (scope) => scope.startsWith('write:') || scope.startsWith('delete:'),
+);
+/** write scope を持つ grant が必ず含む read scope。 */
+const READ_ENTRIES: SupportedScope = 'read:entries';
 
 const DB_INTERNAL = 'DB 関数の内部状態で、TS は値を扱わない';
 
@@ -51,7 +59,7 @@ export const CHECK_CONSTRAINT_REGISTRY: CheckConstraintRegistry = {
     source: 'ts',
     values: SUPPORTED_LOCALES,
   },
-  'public.profiles.profiles_subscription_status_check': {
+  'public.profiles.chk_subscription_status': {
     source: 'ts',
     values: subscriptionStatuses,
   },
@@ -97,6 +105,23 @@ export const CHECK_CONSTRAINT_REGISTRY: CheckConstraintRegistry = {
   'public.mcp_mutation_control.mcp_mutation_control_enabled_clients_valid': {
     source: 'ts',
     values: OAUTH_CLIENT_IDS,
+  },
+  // write scope を付与するには write gate と read:entries が要る（scope の集合は TS が正本）。
+  'public.oauth_tokens.oauth_tokens_write_requires_read_entries_check': {
+    source: 'ts',
+    values: [...WRITE_SCOPE_SET, READ_ENTRIES],
+  },
+  'public.oauth_authorization_codes.oauth_authorization_codes_write_requires_read_entries_check': {
+    source: 'ts',
+    values: [...WRITE_SCOPE_SET, READ_ENTRIES],
+  },
+  'public.oauth_connections.oauth_connections_write_requires_read_entries_check': {
+    source: 'ts',
+    values: [...WRITE_SCOPE_SET, READ_ENTRIES],
+  },
+  'public.oauth_connections.oauth_connections_write_gate': {
+    source: 'ts',
+    values: WRITE_SCOPE_SET,
   },
   // 正本は未作成（`env.ts` の `MCP_OAUTH_ENVIRONMENT` の z.enum）。
   'public.mcp_environment_identity.mcp_environment_identity_environment_check': {
@@ -155,16 +180,53 @@ export const CHECK_CONSTRAINT_REGISTRY: CheckConstraintRegistry = {
     source: 'excluded',
     reason: 'state と terminal_reason などの組み合わせ条件',
   },
+  'private.account_deletion_control.account_deletion_control_activation_version_check': {
+    source: 'db',
+    reason: DB_INTERNAL,
+  },
+  'private.calendar_account_deletion_intents.calendar_account_deletion_intents_state_check': {
+    source: 'db',
+    reason: DB_INTERNAL,
+  },
+  'private.calendar_authority_projects.calendar_authority_projects_activation_version_check': {
+    source: 'db',
+    reason: DB_INTERNAL,
+  },
+  'private.calendar_oauth_attempts.calendar_oauth_attempts_result_check': {
+    source: 'db',
+    reason: DB_INTERNAL,
+  },
+  'private.calendar_authority_fences.calendar_authority_fences_scope_shape': {
+    source: 'excluded',
+    reason: '複数列の組み合わせ条件',
+  },
+  'private.calendar_authority_fences.calendar_authority_fences_state_shape': {
+    source: 'excluded',
+    reason: '複数列の組み合わせ条件',
+  },
+  'private.calendar_revoke_operations.calendar_revoke_operations_provider_attempt_shape': {
+    source: 'excluded',
+    reason: '複数列の組み合わせ条件',
+  },
+  'private.calendar_revoke_operations.calendar_revoke_operations_state_shape': {
+    source: 'excluded',
+    reason: '複数列の組み合わせ条件',
+  },
+  'private.timeblock_transaction_states.timeblock_transaction_states_supported_lock_mode_check': {
+    source: 'excluded',
+    reason: '複数列の組み合わせ条件',
+  },
   'private.billing_account_deletion_bindings.billing_account_deletion_bindings_state_check': {
     source: 'db',
     reason: DB_INTERNAL,
   },
   'private.billing_account_deletion_bindings.billing_account_deletion_bindings_provider_outcome_check':
     { source: 'db', reason: DB_INTERNAL },
-  'private.billing_customer_provisioning.billing_customer_provisioning_state_check': {
-    source: 'db',
-    reason: DB_INTERNAL,
-  },
+  'private.billing_customer_provisioning_attempts.billing_customer_provisioning_attempts_state_check':
+    {
+      source: 'db',
+      reason: DB_INTERNAL,
+    },
   'private.calendar_authority_fences.calendar_authority_fences_scope_kind_check': {
     source: 'db',
     reason: DB_INTERNAL,
