@@ -576,6 +576,7 @@ export function useTimeblockWriteMutations(options: UseTimeblockWriteMutationsOp
    * `client-safe-service-code.ts` の allowlist に載っているものだけが届く。
    */
   const temporalRuleMessage = (error: unknown): string | undefined => {
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- #3094 で assertNever 化
     switch (getTimeblockServiceCode(error)) {
       case 'RECORD_IN_FUTURE':
         return t('timeLocked');

@@ -15,6 +15,7 @@ import type { MessageKey } from '@/lib/i18n';
 const MFA_CHALLENGE_EXPIRED_CODE = 'mfa_challenge_expired';
 
 export function resolveMfaVerifyErrorKey(code: string | undefined): MessageKey {
+  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- #3094 で assertNever 化
   switch (code) {
     case MFA_CHALLENGE_EXPIRED_CODE:
       return 'common.errors.mfa.challengeExpired';

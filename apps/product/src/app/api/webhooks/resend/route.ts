@@ -234,6 +234,7 @@ export async function POST(request: NextRequest) {
     }
     claimedEvent = { id: svixId, token: claim.token };
 
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- 外部 SDK の event union のうち処理対象だけを扱う。未対応 event は default でログに残す
     switch (event.type) {
       case 'email.bounced': {
         if (

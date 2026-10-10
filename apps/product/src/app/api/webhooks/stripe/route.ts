@@ -357,6 +357,7 @@ export async function POST(request: NextRequest) {
   let subscriptionStartedUserId: string | null = null;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- #3093 で処理対象 event の型に絞る
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
